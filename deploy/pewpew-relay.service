@@ -1,0 +1,15 @@
+[Unit]
+Description=pewpew orbital command relay (syslog -> websocket visualizer)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/pewpew-ui/relay
+ExecStart=/home/pi/pewpew-ui/relay/.venv/bin/python /home/pi/pewpew-ui/relay/pewpew_relay.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

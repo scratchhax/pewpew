@@ -1,0 +1,13 @@
+# build / dependency dirs (rebuildable, huge)
+node_modules/
+.venv/
+.venv-win/
+__pycache__/
+*.pyc
+web/dist/
+
+# OS noise
+Thumbs.db
+desktop.ini
+
+*.log

@@ -1,0 +1,42 @@
+# pewpew relay configuration
+# Point your UniFi gateway's remote syslog at this host + syslog_port.
+
+syslog_bind: 0.0.0.0
+syslog_port: 5514
+
+http_host: 0.0.0.0
+http_port: 8080
+
+# How many recent events to replay to a newly connected browser
+buffer_size: 500
+
+# Interfaces that count as WAN on your gateway (used for direction derivation).
+# UDM: usually ppp0 (DSL) or eth9/eth10 depending on setup.
+wan_interfaces: [ppp0]
+
+# Optional: explicit WAN IP(s); auto-learned from WAN_LOCAL rules if empty
+wan_ips: []
+
+# Optional: VPN networks for badges, e.g.
+# vpn_networks:
+#   wgsrv1: {cidr: 10.8.1.0/24, badge: WGD SRV}
+vpn_networks: {}
+
+# Quiet log types you don't want on screen, e.g. [system]
+drop_log_types: []
+
+# Regex patterns matched against the RAW syslog line — anything matching is
+# dropped before parsing (counter: "dropped" in /healthz). Pre-populated with
+# the UDM + UniFi AP chatter that floods remote syslog but isn't traffic.
+drop_patterns:
+  - '\[DHCP-SM\]'                            # AP kernel DHCP state-machine spam
+  - 'keep-alive|Send NULL to STA|NoDataIdleCount'   # power-save polling noise
+  - 'iwpriv.*ioctl_kickmac'                  # kernel echo of stamgr kick (stamgr line kept)
+  - 'ieee80211_update_node_ecm_flags'        # node flag bookkeeping
+  - 'inotify|hosts\.d//leases|flushed \d+ names'   # dnsmasq lease-file churn
+  - 'Updating leases'                              # dnsmasq lease bookkeeping
+  - 'time elapsed \[release'                 # dnsmasq perf chatter
+  - 'pcap dumping rate exceeded'             # ubios DPI warnings
+  - 'ubnt-dpi-util'
+  - 'Logread connected'                      # APs logging their syslog connection (feedback spam)
+  - 'mcad\[|ace_reporter'                    # UniFi management-agent chatter
