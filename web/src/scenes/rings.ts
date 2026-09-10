@@ -47,7 +47,7 @@ export class Rings {
     const minGap = kind === 'general' ? 0.35 : 0.09;
     if (now - st.lastFlare >= minGap) {
       st.lastFlare = now;
-      st.pulse = Math.min(2.0, st.pulse + 0.7);
+      st.pulse = Math.min(3.0, st.pulse + 1.2);
     }
     st.count++;
     if (st.count % def.every === 0 && st.objs.length < def.cap) {
@@ -69,14 +69,14 @@ export class Rings {
       const def = DEFS[kind];
       const st = this.state[kind];
       // whole-ring flare: fast attack on activate, smooth fall back to rest
-      st.pulse = Math.max(0, st.pulse - dt * (1.1 + st.pulse * 1.2));
+      st.pulse = Math.max(0, st.pulse - dt * (0.9 + st.pulse * 0.9));
       // radius bounce — the ring physically kicks and settles
-      const radius = base * def.radius * (1 + st.pulse * 0.02);
+      const radius = base * def.radius * (1 + st.pulse * 0.03);
       this.g.circle(cx, cy, radius)
         .stroke({
-          width: 1.2 + Math.min(2, st.pulse) * 3.2,
+          width: 1.2 + Math.min(3, st.pulse) * 3.4,
           color: def.color,
-          alpha: Math.min(0.9, 0.14 + st.pulse * 0.42),
+          alpha: Math.min(0.95, 0.14 + st.pulse * 0.45),
         });
 
       for (let i = st.objs.length - 1; i >= 0; i--) {

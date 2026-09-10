@@ -8,7 +8,7 @@ interface Nebula extends Sprite {
 }
 
 const NEBULA_COLORS = [
-  0x7b3fbf, 0x2f6fd8, 0xd84a7a, 0x1fae8f,
+  0x7b3fbf, 0x2f6fd8, 0xd84a7a, 0x5f2fae,
   0x4a55e8, 0xb03fae, 0x2fa8d8,
 ];
 
@@ -38,8 +38,8 @@ export class Starfield {
       for (let i = 0; i < n; i++) {
         const s = new Sprite(this.dot);
         s.anchor.set(0.5);
-        s.x = Math.random() * this.w;
-        s.y = Math.random() * this.h;
+        s.x = this.w * (0.22 + Math.random() * 0.56);
+        s.y = this.h * (0.24 + Math.random() * 0.48);
         const depth = 0.3 + Math.random() * 0.7;
         s.scale.set(0.14 + depth * 0.34);      // pinpoints, not snowflakes
         s.blendMode = 'add';
@@ -60,8 +60,8 @@ export class Starfield {
       for (let i = 0; i < 7; i++) {
         const s = new Sprite(this.clouds[i % this.clouds.length]) as Nebula;
         s.anchor.set(0.5);
-        s.x = Math.random() * this.w;
-        s.y = Math.random() * this.h;
+        s.x = this.w * (0.22 + Math.random() * 0.56);
+        s.y = this.h * (0.24 + Math.random() * 0.48);
         s.baseScale = 2.4 + Math.random() * 2.2;   // 256px cloud → 600-1150px
         s.scale.set(s.baseScale);
         s.tint = NEBULA_COLORS[i % NEBULA_COLORS.length];
@@ -107,10 +107,10 @@ export class Starfield {
       nb.x += nb.vx * dt * (0.5 + boost);
       nb.y += nb.vy * dt * (0.5 + boost);
       nb.rotation += nb.spin * dt;
-      if (nb.x < -this.w * 0.3) nb.x = this.w * 1.3;
-      if (nb.x > this.w * 1.3) nb.x = -this.w * 0.3;
-      if (nb.y < -this.h * 0.3) nb.y = this.h * 1.3;
-      if (nb.y > this.h * 1.3) nb.y = -this.h * 0.3;
+      if (nb.x < this.w * 0.10) nb.x = this.w * 0.90;
+      if (nb.x > this.w * 0.90) nb.x = this.w * 0.10;
+      if (nb.y < this.h * 0.14) nb.y = this.h * 0.86;
+      if (nb.y > this.h * 0.86) nb.y = this.h * 0.14;
       const base = weatherAlpha(state.weather);
       const target2 = base * (1 + Math.sin(nb.pulse * 0.4) * 0.45);
       nb.alpha += (target2 - nb.alpha) * Math.min(1, dt);

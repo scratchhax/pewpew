@@ -62,11 +62,17 @@ export class Station {
     } else {
       c = this.clouds[(this.cloudIdx++) % this.clouds.length];
     }
-    c.s.tint = color;
-    c.life = 1;
     // seed offset so concurrent clouds don't stack dead-center
     const a = Math.random() * Math.PI * 2;
     c.ox = Math.cos(a) * 18; c.oy = Math.sin(a) * 14;
+    // position NOW — a newborn sprite left at default (0,0) would flash in
+    // the screen corner for a frame before update() catches it
+    c.s.x = this.center.x + c.ox * 0.4;
+    c.s.y = this.center.y + c.oy * 0.4;
+    c.s.scale.set(2.6);
+    c.s.tint = color;
+    c.s.alpha = 0.32;
+    c.life = 1;
   }
   private cloudIdx = 0;
 
@@ -131,8 +137,8 @@ export class Station {
       const grow = 1 - c.life;
       c.s.x = cx + (c.ox ?? 0) * grow * 2.2;
       c.s.y = cy + (c.oy ?? 0) * grow * 2.2;
-      c.s.scale.set(2.6 + grow * 4.2);
-      c.s.alpha = c.life * 0.30;
+      c.s.scale.set(2.6 + grow * 5.5);
+      c.s.alpha = c.life * 0.34;
     }
   }
 }
