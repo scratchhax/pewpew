@@ -124,9 +124,14 @@ export class Fx {
 
   /** Colored burst for non-explosive events (crystal arrivals etc.). */
   burst(x: number, y: number, color: number, count = 10): void {
-    this.emit(x, y, 0xffffff, Math.max(2, count / 3) | 0, 90, 0.12, 0.3);
-    this.emit(x, y, color, count, 110, 0.18, 0.65);
-    this.shockwave(x, y, color, 70, 1.6);
+    // jitter around the target: hot infrastructure IPs (resolvers, gateways)
+    // receive a constant stream — bursts stacked at the exact same pixel
+    // read as a stuck pulsing blob instead of activity around a star
+    const jx = x + (Math.random() - 0.5) * 44;
+    const jy = y + (Math.random() - 0.5) * 36;
+    this.emit(jx, jy, 0xffffff, Math.max(2, count / 3) | 0, 90, 0.12, 0.3);
+    this.emit(jx, jy, color, count, 110, 0.18, 0.65);
+    this.shockwave(jx, jy, color, 70, 1.6);
   }
 
   shockwave(x: number, y: number, color: number, maxR = 120, width = 3): void {

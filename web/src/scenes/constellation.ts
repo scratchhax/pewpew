@@ -90,6 +90,10 @@ export class Constellation {
       node.halo.alpha += (target * 0.4 - node.halo.alpha) * Math.min(1, dt * 2);
     }
 
+    if ((window as any).__diag) {
+      (window as any).__diagLinks = this.links.map(l =>
+        [l.x1 | 0, l.y1 | 0, l.x2 | 0, l.y2 | 0]);
+    }
     this.lineG.clear();
     for (let i = this.links.length - 1; i >= 0; i--) {
       const l = this.links[i];

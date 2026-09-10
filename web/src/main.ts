@@ -100,6 +100,8 @@ async function main(): Promise<void> {
     textures.clouds, w, h, settings);
   const dust = new Dust(dustLayer, textures.glow, w, h);
   const ambient = new AmbientShips(shipLayer, [...textures.icons, ...textures.ships], w, h);
+  if (new URLSearchParams(location.search).has('diag'))
+    (window as any).__diag = { app };
   const station = new Station(stationLayer, textures.glow, w, h);
   const rings = new Rings(ringsLayer, textures.dot, w, h);
   const crystals = new Crystals(fxLayer, textures.crystal, textures.glow, fx);
@@ -208,7 +210,7 @@ async function main(): Promise<void> {
             // lines only. Crystals + arrival bursts at fixed hot internal
             // stars turned inter-VLAN chatter into a permanent green blob.
             if (dir !== 'internal' && settings.crystals &&
-                fxAllow(`alw|${ev.src_ip}|${ev.dst_ip}|${ev.dst_port}`, 2)) {
+                fxAllow(`alw|${ev.dst_ip}`, 1.8)) {
               // a permitted connection = energy pulse from src star to dst star
               const a = ev.src_ip && settings.constellations
                 ? constellation.starPosition(ev.src_ip) : null;
@@ -241,10 +243,11 @@ async function main(): Promise<void> {
         rings.activate('dns', performance.now() / 1000);
         if (replay) break;
         station.eventCloud(COLORS.dns, 0.9, 0.34);
-        if (!fxAllow(`dns|${ev.src_ip}|${ev.dns_query}`, 2)) break;
         audio.cueSong('dns', ev.src_ip ?? undefined);
+        if (!fxAllow(`dns|${ev.src_ip}|${ev.dns_query}`, 2)) break;
         // client star → station (it IS the resolver): anchored both ends
-        if (ev.src_ip && settings.constellations) {
+        if (ev.src_ip && settings.constellations &&
+            fxAllow(`dnsl|${ev.src_ip}`, 2.5)) {
           const st = constellation.starPosition(ev.src_ip);
           fx.laser(st.x, st.y, cx, cy, COLORS.dns, 1.6);
           fx.emit(st.x, st.y, COLORS.dns, 3, 35, 0.16, 0.5);
