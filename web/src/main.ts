@@ -195,16 +195,20 @@ async function main(): Promise<void> {
             const ext = dir === 'internal' ? `${ev.src_ip}|${ev.dst_ip}`
               : dir === 'inbound' ? ev.src_ip : ev.dst_ip;
             asteroids.spawn(cx, cy, w, h, ipAngle(ext ?? '0.0.0.0'), COLORS.block);
-            station.eventCloud(COLORS.block);
+            station.eventCloud(COLORS.block, 0.6, 0.4);
             if (settings.screenShake) shake = Math.min(14, shake + 4);
             audio.cueSong('block');
           }
         } else {
           state.onEvent('allow');
           rings.activate('general', performance.now() / 1000);
-          if (!replay) station.eventCloud(COLORS.allow);
+          if (!replay) station.eventCloud(COLORS.allow, 1.2, 0.22);
           if (!replay) {
-            if (settings.crystals && fxAllow(`alw|${ev.src_ip}|${ev.dst_ip}|${ev.dst_port}`, 2)) {
+            // internal (LAN↔LAN) permits are housekeeping — constellation
+            // lines only. Crystals + arrival bursts at fixed hot internal
+            // stars turned inter-VLAN chatter into a permanent green blob.
+            if (dir !== 'internal' && settings.crystals &&
+                fxAllow(`alw|${ev.src_ip}|${ev.dst_ip}|${ev.dst_port}`, 2)) {
               // a permitted connection = energy pulse from src star to dst star
               const a = ev.src_ip && settings.constellations
                 ? constellation.starPosition(ev.src_ip) : null;
@@ -215,8 +219,7 @@ async function main(): Promise<void> {
                 crystals.spawnToward(a.x, a.y, b.x, b.y, hue,
                   () => { station.flash(0.15); fx.burst(b.x, b.y, hue, 10); });
               } else {
-                const ext = dir === 'internal' ? `${ev.src_ip}|${ev.dst_ip}`
-                  : dir === 'inbound' ? ev.src_ip : ev.dst_ip;
+                const ext = dir === 'inbound' ? ev.src_ip : ev.dst_ip;
                 crystals.spawn(cx, cy, w, h, ipAngle(ext ?? '0.0.0.0'),
                   dir === 'inbound', COLORS.allow,
                   (x, y) => { station.flash(0.35); fx.burst(x, y, COLORS.allow, 12); });
@@ -237,7 +240,7 @@ async function main(): Promise<void> {
         state.onEvent('net');
         rings.activate('dns', performance.now() / 1000);
         if (replay) break;
-        station.eventCloud(COLORS.dns);
+        station.eventCloud(COLORS.dns, 0.9, 0.34);
         if (!fxAllow(`dns|${ev.src_ip}|${ev.dns_query}`, 2)) break;
         audio.cueSong('dns', ev.src_ip ?? undefined);
         // client star → station (it IS the resolver): anchored both ends
@@ -254,7 +257,7 @@ async function main(): Promise<void> {
         state.onEvent('net');
         rings.activate('dhcp', performance.now() / 1000);
         if (replay) break;
-        station.eventCloud(COLORS.dhcp);
+        station.eventCloud(COLORS.dhcp, 1.2, 0.34);
         if (!fxAllow(`dhcp|${ev.syslog_host}|${ev.hostname}`, 5)) break;
         // DHCP leases drift across the screen as labelled planets
         const name = ev.hostname ||
@@ -278,7 +281,7 @@ async function main(): Promise<void> {
         state.onEvent(bad ? 'wifi-bad' : joined ? 'wifi-good' : 'net');
         if (replay) break;
         rings.activate('wifi', performance.now() / 1000);
-        station.eventCloud(COLORS.wifi);
+        station.eventCloud(COLORS.wifi, 0.9, 0.34);
         if (!fxAllow(`wifi|${ev.syslog_host}|${ev.mac_address}|${ev.wifi_event}`, 3)) break;
         // background marker: faint star at a random map spot, hue = event type
         audio.cueSong('wifi');

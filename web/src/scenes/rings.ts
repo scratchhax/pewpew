@@ -42,12 +42,14 @@ export class Rings {
   activate(kind: RingKind, now: number): void {
     const def = DEFS[kind];
     const st = this.state[kind];
-    // allow traffic is constant — throttle its flare so browsing reads as a
-    // heartbeat instead of pinning the green ring at max
-    const minGap = kind === 'general' ? 0.35 : 0.09;
+    // allow traffic is constant — throttle + gentler amplitude so its flare
+    // reads as a slow heartbeat that fully decays between beats, instead of
+    // inflow outpacing decay and pinning the green ring at max brightness
+    const minGap = kind === 'general' ? 1.1 : 0.09;
+    const amp = kind === 'general' ? 0.8 : 1.4;
     if (now - st.lastFlare >= minGap) {
       st.lastFlare = now;
-      st.pulse = Math.min(3.0, st.pulse + 1.2);
+      st.pulse = Math.min(3.0, st.pulse + amp);
     }
     st.count++;
     if (st.count % def.every === 0 && st.objs.length < def.cap) {

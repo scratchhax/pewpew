@@ -5,7 +5,7 @@ import type { State } from '../state';
 export class Station {
   private glowTex: Texture;
   private cloudLayer = new Container();
-  private clouds: { s: Sprite; life: number; ox?: number; oy?: number }[] = [];
+  private clouds: { s: Sprite; life: number; ox?: number; oy?: number; maxAlpha?: number }[] = [];
   private core: Sprite;
   private ringG: Graphics;
   private hexG: Graphics;
@@ -49,9 +49,16 @@ export class Station {
 
   flash(strength = 0.6): void { this.pulse = Math.min(1, this.pulse + strength); }
 
-  /** Soft event-colored cloud blooming around the core, drifting outward. */
-  eventCloud(color: number): void {
-    let c: { s: Sprite; life: number; ox?: number; oy?: number };
+  /** Soft event-colored cloud blooming around the core, drifting outward.
+   *  Per-color throttle keeps constant allow traffic from turning the core
+   *  into permanent green fog — clouds need dark time between blooms. */
+  private lastCloud = new Map<number, number>();
+  eventCloud(color: number, minGap = 0.9, alpha = 0.34): void {
+    const now = performance.now() / 1000;
+    const last = this.lastCloud.get(color) ?? -99;
+    if (now - last < minGap) return;
+    this.lastCloud.set(color, now);
+    let c: { s: Sprite; life: number; ox?: number; oy?: number; maxAlpha?: number };
     if (this.clouds.length < 5) {
       const sp = new Sprite(this.glowTex);
       sp.anchor.set(0.5);
@@ -71,7 +78,8 @@ export class Station {
     c.s.y = this.center.y + c.oy * 0.4;
     c.s.scale.set(2.6);
     c.s.tint = color;
-    c.s.alpha = 0.32;
+    c.s.alpha = alpha;
+    c.maxAlpha = alpha;
     c.life = 1;
   }
   private cloudIdx = 0;
@@ -138,7 +146,7 @@ export class Station {
       c.s.x = cx + (c.ox ?? 0) * grow * 2.2;
       c.s.y = cy + (c.oy ?? 0) * grow * 2.2;
       c.s.scale.set(2.6 + grow * 5.5);
-      c.s.alpha = c.life * 0.34;
+      c.s.alpha = c.life * (c.maxAlpha ?? 0.34);
     }
   }
 }
