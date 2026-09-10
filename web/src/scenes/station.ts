@@ -3,6 +3,9 @@ import type { State } from '../state';
 
 /** Central command station: pulsing core, rotating hex, orbiting guard dots. */
 export class Station {
+  private glowTex: Texture;
+  private cloudLayer = new Container();
+  private clouds: { s: Sprite; life: number; ox?: number; oy?: number }[] = [];
   private core: Sprite;
   private ringG: Graphics;
   private hexG: Graphics;
@@ -14,6 +17,7 @@ export class Station {
   readonly center = { x: 0, y: 0 };
 
   constructor(private layer: Container, glow: Texture, private w: number, private h: number) {
+    this.glowTex = glow;
     this.core = new Sprite(glow);
     this.core.anchor.set(0.5);
     this.core.scale.set(2.3);
@@ -31,7 +35,7 @@ export class Station {
       o.tint = 0x9ff3ff;
       this.orbiters.push(o);
     }
-    layer.addChild(this.ringG, this.hexG, this.core, ...this.orbiters);
+    layer.addChild(this.cloudLayer, this.ringG, this.hexG, this.core, ...this.orbiters);
     this.layout();
   }
 
@@ -44,6 +48,27 @@ export class Station {
   resize(w: number, h: number): void { this.w = w; this.h = h; this.layout(); }
 
   flash(strength = 0.6): void { this.pulse = Math.min(1, this.pulse + strength); }
+
+  /** Soft event-colored cloud blooming around the core, drifting outward. */
+  eventCloud(color: number): void {
+    let c: { s: Sprite; life: number; ox?: number; oy?: number };
+    if (this.clouds.length < 5) {
+      const sp = new Sprite(this.glowTex);
+      sp.anchor.set(0.5);
+      sp.blendMode = 'add';
+      this.cloudLayer.addChild(sp);
+      c = { s: sp, life: 0 };
+      this.clouds.push(c);
+    } else {
+      c = this.clouds[(this.cloudIdx++) % this.clouds.length];
+    }
+    c.s.tint = color;
+    c.life = 1;
+    // seed offset so concurrent clouds don't stack dead-center
+    const a = Math.random() * Math.PI * 2;
+    c.ox = Math.cos(a) * 18; c.oy = Math.sin(a) * 14;
+  }
+  private cloudIdx = 0;
 
   update(dt: number, state: State): void {
     this.t += dt;
@@ -98,6 +123,17 @@ export class Station {
       o.y = cy + Math.sin(a) * rad;
       o.tint = tint;
     });
+
+    // event clouds: bloom outward and dissolve
+    for (const c of this.clouds) {
+      if (c.life <= 0) { c.s.alpha = 0; continue; }
+      c.life = Math.max(0, c.life - dt * 1.1);
+      const grow = 1 - c.life;
+      c.s.x = cx + (c.ox ?? 0) * grow * 2.2;
+      c.s.y = cy + (c.oy ?? 0) * grow * 2.2;
+      c.s.scale.set(2.6 + grow * 4.2);
+      c.s.alpha = c.life * 0.30;
+    }
   }
 }
 
