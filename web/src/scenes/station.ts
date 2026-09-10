@@ -9,6 +9,9 @@ export class Station {
   private orbiters: Sprite[] = [];
   private pulse = 0;         // 0..1 energy flash
   private t = 0;
+  private phi1 = Math.random() * Math.PI * 2;   // flight pattern, unique per boot
+  private phi2 = Math.random() * Math.PI * 2;
+  readonly center = { x: 0, y: 0 };
 
   constructor(private layer: Container, glow: Texture, private w: number, private h: number) {
     this.core = new Sprite(glow);
@@ -33,8 +36,8 @@ export class Station {
   }
 
   layout(): void {
-    const cx = this.w / 2, cy = this.h / 2;
-    this.core.x = cx; this.core.y = cy;
+    this.center.x = this.w / 2;
+    this.center.y = this.h / 2;
     this.layer.position.set(0, 0);
   }
 
@@ -46,7 +49,17 @@ export class Station {
     this.t += dt;
     this.pulse = Math.max(0, this.pulse - dt * 1.6);
 
-    const cx = this.w / 2, cy = this.h / 2;
+    // Lissajous roam: prime-ratio periods never visibly loop; storms add
+    // smooth turbulence on top of the lazy drift
+    const heat = state.heat ?? 0;
+    const roamX = 0.20 * this.w * Math.sin((2 * Math.PI * this.t) / 47 + this.phi1);
+    const roamY = 0.14 * this.h * Math.sin((2 * Math.PI * this.t) / 71 + this.phi2);
+    const turb = heat * 10;
+    this.center.x = this.w / 2 + roamX
+      + Math.sin(this.t * 3.1) * turb + Math.sin(this.t * 5.3) * turb * 0.6;
+    this.center.y = this.h / 2 + roamY
+      + Math.sin(this.t * 4.3) * turb + Math.sin(this.t * 2.6) * turb * 0.6;
+    const cx = this.center.x, cy = this.center.y;
     const threat = state.threat;
 
     // threat tint: cyan → amber → red
@@ -79,7 +92,7 @@ export class Station {
     this.hexG.poly(pts).stroke({ width: 2, color: 0xbff6ff, alpha: 0.85 });
 
     this.orbiters.forEach((o, i) => {
-      const a = this.t * (0.5 + i * 0.18) + (i * Math.PI * 2) / 3;
+      const a = this.t * (0.5 + i * 0.18) * (1 + heat * 1.5) + (i * Math.PI * 2) / 3;
       const rad = base * 0.06;
       o.x = cx + Math.cos(a) * rad;
       o.y = cy + Math.sin(a) * rad;

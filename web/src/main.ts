@@ -168,7 +168,7 @@ async function main(): Promise<void> {
   }
 
   function route(ev: NetEvent, replay = false): void {
-    const cx = w / 2, cy = h / 2;
+    const cx = station.center.x, cy = station.center.y;
     // RFC1918 both ends = internal traffic: no "border" semantics
     const dir = isInternalIp(ev.src_ip) && isInternalIp(ev.dst_ip)
       ? 'internal' : (ev.direction ?? 'local');
@@ -200,7 +200,7 @@ async function main(): Promise<void> {
           }
         } else {
           state.onEvent('allow');
-          rings.activate('general');
+          rings.activate('general', performance.now() / 1000);
           if (!replay) {
             if (settings.crystals && fxAllow(`alw|${ev.src_ip}|${ev.dst_ip}|${ev.dst_port}`, 2)) {
               // a permitted connection = energy pulse from src star to dst star
@@ -233,7 +233,7 @@ async function main(): Promise<void> {
 
       case 'dns': {
         state.onEvent('net');
-        rings.activate('dns');
+        rings.activate('dns', performance.now() / 1000);
         if (replay) break;
         if (!fxAllow(`dns|${ev.src_ip}|${ev.dns_query}`, 2)) break;
         audio.cueSong('dns', ev.src_ip ?? undefined);
@@ -249,7 +249,7 @@ async function main(): Promise<void> {
 
       case 'dhcp': {
         state.onEvent('net');
-        rings.activate('dhcp');
+        rings.activate('dhcp', performance.now() / 1000);
         if (replay) break;
         if (!fxAllow(`dhcp|${ev.syslog_host}|${ev.hostname}`, 5)) break;
         // DHCP leases drift across the screen as labelled planets
@@ -273,7 +273,7 @@ async function main(): Promise<void> {
         const joined = e === 'associated' || e === 'authenticated' || e === 'joined';
         state.onEvent(bad ? 'wifi-bad' : joined ? 'wifi-good' : 'net');
         if (replay) break;
-        rings.activate('wifi');
+        rings.activate('wifi', performance.now() / 1000);
         if (!fxAllow(`wifi|${ev.syslog_host}|${ev.mac_address}|${ev.wifi_event}`, 3)) break;
         // background marker: faint star at a random map spot, hue = event type
         audio.cueSong('wifi');
@@ -357,10 +357,10 @@ async function main(): Promise<void> {
     audio.update(state);
     if (settings.dust) dust.update(dt, state.weather === 'hurricane' ? 2.2 : 1);
     if (settings.ambientShips) ambient.update(dt, state.weather === 'hurricane' ? 2 : 1);
-    rings.update(dt);
+    rings.update(dt, station.center.x, station.center.y);
     crystals.update(dt);
 
-    const hits = asteroids.update(dt, w / 2, h / 2);
+    const hits = asteroids.update(dt, station.center.x, station.center.y);
     if (hits.impacts.length > 0) {
       state.slowmo(0.25, 0.55);
       punch += 0.06;

@@ -14,10 +14,14 @@ const DEFS: Record<RingKind, RingDef> = {
 
 interface RingObj { s: Sprite; angle: number; life: number; }
 
+interface Sweep { angle: number; life: number; dir: number; }
+
 interface RingState {
   pulse: number;
   count: number;
   objs: RingObj[];
+  sweeps: Sweep[];
+  lastFlare: number;
 }
 
 /** Three concentric orbital rings accumulating objects and pulsing on traffic. */
@@ -25,10 +29,10 @@ export class Rings {
   private g = new Graphics();
   private objLayer = new Container();
   private state: Record<RingKind, RingState> = {
-    general: { pulse: 0, count: 0, objs: [] },
-    dns: { pulse: 0, count: 0, objs: [] },
-    dhcp: { pulse: 0, count: 0, objs: [] },
-    wifi: { pulse: 0, count: 0, objs: [] },
+    general: { pulse: 0, count: 0, objs: [], sweeps: [], lastFlare: 0 },
+    dns: { pulse: 0, count: 0, objs: [], sweeps: [], lastFlare: 0 },
+    dhcp: { pulse: 0, count: 0, objs: [], sweeps: [], lastFlare: 0 },
+    wifi: { pulse: 0, count: 0, objs: [], sweeps: [], lastFlare: 0 },
   };
 
   constructor(private layer: Container, private dot: Texture,
@@ -38,10 +42,22 @@ export class Rings {
 
   resize(w: number, h: number): void { this.w = w; this.h = h; }
 
-  activate(kind: RingKind): void {
+  activate(kind: RingKind, now: number): void {
     const def = DEFS[kind];
     const st = this.state[kind];
-    st.pulse = 1;
+    // allow traffic is constant — throttle its flare so browsing reads as a
+    // heartbeat instead of pinning the green ring at max
+    const minGap = kind === 'general' ? 0.35 : 0.09;
+    if (now - st.lastFlare >= minGap) {
+      st.lastFlare = now;
+      st.pulse = Math.min(1.8, st.pulse + 0.6);
+      if (st.sweeps.length < 3) {
+        st.sweeps.push({
+          angle: Math.random() * Math.PI * 2, life: 1,
+          dir: def.speed >= 0 ? 1 : -1,
+        });
+      }
+    }
     st.count++;
     if (st.count % def.every === 0 && st.objs.length < def.cap) {
       const s = new Sprite(this.dot);
@@ -54,18 +70,38 @@ export class Rings {
     }
   }
 
-  update(dt: number): void {
-    const cx = this.w / 2, cy = this.h / 2;
+  update(dt: number, cx: number, cy: number): void {
     const base = Math.min(this.w, this.h);
 
     this.g.clear();
     for (const kind of Object.keys(DEFS) as RingKind[]) {
       const def = DEFS[kind];
       const st = this.state[kind];
-      st.pulse = Math.max(0, st.pulse - dt * 1.5);
-      const radius = base * def.radius;
+      // fast attack (activate adds), organic decay: bigger flares fall faster
+      st.pulse = Math.max(0, st.pulse - dt * (0.9 + st.pulse * 1.3));
+      // radius bounce — the ring physically kicks on a flare
+      const radius = base * def.radius * (1 + st.pulse * 0.015);
       this.g.circle(cx, cy, radius)
-        .stroke({ width: 1 + st.pulse * 3, color: def.color, alpha: 0.16 + st.pulse * 0.5 });
+        .stroke({
+          width: 1 + Math.min(1.8, st.pulse) * 1.8,
+          color: def.color,
+          alpha: Math.min(0.8, 0.14 + st.pulse * 0.3),
+        });
+
+      // sweep arcs: a bright segment races around the ring and dies
+      for (let i = st.sweeps.length - 1; i >= 0; i--) {
+        const sw = st.sweeps[i];
+        sw.life -= dt * 1.1;
+        if (sw.life <= 0) { st.sweeps.splice(i, 1); continue; }
+        sw.angle += sw.dir * dt * 7;
+        const trail = 0.35 + 0.45 * sw.life;
+        this.g.arc(cx, cy, radius, sw.angle - trail, sw.angle)
+          .stroke({
+            width: 2 + 2.5 * sw.life,
+            color: def.color,
+            alpha: 0.85 * sw.life,
+          });
+      }
 
       for (let i = st.objs.length - 1; i >= 0; i--) {
         const o = st.objs[i];
