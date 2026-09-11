@@ -14,6 +14,8 @@ export class Station {
   private orbiters: Sprite[] = [];
   private verts: Sprite[] = [];
   private sparks: { s: Sprite; r: number; a: number; sp: number; ecc: number }[] = [];
+  private aura: { s: Sprite; r: number; a: number; sp: number; wob: number;
+    wosp: number; sc: number; al: number }[] = [];
   private pulse = 0;         // 0..1 energy flash
   private t = 0;
   private phi1 = Math.random() * Math.PI * 2;   // flight pattern, unique per boot
@@ -73,7 +75,20 @@ export class Station {
         sp: 1.4 + Math.random() * 2.0, ecc: 0.55 + Math.random() * 0.4,
       });
     }
-    layer.addChild(this.bloom, this.cloudLayer, this.ringG, this.hexG, this.structG,
+    // gassy ethereal aura — soft blobs on a slow swirling differential orbit
+    for (let i = 0; i < 11; i++) {
+      const s = new Sprite(glow);
+      s.anchor.set(0.5);
+      s.blendMode = 'add';
+      this.aura.push({
+        s, r: 1.35 + Math.random() * 0.75, a: Math.random() * Math.PI * 2,
+        sp: 0.3 + Math.random() * 0.55, wob: 0.10 + Math.random() * 0.16,
+        wosp: 0.5 + Math.random() * 0.9, sc: 1.3 + Math.random() * 1.7,
+        al: 0.09 + Math.random() * 0.09,
+      });
+    }
+    layer.addChild(this.bloom, ...this.aura.map((a) => a.s), this.cloudLayer,
+      this.ringG, this.hexG, this.structG,
       this.core, ...this.verts, ...this.sparks.map((sp) => sp.s), ...this.orbiters);
     this.layout();
   }
@@ -201,27 +216,18 @@ export class Station {
     this.hexG.circle(cx, cy, hr * 0.2).fill({ color: 0xffffff, alpha: 0.9 });
     this.hexG.circle(cx, cy, hr * 0.34).stroke({ width: 1.2, color: 0xbff6ff, alpha: 0.85 });
 
-    // rotating reactor collar — three additive arcs sweeping around the hull
-    const arcR = hr * 1.3;
-    const arcRot = this.t * 1.2;
-    for (let k = 0; k < 3; k++) {
-      const s = arcRot + (k / 3) * TAU;
-      this.structG.arc(cx, cy, arcR, s, s + 0.7)
-        .stroke({ width: 2.4, color: tint, alpha: 0.5 + this.pulse * 0.4 });
-    }
-
-    // segmented outer dial + tick marks — slow counter-rotating tech ring
-    const dialR = hr * 1.62;
-    const dialRot = -this.t * 0.35;
-    const seg = TAU / 12;
-    for (let i = 0; i < 12; i++) {
-      const s0 = dialRot + i * seg;
-      this.structG.arc(cx, cy, dialR, s0, s0 + seg * 0.6)
-        .stroke({ width: 2, color: tint, alpha: 0.28 + this.pulse * 0.3 });
-      const ta = dialRot + i * seg;
-      this.structG.moveTo(cx + Math.cos(ta) * dialR * 1.03, cy + Math.sin(ta) * dialR * 1.03)
-        .lineTo(cx + Math.cos(ta) * dialR * 1.16, cy + Math.sin(ta) * dialR * 1.16)
-        .stroke({ width: 1, color: 0xbff6ff, alpha: 0.35 });
+    // gassy ethereal aura — soft blobs on a slow differential swirl, breathing
+    // radially so the edge is wispy and moving, never a hard spinning rim
+    for (const au of this.aura) {
+      au.a += dt * au.sp * (1 + heat * 1.2 + this.pulse * 0.6);
+      const wob = 1 + Math.sin(this.t * au.wosp + au.a) * au.wob;
+      const rr = hr * au.r * wob * (1 + this.pulse * 0.14);
+      au.s.x = cx + Math.cos(au.a) * rr;
+      au.s.y = cy + Math.sin(au.a) * rr * 0.9;   // slightly flattened disc
+      au.s.scale.set(au.sc * (1 + this.pulse * 0.2 + state.energy * 0.25));
+      au.s.tint = tint;
+      au.s.alpha = au.al * (0.7 + 0.3 * Math.sin(this.t * 1.3 + au.a))
+        * (0.7 + state.energy * 0.7 + this.pulse * 0.6);
     }
 
     // diffraction flare spikes — the lens-flare "wow", energy-scaled
