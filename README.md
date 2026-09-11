@@ -10,11 +10,27 @@ never touches the network itself.
 
 ![demo](docs/demo.gif)
 
-Full-quality 60s showreel: [docs/demo.mp4](docs/demo.mp4) ·
-Screenshots: [hero](docs/hero.png) ·
-[storm](docs/storm.png) ·
-[settings](docs/panel.png) ·
-[debug](docs/debug.png)
+Full 42s showreel — calm cruise → the F1 config tour → full storm:
+**[docs/demo.mp4](docs/demo.mp4)** · Screenshots: [hero](docs/hero.png) ·
+[storm](docs/storm.png) · [settings](docs/panel.png) · [debug](docs/debug.png)
+
+## Highlights
+
+- **Living scene** (PixiJS v8) — an orbital station at the center of your
+  network; hosts drift in as stars and grow into constellations, blocked
+  inbound traffic becomes asteroids the station shoots down, and the whole
+  thing rides a parallax nebula.
+- **Generative soundtrack** — a 4-song "band" that listens to your traffic and
+  plays it back: set-list rotation, song structure, tension & release — every
+  note synthesized live with the WebAudio API. **No audio files anywhere.**
+- **Mixable, layered audio** — additive **Melody / Devices / Noise** layers,
+  each with per-event *volume* **and** *gate* controls, plus reverb, echo and a
+  music-bed balance. All live in the F1 panel (below).
+- **Colour system** — a fixed event colour-law (block=red, allow=green…) so the
+  picture stays readable, *plus* a 48-hue host-mesh you can reskin
+  (spectrum / event-law / mono / warm / cool) with a global hue-shift & intensity.
+- **Zero footprint** — syslog parsed in RAM and fanned out over WebSocket;
+  nothing written to disk, no cloud, no accounts, no telemetry.
 
 ## See it right now (no hardware needed)
 
@@ -26,7 +42,8 @@ open http://localhost:5173/?demo=1&showreel=1
 `?demo=1` runs a fully synthetic event generator (fake IPs/MACs/hosts —
 nothing real), `showreel=1` scripts a 60s arc: calm cruise → traffic build →
 **hurricane** → cooldown. Click once to wake the audio engine (browser autoplay
-policy). See [URL params](#url-params) for dialing the intensity by hand.
+policy). Press **F1** any time to open the settings panel. See
+[URL params](#url-params) for dialing the intensity by hand.
 
 ## How it works
 
@@ -81,8 +98,9 @@ Colors of every effect match the comms-log lines verbatim:
 | wifi     | purple     | AP↔station links + crystals, 4th ring |
 | system   | grey       | grey shockwave from the station |
 
-Traffic volume drives weather: **STORM** at ≥300 events/30s, **HURRICANE** at
-≥1200 — the whole scene reddens, debris fields spawn, and the HUD goes amber.
+Traffic volume drives weather: **STORM** at ≥300 events/30s and **HURRICANE** at
+≥1200 — the HUD goes amber, the station flares, and the field fills with debris
+and intercept fire.
 IPs you talk to a lot grow into constellations; blocked destinations rack up
 on the **MOST WANTED** board. The fleet drifting through the scene is a
 hand-drawn (procedurally generated) honor squad.
@@ -117,12 +135,33 @@ your network:
 ## F1 settings panel
 
 Press **F1** for a tabbed control surface — **Scene / HUD / Audio / Colour /
-System**. Everything is live and persists to localStorage: scene layers and HUD
-panels; the audio mix (additive Melody / Devices / Noise layers, per-event
-volume *and* gate sliders, reverb, echo, music-bed balance); the host-mesh
-colour scheme (spectrum / event-law / mono / warm / cool) with a global
-hue-shift & intensity knob that sweeps the mesh, nebula and HUD accent; plus
-the particle budget, simulation speed and a reset-to-defaults.
+System**. Everything is live (no reload) and persists to localStorage.
+
+| Tab | What's in it |
+|-----|--------------|
+| **Scene** | starfield · nebula · dust · ambient ships · DHCP planets · event stars · asteroids · crystals · IP constellations · ring objects · AP cores · screen shake |
+| **HUD** | uplink · ship-status bars · telemetry · most-wanted · comms log · sensor flux · subspace spectrum · radar · scanlines |
+| **Audio** | additive Melody / Devices layers, per-event volume + per-event gate, the noise (chaos) gate, master / reverb / echo / music-bed, device mix |
+| **Colour** | host-mesh scheme (spectrum / event-law / mono / warm / cool) + a global hue-shift & intensity that sweeps the mesh, nebula and HUD accent |
+| **System** | particle budget · simulation speed · reset-to-defaults |
+
+### Audio: volume vs gate
+
+Two knobs per event type, and they do very different jobs:
+
+- **Volume** — how *loud* that event's sound is.
+- **Gate** — how *often* it passes (0 = choked off → 1 = every hit). Gates are
+  densities: they thin a busy stream without changing its level.
+- **Noise (chaos) gate** — replaces the old NOISE MODE. Fires a noise burst on
+  a fraction of raw events; 0 = off, 1 = every single event (full chaos).
+
+Flip the **Melody** and **Devices** toggles to add or subtract whole layers —
+everything sums, so you can run melody-only, devices-only, or stack both under
+noise. (The pitched impacts fire once per sequencer step, so they're a per-step
+summary; the noise gate fires 1:1 on raw events — that's why noise ≠ a wide-open
+gate.)
+
+![config tour](docs/config.gif)
 
 ![settings](docs/panel.png)
 
