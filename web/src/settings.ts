@@ -1,3 +1,5 @@
+export type MeshMode = 'law' | 'spectrum' | 'mono' | 'warm' | 'cool';
+
 export interface Settings {
   starfield: boolean;
   nebula: boolean;
@@ -31,6 +33,12 @@ export interface Settings {
   gWifi: number;
   gDhcp: number;
   deviceMix: number;
+  reverb: number;         // hangar reverb wet 0..1
+  echo: number;           // dotted-delay level 0..1
+  melodyBal: number;      // music bed vs event hits 0..1
+  meshMode: MeshMode;     // host-mesh colouring scheme
+  hueShift: number;       // rotate mesh/nebula/accent hues 0..360
+  colorSat: number;       // colour intensity 0..1
   maxParticles: number;
   speed: number;          // global sim speed multiplier
   demo: boolean;
@@ -69,6 +77,12 @@ export const DEFAULTS: Settings = {
   gWifi: 1,
   gDhcp: 1,
   deviceMix: 1,
+  reverb: 0.3,
+  echo: 0.5,
+  melodyBal: 0.65,
+  meshMode: 'spectrum',
+  hueShift: 0,
+  colorSat: 1,
   maxParticles: 4000,
   speed: 1,
   demo: false,
@@ -86,4 +100,10 @@ export function loadSettings(): Settings {
 
 export function saveSettings(s: Settings): void {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* ignore */ }
+}
+
+/** Wipe saved prefs and restore DEFAULTS into the live object (in place). */
+export function resetSettings(live: Settings): void {
+  try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+  Object.assign(live, DEFAULTS);
 }

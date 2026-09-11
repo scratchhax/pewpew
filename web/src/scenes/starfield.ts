@@ -1,16 +1,15 @@
 import { Container, Sprite, Texture } from 'pixi.js';
 import type { Settings } from '../settings';
 import type { State } from '../state';
+import { hsl } from '../palette';
 
 interface Star { s: Sprite; speed: number; vx: number; baseAlpha: number; phase: number; tw: number; }
 interface Nebula extends Sprite {
   vx: number; vy: number; pulse: number; baseScale: number; spin: number;
 }
 
-const NEBULA_COLORS = [
-  0x7b3fbf, 0x2f6fd8, 0xd84a7a, 0x5f2fae,
-  0x4a55e8, 0xb03fae, 0x2fa8d8,
-];
+// base hues of the nebula palette — hue-shift + intensity knobs rotate/fade them
+const NEBULA_HUES = [270, 218, 340, 263, 233, 303, 196];
 
 export class Starfield {
   private stars: Star[] = [];
@@ -64,7 +63,8 @@ export class Starfield {
         s.y = this.h * (0.24 + Math.random() * 0.48);
         s.baseScale = 2.4 + Math.random() * 2.2;   // 256px cloud → 600-1150px
         s.scale.set(s.baseScale);
-        s.tint = NEBULA_COLORS[i % NEBULA_COLORS.length];
+        s.tint = hsl(NEBULA_HUES[i % NEBULA_HUES.length] + this.settings.hueShift,
+          0.5 * this.settings.colorSat, 0.52);
         s.alpha = 0.12;
         s.blendMode = 'add';
         s.vx = (Math.random() - 0.5) * 3;

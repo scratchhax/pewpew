@@ -80,6 +80,8 @@ export class Audio {
   private bassEvery = false;
   private sectionOct = 0;
   private delayWet: GainNode | null = null;
+  private reverbWet: GainNode | null = null;
+  private echoLevel: GainNode | null = null;
   private analyser: AnalyserNode | null = null;
   private hosts = new Map<string, HostVoice>();
   private motifBank: number[][] = [];
@@ -174,7 +176,8 @@ export class Audio {
     const conv = ctx.createConvolver();
     conv.buffer = ir;
     const revWet = ctx.createGain();
-    revWet.gain.value = 0.3;
+    revWet.gain.value = this.settings.reverb;
+    this.reverbWet = revWet;
     conv.connect(revWet).connect(this.master);
     this.reverbIn = ctx.createGain();
     this.reverbIn.connect(conv);
@@ -192,7 +195,11 @@ export class Audio {
     const wet = ctx.createGain();
     wet.gain.value = 0.5;
     this.delayWet = wet;
-    this.delay.connect(wet).connect(this.master);
+    // user echo slider scales the whole delay tail (1.0 at default 0.5)
+    this.echoLevel = ctx.createGain();
+    this.echoLevel.gain.value = this.settings.echo * 2;
+    wet.connect(this.echoLevel).connect(this.master);
+    this.delay.connect(wet);
 
     // ── rhythm kit: shared noise buffer for drums ──
     const nb = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.2), ctx.sampleRate);
@@ -223,6 +230,19 @@ export class Audio {
   setVolume(v: number): void {
     if (this.master && this.ctx) {
       this.master.gain.setTargetAtTime(v * 1.1, this.ctx.currentTime, 0.2);
+    }
+  }
+
+  setReverb(v: number): void {
+    if (this.reverbWet && this.ctx) {
+      this.reverbWet.gain.setTargetAtTime(v, this.ctx.currentTime, 0.2);
+    }
+  }
+
+  setEcho(v: number): void {
+    if (this.echoLevel && this.ctx) {
+      // 0.5 default → 1.0 gain (unchanged feel); 0 = dry, 1 = heavy
+      this.echoLevel.gain.setTargetAtTime(v * 2, this.ctx.currentTime, 0.2);
     }
   }
 
@@ -670,6 +690,10 @@ export class Audio {
     src.stop(now + dur + 0.02);
   }
 
+  /** Music-bed level (1.0 at melodyBal 0.65): scales sustained melody
+   *  against the event-triggered hits. */
+  private mb(): number { return this.settings.melodyBal / 0.65; }
+
   /** The carry tune: plays and evolves the motif, frames the rest. */
   private carry(): void {
     if (!this.motif.length) this.genMotif();
@@ -682,12 +706,12 @@ export class Audio {
           + (this.section === 'chorus' && Math.random() < 0.4 ? 5 : 0);
         const pan = (Math.random() - 0.5) * 0.9;
         this.voice(degreeToFreq(note + this.motifShift + oct), this.leadWave,
-          GRID * (1.2 + Math.random() * 1.6), 0.075,
+          GRID * (1.2 + Math.random() * 1.6), 0.075 * this.mb(),
           pan, 0, 0.6, 0.5);
         // traffic pressure adds passing tones between motif notes
         if (this.pending.allow > 2 && Math.random() < 0.4) {
           this.voice(degreeToFreq(note + this.motifShift + oct + 1), 'triangle',
-            GRID * 0.6, 0.04, pan, 0, 0.5, 0.4);
+            GRID * 0.6, 0.04 * this.mb(), pan, 0, 0.5, 0.4);
         }
       }
     }
@@ -770,10 +794,10 @@ export class Audio {
         const f = degreeToFreq(this.melodyIdx);
         const dur = GRID * (1.5 + Math.random());
         if (Math.random() < 0.22) {               // octave shimmer
-          this.voice(f * 2, 'sine', dur * 0.7, 0.05, this.melodyPan, 0, 0, 0.4);
+          this.voice(f * 2, 'sine', dur * 0.7, 0.05 * this.mb(), this.melodyPan, 0, 0, 0.4);
         }
         this.voice(f, Math.random() < 0.7 ? 'triangle' : 'square', dur,
-          this.allowGain * this.settings.gAllow, this.melodyPan, 0, 0.3, 0.3);
+          this.allowGain * this.settings.gAllow * this.mb(), this.melodyPan, 0, 0.3, 0.3);
       }
       p.allow = 0;
     }

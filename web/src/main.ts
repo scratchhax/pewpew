@@ -4,7 +4,7 @@ import { State, ipAngle, hash01, isInternalIp } from './state';
 import { Feed } from './ws';
 import { buildTextures } from './textures';
 import { NetEvent } from './types';
-import { pathColorFor } from './palette';
+import { pathColorFor, hsl } from './palette';
 import { Starfield } from './scenes/starfield';
 import { Dust } from './scenes/dust';
 import { Station } from './scenes/station';
@@ -108,11 +108,22 @@ async function main(): Promise<void> {
   const hud = new Hud(settings);
   const audio = new Audio(settings);
   hud.attachAudio(audio);
+  // HUD accent + nebula follow the colour knobs (event-law colours stay fixed)
+  function applyColors(): void {
+    const hex = hsl(172 + settings.hueShift, 0.8 * settings.colorSat, 0.61);
+    const css = `#${hex.toString(16).padStart(6, '0')}`;
+    document.documentElement.style.setProperty('--accent', css);
+  }
+  applyColors();
+
   const panel = new SettingsPanel(settings, () => {
     hud.applySettings(settings);
     audio.setVolume(settings.volume);
+    audio.setReverb(settings.reverb);
+    audio.setEcho(settings.echo);
     audio.setEnabled(settings.audio);
     starfield.rebuild();
+    applyColors();
     if (!settings.constellations) clearConstellation();
   });
 
@@ -212,12 +223,12 @@ async function main(): Promise<void> {
               const b = ev.dst_ip && settings.constellations
                 ? constellation.starPosition(ev.dst_ip) : null;
               if (a && b) {
-                const hue = pathColorFor(`${ev.src_ip}>${ev.dst_ip}`);
+                const hue = pathColorFor(`${ev.src_ip}>${ev.dst_ip}`, settings);
                 crystals.spawnToward(a.x, a.y, b.x, b.y, hue,
                   () => { station.flash(0.15); fx.burst(b.x, b.y, hue, 10); });
               } else {
                 const ext = dir === 'inbound' ? ev.src_ip : ev.dst_ip;
-                const hue = pathColorFor(`${ext}`);
+                const hue = pathColorFor(`${ext}`, settings);
                 crystals.spawn(cx, cy, w, h, ipAngle(ext ?? '0.0.0.0'),
                   dir === 'inbound', hue,
                   (x, y) => { station.flash(0.35); fx.burst(x, y, hue, 12); });
@@ -227,7 +238,7 @@ async function main(): Promise<void> {
             if (settings.constellations && ev.src_ip && ev.dst_ip &&
                 fxAllow(`con|${ev.src_ip}|${ev.dst_ip}`, 10)) {
               constellation.connect(ev.src_ip, ev.dst_ip,
-                pathColorFor(`${ev.src_ip}>${ev.dst_ip}`));
+                pathColorFor(`${ev.src_ip}>${ev.dst_ip}`, settings));
             }
           }
           if (!replay) station.flash(0.15);
