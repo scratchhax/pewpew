@@ -7,11 +7,13 @@ export class Station {
   private cloudLayer = new Container();
   private clouds: { s: Sprite; life: number; ox?: number; oy?: number; maxAlpha?: number }[] = [];
   private core: Sprite;
+  private bloom: Sprite;
   private ringG: Graphics;
   private hexG: Graphics;
   private structG: Graphics;
   private orbiters: Sprite[] = [];
   private verts: Sprite[] = [];
+  private sparks: { s: Sprite; r: number; a: number; sp: number; ecc: number }[] = [];
   private pulse = 0;         // 0..1 energy flash
   private t = 0;
   private phi1 = Math.random() * Math.PI * 2;   // flight pattern, unique per boot
@@ -20,6 +22,16 @@ export class Station {
 
   constructor(private layer: Container, glow: Texture, private w: number, private h: number) {
     this.glowTex = glow;
+    // wide soft bloom behind everything — the lush outer atmosphere of the core
+    this.bloom = new Sprite(glow);
+    this.bloom.anchor.set(0.5);
+    this.bloom.scale.set(4.2);
+    this.bloom.tint = 0x35e0ff;
+    this.bloom.alpha = 0.22;
+    this.bloom.blendMode = 'add';
+    this.bloom.x = this.w / 2;
+    this.bloom.y = this.h / 2;
+
     this.core = new Sprite(glow);
     this.core.anchor.set(0.5);
     this.core.scale.set(2.3);
@@ -50,8 +62,19 @@ export class Station {
       v.blendMode = 'add';
       this.verts.push(v);
     }
-    layer.addChild(this.cloudLayer, this.ringG, this.hexG, this.structG,
-      this.core, ...this.verts, ...this.orbiters);
+    // accretion sparks whipping around the reactor
+    for (let i = 0; i < 6; i++) {
+      const s = new Sprite(glow);
+      s.anchor.set(0.5);
+      s.blendMode = 'add';
+      s.scale.set(0.14 + Math.random() * 0.12);
+      this.sparks.push({
+        s, r: 0.75 + Math.random() * 0.55, a: Math.random() * Math.PI * 2,
+        sp: 1.4 + Math.random() * 2.0, ecc: 0.55 + Math.random() * 0.4,
+      });
+    }
+    layer.addChild(this.bloom, this.cloudLayer, this.ringG, this.hexG, this.structG,
+      this.core, ...this.verts, ...this.sparks.map((sp) => sp.s), ...this.orbiters);
     this.layout();
   }
 
@@ -124,6 +147,11 @@ export class Station {
 
     const breathe = 1 + Math.sin(this.t * 2.2) * 0.05 + this.pulse * 0.5
                     + state.energy * 0.35;
+    this.bloom.x = cx;
+    this.bloom.y = cy;
+    this.bloom.tint = tint;
+    this.bloom.scale.set(4.2 * (0.85 + breathe * 0.25 + this.pulse * 0.4));
+    this.bloom.alpha = 0.16 + state.energy * 0.14 + this.pulse * 0.22;
     this.core.x = cx;
     this.core.y = cy;
     this.core.scale.set(2.3 * breathe);
@@ -182,6 +210,37 @@ export class Station {
         .stroke({ width: 2.4, color: tint, alpha: 0.5 + this.pulse * 0.4 });
     }
 
+    // segmented outer dial + tick marks — slow counter-rotating tech ring
+    const dialR = hr * 1.62;
+    const dialRot = -this.t * 0.35;
+    const seg = TAU / 12;
+    for (let i = 0; i < 12; i++) {
+      const s0 = dialRot + i * seg;
+      this.structG.arc(cx, cy, dialR, s0, s0 + seg * 0.6)
+        .stroke({ width: 2, color: tint, alpha: 0.28 + this.pulse * 0.3 });
+      const ta = dialRot + i * seg;
+      this.structG.moveTo(cx + Math.cos(ta) * dialR * 1.03, cy + Math.sin(ta) * dialR * 1.03)
+        .lineTo(cx + Math.cos(ta) * dialR * 1.16, cy + Math.sin(ta) * dialR * 1.16)
+        .stroke({ width: 1, color: 0xbff6ff, alpha: 0.35 });
+    }
+
+    // diffraction flare spikes — the lens-flare "wow", energy-scaled
+    const spikeLen = hr * (1.9 + state.energy * 1.4);
+    const spikeRot = this.t * 0.15;
+    for (let k = 0; k < 6; k++) {
+      const a = spikeRot + (k / 6) * TAU;
+      this.structG.moveTo(cx, cy)
+        .lineTo(cx + Math.cos(a) * spikeLen, cy + Math.sin(a) * spikeLen)
+        .stroke({ width: 1.3, color: 0xbff6ff, alpha: 0.1 + this.pulse * 0.28 });
+    }
+
+    // reactive shockwave ring — every flash sends a pulse out from the core
+    if (this.pulse > 0.02) {
+      const pr = hr * 1.1 + (1 - this.pulse) * hr * 2.2;
+      this.structG.arc(cx, cy, pr, 0, TAU)
+        .stroke({ width: 0.5 + this.pulse * 2.6, color: tint, alpha: this.pulse * 0.5 });
+    }
+
     // vertex nodes light the hull corners, chasing around
     for (let i = 0; i < 6; i++) {
       const v = this.verts[i];
@@ -192,6 +251,16 @@ export class Station {
       const beat = 0.5 + 0.5 * Math.sin(this.t * 2.6 - i * 0.9);
       v.alpha = 0.3 + this.pulse * 0.5 + beat * 0.35;
       v.scale.set(0.4 + this.pulse * 0.25 + beat * 0.08);
+    }
+
+    // accretion sparks — bright motes whipping in tight elliptical orbits
+    for (const sp of this.sparks) {
+      sp.a += sp.sp * dt * (1 + heat * 1.5 + this.pulse * 1.5);
+      const rr = hr * sp.r;
+      sp.s.x = cx + Math.cos(sp.a) * rr;
+      sp.s.y = cy + Math.sin(sp.a) * rr * sp.ecc;
+      sp.s.tint = 0xdffcff;
+      sp.s.alpha = 0.55 + 0.45 * Math.sin(sp.a * 2);
     }
 
     this.orbiters.forEach((o, i) => {
