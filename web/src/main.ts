@@ -103,7 +103,7 @@ async function main(): Promise<void> {
   if (new URLSearchParams(location.search).has('diag'))
     (window as any).__diag = { app };
   const station = new Station(stationLayer, textures.glow, w, h);
-  const rings = new Rings(ringsLayer, textures.dot, w, h);
+  const rings = new Rings(ringsLayer, textures.dot, textures.glow, w, h);
   const crystals = new Crystals(fxLayer, textures.crystal, textures.glow, fx);
   const asteroids = new Asteroids(fxLayer, textures.asteroids, fx);
   const apCores = new ApCores(apLayer, textures.glow, fx, w, h);

@@ -14,31 +14,67 @@ const DEFS: Record<RingKind, RingDef> = {
 
 interface RingObj { s: Sprite; angle: number; life: number; }
 
+// a soft glow blob that sits on the ring circumference (the "fog" wrap)
+interface FogBlob { s: Sprite; angle: number; phase: number; }
+
 interface RingState {
   pulse: number;
   count: number;
   objs: RingObj[];
+  fog: FogBlob[];
+  fogRot: number;
   lastFlare: number;
 }
 
-/** Three concentric orbital rings accumulating objects and pulsing on traffic. */
+/** Concentric orbital rings wrapped in a soft glow that blooms on traffic. */
 export class Rings {
   private g = new Graphics();
   private objLayer = new Container();
+  private fogLayer = new Container();
   private state: Record<RingKind, RingState> = {
-    general: { pulse: 0, count: 0, objs: [], lastFlare: 0 },
-    dns: { pulse: 0, count: 0, objs: [], lastFlare: 0 },
-    dhcp: { pulse: 0, count: 0, objs: [], lastFlare: 0 },
-    wifi: { pulse: 0, count: 0, objs: [], lastFlare: 0 },
+    general: { pulse: 0, count: 0, objs: [], fog: [], fogRot: 0, lastFlare: 0 },
+    dns: { pulse: 0, count: 0, objs: [], fog: [], fogRot: 0, lastFlare: 0 },
+    dhcp: { pulse: 0, count: 0, objs: [], fog: [], fogRot: 0, lastFlare: 0 },
+    wifi: { pulse: 0, count: 0, objs: [], fog: [], fogRot: 0, lastFlare: 0 },
   };
 
-  constructor(private layer: Container, private dot: Texture,
+  constructor(private layer: Container, private dot: Texture, private glow: Texture,
               private w: number, private h: number) {
     this.g.blendMode = 'add';
-    layer.addChild(this.g, this.objLayer);
+    this.fogLayer.blendMode = 'add';
+    layer.addChild(this.fogLayer, this.g, this.objLayer);
+    this.rebuildFog();
   }
 
-  resize(w: number, h: number): void { this.w = w; this.h = h; }
+  resize(w: number, h: number): void { this.w = w; this.h = h; this.rebuildFog(); }
+
+  /** Distribute soft glow blobs around each ring so the whole circle can be
+   *  wrapped in the same fog/cloud that makes the station core bloom. */
+  private rebuildFog(): void {
+    const base = Math.min(this.w, this.h);
+    for (const kind of Object.keys(DEFS) as RingKind[]) {
+      const st = this.state[kind];
+      const def = DEFS[kind];
+      const radius = base * def.radius;
+      // enough blobs to read as continuous fog, sized to overlap
+      const n = Math.max(10, Math.min(40, Math.round(radius / 20)));
+      // clear old fog sprites for this ring
+      for (const f of st.fog) { this.fogLayer.removeChild(f.s); f.s.destroy(); }
+      st.fog = [];
+      for (let i = 0; i < n; i++) {
+        const s = new Sprite(this.glow);
+        s.anchor.set(0.5);
+        s.tint = def.color;
+        s.blendMode = 'add';
+        s.alpha = 0;
+        // blob diameter ~ a touch over the arc spacing so neighbours blend
+        const spacing = (2 * Math.PI * radius) / n;
+        s.scale.set((spacing * 2.4) / 64);
+        this.fogLayer.addChild(s);
+        st.fog.push({ s, angle: (i / n) * Math.PI * 2, phase: Math.random() * Math.PI * 2 });
+      }
+    }
+  }
 
   activate(kind: RingKind, now: number): void {
     const def = DEFS[kind];
@@ -67,34 +103,41 @@ export class Rings {
   update(dt: number, cx: number, cy: number): void {
     const base = Math.min(this.w, this.h);
 
-    this.g.clear();
     for (const kind of Object.keys(DEFS) as RingKind[]) {
       const def = DEFS[kind];
       const st = this.state[kind];
       // glow envelope: fast attack on activate, smooth fall back to rest.
-      // The ring geometry stays put — activity shows as a soft halo that
-      // blooms up and fades down, the way the station core glow does,
-      // rather than the ring line itself thickening / bouncing.
+      // The ring geometry stays put — activity shows as a soft fog that
+      // blooms up and fades away, the same effect the station core uses.
       st.pulse = Math.max(0, st.pulse - dt * (0.9 + st.pulse * 0.9));
       const radius = base * def.radius;
       const glow = Math.min(1, st.pulse);
 
-      // steady base outline so the ring is always readable at rest
-      this.g.circle(cx, cy, radius)
-        .stroke({ width: 1.1, color: def.color, alpha: 0.15 });
-
-      if (glow > 0.01) {
-        // widening faint passes fake a gaussian bloom around the ring
-        for (let k = 1; k <= 3; k++) {
-          this.g.circle(cx, cy, radius)
-            .stroke({ width: 1.1 + k * 7 * glow, color: def.color,
-                      alpha: 0.045 * glow / k });
-        }
-        // bright core line riding on the halo
-        this.g.circle(cx, cy, radius)
-          .stroke({ width: 1.5 + glow * 2.6, color: def.color,
-                    alpha: Math.min(0.95, 0.2 + glow * 0.55) });
+      // wrap the ring in the soft glow fog: brightness rides the envelope,
+      // with a slow shimmer so it breathes like a living cloud
+      st.fogRot += dt * def.speed * 0.25;
+      for (const f of st.fog) {
+        const a = f.angle + st.fogRot;
+        f.s.x = cx + Math.cos(a) * radius;
+        f.s.y = cy + Math.sin(a) * radius;
+        const shimmer = 0.82 + 0.18 * Math.sin(this.t * 0.8 + f.phase);
+        f.s.alpha = (0.05 + glow * 0.5) * shimmer;
       }
+    }
+    this.t += dt;
+
+    // crisp ring outlines drawn on top of the fog
+    this.g.clear();
+    for (const kind of Object.keys(DEFS) as RingKind[]) {
+      const def = DEFS[kind];
+      const st = this.state[kind];
+      const radius = base * def.radius;
+      const glow = Math.min(1, st.pulse);
+      // steady base outline so the ring stays readable at rest, a touch
+      // brighter when the fog is blooming
+      this.g.circle(cx, cy, radius)
+        .stroke({ width: 1.1 + glow * 1.6, color: def.color,
+                  alpha: 0.16 + glow * 0.35 });
 
       for (let i = st.objs.length - 1; i >= 0; i--) {
         const o = st.objs[i];
@@ -112,4 +155,5 @@ export class Rings {
       }
     }
   }
+  private t = 0;
 }
