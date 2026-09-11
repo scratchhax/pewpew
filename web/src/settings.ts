@@ -24,9 +24,9 @@ export interface Settings {
   ambientShips: boolean;
   audio: boolean;
   volume: number;
+  melody: boolean;
   deviceVoices: boolean;
   noiseMode: boolean;
-  melodyWithNoise: boolean;
   gBlock: number;
   gAllow: number;
   gDns: number;
@@ -68,9 +68,9 @@ export const DEFAULTS: Settings = {
   ambientShips: true,
   audio: true,
   volume: 0.5,
+  melody: true,
   deviceVoices: true,
   noiseMode: false,
-  melodyWithNoise: true,
   gBlock: 1,
   gAllow: 0.8,
   gDns: 1,

@@ -14,10 +14,6 @@ const HUD: Array<[Key, string]> = [
   ['mostWanted', 'Most wanted'], ['terminal', 'Comms log'], ['oscilloscope', 'Sensor flux'],
   ['spectrum', 'Subspace spectrum'], ['radar', 'Scan (radar)'], ['scanlines', 'Scanlines'],
 ];
-const AUDIO_TOG: Array<[Key, string]> = [
-  ['audio', 'Audio on'], ['deviceVoices', 'Device voices'],
-  ['noiseMode', 'NOISE MODE (chaos)'], ['melodyWithNoise', 'Melody during chaos'],
-];
 const EVENT_VOL: Array<[Key, string]> = [
   ['gBlock', 'Block'], ['gAllow', 'Allow'], ['gDns', 'DNS'], ['gWifi', 'WiFi'], ['gDhcp', 'DHCP'],
 ];
@@ -101,11 +97,11 @@ export class SettingsPanel {
       html += `<div class="cols"><div class="col">
         <p class="grp">Master</p>
         ${this.chk('audio', 'Audio on')}${this.rng('volume', 'Volume', 0, 1, 0.05)}
-        <p class="grp">Texture</p>
-        ${this.chk('deviceVoices', 'Device voices')}
+        <p class="grp">Texture — additive layers</p>
+        ${this.chk('melody', 'Melody')}
+        ${this.chk('deviceVoices', 'Devices (gated)')}
+        ${this.chk('noiseMode', 'Chaos (ungated)')}
         ${this.rng('deviceMix', 'Device mix', 0, 1, 0.05)}
-        ${this.chk('noiseMode', 'NOISE MODE (chaos)')}
-        ${this.chk('melodyWithNoise', 'Melody during chaos')}
         </div><div class="col">
         <p class="grp">Event volumes</p>
         ${EVENT_VOL.map(([k, l]) => this.rng(k, l, 0, 1, 0.05)).join('')}

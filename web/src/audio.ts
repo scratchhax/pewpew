@@ -249,7 +249,6 @@ export class Audio {
   /** Composition-mode cue (fires after visual gates). */
   cueSong(kind: Cue, srcIp?: string): void {
     if (!this.settings.audio) return;
-    if (this.settings.noiseMode && !this.settings.melodyWithNoise) return;
     this.ingest(kind, srcIp);
   }
 
@@ -762,20 +761,23 @@ export class Audio {
     this.sectionT += GRID;
     if (this.weather === 'calm' && this.tension < 0.2) this.calmT += GRID;
     else this.calmT = 0;
-    if (this.settings.noiseMode && !this.settings.melodyWithNoise) return;
-    this.arrange();
-    this.rhythm();
-    this.carry();
+    const mel = this.settings.melody;              // melody layer (additive)
+    if (mel) {
+      this.arrange();
+      this.rhythm();
+      this.carry();
+    }
 
     if (p.block > 0) {                            // impact: kick + bell taper
       this.kick(Math.min(0.4, 0.26 + p.block * 0.03) * this.settings.gBlock);
       this.bong(0, this.settings.gBlock);
       p.block = 0;
-    } else if (busy && (this.bassEvery || this.stepCount % 4 === 0)) {
+    } else if (mel && busy && (this.bassEvery || this.stepCount % 4 === 0)) {
       this.voice(55, 'sine', 0.4, this.bassEvery ? 0.2 : 0.12, 0);
     }
 
     if (p.allow > 0) {                            // melody walks the scale
+      if (mel) {
       const n = Math.min(1 + Math.floor(p.allow / 5), 3);
       for (let i = 0; i < n; i++) {
         // 55% of the time: answer the motif (octave above a nearby motif tone);
@@ -798,6 +800,7 @@ export class Audio {
         }
         this.voice(f, Math.random() < 0.7 ? 'triangle' : 'square', dur,
           this.allowGain * this.settings.gAllow * this.mb(), this.melodyPan, 0, 0.3, 0.3);
+      }
       }
       p.allow = 0;
     }
