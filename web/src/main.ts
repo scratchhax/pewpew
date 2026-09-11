@@ -4,6 +4,7 @@ import { State, ipAngle, hash01, isInternalIp } from './state';
 import { Feed } from './ws';
 import { buildTextures } from './textures';
 import { NetEvent } from './types';
+import { pathColorFor } from './palette';
 import { Starfield } from './scenes/starfield';
 import { Dust } from './scenes/dust';
 import { Station } from './scenes/station';
@@ -43,12 +44,6 @@ const WIFI_STAR: Array<[RegExp, number]> = [
 ];
 /** Planet hues — per-device deterministic; yellow is just one of them. */
 const PLANET_HUES = [0xffd84d, 0xffb347, 0xff9d5c, 0x7de3ff, 0x9d8cff, 0x8affc1];
-
-/** Energy pulse hues — picked per pulse for variety. */
-const ENERGY_HUES = [0x5ce6a4, 0x7dffb0, 0x4dffd8, 0xa8ff6b, 0x55e0ff, 0x6bffc4];
-function energyColor(): number {
-  return ENERGY_HUES[(Math.random() * ENERGY_HUES.length) | 0];
-}
 
 function wifiStarColor(ev: NetEvent): number {
   const e = `${ev.wifi_event ?? ''} ${ev.wifi_reason ?? ''}`.toLowerCase();
@@ -217,20 +212,22 @@ async function main(): Promise<void> {
               const b = ev.dst_ip && settings.constellations
                 ? constellation.starPosition(ev.dst_ip) : null;
               if (a && b) {
-                const hue = energyColor();
+                const hue = pathColorFor(`${ev.src_ip}>${ev.dst_ip}`);
                 crystals.spawnToward(a.x, a.y, b.x, b.y, hue,
                   () => { station.flash(0.15); fx.burst(b.x, b.y, hue, 10); });
               } else {
                 const ext = dir === 'inbound' ? ev.src_ip : ev.dst_ip;
+                const hue = pathColorFor(`${ext}`);
                 crystals.spawn(cx, cy, w, h, ipAngle(ext ?? '0.0.0.0'),
-                  dir === 'inbound', COLORS.allow,
-                  (x, y) => { station.flash(0.35); fx.burst(x, y, COLORS.allow, 12); });
+                  dir === 'inbound', hue,
+                  (x, y) => { station.flash(0.35); fx.burst(x, y, hue, 12); });
               }
               audio.cueSong('allow', ev.src_ip ?? ev.dst_ip ?? undefined);
             }
             if (settings.constellations && ev.src_ip && ev.dst_ip &&
                 fxAllow(`con|${ev.src_ip}|${ev.dst_ip}`, 10)) {
-              constellation.connect(ev.src_ip, ev.dst_ip, COLORS.allow);
+              constellation.connect(ev.src_ip, ev.dst_ip,
+                pathColorFor(`${ev.src_ip}>${ev.dst_ip}`));
             }
           }
           if (!replay) station.flash(0.15);
