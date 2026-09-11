@@ -762,6 +762,7 @@ export class Audio {
     if (this.weather === 'calm' && this.tension < 0.2) this.calmT += GRID;
     else this.calmT = 0;
     const mel = this.settings.melody;              // melody layer (additive)
+    const dev = this.settings.deviceVoices;        // gated event sounds
     if (mel) {
       this.arrange();
       this.rhythm();
@@ -769,8 +770,10 @@ export class Audio {
     }
 
     if (p.block > 0) {                            // impact: kick + bell taper
-      this.kick(Math.min(0.4, 0.26 + p.block * 0.03) * this.settings.gBlock);
-      this.bong(0, this.settings.gBlock);
+      if (dev) {
+        this.kick(Math.min(0.4, 0.26 + p.block * 0.03) * this.settings.gBlock);
+        this.bong(0, this.settings.gBlock);
+      }
       p.block = 0;
     } else if (mel && busy && (this.bassEvery || this.stepCount % 4 === 0)) {
       this.voice(55, 'sine', 0.4, this.bassEvery ? 0.2 : 0.12, 0);
@@ -806,7 +809,7 @@ export class Audio {
     }
 
     if (p.dns > 0) {                              // sparkles
-      if (Math.random() < 0.5) {
+      if (dev && Math.random() < 0.5) {
         const f = degreeToFreq(18 + ((Math.random() * 6) | 0));
         this.voice(f, 'sine', 0.25, 0.05 * this.settings.gDns,
           (Math.random() - 0.5) * 1.2, 0, 0, 0.7);
@@ -815,7 +818,7 @@ export class Audio {
     }
 
     if (p.wifi > 0) {                             // glides
-      if (Math.random() < 0.75) {
+      if (dev && Math.random() < 0.75) {
         const f = Math.random() < 0.5 && this.motif.length
           ? this.motifTone(this.motifPos - 1) * 0.5
           : degreeToFreq(10 + ((Math.random() * 5) | 0));
@@ -827,10 +830,12 @@ export class Audio {
     }
 
     if (p.dhcp > 0) {                             // arrival chord
-      const root = Math.random() < 0.5 ? BASE : BASE * 6 / 5;
-      for (const mult of [1, 1.2, 1.5]) {
-        this.voice(root * mult, 'sine', 1.6, 0.055 * this.settings.gDhcp,
-          (Math.random() - 0.5) * 0.6, 0, 0, 0.8);
+      if (dev) {
+        const root = Math.random() < 0.5 ? BASE : BASE * 6 / 5;
+        for (const mult of [1, 1.2, 1.5]) {
+          this.voice(root * mult, 'sine', 1.6, 0.055 * this.settings.gDhcp,
+            (Math.random() - 0.5) * 0.6, 0, 0, 0.8);
+        }
       }
       p.dhcp = 0;
     }
