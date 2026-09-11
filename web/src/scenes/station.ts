@@ -166,12 +166,12 @@ export class Station {
     this.bloom.y = cy;
     this.bloom.tint = tint;
     this.bloom.scale.set(4.2 * (0.85 + breathe * 0.25 + this.pulse * 0.4));
-    this.bloom.alpha = 0.16 + state.energy * 0.14 + this.pulse * 0.22;
+    this.bloom.alpha = 0.1 + state.energy * 0.1 + this.pulse * 0.14;
     this.core.x = cx;
     this.core.y = cy;
     this.core.scale.set(2.3 * breathe);
     this.core.tint = tint;
-    this.core.alpha = 0.75 + this.pulse * 0.25;
+    this.core.alpha = 0.48 + this.pulse * 0.22;
 
     const base = Math.min(this.w, this.h);
 
@@ -212,9 +212,9 @@ export class Station {
         .stroke({ width: 1, color: tint, alpha: 0.5 });
     }
 
-    // bright reactor core
-    this.hexG.circle(cx, cy, hr * 0.2).fill({ color: 0xffffff, alpha: 0.9 });
-    this.hexG.circle(cx, cy, hr * 0.34).stroke({ width: 1.2, color: 0xbff6ff, alpha: 0.85 });
+    // bright reactor core — tinted, not pure white, so it never blows out
+    this.hexG.circle(cx, cy, hr * 0.17).fill({ color: tint, alpha: 0.7 });
+    this.hexG.circle(cx, cy, hr * 0.34).stroke({ width: 1.2, color: 0xbff6ff, alpha: 0.55 });
 
     // gassy ethereal aura — soft blobs on a slow differential swirl, breathing
     // radially so the edge is wispy and moving, never a hard spinning rim
@@ -237,7 +237,7 @@ export class Station {
       const a = spikeRot + (k / 6) * TAU;
       this.structG.moveTo(cx, cy)
         .lineTo(cx + Math.cos(a) * spikeLen, cy + Math.sin(a) * spikeLen)
-        .stroke({ width: 1.3, color: 0xbff6ff, alpha: 0.1 + this.pulse * 0.28 });
+        .stroke({ width: 1.3, color: 0xbff6ff, alpha: 0.07 + this.pulse * 0.16 });
     }
 
     // reactive shockwave ring — every flash sends a pulse out from the core
@@ -255,7 +255,7 @@ export class Station {
       v.y = cy + Math.sin(a) * hr;
       v.tint = tint;
       const beat = 0.5 + 0.5 * Math.sin(this.t * 2.6 - i * 0.9);
-      v.alpha = 0.3 + this.pulse * 0.5 + beat * 0.35;
+      v.alpha = 0.18 + this.pulse * 0.35 + beat * 0.2;
       v.scale.set(0.4 + this.pulse * 0.25 + beat * 0.08);
     }
 
@@ -266,7 +266,7 @@ export class Station {
       sp.s.x = cx + Math.cos(sp.a) * rr;
       sp.s.y = cy + Math.sin(sp.a) * rr * sp.ecc;
       sp.s.tint = 0xdffcff;
-      sp.s.alpha = 0.55 + 0.45 * Math.sin(sp.a * 2);
+      sp.s.alpha = 0.32 + 0.3 * Math.sin(sp.a * 2);
     }
 
     this.orbiters.forEach((o, i) => {
