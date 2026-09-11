@@ -26,12 +26,17 @@ export interface Settings {
   volume: number;
   melody: boolean;
   deviceVoices: boolean;
-  noiseMode: boolean;
+  noiseGate: number;      // chaos: fraction of raw events that fire noise 0..1
   gBlock: number;
   gAllow: number;
   gDns: number;
   gWifi: number;
   gDhcp: number;
+  gateBlock: number;      // per-type gate openness 0..1 (1 = every hit passes)
+  gateAllow: number;
+  gateDns: number;
+  gateWifi: number;
+  gateDhcp: number;
   deviceMix: number;
   reverb: number;         // hangar reverb wet 0..1
   echo: number;           // dotted-delay level 0..1
@@ -70,12 +75,17 @@ export const DEFAULTS: Settings = {
   volume: 0.5,
   melody: true,
   deviceVoices: true,
-  noiseMode: false,
+  noiseGate: 0,
   gBlock: 1,
   gAllow: 0.8,
   gDns: 1,
   gWifi: 1,
   gDhcp: 1,
+  gateBlock: 1,
+  gateAllow: 1,
+  gateDns: 1,
+  gateWifi: 1,
+  gateDhcp: 1,
   deviceMix: 1,
   reverb: 0.3,
   echo: 0.5,

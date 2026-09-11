@@ -254,7 +254,9 @@ export class Audio {
 
   /** Noise-mode cue: fires on EVERY raw event; sampling lives in noiseFire. */
   cueNoise(kind: Cue, srcIp?: string): void {
-    if (!this.settings.audio || !this.settings.noiseMode) return;
+    const g = this.settings.noiseGate;
+    if (!this.settings.audio || g <= 0) return;
+    if (g < 1 && Math.random() >= g) return;    // thin the per-event noise stream
     this.noiseFire(kind);
   }
 
@@ -763,6 +765,10 @@ export class Audio {
     else this.calmT = 0;
     const mel = this.settings.melody;              // melody layer (additive)
     const dev = this.settings.deviceVoices;        // gated event sounds
+    // per-type gate openness: 1 = every hit passes (default), 0 = choked off
+    const gB = this.settings.gateBlock, gA = this.settings.gateAllow;
+    const gD = this.settings.gateDns, gW = this.settings.gateWifi;
+    const gH = this.settings.gateDhcp;
     if (mel) {
       this.arrange();
       this.rhythm();
@@ -770,7 +776,7 @@ export class Audio {
     }
 
     if (p.block > 0) {                            // impact: kick + bell taper
-      if (dev) {
+      if (dev && Math.random() < gB) {
         this.kick(Math.min(0.4, 0.26 + p.block * 0.03) * this.settings.gBlock);
         this.bong(0, this.settings.gBlock);
       }
@@ -783,6 +789,7 @@ export class Audio {
       if (dev) {                                  // gated "data" tick (rate-limited
         const ticks = Math.min(2, p.allow);       // by the step queue, not per-packet
         for (let i = 0; i < ticks; i++) {
+          if (Math.random() >= gA) continue;
           const f = degreeToFreq(16 + ((Math.random() * 5) | 0));
           this.voice(f, 'square', 0.08, 0.045 * this.settings.gAllow,
             (Math.random() - 0.5) * 1.1, 0, 0, 0.15);
@@ -817,7 +824,7 @@ export class Audio {
     }
 
     if (p.dns > 0) {                              // sparkles
-      if (dev && Math.random() < 0.5) {
+      if (dev && Math.random() < 0.5 * gD) {
         const f = degreeToFreq(18 + ((Math.random() * 6) | 0));
         this.voice(f, 'sine', 0.25, 0.05 * this.settings.gDns,
           (Math.random() - 0.5) * 1.2, 0, 0, 0.7);
@@ -826,7 +833,7 @@ export class Audio {
     }
 
     if (p.wifi > 0) {                             // glides
-      if (dev && Math.random() < 0.75) {
+      if (dev && Math.random() < 0.75 * gW) {
         const f = Math.random() < 0.5 && this.motif.length
           ? this.motifTone(this.motifPos - 1) * 0.5
           : degreeToFreq(10 + ((Math.random() * 5) | 0));
@@ -838,7 +845,7 @@ export class Audio {
     }
 
     if (p.dhcp > 0) {                             // arrival chord
-      if (dev) {
+      if (dev && Math.random() < gH) {
         const root = Math.random() < 0.5 ? BASE : BASE * 6 / 5;
         for (const mult of [1, 1.2, 1.5]) {
           this.voice(root * mult, 'sine', 1.6, 0.055 * this.settings.gDhcp,

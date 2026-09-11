@@ -17,6 +17,10 @@ const HUD: Array<[Key, string]> = [
 const EVENT_VOL: Array<[Key, string]> = [
   ['gBlock', 'Block'], ['gAllow', 'Allow'], ['gDns', 'DNS'], ['gWifi', 'WiFi'], ['gDhcp', 'DHCP'],
 ];
+const GATES: Array<[Key, string]> = [
+  ['gateBlock', 'Block'], ['gateAllow', 'Allow'], ['gateDns', 'DNS'],
+  ['gateWifi', 'WiFi'], ['gateDhcp', 'DHCP'],
+];
 const MESH_MODES: Array<[MeshMode, string]> = [
   ['spectrum', 'Spectrum (rainbow web)'], ['law', 'Event-law (all allow-green)'],
   ['mono', 'Mono (cyan)'], ['warm', 'Warm'], ['cool', 'Cool'],
@@ -100,8 +104,10 @@ export class SettingsPanel {
         <p class="grp">Texture — additive layers</p>
         ${this.chk('melody', 'Melody')}
         ${this.chk('deviceVoices', 'Devices (gated)')}
-        ${this.chk('noiseMode', 'Chaos (ungated)')}
         ${this.rng('deviceMix', 'Device mix', 0, 1, 0.05)}
+        <p class="grp">Event gates — openness (1 = every hit)</p>
+        ${GATES.map(([k, l]) => this.rng(k, l, 0, 1, 0.05)).join('')}
+        ${this.rng('noiseGate', 'Noise (chaos)', 0, 1, 0.05)}
         </div><div class="col">
         <p class="grp">Event volumes</p>
         ${EVENT_VOL.map(([k, l]) => this.rng(k, l, 0, 1, 0.05)).join('')}
@@ -109,6 +115,9 @@ export class SettingsPanel {
         ${this.rng('reverb', 'Reverb', 0, 1, 0.05)}
         ${this.rng('echo', 'Echo', 0, 1, 0.05)}
         ${this.rng('melodyBal', 'Music bed', 0, 1, 0.05)}
+        <p class="hint">Gates set how <b>often</b> each event sounds (density);
+        volumes set how <b>loud</b>. Noise gate replaces the old Chaos mode —
+        it fires a burst per event at that rate (1 = full chaos, 0 = none).</p>
         </div></div>`;
     } else if (tab === 'color') {
       html += `<div class="cols"><div class="col">

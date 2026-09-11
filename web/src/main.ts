@@ -182,9 +182,9 @@ async function main(): Promise<void> {
       ? 'internal' : (ev.direction ?? 'local');
 
     if (!replay) hud.log(ev);
-    if (!replay && settings.noiseMode) {
-      // NOISE MODE screams at the raw feed — the visual fxAllow gates are
-      // for visuals; every connection must be heard
+    if (!replay && settings.noiseGate > 0) {
+      // noise gate screams at the raw feed — the visual fxAllow gates are
+      // for visuals; every connection may be heard (density = noiseGate)
       const k = ev.log_type === 'firewall'
         ? (ev.rule_action === 'block' ? 'block' : 'allow')
         : ev.log_type === 'dns' ? 'dns'
