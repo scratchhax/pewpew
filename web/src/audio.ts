@@ -779,7 +779,15 @@ export class Audio {
       this.voice(55, 'sine', 0.4, this.bassEvery ? 0.2 : 0.12, 0);
     }
 
-    if (p.allow > 0) {                            // melody walks the scale
+    if (p.allow > 0) {                            // allow: data tick + melody
+      if (dev) {                                  // gated "data" tick (rate-limited
+        const ticks = Math.min(2, p.allow);       // by the step queue, not per-packet
+        for (let i = 0; i < ticks; i++) {
+          const f = degreeToFreq(16 + ((Math.random() * 5) | 0));
+          this.voice(f, 'square', 0.08, 0.045 * this.settings.gAllow,
+            (Math.random() - 0.5) * 1.1, 0, 0, 0.15);
+        }
+      }
       if (mel) {
       const n = Math.min(1 + Math.floor(p.allow / 5), 3);
       for (let i = 0; i < n; i++) {
