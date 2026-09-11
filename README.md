@@ -102,15 +102,27 @@ your network:
   denied traffic) builds tension; a lull after a storm resolves it.
 - **Device voices** — every MAC/IP gets a hash-derived musical identity, so
   your laptop plays "its" notes; overly chatty devices get fame-limited.
-- **NOISE MODE** (F1) — pure chaos: every single raw event, no dedupe,
-  scheduled sample-accurately through a pacing queue so bursts stay audible.
-  On by default *with* the band (toggle "melody during chaos" to strike them).
-- Per-event-type volume sliders, master volume, device-voice mix — all in F1.
+- **Additive layers** (F1) — three sound sources you mix in and out, they sum:
+  **Melody** (the generative band), **Devices** (gated per-event hits — block
+  kick, DNS sparkle, WiFi glide, DHCP chord, allow data-tick — plus the per-host
+  identity notes), and **Noise** (a chaos texture fired 1:1 on raw events).
+- **Volume vs gate** (F1) — every event type has its own *volume* (how loud)
+  and its own *gate* (how often it passes, 0 = choked off → 1 = every hit).
+  The **Noise gate** replaces the old NOISE MODE: 0 is silent, 1 is full chaos
+  (every raw event, no dedupe, scheduled sample-accurately through a pacing
+  queue so bursts stay audible).
+- Master volume, reverb, echo, a music-bed-vs-hits balance, and a device-voice
+  mix — all in F1.
 
 ## F1 settings panel
 
-Everything is toggleable at runtime (and persists to localStorage): every
-scene layer, HUD panel, audio subsystem, particle budget, simulation speed.
+Press **F1** for a tabbed control surface — **Scene / HUD / Audio / Colour /
+System**. Everything is live and persists to localStorage: scene layers and HUD
+panels; the audio mix (additive Melody / Devices / Noise layers, per-event
+volume *and* gate sliders, reverb, echo, music-bed balance); the host-mesh
+colour scheme (spectrum / event-law / mono / warm / cool) with a global
+hue-shift & intensity knob that sweeps the mesh, nebula and HUD accent; plus
+the particle budget, simulation speed and a reset-to-defaults.
 
 ![settings](docs/panel.png)
 
