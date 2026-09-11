@@ -24,6 +24,8 @@ export class Station {
     this.core.tint = 0x35e0ff;
     this.core.alpha = 0.75;
     this.core.blendMode = 'add';
+    this.core.x = this.w / 2;
+    this.core.y = this.h / 2;
 
     this.ringG = new Graphics();
     this.hexG = new Graphics();
@@ -108,6 +110,8 @@ export class Station {
 
     const breathe = 1 + Math.sin(this.t * 2.2) * 0.05 + this.pulse * 0.5
                     + state.energy * 0.35;
+    this.core.x = cx;
+    this.core.y = cy;
     this.core.scale.set(2.3 * breathe);
     this.core.tint = tint;
     this.core.alpha = 0.75 + this.pulse * 0.25;

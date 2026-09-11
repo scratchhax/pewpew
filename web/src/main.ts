@@ -73,17 +73,17 @@ async function main(): Promise<void> {
   const textures = buildTextures();
 
   // ── layers ──
-  const bgLayer = new Container();
-  const world = new Container();
-  const shipLayer = new Container();
-  const dustLayer = new Container();
-  const constellationLayer = new Container();
-  const ringsLayer = new Container();
-  const apLayer = new Container();
-  const eventStarLayer = new Container();
-  const fxLayer = new Container();
-  const stationLayer = new Container();
-  const planetLayer = new Container();
+  const bgLayer = new Container(); bgLayer.label = 'bgLayer';
+  const world = new Container(); world.label = 'world';
+  const shipLayer = new Container(); shipLayer.label = 'shipLayer';
+  const dustLayer = new Container(); dustLayer.label = 'dustLayer';
+  const constellationLayer = new Container(); constellationLayer.label = 'constellationLayer';
+  const ringsLayer = new Container(); ringsLayer.label = 'ringsLayer';
+  const apLayer = new Container(); apLayer.label = 'apLayer';
+  const eventStarLayer = new Container(); eventStarLayer.label = 'eventStarLayer';
+  const fxLayer = new Container(); fxLayer.label = 'fxLayer';
+  const stationLayer = new Container(); stationLayer.label = 'stationLayer';
+  const planetLayer = new Container(); planetLayer.label = 'planetLayer';
   world.addChild(shipLayer, dustLayer, eventStarLayer, constellationLayer,
     ringsLayer, planetLayer, apLayer, fxLayer, stationLayer);
   app.stage.addChild(bgLayer, world);
