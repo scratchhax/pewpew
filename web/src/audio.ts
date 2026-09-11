@@ -126,6 +126,7 @@ export class Audio {
   private weather: State['weather'] = 'calm';
   private started = false;
   private gestured = false;
+  private wantRec = false;
 
   constructor(private settings: Settings) {
     window.addEventListener('pointerdown', () => this.onGesture());
@@ -135,6 +136,14 @@ export class Audio {
       if (document.hidden) void this.ctx.suspend();
       else if (this.settings.audio) void this.ctx.resume();
     });
+    // ?audiorec=1 — capture the synth to a webm via MediaRecorder (no sound
+    // device needed) and POST it when window.__recStop() is called.
+    if (typeof location !== 'undefined'
+      && new URLSearchParams(location.search).has('audiorec')) {
+      this.wantRec = true;
+      this.gestured = true;
+      this.maybeStart();
+    }
   }
 
   private onGesture(): void {
@@ -156,6 +165,7 @@ export class Audio {
     this.master = ctx.createGain();
     this.master.gain.value = this.settings.volume * 1.1;
     this.master.connect(this.analyser).connect(ctx.destination);
+    if (this.wantRec) this.startRec();
 
     // ── algorithmic hangar: convolution reverb, IR synthesized here ──
     const ir = ctx.createBuffer(2, Math.floor(ctx.sampleRate * 2.4), ctx.sampleRate);
@@ -231,6 +241,34 @@ export class Audio {
     if (this.master && this.ctx) {
       this.master.gain.setTargetAtTime(v * 1.1, this.ctx.currentTime, 0.2);
     }
+  }
+
+  /** Dev hook (?audiorec=1): capture the master bus to a webm and POST it. */
+  private startRec(): void {
+    const ctx = this.ctx, master = this.master;
+    if (!ctx || !master) return;
+    void ctx.resume();
+    const dest = ctx.createMediaStreamDestination();
+    master.connect(dest);
+    let mr: MediaRecorder;
+    try {
+      mr = new MediaRecorder(dest.stream, { mimeType: 'audio/webm' });
+    } catch { return; }
+    const parts: BlobPart[] = [];
+    mr.ondataavailable = (e) => { if (e.data && e.data.size) parts.push(e.data); };
+    (window as unknown as Record<string, unknown>).__recStop = () =>
+      new Promise<void>((resolve) => {
+        if (mr.state === 'inactive') { resolve(); return; }
+        mr.onstop = async () => {
+          const blob = new Blob(parts, { type: 'audio/webm' });
+          try {
+            await fetch('https://pewpew.rec/audio.webm', { method: 'POST', body: blob });
+          } catch { /* recorder harness only */ }
+          resolve();
+        };
+        mr.stop();
+      });
+    mr.start();
   }
 
   setReverb(v: number): void {

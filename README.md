@@ -10,7 +10,7 @@ never touches the network itself.
 
 ![demo](docs/demo.gif)
 
-Full 42s showreel — calm cruise → the F1 config tour → full storm:
+Full 42s showreel with sound — calm cruise → the F1 config tour → full storm:
 **[docs/demo.mp4](docs/demo.mp4)** · Screenshots: [hero](docs/hero.png) ·
 [storm](docs/storm.png) · [settings](docs/panel.png) · [debug](docs/debug.png)
 
