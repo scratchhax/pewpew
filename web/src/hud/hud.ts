@@ -378,11 +378,11 @@ export class Hud {
     c.moveTo(mid - R, mid); c.lineTo(mid + R, mid);
     c.moveTo(mid, mid - R); c.lineTo(mid, mid + R);
     c.stroke();
-    // sweep wedge
+    // sweep wedge — fading trail BEHIND the clockwise-moving line
     const grad = c.createConicGradient(this.sweep, mid, mid);
-    grad.addColorStop(0, 'rgba(70,240,217,0.30)');
-    grad.addColorStop(0.12, 'rgba(70,240,217,0)');
-    grad.addColorStop(1, 'rgba(70,240,217,0)');
+    grad.addColorStop(0, 'rgba(70,240,217,0)');
+    grad.addColorStop(0.88, 'rgba(70,240,217,0)');
+    grad.addColorStop(1, 'rgba(70,240,217,0.30)');
     c.fillStyle = grad;
     c.beginPath(); c.arc(mid, mid, R, 0, Math.PI * 2); c.fill();
     c.strokeStyle = 'rgba(70,240,217,0.8)';
@@ -395,9 +395,9 @@ export class Hud {
       const b = this.blips[i];
       b.age += dt;
       if (b.age > 6) { this.blips.splice(i, 1); continue; }
-      let d = Math.abs(((this.sweep - b.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-      d = Math.PI - d;
-      const lit = d < 0.18 ? 1 : 0;
+      let d = this.sweep - b.a;
+      d = Math.atan2(Math.sin(d), Math.cos(d));   // angular sep to sweep, [-PI,PI]
+      const lit = Math.abs(d) < 0.18 ? 1 : 0;     // sweep passing over the blip
       const base = Math.max(0, 1 - b.age / 6);
       const alpha = Math.max(lit, base * 0.25 + (lit ? base : 0));
       c.fillStyle = b.color;

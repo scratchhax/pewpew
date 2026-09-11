@@ -9,7 +9,9 @@ export class Station {
   private core: Sprite;
   private ringG: Graphics;
   private hexG: Graphics;
+  private structG: Graphics;
   private orbiters: Sprite[] = [];
+  private verts: Sprite[] = [];
   private pulse = 0;         // 0..1 energy flash
   private t = 0;
   private phi1 = Math.random() * Math.PI * 2;   // flight pattern, unique per boot
@@ -29,6 +31,8 @@ export class Station {
 
     this.ringG = new Graphics();
     this.hexG = new Graphics();
+    this.structG = new Graphics();
+    this.structG.blendMode = 'add';
 
     for (let i = 0; i < 3; i++) {
       const o = new Sprite(glow);
@@ -37,7 +41,17 @@ export class Station {
       o.tint = 0x9ff3ff;
       this.orbiters.push(o);
     }
-    layer.addChild(this.cloudLayer, this.ringG, this.hexG, this.core, ...this.orbiters);
+    // six vertex nodes that light up the outer hull corners
+    for (let i = 0; i < 6; i++) {
+      const v = new Sprite(glow);
+      v.anchor.set(0.5);
+      v.scale.set(0.42);
+      v.tint = 0xbff6ff;
+      v.blendMode = 'add';
+      this.verts.push(v);
+    }
+    layer.addChild(this.cloudLayer, this.ringG, this.hexG, this.structG,
+      this.core, ...this.verts, ...this.orbiters);
     this.layout();
   }
 
@@ -125,14 +139,60 @@ export class Station {
     }
 
     this.hexG.clear();
-    const hr = base * 0.022;
-    const rot = this.t * 0.4;
-    const pts: number[] = [];
+    this.structG.clear();
+    const hr = base * 0.030;
+    const outerRot = this.t * 0.28;
+    const innerRot = -this.t * 0.5;
+    const hr2 = hr * 0.56;
+    const TAU = Math.PI * 2;
+
+    // outer hull hexagon
+    const outer: number[] = [];
     for (let i = 0; i < 6; i++) {
-      const a = rot + (i / 6) * Math.PI * 2;
-      pts.push(cx + Math.cos(a) * hr, cy + Math.sin(a) * hr);
+      const a = outerRot + (i / 6) * TAU;
+      outer.push(cx + Math.cos(a) * hr, cy + Math.sin(a) * hr);
     }
-    this.hexG.poly(pts).stroke({ width: 2, color: 0xbff6ff, alpha: 0.85 });
+    this.hexG.poly(outer).closePath().stroke({ width: 2, color: 0xbff6ff, alpha: 0.9 });
+
+    // counter-rotating inner core hexagon
+    const inner: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      const a = innerRot + (i / 6) * TAU;
+      inner.push(cx + Math.cos(a) * hr2, cy + Math.sin(a) * hr2);
+    }
+    this.hexG.poly(inner).closePath().stroke({ width: 1.4, color: tint, alpha: 0.75 });
+
+    // spokes linking inner and outer hull — twist as the cores counter-spin
+    for (let i = 0; i < 6; i++) {
+      this.hexG.moveTo(inner[i * 2], inner[i * 2 + 1])
+        .lineTo(outer[i * 2], outer[i * 2 + 1])
+        .stroke({ width: 1, color: tint, alpha: 0.5 });
+    }
+
+    // bright reactor core
+    this.hexG.circle(cx, cy, hr * 0.2).fill({ color: 0xffffff, alpha: 0.9 });
+    this.hexG.circle(cx, cy, hr * 0.34).stroke({ width: 1.2, color: 0xbff6ff, alpha: 0.85 });
+
+    // rotating reactor collar — three additive arcs sweeping around the hull
+    const arcR = hr * 1.3;
+    const arcRot = this.t * 1.2;
+    for (let k = 0; k < 3; k++) {
+      const s = arcRot + (k / 3) * TAU;
+      this.structG.arc(cx, cy, arcR, s, s + 0.7)
+        .stroke({ width: 2.4, color: tint, alpha: 0.5 + this.pulse * 0.4 });
+    }
+
+    // vertex nodes light the hull corners, chasing around
+    for (let i = 0; i < 6; i++) {
+      const v = this.verts[i];
+      const a = outerRot + (i / 6) * TAU;
+      v.x = cx + Math.cos(a) * hr;
+      v.y = cy + Math.sin(a) * hr;
+      v.tint = tint;
+      const beat = 0.5 + 0.5 * Math.sin(this.t * 2.6 - i * 0.9);
+      v.alpha = 0.3 + this.pulse * 0.5 + beat * 0.35;
+      v.scale.set(0.4 + this.pulse * 0.25 + beat * 0.08);
+    }
 
     this.orbiters.forEach((o, i) => {
       const a = this.t * (0.5 + i * 0.18) * (1 + heat * 1.5) + (i * Math.PI * 2) / 3;
