@@ -1,10 +1,13 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { hash01 } from '../state';
 
-interface StarNode { s: Sprite; halo: Sprite; lastSeen: number; }
+interface StarNode { s: Sprite; halo: Sprite; lastSeen: number; vx: number; vy: number; }
 interface Link { x1: number; y1: number; x2: number; y2: number; life: number; color: number; }
 
 const MAX_STARS = 140;
+// slow drift so IP stars never sit on the same pixels (LCD burn-in);
+// kept gentle so the constellation reads as a lazy star map, not sliding
+const DRIFT_SPEED = 7;   // px/sec baseline
 
 /** Faint IP star field with transient src→dst connection lines. */
 export class Constellation {
@@ -18,7 +21,16 @@ export class Constellation {
     layer.addChild(this.lineG);
   }
 
-  resize(w: number, h: number): void { this.w = w; this.h = h; }
+  resize(w: number, h: number): void {
+    this.w = w; this.h = h;
+    // keep drifting stars inside the (possibly new) viewport
+    const m = Math.min(w, h) * 0.06;
+    for (const node of this.stars.values()) {
+      node.s.x = Math.min(w - m, Math.max(m, node.s.x));
+      node.s.y = Math.min(h - m, Math.max(m, node.s.y));
+      node.halo.x = node.s.x; node.halo.y = node.s.y;
+    }
+  }
 
   private positionFor(ip: string): { x: number; y: number } {
     const h1 = hash01(ip);
@@ -51,7 +63,10 @@ export class Constellation {
       halo.alpha = 0;
 
       this.layer.addChild(halo, sp);
-      s = { s: sp, halo, lastSeen: now };
+      const va = Math.random() * Math.PI * 2;
+      const vs = DRIFT_SPEED * (0.4 + Math.random() * 0.9);
+      s = { s: sp, halo, lastSeen: now,
+            vx: Math.cos(va) * vs, vy: Math.sin(va) * vs };
       this.stars.set(ip, s);
       if (this.stars.size > MAX_STARS) {
         let oldestKey = ''; let oldest = Infinity;
@@ -83,7 +98,17 @@ export class Constellation {
 
   update(dt: number): void {
     const now = performance.now();
+    const m = Math.min(this.w, this.h) * 0.06;
     for (const node of this.stars.values()) {
+      // lazy drift with soft bounce off the margins — no fixed star pixels
+      node.s.x += node.vx * dt;
+      node.s.y += node.vy * dt;
+      if (node.s.x < m) { node.s.x = m; node.vx = Math.abs(node.vx); }
+      else if (node.s.x > this.w - m) { node.s.x = this.w - m; node.vx = -Math.abs(node.vx); }
+      if (node.s.y < m) { node.s.y = m; node.vy = Math.abs(node.vy); }
+      else if (node.s.y > this.h - m) { node.s.y = this.h - m; node.vy = -Math.abs(node.vy); }
+      node.halo.x = node.s.x; node.halo.y = node.s.y;
+
       const since = (now - node.lastSeen) / 1000;
       const target = since < 8 ? 1 : Math.max(0.15, 1 - (since - 8) * 0.05);
       node.s.alpha += (target - node.s.alpha) * Math.min(1, dt * 2);

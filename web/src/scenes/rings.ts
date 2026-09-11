@@ -34,6 +34,7 @@ export class Rings {
 
   constructor(private layer: Container, private dot: Texture,
               private w: number, private h: number) {
+    this.g.blendMode = 'add';
     layer.addChild(this.g, this.objLayer);
   }
 
@@ -70,16 +71,30 @@ export class Rings {
     for (const kind of Object.keys(DEFS) as RingKind[]) {
       const def = DEFS[kind];
       const st = this.state[kind];
-      // whole-ring flare: fast attack on activate, smooth fall back to rest
+      // glow envelope: fast attack on activate, smooth fall back to rest.
+      // The ring geometry stays put — activity shows as a soft halo that
+      // blooms up and fades down, the way the station core glow does,
+      // rather than the ring line itself thickening / bouncing.
       st.pulse = Math.max(0, st.pulse - dt * (0.9 + st.pulse * 0.9));
-      // radius bounce — the ring physically kicks and settles
-      const radius = base * def.radius * (1 + st.pulse * 0.03);
+      const radius = base * def.radius;
+      const glow = Math.min(1, st.pulse);
+
+      // steady base outline so the ring is always readable at rest
       this.g.circle(cx, cy, radius)
-        .stroke({
-          width: 1.2 + Math.min(3, st.pulse) * 3.4,
-          color: def.color,
-          alpha: Math.min(0.95, 0.14 + st.pulse * 0.45),
-        });
+        .stroke({ width: 1.1, color: def.color, alpha: 0.15 });
+
+      if (glow > 0.01) {
+        // widening faint passes fake a gaussian bloom around the ring
+        for (let k = 1; k <= 3; k++) {
+          this.g.circle(cx, cy, radius)
+            .stroke({ width: 1.1 + k * 7 * glow, color: def.color,
+                      alpha: 0.045 * glow / k });
+        }
+        // bright core line riding on the halo
+        this.g.circle(cx, cy, radius)
+          .stroke({ width: 1.5 + glow * 2.6, color: def.color,
+                    alpha: Math.min(0.95, 0.2 + glow * 0.55) });
+      }
 
       for (let i = st.objs.length - 1; i >= 0; i--) {
         const o = st.objs[i];
