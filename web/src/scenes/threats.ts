@@ -2,11 +2,12 @@ import { Container, Sprite, Texture } from 'pixi.js';
 import type { Fx } from './fx';
 
 interface Missile {
-  s: Sprite;
+  root: Container;
+  body: Sprite;
+  aura: Sprite;
   startX: number; startY: number;
   t: number; flight: number;
   interceptAt: number;
-  shot: boolean;
   freq: number; amp: number; phase: number;
   prevX: number; prevY: number;
   color: number;
@@ -14,48 +15,55 @@ interface Missile {
 
 /**
  * IDS/IPS threats (Enhanced/CyberSecure tier) are always malicious, so they
- * arrive as attacks inbound on the core — but unlike block asteroids (which
- * barrel in on a straight line) they fly a looping corkscrew that tightens as
- * it closes, signalling a more sophisticated attack. The defense laser still
- * shoots them down mid-flight, amber explosion instead of red.
+ * arrive as attack rockets inbound on the core. Unlike block asteroids (which
+ * barrel in on a straight line) they burn in slowly, weaving hard corkscrews
+ * that "zoom around" for several seconds before the defense laser shoots them
+ * down close to the station — a bright, unmistakable amber intercept.
  */
 export class Threats {
   private active: Missile[] = [];
-  private trailTick = 0;
 
-  constructor(private layer: Container, private textures: Texture[], private fx: Fx) {}
+  constructor(private layer: Container, private rocket: Texture,
+              private glow: Texture, private fx: Fx) {}
 
   count(): number { return this.active.length; }
 
   spawn(cx: number, cy: number, w: number, h: number, angle: number, color = 0xff9a45): void {
-    const radius = Math.max(w, h) * 0.6;
+    const radius = Math.max(w, h) * 0.62;
     const x = cx + Math.cos(angle) * radius;
     const y = cy + Math.sin(angle) * radius;
-    const speed = Math.min(w, h) * 0.21;            // a touch faster than rocks
+    // slow burn: ~6-8s across the field so the whole attack is visible
+    const speed = Math.min(w, h) * 0.15;
     const dist = Math.hypot(cx - x, cy - y) || 1;
 
-    const s = new Sprite(this.textures[(Math.random() * this.textures.length) | 0]);
-    s.anchor.set(0.5);
-    s.tint = color;
-    s.scale.set(0.32 + Math.random() * 0.22);
-    s.x = x; s.y = y;
-    this.layer.addChild(s);
+    const root = new Container();
+    const aura = new Sprite(this.glow);
+    aura.anchor.set(0.5);
+    aura.tint = color;
+    aura.blendMode = 'add';
+    aura.scale.set(1.4);
+    aura.alpha = 0.55;
+    const body = new Sprite(this.rocket);
+    body.anchor.set(0.5);
+    body.scale.set(0.62 + Math.random() * 0.2);
+    root.addChild(aura, body);
+    root.x = x; root.y = y;
+    this.layer.addChild(root);
 
     this.active.push({
-      s, startX: x, startY: y,
+      root, body, aura, startX: x, startY: y,
       t: 0, flight: dist / speed,
-      interceptAt: 0.4 + Math.random() * 0.35,
-      shot: false,
-      freq: 2.5 + Math.random() * 2.5,              // loops across the approach
-      amp: Math.min(w, h) * (0.05 + Math.random() * 0.05),  // ~24–46px loops
+      interceptAt: 0.66 + Math.random() * 0.26,   // shot down close to the core
+      freq: 4.5 + Math.random() * 3.5,            // tight, frequent weaving
+      amp: Math.min(w, h) * (0.08 + Math.random() * 0.05),
       phase: Math.random() * Math.PI * 2,
       prevX: x, prevY: y, color,
     });
   }
 
   /**
-   * March every missile along its tightening corkscrew and intercept/impact.
-   * Returns what happened this frame so the caller drives punch / slowmo.
+   * March every rocket along its weaving approach, trail flame, and intercept
+   * /impact. Returns what happened this frame so the caller drives punch.
    */
   update(dt: number, cx: number, cy: number): {
     intercepts: { x: number; y: number }[];
@@ -63,42 +71,47 @@ export class Threats {
   } {
     const intercepts: { x: number; y: number }[] = [];
     const impacts: { x: number; y: number }[] = [];
-    this.trailTick++;
-    const emitTrail = (this.trailTick & 1) === 0;    // trail every other frame
 
     for (let i = this.active.length - 1; i >= 0; i--) {
       const m = this.active[i];
       m.t += dt;
       const p = Math.min(1, m.t / m.flight);
 
-      // base point drifting inward + a shrinking circular offset = corkscrew
+      // base point drifting inward + a weaving offset that only tightens late,
+      // so it keeps "zooming around" for most of the run
       const bx = m.startX + (cx - m.startX) * p;
       const by = m.startY + (cy - m.startY) * p;
       const th = m.phase + m.freq * Math.PI * 2 * p;
-      const r = m.amp * (1 - p);
+      const r = m.amp * (1 - 0.45 * p);
       const nx = bx + Math.cos(th) * r;
       const ny = by + Math.sin(th) * r;
 
       const dx = nx - m.prevX, dy = ny - m.prevY;
-      if (dx || dy) m.s.rotation = Math.atan2(dy, dx) + Math.PI / 2;
-      m.prevX = nx; m.prevY = ny; m.s.x = nx; m.s.y = ny;
-      if (emitTrail) this.fx.emit(nx, ny, m.color, 1, 16, 0.26, 0.5);
+      const heading = Math.atan2(dy, dx) + Math.PI / 2;
+      if (dx || dy) m.body.rotation = heading;
+      m.root.x = nx; m.root.y = ny;
+      m.prevX = nx; m.prevY = ny;
 
-      if (!m.shot && m.t >= m.flight * m.interceptAt) {
-        m.shot = true;
-        this.fx.laser(cx, cy, nx, ny, 0x6ef7ff, 2.5);
-        this.fx.emit(cx, cy, 0x6ef7ff, 4, 60, 0.14, 0.3);   // muzzle flash
-        this.fx.explosion(nx, ny, false, m.color);          // amber detonation
-        this.fx.burst(nx, ny, m.color, 8);
+      // engine flame: exhaust streams from the tail, opposite the heading
+      const ex = nx - Math.cos(heading - Math.PI / 2) * 14;
+      const ey = ny - Math.sin(heading - Math.PI / 2) * 14;
+      this.fx.emit(ex, ey, 0xffb14a, 2, 26, 0.22, 0.34);
+      m.aura.alpha = 0.45 + Math.sin(m.t * 20) * 0.12;   // engine flicker
+
+      if (m.t >= m.flight * m.interceptAt) {
+        this.fx.laser(cx, cy, nx, ny, 0x6ef7ff, 3);
+        this.fx.emit(cx, cy, 0x6ef7ff, 5, 70, 0.16, 0.3);     // muzzle flash
+        this.fx.explosion(nx, ny, true, m.color);             // amber detonation
+        this.fx.burst(nx, ny, m.color, 12);
         intercepts.push({ x: nx, y: ny });
-        this.layer.removeChild(m.s); m.s.destroy(); this.active.splice(i, 1);
+        this.layer.removeChild(m.root); m.root.destroy(); this.active.splice(i, 1);
         continue;
       }
 
       if (Math.hypot(nx - cx, ny - cy) < 24 || m.t > m.flight + 0.6) {
-        this.fx.explosion(m.s.x, m.s.y, true, m.color);     // reached the core
-        impacts.push({ x: m.s.x, y: m.s.y });
-        this.layer.removeChild(m.s); m.s.destroy(); this.active.splice(i, 1);
+        this.fx.explosion(m.root.x, m.root.y, true, m.color);   // reached the core
+        impacts.push({ x: m.root.x, y: m.root.y });
+        this.layer.removeChild(m.root); m.root.destroy(); this.active.splice(i, 1);
       }
     }
     return { intercepts, impacts };

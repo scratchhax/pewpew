@@ -158,6 +158,75 @@ export function makeAsteroid(size = 48, seed = 1): Texture {
   });
 }
 
+/** IDS attack rocket, drawn nose-up (rotation 0 = pointing up). */
+export function makeRocket(size = 72): Texture {
+  return canvas(size, (ctx, s) => {
+    const c = s / 2;
+    const top = s * 0.06;         // nose tip
+    const bodyTop = s * 0.22;
+    const bodyBot = s * 0.72;
+    const bw = s * 0.15;          // body half-width
+
+    // engine flame (baked, additive reads hot against dark space)
+    const fl = ctx.createLinearGradient(0, bodyBot, 0, s * 0.99);
+    fl.addColorStop(0, 'rgba(255,240,190,0.95)');
+    fl.addColorStop(0.4, 'rgba(255,150,50,0.85)');
+    fl.addColorStop(1, 'rgba(255,80,20,0)');
+    ctx.fillStyle = fl;
+    ctx.beginPath();
+    ctx.moveTo(c - bw * 0.62, bodyBot);
+    ctx.quadraticCurveTo(c, s * 1.02, c + bw * 0.62, bodyBot);
+    ctx.closePath();
+    ctx.fill();
+
+    // fins (red)
+    ctx.fillStyle = '#e0432a';
+    for (const d of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(c + d * bw * 0.9, bodyBot - s * 0.16);
+      ctx.lineTo(c + d * bw * 1.9, bodyBot + s * 0.02);
+      ctx.lineTo(c + d * bw * 0.9, bodyBot + s * 0.02);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // body (metallic white → grey, lit from left)
+    const bg = ctx.createLinearGradient(c - bw, 0, c + bw, 0);
+    bg.addColorStop(0, 'rgba(238,242,250,1)');
+    bg.addColorStop(0.5, 'rgba(206,214,228,1)');
+    bg.addColorStop(1, 'rgba(120,130,150,1)');
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.moveTo(c - bw, bodyBot);
+    ctx.lineTo(c - bw, bodyTop);
+    ctx.quadraticCurveTo(c - bw, top + s * 0.02, c, top);
+    ctx.quadraticCurveTo(c + bw, top + s * 0.02, c + bw, bodyTop);
+    ctx.lineTo(c + bw, bodyBot);
+    ctx.closePath();
+    ctx.fill();
+
+    // nose cone (red)
+    ctx.fillStyle = '#e8482c';
+    ctx.beginPath();
+    ctx.moveTo(c, top);
+    ctx.quadraticCurveTo(c + bw, top + s * 0.02, c + bw, bodyTop + s * 0.06);
+    ctx.lineTo(c - bw, bodyTop + s * 0.06);
+    ctx.quadraticCurveTo(c - bw, top + s * 0.02, c, top);
+    ctx.closePath();
+    ctx.fill();
+
+    // amber hazard window
+    ctx.fillStyle = '#ffcf5a';
+    ctx.beginPath();
+    ctx.ellipse(c, bodyTop + s * 0.13, bw * 0.42, s * 0.038, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(60,40,10,0.6)';
+    ctx.beginPath();
+    ctx.ellipse(c, bodyTop + s * 0.13, bw * 0.24, s * 0.022, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
 /** Ambient freighter silhouette with tiny lit windows. */
 export function makeShip(size = 96, seed = 1): Texture {
   return canvas(size, (ctx, s) => {
@@ -530,6 +599,7 @@ export interface Textures {
   crystal: Texture;
   planets: Texture[];
   asteroids: Texture[];
+  rocket: Texture;
   ships: Texture[];
   icons: Texture[];
 }
@@ -543,6 +613,7 @@ export function buildTextures(): Textures {
     cloud: makeCloud(),
     clouds: [1, 2, 3].map((i) => makeCloud(256, i * 13 + 1)),
     asteroids: [1, 2, 3, 4, 5].map((i) => makeAsteroid(56, i)),
+    rocket: makeRocket(72),
     ships: [1, 2, 3].map((i) => makeShip(96, i)),
     icons: makeIconShips(),
   };

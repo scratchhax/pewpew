@@ -103,7 +103,7 @@ async function main(): Promise<void> {
   const rings = new Rings(ringsLayer, textures.dot, textures.glow, w, h);
   const crystals = new Crystals(fxLayer, textures.crystal, textures.glow, fx);
   const asteroids = new Asteroids(fxLayer, textures.asteroids, fx);
-  const threats = new Threats(fxLayer, textures.asteroids, fx);
+  const threats = new Threats(fxLayer, textures.rocket, textures.glow, fx);
   const apCores = new ApCores(apLayer, textures.glow, fx, w, h);
   const eventStars = new EventStars(eventStarLayer, textures.dot, textures.glow);
   const planets = new Planets(planetLayer, textures.planets, w, h);
@@ -401,6 +401,7 @@ async function main(): Promise<void> {
 
     const hits = asteroids.update(dt, station.center.x, station.center.y);
     const th = threats.update(dt, station.center.x, station.center.y);
+    station.setAlarm(threats.count() > 0);
     if (hits.impacts.length > 0 || th.impacts.length > 0) {
       state.slowmo(0.25, 0.55);
       punch += 0.06;

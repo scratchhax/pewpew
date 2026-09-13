@@ -17,6 +17,8 @@ export class Station {
   private aura: { s: Sprite; r: number; a: number; sp: number; wob: number;
     wosp: number; sc: number; al: number }[] = [];
   private pulse = 0;         // 0..1 energy flash
+  private danger = 0;        // 0..1 "under attack": core red while a threat lives
+  private alarmOn = false;
   private t = 0;
   private phi1 = Math.random() * Math.PI * 2;   // flight pattern, unique per boot
   private phi2 = Math.random() * Math.PI * 2;
@@ -103,6 +105,10 @@ export class Station {
 
   flash(strength = 0.6): void { this.pulse = Math.min(1, this.pulse + strength); }
 
+  /** Core goes red the moment a threat rocket is alive, and holds red until
+   *  the last one is shot down (then fades back). */
+  setAlarm(on: boolean): void { this.alarmOn = on; }
+
   /** Soft event-colored cloud blooming around the core, drifting outward.
    *  Per-color throttle keeps constant allow traffic from turning the core
    *  into permanent green fog — clouds need dark time between blooms. */
@@ -141,6 +147,8 @@ export class Station {
   update(dt: number, state: State): void {
     this.t += dt;
     this.pulse = Math.max(0, this.pulse - dt * 1.6);
+    const target = this.alarmOn ? 1 : 0;
+    this.danger += (target - this.danger) * Math.min(1, dt * (this.alarmOn ? 12 : 3));
 
     // Lissajous roam: prime-ratio periods never visibly loop; storms add
     // smooth turbulence on top of the lazy drift
@@ -158,20 +166,31 @@ export class Station {
     // threat tint: cyan → amber → red
     const r = threat < 0.5 ? 0.2 + threat * 1.2 : 1;
     const g = threat < 0.5 ? 0.88 - threat * 0.5 : 0.35 - (threat - 0.5) * 0.55;
-    const tint = toRgb(r, Math.max(0.1, g), 0.35 * (1 - threat));
+    let tint = toRgb(r, Math.max(0.1, g), 0.35 * (1 - threat));
+
+    // "under attack" alarm: a live threat rocket slams the core to red, and it
+    // holds red until the last one is shot down
+    if (this.danger > 0.002) {
+      const d = this.danger;
+      const tr = (tint >> 16) & 255, tg = (tint >> 8) & 255, tb = tint & 255;
+      tint = ((Math.round(tr + (255 - tr) * d) << 16)
+        | (Math.round(tg + (34 - tg) * d) << 8)
+        | Math.round(tb + (34 - tb) * d));
+    }
 
     const breathe = 1 + Math.sin(this.t * 2.2) * 0.05 + this.pulse * 0.5
-                    + state.energy * 0.35;
+                    + state.energy * 0.35
+                    + this.danger * (0.10 + 0.08 * Math.sin(this.t * 9));
     this.bloom.x = cx;
     this.bloom.y = cy;
     this.bloom.tint = tint;
-    this.bloom.scale.set(4.2 * (0.85 + breathe * 0.25 + this.pulse * 0.4));
-    this.bloom.alpha = 0.1 + state.energy * 0.1 + this.pulse * 0.14;
+    this.bloom.scale.set(4.2 * (0.85 + breathe * 0.25 + this.pulse * 0.4 + this.danger * 0.3));
+    this.bloom.alpha = 0.1 + state.energy * 0.1 + this.pulse * 0.14 + this.danger * 0.22;
     this.core.x = cx;
     this.core.y = cy;
     this.core.scale.set(2.3 * breathe);
     this.core.tint = tint;
-    this.core.alpha = 0.48 + this.pulse * 0.22;
+    this.core.alpha = 0.48 + this.pulse * 0.22 + this.danger * 0.2;
 
     const base = Math.min(this.w, this.h);
 
