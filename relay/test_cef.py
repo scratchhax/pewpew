@@ -77,6 +77,7 @@ IPTABLES = (
 def test_blocked():
     e = parsers.parse_log(BLOCKED)
     assert e['log_type'] == 'firewall', e['log_type']
+    assert not e.get('threat'), 'firewall block must not be flagged as IDS threat'
     assert e['rule_action'] == 'block', e['rule_action']
     assert e['direction'] == 'local', e['direction']
     assert e['src_ip'] == '192.0.2.49', e['src_ip']
@@ -94,6 +95,7 @@ def test_blocked():
 def test_threat():
     e = parsers.parse_log(THREAT)
     assert e['log_type'] == 'firewall', e['log_type']
+    assert e.get('threat') is True, 'IDS/IPS threat event must carry threat=True'
     assert e['rule_action'] == 'allow', e['rule_action']
     assert e['direction'] == 'outbound', e['direction']   # CEF 'outgoing'
     assert e['src_ip'] is None, e['src_ip']               # IDS events carry no src IP

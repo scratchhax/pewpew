@@ -72,6 +72,7 @@ CEF_DST_IP    = _cef_field('UNIFIdstDeviceIp')
 CEF_DST       = _cef_field('dst')
 CEF_MSG       = _cef_field('msg')
 CEF_SIGNATURE = _cef_field('UNIFIipsSignature')
+CEF_POLICY_TYPE = _cef_field('UNIFIpolicyType')
 
 # CEF act= / UNIFIdirection= use different vocabulary than the iptables path.
 CEF_ACTION_MAP    = {'blocked': 'block', 'allowed': 'allow'}
@@ -438,6 +439,14 @@ def parse_cef(body: str) -> dict:
         result['direction'] = _both_private_direction(
             result.get('src_ip'), result.get('dst_ip')
         )
+
+    # IDS/IPS detections (Enhanced tier) are always malicious, even when CEF
+    # reports act=allowed (monitor mode). Mark them so the frontend renders an
+    # attack instead of a benign allow. Keyed on policy type or event name.
+    policy_type = (field(CEF_POLICY_TYPE) or '').lower()
+    name = (event_name or '').lower()
+    if 'ids' in policy_type or 'ips' in policy_type or 'threat' in name:
+        result['threat'] = True
 
     return result
 

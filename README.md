@@ -97,6 +97,7 @@ Colors of every effect match the comms-log lines verbatim:
 | dhcp     | yellow     | station→AP yellow laser, 3rd ring |
 | wifi     | purple     | AP↔station links + crystals, 4th ring |
 | system   | grey       | grey shockwave from the station |
+| threat   | amber      | IDS/IPS detection (Enhanced/CyberSecure tier) — an inbound attack that flies a **looping** path into the core and is shot down like an asteroid; carries a MAC, no source IP |
 
 Traffic volume drives weather: **STORM** at ≥300 events/30s and **HURRICANE** at
 ≥1200 — the HUD goes amber, the station flares, and the field fills with debris

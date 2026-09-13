@@ -5,7 +5,8 @@ type Key = keyof Settings;
 const SCENE: Array<[Key, string]> = [
   ['starfield', 'Starfield'], ['nebula', 'Nebula clouds'], ['dust', 'Space dust'],
   ['ambientShips', 'Ambient ships'], ['planets', 'DHCP planets'], ['eventStars', 'Event stars'],
-  ['asteroids', 'Block asteroids'], ['crystals', 'Allow crystals'],
+  ['asteroids', 'Block asteroids'], ['threatMissiles', 'Threat missiles'],
+  ['crystals', 'Allow crystals'],
   ['constellations', 'IP constellations'], ['ringObjects', 'Ring objects'],
   ['apCores', 'AP cores'], ['screenShake', 'Screen shake'],
 ];
@@ -16,10 +17,11 @@ const HUD: Array<[Key, string]> = [
 ];
 const EVENT_VOL: Array<[Key, string]> = [
   ['gBlock', 'Block'], ['gAllow', 'Allow'], ['gDns', 'DNS'], ['gWifi', 'WiFi'], ['gDhcp', 'DHCP'],
+  ['gThreat', 'Threat'],
 ];
 const GATES: Array<[Key, string]> = [
   ['gateBlock', 'Block'], ['gateAllow', 'Allow'], ['gateDns', 'DNS'],
-  ['gateWifi', 'WiFi'], ['gateDhcp', 'DHCP'],
+  ['gateWifi', 'WiFi'], ['gateDhcp', 'DHCP'], ['gateThreat', 'Threat'],
 ];
 const MESH_MODES: Array<[MeshMode, string]> = [
   ['spectrum', 'Spectrum (rainbow web)'], ['law', 'Event-law (all allow-green)'],

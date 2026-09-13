@@ -17,6 +17,12 @@ const DEMO_SERVICES: Array<[number, string, string]> = [
   [443, 'https', 'tcp'], [80, 'http', 'tcp'], [53, 'dns', 'udp'],
   [8443, 'https-alt', 'tcp'], [22, 'ssh', 'tcp'], [51820, 'wireguard', 'udp'],
 ];
+// IPS-signature-style labels for synthetic IDS/IPS threats (doc-safe).
+const DEMO_THREAT_SIGS = [
+  'ET SCAN Suspicious inbound scan', 'ET POLICY outbound tunnel',
+  'ET TROJAN C2 beacon activity', 'ET WEB_CLIENT exploit attempt',
+  'GPL ATTACK_RESPONSE id check', 'ET INFO suspicious DNS query',
+];
 
 const rnd = Math.random;
 const pick = <T,>(a: T[]): T => a[(rnd() * a.length) | 0];
@@ -28,6 +34,17 @@ function isoNow(): string { return new Date().toISOString(); }
 function demoEvent(blockBias = 0.18): NetEvent {
   const roll = rnd();
   if (roll < 0.6) {
+    if (rnd() < 0.07) {                            // ~7%: IDS/IPS threat (Enhanced tier)
+      const [port, service, proto] = pick(DEMO_SERVICES);
+      return {
+        log_type: 'firewall', timestamp: isoNow(), threat: true,
+        rule_name: 'IDS/IPS', rule_desc: pick(DEMO_THREAT_SIGS),
+        rule_action: 'allow', direction: 'outbound',
+        interface_in: 'LAN', interface_out: 'WAN',
+        src_ip: null, dst_ip: pick(DEMO_WAN), dst_port: port,
+        protocol: proto, service_name: service, mac_address: rndMac(), syslog_host: GW,
+      };
+    }
     const [port, service, proto] = pick(DEMO_SERVICES);
     const blocked = rnd() < blockBias;
     const inbound = rnd() < 0.3;

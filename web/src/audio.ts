@@ -37,7 +37,7 @@ function degreeToFreq(d: number): number {
   return BASE * Math.pow(2, oct + semi / 12);
 }
 
-type Cue = 'block' | 'allow' | 'dns' | 'dhcp' | 'wifi';
+type Cue = 'block' | 'allow' | 'dns' | 'dhcp' | 'wifi' | 'threat';
 
 interface HostVoice {
   deg: number; cell: number[]; cellIdx: number;
@@ -55,7 +55,7 @@ export class Audio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noiseBuf: AudioBuffer | null = null;
-  private pending: Record<Cue, number> = { block: 0, allow: 0, dns: 0, dhcp: 0, wifi: 0 };
+  private pending: Record<Cue, number> = { block: 0, allow: 0, dns: 0, dhcp: 0, wifi: 0, threat: 0 };
   private last = 0;
   private stepAcc = 0;
   private melodyIdx = 12;
@@ -299,9 +299,10 @@ export class Audio {
   }
 
   private ingest(kind: Cue, srcIp?: string): void {
-    const cap = kind === 'allow' ? 10 : 4;
+    const cap = kind === 'allow' ? 10 : kind === 'threat' ? 2 : 4;
     this.pending[kind] = Math.min(cap, this.pending[kind] + 1);
     if (kind === 'block') this.tension = Math.min(1, this.tension + 0.09);
+    if (kind === 'threat') this.tension = Math.min(1, this.tension + 0.14);
     if ((kind === 'allow' || kind === 'dns') && srcIp) this.hostVoice(srcIp);
   }
 
@@ -331,6 +332,7 @@ export class Audio {
       : kind === 'allow' ? this.settings.gAllow
       : kind === 'dns' ? this.settings.gDns
       : kind === 'wifi' ? this.settings.gWifi
+      : kind === 'threat' ? this.settings.gThreat
       : this.settings.gDhcp;
   }
 
@@ -807,13 +809,29 @@ export class Audio {
     const gB = this.settings.gateBlock, gA = this.settings.gateAllow;
     const gD = this.settings.gateDns, gW = this.settings.gateWifi;
     const gH = this.settings.gateDhcp;
+    const gT = this.settings.gateThreat;
     if (mel) {
       this.arrange();
       this.rhythm();
       this.carry();
     }
 
-    if (p.block > 0) {                            // impact: kick + bell taper
+    if (p.threat > 0) {                             // IDS alert: dissonant tritone klaxon
+      if (dev && Math.random() < gT) {
+        const n = Math.min(2, p.threat);
+        for (let i = 0; i < n; i++) {
+          const pan = (Math.random() - 0.5) * 1.2;
+          const base = 150 + Math.random() * 40;    // low + menacing
+          this.voice(base, 'sawtooth', 0.2, 0.085 * this.settings.gThreat,
+            pan, base * 0.85, 0.25, 0.5);           // root, quick downward drop
+          this.voice(base * 1.414, 'square', 0.16, 0.05 * this.settings.gThreat,
+            pan, 0, 0.2, 0.5);                      // tritone dissonance
+        }
+      }
+      p.threat = 0;
+    }
+
+    if (p.block > 0) {                              // impact: kick + bell taper
       if (dev && Math.random() < gB) {
         this.kick(Math.min(0.4, 0.26 + p.block * 0.03) * this.settings.gBlock);
         this.bong(0, this.settings.gBlock);

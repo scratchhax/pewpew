@@ -7,6 +7,7 @@ export interface Settings {
   constellations: boolean;
   crystals: boolean;
   asteroids: boolean;
+  threatMissiles: boolean;   // IDS threats fly looping attack paths into the core
   ringObjects: boolean;
   apCores: boolean;
   terminal: boolean;
@@ -32,11 +33,13 @@ export interface Settings {
   gDns: number;
   gWifi: number;
   gDhcp: number;
+  gThreat: number;
   gateBlock: number;      // per-type gate openness 0..1 (1 = every hit passes)
   gateAllow: number;
   gateDns: number;
   gateWifi: number;
   gateDhcp: number;
+  gateThreat: number;
   deviceMix: number;
   reverb: number;         // hangar reverb wet 0..1
   echo: number;           // dotted-delay level 0..1
@@ -56,6 +59,7 @@ export const DEFAULTS: Settings = {
   constellations: true,
   crystals: true,
   asteroids: true,
+  threatMissiles: true,
   ringObjects: true,
   apCores: true,
   terminal: true,
@@ -81,11 +85,13 @@ export const DEFAULTS: Settings = {
   gDns: 1,
   gWifi: 1,
   gDhcp: 1,
+  gThreat: 1,
   gateBlock: 1,
   gateAllow: 1,
   gateDns: 1,
   gateWifi: 1,
   gateDhcp: 1,
+  gateThreat: 1,
   deviceMix: 1,
   reverb: 0.3,
   echo: 0.5,

@@ -126,6 +126,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
 /* event colors — the law, keep in sync with main.ts COLORS */
 .log-firewall { color: #5ce6a4; text-shadow: 0 0 6px rgba(92,230,164,0.35); }
 .log-block { color: #ff6b6b; text-shadow: 0 0 6px rgba(255,107,107,0.35); }
+.log-threat { color: #ff9a45; text-shadow: 0 0 7px rgba(255,154,69,0.5); font-weight: bold; }
 .log-dns { color: #55b5ff; text-shadow: 0 0 6px rgba(85,181,255,0.35); }
 .log-dhcp { color: #ffd84d; text-shadow: 0 0 6px rgba(255,216,77,0.35); }
 .log-wifi { color: #c08cff; text-shadow: 0 0 6px rgba(192,140,255,0.35); }

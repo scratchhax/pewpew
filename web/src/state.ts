@@ -16,6 +16,7 @@ export class State {
 
   private stamps: number[] = [];  // recent event timestamps (ms)
   private blockStamps: number[] = [];
+  private threatStamps: number[] = [];
 
   get rate30s(): number {
     const cutoff = performance.now() - 30_000;
@@ -29,12 +30,21 @@ export class State {
     return this.blockStamps.length;
   }
 
-  onEvent(kind: 'allow' | 'block' | 'net' | 'wifi-good' | 'wifi-bad' | 'system'): void {
+  private threats30s(): number {
+    const cutoff = performance.now() - 30_000;
+    while (this.threatStamps.length && this.threatStamps[0] < cutoff) this.threatStamps.shift();
+    return this.threatStamps.length;
+  }
+
+  onEvent(kind: 'allow' | 'block' | 'net' | 'wifi-good' | 'wifi-bad' | 'system' | 'threat'): void {
     const now = performance.now();
     this.stamps.push(now);
     if (kind === 'block') {
       this.blockStamps.push(now);
       this.heat = Math.min(1, this.heat + 0.12);
+    } else if (kind === 'threat') {
+      this.threatStamps.push(now);
+      this.heat = Math.min(1, this.heat + 0.06);
     } else if (kind === 'wifi-bad') {
       this.heat = Math.min(1, this.heat + 0.04);
     }
@@ -51,7 +61,10 @@ export class State {
     // 30s windows (fast attack, slow release) instead of per-event bumps.
     const dt = dtReal * this.timeScale;
     const blocks = this.blocks30s();
-    const threatTarget = clamp01(blocks / 450);
+    // IDS/IPS detections are more alarming than routine denies, so they nudge
+    // threat pressure up on their own (0.4 weight) without inflating deny stats.
+    const threats = this.threats30s();
+    const threatTarget = clamp01((blocks + threats * 0.4) / 450);
     const energyTarget = clamp01(0.2 + (this.rate30s - blocks) / 1500);
     const attack = threatTarget > this.threat ? 1.2 : 0.06;
     this.threat += (threatTarget - this.threat) * Math.min(1, dt * attack);

@@ -22,6 +22,7 @@ export interface NetEvent {
   protocol?: string | null;
   service_name?: string | null;
   mac_address?: string | null;
+  threat?: boolean;          // IDS/IPS detection (Enhanced tier) — always malicious
 
   // dns
   dns_type?: string;

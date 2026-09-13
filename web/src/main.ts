@@ -12,6 +12,7 @@ import { Rings } from './scenes/rings';
 import { Fx } from './scenes/fx';
 import { Crystals } from './scenes/crystals';
 import { Asteroids } from './scenes/asteroids';
+import { Threats } from './scenes/threats';
 import { ApCores } from './scenes/apcores';
 import { EventStars } from './scenes/eventstars';
 import { Planets } from './scenes/planets';
@@ -33,6 +34,7 @@ const COLORS = {
   dhcp:  0xffd84d,    // dhcp           (#ffd84d)
   wifi:  0xc08cff,    // wifi           (#c08cff)
   system: 0x7d99b3,   // system         (#7d99b3)
+  threat: 0xff9a45,   // IDS/IPS attack (#ff9a45)
 };
 
 /** Sub-hues for wifi event stars (around AP cores), matched in order. */
@@ -101,6 +103,7 @@ async function main(): Promise<void> {
   const rings = new Rings(ringsLayer, textures.dot, textures.glow, w, h);
   const crystals = new Crystals(fxLayer, textures.crystal, textures.glow, fx);
   const asteroids = new Asteroids(fxLayer, textures.asteroids, fx);
+  const threats = new Threats(fxLayer, textures.asteroids, fx);
   const apCores = new ApCores(apLayer, textures.glow, fx, w, h);
   const eventStars = new EventStars(eventStarLayer, textures.dot, textures.glow);
   const planets = new Planets(planetLayer, textures.planets, w, h);
@@ -186,7 +189,7 @@ async function main(): Promise<void> {
       // noise gate screams at the raw feed — the visual fxAllow gates are
       // for visuals; every connection may be heard (density = noiseGate)
       const k = ev.log_type === 'firewall'
-        ? (ev.rule_action === 'block' ? 'block' : 'allow')
+        ? (ev.threat || ev.rule_action === 'block' ? 'block' : 'allow')
         : ev.log_type === 'dns' ? 'dns'
         : ev.log_type === 'dhcp' ? 'dhcp'
         : ev.log_type === 'wifi' ? 'wifi' : null;
@@ -195,6 +198,23 @@ async function main(): Promise<void> {
 
     switch (ev.log_type) {
       case 'firewall': {
+        // IDS/IPS threats: always malicious. Fly a looping attack into the core
+        // (shot down like a block asteroid); never render as a benign allow.
+        if (ev.threat) {
+          state.onEvent('threat');
+          if (replay) break;
+          audio.cueSong('threat', ev.src_ip ?? undefined);
+          const target = ev.dst_ip ?? ev.mac_address ?? '';
+          if (fxAllow(`thr|${target}|${ev.rule_desc ?? ev.rule_name ?? ''}`, 2.2)) {
+            if (settings.threatMissiles && threats.count() < 8) {
+              threats.spawn(cx, cy, w, h, ipAngle(target || '0.0.0.0'), COLORS.threat);
+            } else {
+              fx.shockwave(cx, cy, COLORS.threat, 90, 2.5);
+              station.flash(0.25);
+            }
+          }
+          break;
+        }
         if (ev.rule_action === 'block') {
           state.onEvent('block');
           if (replay) break;
@@ -380,11 +400,12 @@ async function main(): Promise<void> {
     crystals.update(dt);
 
     const hits = asteroids.update(dt, station.center.x, station.center.y);
-    if (hits.impacts.length > 0) {
+    const th = threats.update(dt, station.center.x, station.center.y);
+    if (hits.impacts.length > 0 || th.impacts.length > 0) {
       state.slowmo(0.25, 0.55);
       punch += 0.06;
       shake = Math.min(22, shake + 10);
-    } else if (hits.intercepts.length > 0) {
+    } else if (hits.intercepts.length > 0 || th.intercepts.length > 0) {
       punch += 0.015;
     }
 

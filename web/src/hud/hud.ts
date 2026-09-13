@@ -148,9 +148,14 @@ export class Hud {
       case 'firewall': {
         const dir = isInternalIp(ev.src_ip) && isInternalIp(ev.dst_ip)
           ? 'internal' : (ev.direction ?? '-');
-        msg = `${(ev.rule_action ?? '?').toUpperCase()} ${ev.src_ip} → ${ev.dst_ip}` +
-              ` ${ev.service_name ?? ev.dst_port ?? ''} [${dir}]` +
-              (ev.rule_name ? ` (${ev.rule_name})` : '');
+        if (ev.threat) {
+          msg = `THREAT ${ev.dst_ip ?? '?'} → ${ev.service_name ?? ev.dst_port ?? ''}` +
+                ` [${dir}]` + (ev.rule_desc ? ` (${ev.rule_desc})` : '');
+        } else {
+          msg = `${(ev.rule_action ?? '?').toUpperCase()} ${ev.src_ip} → ${ev.dst_ip}` +
+                ` ${ev.service_name ?? ev.dst_port ?? ''} [${dir}]` +
+                (ev.rule_name ? ` (${ev.rule_name})` : '');
+        }
         break;
       }
       case 'dns':
@@ -174,7 +179,8 @@ export class Hud {
       tail.count++;
       tail.text = `${t}  ${key}`;          // keep newest timestamp
     } else {
-      const cls = `log-${ev.log_type}${ev.rule_action === 'block' ? ' log-block' : ''}`;
+      const cls = `log-${ev.log_type}`
+        + (ev.threat ? ' log-threat' : ev.rule_action === 'block' ? ' log-block' : '');
       this.queue.push({ text: `${t}  ${key}`, key, cls, count: 1 });
       if (this.queue.length > 1200) this.queue.shift();
     }
@@ -353,7 +359,7 @@ export class Hud {
     for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619); }
     const u = (h >>> 0) / 4294967296;
     const colors: Record<string, string> = {
-      firewall: ev.rule_action === 'block' ? '#ff6b6b' : '#5ce6a4',
+      firewall: ev.threat ? '#ff9a45' : ev.rule_action === 'block' ? '#ff6b6b' : '#5ce6a4',
       dns: '#55b5ff', dhcp: '#ffd84d', wifi: '#c08cff', system: '#7d99b3',
     };
     this.blips.push({
