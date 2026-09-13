@@ -1,5 +1,6 @@
 import { Container, Sprite, Texture } from 'pixi.js';
 import type { Fx } from './fx';
+import { edgePoint } from '../state';
 
 interface Missile {
   root: Container;
@@ -29,11 +30,12 @@ export class Threats {
   count(): number { return this.active.length; }
 
   spawn(cx: number, cy: number, w: number, h: number, angle: number, color = 0xff9a45): void {
-    const radius = Math.max(w, h) * 0.62;
-    const x = cx + Math.cos(angle) * radius;
-    const y = cy + Math.sin(angle) * radius;
-    // slow burn: ~6-8s across the field so the whole attack is visible
-    const speed = Math.min(w, h) * 0.15;
+    // Start just outside the visible edge along the attack bearing so the
+    // rocket flies fully into view for the whole burn.
+    const { x, y } = edgePoint(cx, cy, w, h, angle, 1.08);
+    const dx = Math.cos(angle), dy = Math.sin(angle);
+    // slow burn: ~5-7s across the visible field
+    const speed = Math.min(w, h) * 0.14;
     const dist = Math.hypot(cx - x, cy - y) || 1;
 
     const root = new Container();
@@ -41,11 +43,11 @@ export class Threats {
     aura.anchor.set(0.5);
     aura.tint = color;
     aura.blendMode = 'add';
-    aura.scale.set(1.4);
+    aura.scale.set(1.5);
     aura.alpha = 0.55;
     const body = new Sprite(this.rocket);
     body.anchor.set(0.5);
-    body.scale.set(0.62 + Math.random() * 0.2);
+    body.scale.set(0.85 + Math.random() * 0.25);
     root.addChild(aura, body);
     root.x = x; root.y = y;
     this.layer.addChild(root);
@@ -53,9 +55,9 @@ export class Threats {
     this.active.push({
       root, body, aura, startX: x, startY: y,
       t: 0, flight: dist / speed,
-      interceptAt: 0.66 + Math.random() * 0.26,   // shot down close to the core
-      freq: 4.5 + Math.random() * 3.5,            // tight, frequent weaving
-      amp: Math.min(w, h) * (0.08 + Math.random() * 0.05),
+      interceptAt: 0.68 + Math.random() * 0.24,   // shot down close to the core
+      freq: 3.5 + Math.random() * 2.5,            // broad, readable weaving
+      amp: Math.min(w, h) * (0.07 + Math.random() * 0.04),
       phase: Math.random() * Math.PI * 2,
       prevX: x, prevY: y, color,
     });

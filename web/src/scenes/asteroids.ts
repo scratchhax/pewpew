@@ -1,5 +1,6 @@
 import { Container, Sprite, Texture } from 'pixi.js';
 import type { Fx } from './fx';
+import { edgePoint } from '../state';
 
 interface Asteroid {
   s: Sprite;
@@ -24,9 +25,7 @@ export class Asteroids {
   constructor(private layer: Container, private textures: Texture[], private fx: Fx) {}
 
   spawn(cx: number, cy: number, w: number, h: number, angle: number, color = 0xff8a80): void {
-    const radius = Math.max(w, h) * 0.58;
-    const x = cx + Math.cos(angle) * radius;
-    const y = cy + Math.sin(angle) * radius;
+    const { x, y } = edgePoint(cx, cy, w, h, angle, 1.06);
 
     const dx = cx - x, dy = cy - y;
     const dist = Math.hypot(dx, dy) || 1;

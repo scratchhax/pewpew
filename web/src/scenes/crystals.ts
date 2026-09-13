@@ -1,5 +1,6 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import type { Fx } from './fx';
+import { edgePoint } from '../state';
 
 interface Puff {
   sp: Sprite;
@@ -34,9 +35,7 @@ export class Crystals {
    */
   spawn(cx: number, cy: number, w: number, h: number, angle: number,
         inbound: boolean, color: number, onArrive?: (x: number, y: number) => void): void {
-    const radius = Math.max(w, h) * 0.55;
-    const ex = cx + Math.cos(angle) * radius;
-    const ey = cy + Math.sin(angle) * radius;
+    const { x: ex, y: ey } = edgePoint(cx, cy, w, h, angle, 1.06);
 
     const fromX = inbound ? ex : cx, fromY = inbound ? ey : cy;
     const toX = inbound ? cx : ex,   toY = inbound ? cy : ey;

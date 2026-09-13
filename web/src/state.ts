@@ -102,3 +102,19 @@ export function hash01(s: string): number {
 export function ipAngle(ip: string): number {
   return hash01(ip) * Math.PI * 2;
 }
+
+/**
+ * A point just OUTSIDE the visible viewport along a bearing from (cx,cy).
+ * Spawning inbound actors here (rather than at a fixed large radius) keeps
+ * them on screen for essentially their whole flight on any aspect ratio —
+ * the old max(w,h)*0.55 approach dropped them far off-screen on wide displays.
+ */
+export function edgePoint(cx: number, cy: number, w: number, h: number,
+                          angle: number, pad = 1.06): { x: number; y: number } {
+  const dx = Math.cos(angle), dy = Math.sin(angle);
+  const ray = (d: number, pos: number, neg: number) =>
+    d > 1e-4 ? pos / d : d < -1e-4 ? neg / -d : Infinity;
+  const t = Math.min(ray(dx, w - cx, cx), ray(dy, h - cy, cy));
+  const r = (isFinite(t) ? t : Math.max(w, h)) * pad;
+  return { x: cx + dx * r, y: cy + dy * r };
+}
