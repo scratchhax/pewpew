@@ -46,6 +46,37 @@ FW_SPT      = re.compile(r'SPT=(\d+)')
 FW_DPT      = re.compile(r'DPT=(\d+)')
 FW_MAC      = re.compile(r'MAC=([0-9A-Fa-f:]+)')
 
+# ── CEF (UniFi CyberSecure / Enhanced protection tier) ────────────────────────
+# Gateways on the Enhanced tier emit security events in ArcSight CEF instead of
+# the legacy iptables kernel format, e.g.
+#   CEF: 0|Ubiquiti|UniFi Network|10.6.101|203|Blocked by Firewall|4|act=blocked ...
+# Values may contain spaces (UNIFIhost=Athens UCG Fiber), so each field is
+# matched lazily up to the next "key=" token or end of line rather than \S+.
+CEF_HEADER  = re.compile(r'\bCEF:\s*\d+\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|([^|]*)\|')
+_CEF_VAL    = r'(.*?)(?=\s+[A-Za-z][A-Za-z0-9]*=|$)'
+
+def _cef_field(key: str) -> re.Pattern:
+    return re.compile(r'\b' + re.escape(key) + r'=' + _CEF_VAL)
+
+CEF_ACT       = _cef_field('act')
+CEF_PROTO     = _cef_field('proto')
+CEF_SPT       = _cef_field('spt')
+CEF_DPT       = _cef_field('dpt')
+CEF_DIRECTION = _cef_field('UNIFIdirection')
+CEF_POLICY    = _cef_field('UNIFIpolicyName')
+CEF_IFACE_IN  = _cef_field('deviceInboundInterface')
+CEF_IFACE_OUT = _cef_field('deviceOutboundInterface')
+CEF_SRC_IP    = _cef_field('UNIFIsrcClientIp')
+CEF_SRC_MAC   = _cef_field('UNIFIsrcClientMac')
+CEF_DST_IP    = _cef_field('UNIFIdstDeviceIp')
+CEF_DST       = _cef_field('dst')
+CEF_MSG       = _cef_field('msg')
+CEF_SIGNATURE = _cef_field('UNIFIipsSignature')
+
+# CEF act= / UNIFIdirection= use different vocabulary than the iptables path.
+CEF_ACTION_MAP    = {'blocked': 'block', 'allowed': 'allow'}
+CEF_DIRECTION_MAP = {'incoming': 'inbound', 'outgoing': 'outbound', 'local': 'local'}
+
 # ── DNS (dnsmasq) ─────────────────────────────────────────────────────────────
 DNS_QUERY   = re.compile(r'query\[([A-Z]+)\]\s+(\S+)\s+from\s+([0-9a-fA-F:.]+)')
 DNS_REPLY   = re.compile(r'reply\s+(\S+)\s+is\s+(.+)')
@@ -324,6 +355,93 @@ def parse_firewall(body: str) -> dict:
     return result
 
 
+def _both_private_direction(src_ip: str, dst_ip: str) -> str:
+    """'local' when both endpoints are private/link-local, else None."""
+    if not src_ip or not dst_ip:
+        return None
+    try:
+        a = ipaddress.ip_address(src_ip)
+        b = ipaddress.ip_address(dst_ip)
+    except ValueError:
+        return None
+    return 'local' if a.is_private and b.is_private else None
+
+
+def parse_cef(body: str) -> dict:
+    """Parse a UniFi CEF security event into the firewall event shape.
+
+    Gateways running the Enhanced / CyberSecure protection tier emit "Blocked by
+    Firewall" and "Threat Detected" events as CEF rather than iptables kernel
+    lines, so without this they are received and silently dropped as 'system'.
+
+    Field availability differs by event class: firewall blocks carry
+    UNIFIsrcClientIp + UNIFIdstDeviceIp, while IDS/IPS threat events carry no
+    source IP at all (only UNIFIsrcClientMac) and use a bare dst=.
+    """
+    # Admin/audit CEF events (Config Modified, Network Accessed, Admin Accessed
+    # UniFi OS...) carry no proto/ports/IPs. They are not traffic, so classify
+    # them as 'system' rather than emitting empty firewall events.
+    result = {'log_type': 'firewall' if 'proto=' in body else 'system'}
+
+    def field(pattern):
+        m = pattern.search(body)
+        if not m:
+            return None
+        val = m.group(1).strip()
+        return val or None
+
+    m = CEF_HEADER.search(body)
+    event_name = m.group(1).strip() if m else None
+
+    # Policy name is the closest analogue to an iptables rule name; fall back to
+    # the CEF event name so the HUD always has a label.
+    result['rule_name'] = field(CEF_POLICY) or event_name
+    # Prefer the IPS signature as the description for threat events.
+    result['rule_desc'] = field(CEF_SIGNATURE) or field(CEF_MSG)
+
+    result['interface_in'] = field(CEF_IFACE_IN)
+    result['interface_out'] = field(CEF_IFACE_OUT)
+
+    result['src_ip'] = field(CEF_SRC_IP)
+    result['dst_ip'] = field(CEF_DST_IP) or field(CEF_DST)
+
+    proto = field(CEF_PROTO)
+    result['protocol'] = proto.lower() if proto else None
+
+    for key, pattern in (('src_port', CEF_SPT), ('dst_port', CEF_DPT)):
+        val = field(pattern)
+        try:
+            result[key] = int(val) if val else None
+        except ValueError:
+            result[key] = None
+
+    result['service_name'] = get_service_name(result.get('dst_port'), result.get('protocol'))
+
+    # CEF reports the client MAC directly — no 12-byte iptables field to slice.
+    result['mac_address'] = field(CEF_SRC_MAC)
+
+    act = (field(CEF_ACT) or '').lower()
+    result['rule_action'] = CEF_ACTION_MAP.get(act) or derive_action(
+        result['rule_name'], result.get('rule_desc')
+    )
+
+    direction = (field(CEF_DIRECTION) or '').lower()
+    result['direction'] = CEF_DIRECTION_MAP.get(direction) or derive_direction(
+        result['interface_in'], result['interface_out'], result['rule_name'],
+        result.get('src_ip'), result.get('dst_ip')
+    )
+
+    # Some CEF events omit both UNIFIdirection and the interface fields, which
+    # leaves derive_direction() with nothing to go on. If both endpoints are
+    # private we can still say it never left the LAN.
+    if result['direction'] is None:
+        result['direction'] = _both_private_direction(
+            result.get('src_ip'), result.get('dst_ip')
+        )
+
+    return result
+
+
 def parse_dns(body: str) -> dict:
     """Parse a DNS (dnsmasq) log line."""
     result = {'log_type': 'dns'}
@@ -521,6 +639,11 @@ def parse_system(body: str) -> dict:
 
 def detect_log_type(body: str) -> str:
     """Detect log type from the syslog message body."""
+    # CEF first: Enhanced-tier gateways emit security events in CEF, which has
+    # its own field vocabulary and would otherwise fall through to 'system'.
+    if 'CEF:' in body and 'UNIFIcategory=' in body:
+        return 'cef'
+
     if 'SRC=' in body and 'DST=' in body and 'PROTO=' in body:
         return 'firewall'
     if body.startswith('[') and 'DESCR=' in body:
@@ -568,6 +691,8 @@ def parse_log(raw_log: str) -> dict:
 
     if log_type == 'firewall':
         parsed = parse_firewall(body)
+    elif log_type == 'cef':
+        parsed = parse_cef(body)
     elif log_type == 'dns':
         parsed = parse_dns(body)
     elif log_type == 'dhcp':
