@@ -6,7 +6,7 @@ import { classify } from './events';
 import { Throttle } from './throttle';
 import { FrameLoop } from './loop';
 import { hsl } from './palette';
-import { Hud } from './hud/hud';
+import { Hud, hudLabels } from './hud/hud';
 import { Audio } from './audio';
 import { SettingsPanel } from './hud/settingsPanel';
 import type { Theme } from './theme';
@@ -29,7 +29,9 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
   const initAntialias = settings.antialias;
   const initPowerPref = settings.powerPref;
 
-  const hud = new Hud(settings);
+  document.body.dataset.theme = theme.id;
+  const labels = hudLabels(theme.hud);
+  const hud = new Hud(settings, labels);
   const audio = new Audio(settings);
   hud.attachAudio(audio);
   const throttle = new Throttle();
@@ -42,7 +44,7 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
 
   // HUD accent follows the colour knobs (event-law colours stay fixed)
   function applyColors(): void {
-    const hex = hsl(172 + settings.hueShift, 0.8 * settings.colorSat, 0.61);
+    const hex = hsl((theme.accentHue ?? 172) + settings.hueShift, 0.8 * settings.colorSat, 0.61);
     const css = `#${hex.toString(16).padStart(6, '0')}`;
     document.documentElement.style.setProperty('--accent', css);
   }
@@ -66,7 +68,7 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
   });
   if (params.has('diag')) Object.assign((window as any).__diag, { settings, tuner, loop, scene });
 
-  const panel = new SettingsPanel(settings, theme, defaults, keys, (key) => {
+  const panel = new SettingsPanel(settings, { ...theme, hudToggles: labels.panel }, defaults, keys, (key) => {
     // key undefined = reset to defaults: re-resolve everything
     if (key === 'quality' || key === undefined) {
       if (settings.quality === 'auto') {

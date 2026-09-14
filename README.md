@@ -20,6 +20,10 @@ Full 42s showreel with sound — calm cruise → the F1 config tour → full sto
   network; hosts drift in as stars and grow into constellations, blocked
   inbound traffic becomes asteroids the station shoots down, and the whole
   thing rides a parallax nebula.
+- **Pick a theme** — the same traffic as **Orbital Command** (sci-fi, the
+  default) or **[Last Outpost](#last-outpost-zombie-theme)**, a top-down
+  zombie survival compound. Different screens can show different themes off
+  one relay.
 - **Generative soundtrack** — a 4-song "band" that listens to your traffic and
   plays it back: set-list rotation, song structure, tension & release — every
   note synthesized live with the WebAudio API. **No audio files anywhere.**
@@ -90,24 +94,26 @@ UDM/UDR ──syslog UDP:5514──► relay (Python) ──JSON over WebSocket�
   parsers (DB/policy deps stripped), broadcasts every event to all browsers,
   replays the last 500 events to each new tab. Regex drop-list filters the
   known UDM/AP log spam. `--demo` generates fake events server-side too.
-- `web/` — Vite + TypeScript + [PixiJS v8](https://pixijs.com/). Everything
-  (starfield, ships, lasers, particles, the entire audio synth) is generated
-  procedurally — zero image or audio assets.
+- `web/` — Vite + TypeScript + [PixiJS v8](https://pixijs.com/). The audio
+  synth and the sci-fi theme (starfield, ships, lasers, particles) are generated
+  procedurally with zero image or audio files; the zombie theme uses one small
+  sprite atlas from Kenney's CC0 Top-down Shooter pack.
 - `deploy/` — systemd unit + kiosk autostart entry (built to run fullscreen
   on a Raspberry Pi, but any Chromium/Chrome/Firefox will do).
 
 ### Viewer architecture: core + themes
 
 The relay knows nothing about how events look, and the viewer is split the
-same way: a shared **core** and a **theme** that only draws. Orbital Command
-(`web/src/themes/scifi/`) is the first theme.
+same way: a shared **core** and a **theme** that only draws. There are two
+themes: Orbital Command (`web/src/themes/scifi/`) and Last Outpost
+(`web/src/themes/zombie/`).
 
 | Core (`web/src/*`) | Theme (`web/src/themes/<id>/`) |
 |--------------------|--------------------------------|
-| relay feed + demo generator (`ws.ts`) | its renderer (PixiJS for sci-fi) and scene |
+| relay feed + demo generator (`ws.ts`) | its renderer (PixiJS for both current themes) and scene |
 | event classification (`events.ts`): allow / block / threat / dns / dhcp / wifi / system, direction, Wi-Fi outcome (joined / bad / other) | what each classified event becomes on screen |
 | sim state + weather (`state.ts`), per-flow visual throttle (`throttle.ts`) | which effects are worth showing, on-screen caps, camera |
-| HUD, comms log, F1 panel shell, audio engine | Scene tab toggles, colour scheme, audio cues for effects it shows |
+| HUD, comms log, F1 panel shell, audio engine | Scene tab toggles, colour scheme, HUD panel names + accent hue (and optional `body[data-theme]` CSS), audio cues for effects it shows |
 | quality presets, auto tuner, frame loop + FPS cap (`perf.ts`, `loop.ts`) | scene budgets per quality tier |
 | boot + event pipeline (`app.ts`), theme selection (`themes/registry.ts`) | `Theme` object as the default export (`theme.ts` is the contract) |
 
@@ -126,7 +132,7 @@ different themes at the same time:
 | URL | Theme |
 |-----|-------|
 | `http://<relay-host>:8080/` | the relay's `default_theme` (`relay.yaml`, default `scifi`) |
-| `http://<relay-host>:8080/<theme>/` | that theme, e.g. `/scifi/` (unknown themes are a 404) |
+| `http://<relay-host>:8080/<theme>/` | that theme: `/scifi/` or `/zombie/` (unknown themes are a 404) |
 | any URL + `?theme=<theme>` | that theme (useful on the Pages demo) |
 
 The viewer picks, in order: the theme named in the URL path, `?theme=`, the
@@ -183,6 +189,49 @@ IPs you talk to a lot grow into constellations; blocked destinations rack up
 on the **MOST WANTED** board. The fleet drifting through the scene is a
 hand-drawn (procedurally generated) honor squad.
 
+## Last Outpost (zombie theme)
+
+![last outpost](docs/zombie.png)
+
+The same traffic as a walled compound seen from above: your network is inside
+the walls, the internet is everything outside. Open `/zombie/` on the relay (or
+set `default_theme: zombie` in `relay.yaml`, or add `?theme=zombie`). The event
+colour law is the same as above, so the radio log still matches the scene.
+
+| Event | On screen |
+|-------|-----------|
+| block | a **zombie** shambles in from a bearing fixed by the remote IP; the nearest watchtower guard shoots it down (tracer, muzzle flash, blood). The odd one reaches the fence: a breach shakes the screen |
+| threat | a **horde**: a brute leading a weaving pack. The two nearest towers open fire, the alarm washes the screen red and the threat audio bed plays while the brute lives |
+| allow (border) | **supply runs**: outbound, a scavenger runs from the camp through the nearest gate and off the map; inbound, a survivor carries a crate in. Internal (LAN↔LAN) permits are couriers strolling between tents |
+| dns | a dashed **radio call** from the client's spot in the camp to the radio mast, which pings blue |
+| dhcp | a **new survivor** walks in through a gate and pitches a cot labelled with the device's hostname (renewals ring the existing tent; names fade when a device goes quiet) |
+| wifi | AP and gateway hosts are **buildings**: joins walk in the door, leaves and failures bolt out in a purple burst and rattle the roof |
+| system | the **generator flickers** and the logging building glows grey |
+
+Traffic weather is **time of day**: CALM is daylight, STORM is dusk with rain,
+HURRICANE is horde night (dark, heavy rain, fog), with floodlight cones on the
+towers, lamps at the gates and zombie eyes glowing in the dark. The HUD is
+relabelled to match (RADIO, COMPOUND, SURVIVAL LOG, HOT ZONES, RADIO LOG…).
+It uses the same generative soundtrack as sci-fi for now.
+
+Its **Scene** tab has toggles for zombies, hordes, supply runs, couriers, DNS
+radio, DHCP arrivals, AP buildings, day/night, rain, blood and screen shake,
+and the **System** tab's budgets per quality tier are:
+
+| Budget | Low | Medium | **High** | Ultra |
+|--------|-----|--------|----------|-------|
+| Particles | 600 | 1500 | 3000 | 6000 |
+| Zombies at once | 8 | 10 | 12 | 18 |
+| Blood decals | 30 | 70 | 140 | 260 |
+| Rain density | 0.3 | 0.6 | 1.0 | 1.5 |
+| Tents | 16 | 22 | 28 | 36 |
+| Fog + survivor flashlights | off | on | on | on |
+
+On the CM5 kiosk (2560×1440, Auto → Low, demo traffic) Last Outpost runs at
+about 23 fps in daylight and 21 fps in horde night, against about 24 fps for
+sci-fi in the same session. Lights that are fully dark are skipped rather than
+drawn at zero alpha, which is what keeps night affordable on a Pi.
+
 ## The audio engine
 
 All sound is synthesized in the browser with the WebAudio API — there is no
@@ -225,7 +274,7 @@ and GPU power, which the renderer reads at startup (the panel offers
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | starfield · nebula · dust · ambient ships · DHCP planets · event stars · asteroids · attack rockets · crystals · IP constellations · ring objects (dots orbiting the event rings) · AP cores · screen shake |
+| **Scene** | the theme's own toggles. Sci-fi: starfield · nebula · dust · ambient ships · DHCP planets · event stars · asteroids · attack rockets · crystals · IP constellations · ring objects (dots orbiting the event rings) · AP cores · screen shake. Zombie: see [Last Outpost](#last-outpost-zombie-theme) |
 | **HUD** | uplink · ship-status bars · telemetry · most-wanted · comms log · sensor flux · subspace spectrum · radar · scanlines |
 | **Audio** | additive Melody / Devices layers, per-event volume + per-event gate, the noise (chaos) gate, master / reverb / echo / music-bed, device mix |
 | **Colour** | host-mesh scheme (spectrum / event-law / mono / warm / cool) + a global hue-shift & intensity that sweeps the mesh, nebula and HUD accent |
@@ -319,7 +368,7 @@ These numbers predate the core/theme split. After it, the same kiosk ran Auto
 | Param | Effect |
 |-------|--------|
 | `/<theme>/` (path) | show that theme, e.g. `/scifi/` (see [Choosing a theme](#choosing-a-theme)) |
-| `?theme=scifi` | show that theme on any URL |
+| `?theme=zombie` | show that theme (`scifi` / `zombie`) on any URL |
 | `?demo=1` | synthetic event generator, no relay needed |
 | `?demo=1&showreel=1` | scripted 60s calm→build→hurricane→cooldown arc, looping |
 | `?demo=1&rate=40` | demo at ~40 events/sec |
@@ -390,7 +439,10 @@ regardless of the relay's default (e.g. `http://192.168.1.5:8080/scifi/?quality=
   [UniFi-Insights-Plus](https://github.com/jmasarweh/UniFi-Insights-Plus)
   (MIT), stripped of database dependencies.
 - [PixiJS v8](https://pixijs.com/) for the renderer.
-- Every texture, sound and melody: generated in code.
+- Every sound and melody, and every sci-fi texture: generated in code.
+- Last Outpost sprites: [Top-down Shooter](https://kenney.nl/assets/top-down-shooter)
+  by [Kenney](https://kenney.nl) (CC0), packed into
+  `web/src/themes/zombie/assets/atlas.png`; license in `LICENSE-kenney.txt` beside it.
 - IDS/IPS threat rendering (the amber attack rockets, red "under-attack" core
   and the sustained threat audio bed) grew out of the CEF security-event parser
   idea and initial implementation by [natechit](https://github.com/natechit).

@@ -5,6 +5,69 @@ import type { Audio } from '../audio';
 import type { NetEvent } from '../types';
 
 
+/** Every piece of HUD text a theme may rename (the data behind it is shared). */
+export interface HudLabels {
+  uplink: string;
+  link: string;
+  weather: Record<Weather, string>;
+  status: string;
+  threat: string;
+  power: string;
+  telemetry: string;
+  uptime: string;
+  contacts: string;
+  nodes: string;
+  denied: string;
+  traffic: string;
+  mostWanted: string;
+  noHostiles: string;
+  spectrum: string;
+  flux: string;
+  scan: string;
+  comms: string;
+  demo: string;
+  /** Names of the HUD toggles in the F1 panel's HUD tab. */
+  panel: Record<'uplink' | 'threatBar' | 'telemetry' | 'mostWanted' | 'terminal'
+    | 'oscilloscope' | 'spectrum' | 'radar' | 'scanlines', string>;
+}
+
+export type HudLabelOverrides = Partial<Omit<HudLabels, 'weather' | 'panel'>> & {
+  weather?: Partial<HudLabels['weather']>;
+  panel?: Partial<HudLabels['panel']>;
+};
+
+export const DEFAULT_HUD_LABELS: HudLabels = {
+  uplink: 'UPLINK',
+  link: 'LINK',
+  weather: { calm: 'CALM', storm: 'STORM', hurricane: 'HURRICANE' },
+  status: 'SHIP STATUS',
+  threat: 'THR',
+  power: 'PWR',
+  telemetry: 'TELEMETRY',
+  uptime: 'UPTIME',
+  contacts: 'CONTACTS',
+  nodes: 'NODES',
+  denied: 'DENIED',
+  traffic: 'TRAFFIC',
+  mostWanted: 'MOST WANTED',
+  noHostiles: '— NO HOSTILES —',
+  spectrum: 'SUBSPACE SPECTRUM',
+  flux: 'SENSOR FLUX',
+  scan: 'SCAN',
+  comms: 'COMMS LOG',
+  demo: 'DEMO DATA',
+  panel: {
+    uplink: 'Uplink', threatBar: 'Ship status bars', telemetry: 'Telemetry',
+    mostWanted: 'Most wanted', terminal: 'Comms log', oscilloscope: 'Sensor flux',
+    spectrum: 'Subspace spectrum', radar: 'Scan (radar)', scanlines: 'Scanlines',
+  },
+};
+
+export function hudLabels(o: HudLabelOverrides = {}): HudLabels {
+  const d = DEFAULT_HUD_LABELS;
+  return { ...d, ...o, weather: { ...d.weather, ...o.weather }, panel: { ...d.panel, ...o.panel } };
+}
+
 export class Hud {
   private root: HTMLElement;
   private threatFill!: HTMLElement;
@@ -47,7 +110,8 @@ export class Hud {
     '#ff6b6b', '#ff6b6b', '#ff6b6b', '#ff6b6b', '#ff6b6b', '#ff6b6b', '#ff6b6b', '#ff6b6b',
   ];
 
-  constructor(settings: Settings) {
+  constructor(settings: Settings, private labels: HudLabels = DEFAULT_HUD_LABELS) {
+    const L = labels;
     this.root = document.createElement('div');
     this.root.id = 'hud';
     this.root.innerHTML = `
@@ -55,47 +119,47 @@ export class Hud {
       <div class="corner tl"></div><div class="corner tr"></div>
       <div class="corner bl"></div><div class="corner br"></div>
       <div id="hud-topleft" class="panel">
-        <div class="panel-head">◢ UPLINK</div>
-        <div id="conn"><span id="conn-dot"></span><span id="conn-text">LINK</span></div>
-        <div id="weather">CALM</div>
+        <div class="panel-head">◢ ${L.uplink}</div>
+        <div id="conn"><span id="conn-dot"></span><span id="conn-text">${L.link}</span></div>
+        <div id="weather">${L.weather.calm}</div>
       </div>
       <div id="hud-bars" class="panel">
-        <div class="panel-head">◢ SHIP STATUS</div>
-        <div class="bar-row"><span class="bar-label">THR<span id="threat-num">15</span></span>
+        <div class="panel-head">◢ ${L.status}</div>
+        <div class="bar-row"><span class="bar-label">${L.threat}<span id="threat-num">15</span></span>
           <div class="bar"><div id="threat-fill"></div></div></div>
-        <div class="bar-row"><span class="bar-label">PWR<span id="energy-num">30</span></span>
+        <div class="bar-row"><span class="bar-label">${L.power}<span id="energy-num">30</span></span>
           <div class="bar"><div id="energy-fill"></div></div></div>
       </div>
       <div id="hud-stats" class="panel">
-        <div class="panel-head">◢ TELEMETRY</div>
-        <div class="stat-row"><span>UPTIME</span><b id="stat-uptime">00:00:00</b></div>
-        <div class="stat-row"><span>CONTACTS</span><b id="stat-clients">0</b></div>
-        <div class="stat-row"><span>NODES</span><b id="stat-nodes">0</b></div>
-        <div class="stat-row"><span>DENIED</span><b id="stat-denied">0</b></div>
-        <div class="stat-row"><span>TRAFFIC</span><b id="stat-total">0</b></div>
+        <div class="panel-head">◢ ${L.telemetry}</div>
+        <div class="stat-row"><span>${L.uptime}</span><b id="stat-uptime">00:00:00</b></div>
+        <div class="stat-row"><span>${L.contacts}</span><b id="stat-clients">0</b></div>
+        <div class="stat-row"><span>${L.nodes}</span><b id="stat-nodes">0</b></div>
+        <div class="stat-row"><span>${L.denied}</span><b id="stat-denied">0</b></div>
+        <div class="stat-row"><span>${L.traffic}</span><b id="stat-total">0</b></div>
       </div>
       <div id="hud-mw" class="panel">
-        <div class="panel-head">◢ MOST WANTED</div>
-        <div id="mw-body"><div class="mw-empty">— NO HOSTILES —</div></div>
+        <div class="panel-head">◢ ${L.mostWanted}</div>
+        <div id="mw-body"><div class="mw-empty">${L.noHostiles}</div></div>
       </div>
       <div id="hud-spec" class="panel">
-        <div class="panel-head">◢ SUBSPACE SPECTRUM</div>
+        <div class="panel-head">◢ ${L.spectrum}</div>
         <canvas id="spec" width="236" height="52"></canvas>
       </div>
       <div id="scope-wrap" class="panel">
-        <div class="panel-head">◢ SENSOR FLUX</div>
+        <div class="panel-head">◢ ${L.flux}</div>
         <canvas id="scope" width="220" height="48"></canvas>
         <div id="rate">0 ev/s</div>
       </div>
       <div id="radar-wrap" class="panel">
-        <div class="panel-head">◢ SCAN</div>
+        <div class="panel-head">◢ ${L.scan}</div>
         <canvas id="radar" width="110" height="110"></canvas>
       </div>
       <div id="terminal" class="panel">
-        <div class="panel-head">◢ COMMS LOG<span class="cursor">▮</span></div>
+        <div class="panel-head">◢ ${L.comms}<span class="cursor">▮</span></div>
         <div class="log-wrap"><div id="terminal-body"></div></div>
       </div>
-      <div id="demo-badge" style="display:none">DEMO DATA</div>
+      <div id="demo-badge" style="display:none">${L.demo}</div>
       <div id="hint">F1 settings</div>`;
     document.body.appendChild(this.root);
 
@@ -291,7 +355,7 @@ export class Hud {
     const top = [...this.wanted.entries()]
       .sort((a, b) => b[1] - a[1]).slice(0, 5);
     if (!top.length) {
-      el.innerHTML = '<div class="mw-empty">— NO HOSTILES —</div>';
+      el.innerHTML = `<div class="mw-empty">${this.labels.noHostiles}</div>`;
       return;
     }
     const max = top[0][1];
@@ -326,8 +390,7 @@ export class Hud {
       q('energy-num').textContent = ` ${(state.energy * 100).toFixed(0)}`;
     }
     if (settings.radar) this.drawRadar(dt);
-    const wLabel: Record<Weather, string> = { calm: 'CALM', storm: 'STORM', hurricane: 'HURRICANE' };
-    this.weatherEl.textContent = wLabel[state.weather];
+    this.weatherEl.textContent = this.labels.weather[state.weather];
     this.weatherEl.style.color = state.weather === 'hurricane' ? '#ff5a5a'
       : state.weather === 'storm' ? '#ffd24a' : '#45ff9b';
 
