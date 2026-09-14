@@ -135,7 +135,8 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
     const d = document.createElement('div');
     d.style.cssText = `position:fixed;left:50%;transform:translateX(-50%);bottom:6px;
       z-index:50;font:11px monospace;color:#7fd4ff;background:rgba(0,0,0,0.65);
-      padding:4px 12px;letter-spacing:1px;display:flex;align-items:center;gap:10px;`;
+      padding:4px 12px;letter-spacing:1px;display:flex;align-items:center;gap:10px;
+      white-space:nowrap;max-width:calc(100vw - 12px);overflow:hidden;`;
     const perfTxt = document.createElement('span');
     d.appendChild(perfTxt);
     const txt = document.createElement('span');

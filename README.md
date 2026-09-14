@@ -154,7 +154,9 @@ picked up automatically: the viewer registry finds it, the build writes
 
 3. Open `http://<relay-host>:8080`. Adjust `wan_interfaces` in
    `relay/relay.yaml` if inbound/outbound classification looks wrong
-   (`ppp0` for DSL, `eth9/eth10` on some setups — see `/healthz`).
+   (`ppp0` for DSL, `eth8`–`eth10` on many UDM/UDR setups). The `IN=` /
+   `OUT=` fields of your gateway's firewall syslog lines show which interface
+   is the WAN.
 
 4. Production build: `cd web && npm run build` — the relay serves `dist/`
    automatically (with `Cache-Control: no-cache`, so refreshes always get the
@@ -169,14 +171,14 @@ Colors of every effect match the comms-log lines verbatim:
 | allow    | green      | crystals core↔device + star-to-star links, inner ring |
 | block    | red        | inbound asteroid → station laser intercept, shake + flash |
 | dns      | blue       | blue laser client→station ("the resolver is you"), 2nd ring |
-| dhcp     | yellow     | station→AP yellow laser, 3rd ring |
+| dhcp     | yellow     | a labelled planet (the client's hostname) drifts across the field, the logging AP core ripples yellow, 3rd ring |
 | wifi     | purple     | client **joins** (associated / authenticated) send a crystal AP core → station; **leaves** and failures (deauth, disassoc, rejects) fire a laser station → AP core; a faint event star marks each one; 4th ring |
 | system   | grey       | grey shockwave from the station |
 | threat   | amber      | IDS/IPS detection (Enhanced/CyberSecure tier) — an attack **rocket** that burns in on an evasive, weaving path from a random bearing, gets shot down close to the station with an amber detonation, and turns the core **red** while any rocket is alive; carries a MAC, no source IP |
 
 Traffic volume drives weather: **STORM** at ≥300 events/30s and **HURRICANE** at
-≥1200 — the HUD goes amber, the station flares, and the field fills with debris
-and intercept fire.
+≥1200 — the weather readout turns amber (STORM) or red (HURRICANE), the
+station flares, and the field fills with debris and intercept fire.
 IPs you talk to a lot grow into constellations; blocked destinations rack up
 on the **MOST WANTED** board. The fleet drifting through the scene is a
 hand-drawn (procedurally generated) honor squad.
@@ -217,7 +219,9 @@ your network:
 ## F1 settings panel
 
 Press **F1** for a tabbed control surface — **Scene / HUD / Audio / Colour /
-System**. Everything is live (no reload) and persists to localStorage.
+System**. Changes apply live and persist to localStorage, except antialias
+and GPU power, which the renderer reads at startup (the panel offers
+*Apply & reload*).
 
 | Tab | What's in it |
 |-----|--------------|
@@ -225,7 +229,7 @@ System**. Everything is live (no reload) and persists to localStorage.
 | **HUD** | uplink · ship-status bars · telemetry · most-wanted · comms log · sensor flux · subspace spectrum · radar · scanlines |
 | **Audio** | additive Melody / Devices layers, per-event volume + per-event gate, the noise (chaos) gate, master / reverb / echo / music-bed, device mix |
 | **Colour** | host-mesh scheme (spectrum / event-law / mono / warm / cool) + a global hue-shift & intensity that sweeps the mesh, nebula and HUD accent |
-| **System** | quality preset (auto / low / medium / high / ultra / custom) · render scale · FPS cap · particle, star, nebula, dust, effect-detail budgets · antialias + GPU power (reload) · simulation speed · reset-to-defaults |
+| **System** | quality preset (auto / low / medium / high / ultra / custom) · render scale · FPS cap · particle, star density, nebula, dust, effect-detail budgets · IP star and event star caps · antialias + GPU power (reload) · simulation speed · reset-to-defaults |
 
 ### Audio: volume vs gate
 
@@ -263,9 +267,10 @@ and a quality tier bundles every knob that trades looks for frame time.
 | IP stars / event stars | 60 / 100 | 100 / 180 | 140 / 260 | 200 / 400 |
 
 - **High** is exactly how the scene looked before presets existed.
-- **Auto** (the default) guesses a tier when the page loads (Pi / phone GPUs
-  and software renderers start at Low, touch devices and ≤4-core machines at
-  Medium, everything else at High), then watches the real frame rate. If it
+- **Auto** (the default) guesses a tier when the page loads (Pi / phone GPUs,
+  software renderers and browsers without WebGL start at Low; touch devices,
+  ≤4-core or ≤4 GB machines and Intel HD/UHD integrated graphics at Medium;
+  everything else at High), then watches the real frame rate. If it
   stays under ~75% of target for 5 seconds, it drops one tier. It only ever
   steps **down**, so it can't flap; a reload starts from the guess again. The
   System tab shows which tier Auto is running and why.
@@ -301,6 +306,9 @@ the render calls ~8ms per frame; the rest is Chromium painting and compositing
 a 1440p page: hiding the HUD alone reached 33fps, and hiding the whole WebGL
 scene only 27fps. On a board like this, running the display at 1080p is likely
 to help more than any in-page setting.
+
+These numbers predate the core/theme split. After it, the same kiosk ran Auto
+(Low) at 26.4fps on live STORM traffic, in line with the numbers above.
 
 ![config tour](docs/config.gif)
 
@@ -363,6 +371,13 @@ sudo cp deploy/pewpew-relay.service /etc/systemd/system/   # adjust paths/user
 sudo systemctl enable --now pewpew-relay
 cp deploy/pewpew-kiosk.desktop ~/.config/autostart/        # fullscreen chromium
 ```
+
+The relay serves `web/dist/`, which needs Node 18+ to build. A Pi doesn't
+need Node: build on any machine (`cd web && npm ci && npm run build`) and
+copy `web/dist/` into the relay's checkout, e.g.
+`rsync -a --delete web/dist/ pi@<relay-host>:pewpew-ui/web/dist/`. Static files
+update without a restart; restart `pewpew-relay` only when `relay/` changes
+(UniFi devices then take 1–3 minutes to resume logging).
 
 The kiosk entry opens `?quality=low`, the starting point for a Pi 5. Edit the URL
 in `pewpew-kiosk.desktop` to try `medium`, to point a kiosk at a relay on
