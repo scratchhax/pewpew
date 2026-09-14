@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  base: mode === 'demo' ? './' : '/',
   define: {
+    __DEMO__: mode === 'demo',
     __BUILD__: JSON.stringify(new Date().toISOString().slice(5, 16).replace('T', ' ')),
   },
   server: {
@@ -14,4 +16,4 @@ export default defineConfig({
     outDir: 'dist',
   },
   esbuild: { legalComments: 'none' },
-});
+}));

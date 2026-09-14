@@ -84,7 +84,7 @@ function demoEvent(blockBias = 0.18): NetEvent {
 
 /**
  * Connects to the relay WS; auto-reconnects.
- * If `?demo=1` in the URL (or connect fails and demoFallback), runs the
+ * In a demo build or with `?demo=1` in the URL, runs the
  * built-in generator instead.
  */
 export class Feed {
@@ -95,7 +95,7 @@ export class Feed {
 
   constructor(private onEvent: EventHandler, private onSnapshot: SnapshotHandler) {
     const params = new URLSearchParams(location.search);
-    this.demoMode = params.has('demo');
+    this.demoMode = __DEMO__ || params.has('demo');
     if (this.demoMode) this.startDemo(); else this.connect();
   }
 

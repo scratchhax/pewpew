@@ -34,6 +34,10 @@ Full 42s showreel with sound — calm cruise → the F1 config tour → full sto
 
 ## See it right now (no hardware needed)
 
+**[Browser demo](https://scratchhax.github.io/pewpew/)** ·
+**[Looping showreel](https://scratchhax.github.io/pewpew/?showreel=1)**
+(available once GitHub Pages is enabled and the first deployment completes).
+
 ```bash
 cd web && npm install && npm run dev
 open http://localhost:5173/?demo=1&showreel=1
@@ -44,6 +48,30 @@ nothing real), `showreel=1` scripts a 60s arc: calm cruise → traffic build →
 **hurricane** → cooldown. Click once to wake the audio engine (browser autoplay
 policy). Press **F1** any time to open the settings panel. See
 [URL params](#url-params) for dialing the intensity by hand.
+
+### GitHub Pages demo
+
+In the repository's **Settings → Pages → Build and deployment**, select
+**GitHub Actions** as the source. Push this change to `main`, or run
+**Deploy demo to GitHub Pages** from the Actions tab on `main`. Subsequent
+changes to `web/` or the workflow on `main` deploy automatically.
+
+The Pages build always uses synthetic traffic, including when opened without
+URL parameters, and needs no relay. Add `?showreel=1` for the looping storm
+sequence or `?rate=40&block=65` to tune traffic. Click to enable sound; press
+**F1** for settings. Relative asset URLs support repository paths and custom
+domains. Forks use their own GitHub Pages URL.
+
+Preview the same build locally:
+
+```bash
+cd web
+npm ci
+npm run build:demo
+npm run preview
+```
+
+The regular `npm run build` still connects to the relay by default.
 
 ## How it works
 
