@@ -16,6 +16,9 @@ export class Station {
   private sparks: { s: Sprite; r: number; a: number; sp: number; ecc: number }[] = [];
   private aura: { s: Sprite; r: number; a: number; sp: number; wob: number;
     wosp: number; sc: number; al: number }[] = [];
+  private auraN = 11;        // live counts — setDetail() trims these
+  private sparkN = 6;
+  private maxClouds = 5;
   private pulse = 0;         // 0..1 energy flash
   private danger = 0;        // 0..1 "under attack": core red while a threat lives
   private alarmOn = false;
@@ -103,6 +106,17 @@ export class Station {
 
   resize(w: number, h: number): void { this.w = w; this.h = h; this.layout(); }
 
+  /** Effect detail 0..1: thins the additive aura blobs, sparks and event
+   *  clouds, the biggest overdraw around the core. 1 = full. */
+  setDetail(detail: number): void {
+    const f = Math.max(0, Math.min(1, detail));
+    this.auraN = Math.round(this.aura.length * f);
+    this.sparkN = Math.round(this.sparks.length * f);
+    this.maxClouds = Math.max(2, Math.round(5 * f));
+    this.aura.forEach((a, i) => { a.s.visible = i < this.auraN; });
+    this.sparks.forEach((sp, i) => { sp.s.visible = i < this.sparkN; });
+  }
+
   flash(strength = 0.6): void { this.pulse = Math.min(1, this.pulse + strength); }
 
   /** Core goes red the moment a threat rocket is alive, and holds red until
@@ -119,7 +133,7 @@ export class Station {
     if (now - last < minGap) return;
     this.lastCloud.set(color, now);
     let c: { s: Sprite; life: number; ox?: number; oy?: number; maxAlpha?: number };
-    if (this.clouds.length < 5) {
+    if (this.clouds.length < this.maxClouds) {
       const sp = new Sprite(this.glowTex);
       sp.anchor.set(0.5);
       sp.blendMode = 'add';
@@ -127,7 +141,7 @@ export class Station {
       c = { s: sp, life: 0 };
       this.clouds.push(c);
     } else {
-      c = this.clouds[(this.cloudIdx++) % this.clouds.length];
+      c = this.clouds[(this.cloudIdx++) % Math.min(this.clouds.length, this.maxClouds)];
     }
     // seed offset so concurrent clouds don't stack dead-center
     const a = Math.random() * Math.PI * 2;
@@ -237,7 +251,8 @@ export class Station {
 
     // gassy ethereal aura — soft blobs on a slow differential swirl, breathing
     // radially so the edge is wispy and moving, never a hard spinning rim
-    for (const au of this.aura) {
+    for (let i = 0; i < this.auraN; i++) {
+      const au = this.aura[i];
       au.a += dt * au.sp * (1 + heat * 1.2 + this.pulse * 0.6);
       const wob = 1 + Math.sin(this.t * au.wosp + au.a) * au.wob;
       const rr = hr * au.r * wob * (1 + this.pulse * 0.14);
@@ -279,7 +294,8 @@ export class Station {
     }
 
     // accretion sparks — bright motes whipping in tight elliptical orbits
-    for (const sp of this.sparks) {
+    for (let i = 0; i < this.sparkN; i++) {
+      const sp = this.sparks[i];
       sp.a += sp.sp * dt * (1 + heat * 1.5 + this.pulse * 1.5);
       const rr = hr * sp.r;
       sp.s.x = cx + Math.cos(sp.a) * rr;

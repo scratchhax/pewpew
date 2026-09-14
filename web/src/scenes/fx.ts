@@ -46,6 +46,9 @@ export class Fx {
 
   resize(): void { /* layer is full-screen; nothing to do */ }
 
+  /** Live particle budget; particles already alive over it just burn out. */
+  setMax(max: number): void { this.max = max; }
+
   private take(): Sprite | null {
     if (this.particles.length >= this.max) return null;
     const s = this.pool.pop() ?? (() => {

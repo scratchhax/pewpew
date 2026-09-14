@@ -4,7 +4,6 @@ import { hash01 } from '../state';
 interface StarNode { s: Sprite; halo: Sprite; lastSeen: number; vx: number; vy: number; }
 interface Link { x1: number; y1: number; x2: number; y2: number; life: number; color: number; }
 
-const MAX_STARS = 140;
 // slow drift so IP stars never sit on the same pixels (LCD burn-in);
 // kept gentle so the constellation reads as a lazy star map, not sliding
 const DRIFT_SPEED = 7;   // px/sec baseline
@@ -14,11 +13,31 @@ export class Constellation {
   private stars = new Map<string, StarNode>();
   private links: Link[] = [];
   private lineG = new Graphics();
+  private maxStars = 140;
+  private maxLinks = 240;
 
   constructor(private layer: Container, private dot: Texture, private glow: Texture,
               private w: number, private h: number) {
     this.lineG.blendMode = 'add';
     layer.addChild(this.lineG);
+  }
+
+  /** Live node cap (links scale with it); lowering it evicts the stalest. */
+  setMax(stars: number): void {
+    this.maxStars = stars;
+    this.maxLinks = Math.round(stars * 12 / 7);   // 140 stars → 240 links
+    while (this.stars.size > this.maxStars) this.evictOldest();
+  }
+
+  private evictOldest(): void {
+    let oldestKey = ''; let oldest = Infinity;
+    for (const [k, v] of this.stars) if (v.lastSeen < oldest) { oldest = v.lastSeen; oldestKey = k; }
+    const old = this.stars.get(oldestKey);
+    if (old) {
+      this.layer.removeChild(old.s, old.halo);
+      old.s.destroy(); old.halo.destroy();
+      this.stars.delete(oldestKey);
+    }
   }
 
   resize(w: number, h: number): void {
@@ -68,16 +87,7 @@ export class Constellation {
       s = { s: sp, halo, lastSeen: now,
             vx: Math.cos(va) * vs, vy: Math.sin(va) * vs };
       this.stars.set(ip, s);
-      if (this.stars.size > MAX_STARS) {
-        let oldestKey = ''; let oldest = Infinity;
-        for (const [k, v] of this.stars) if (v.lastSeen < oldest) { oldest = v.lastSeen; oldestKey = k; }
-        const old = this.stars.get(oldestKey);
-        if (old) {
-          this.layer.removeChild(old.s, old.halo);
-          old.s.destroy(); old.halo.destroy();
-          this.stars.delete(oldestKey);
-        }
-      }
+      if (this.stars.size > this.maxStars) this.evictOldest();
     }
     s.lastSeen = now;
     return s;
@@ -93,7 +103,7 @@ export class Constellation {
     const a = this.star(src, performance.now());
     const b = this.star(dst, performance.now());
     this.links.push({ x1: a.s.x, y1: a.s.y, x2: b.s.x, y2: b.s.y, life: 1.6, color });
-    if (this.links.length > 240) this.links.splice(0, this.links.length - 240);
+    if (this.links.length > this.maxLinks) this.links.splice(0, this.links.length - this.maxLinks);
   }
 
   update(dt: number): void {

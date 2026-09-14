@@ -8,7 +8,6 @@ interface EvStar {
   tw: number;
 }
 
-const MAX_STARS = 260;
 const LIFE = 9;
 
 /**
@@ -17,17 +16,26 @@ const LIFE = 9;
  */
 export class EventStars {
   private stars: EvStar[] = [];
+  private maxStars = 260;
 
   constructor(private layer: Container, private dot: Texture, private glow: Texture) {}
 
-  spawn(x: number, y: number, color: number): void {
-    if (this.stars.length >= MAX_STARS) {
-      const oldest = this.stars.shift();
-      if (oldest) {
-        this.layer.removeChild(oldest.root);
-        oldest.root.destroy({ children: true });
-      }
+  /** Live cap; lowering it retires the oldest stars immediately. */
+  setMax(max: number): void {
+    this.maxStars = max;
+    while (this.stars.length > this.maxStars) this.retireOldest();
+  }
+
+  private retireOldest(): void {
+    const oldest = this.stars.shift();
+    if (oldest) {
+      this.layer.removeChild(oldest.root);
+      oldest.root.destroy({ children: true });
     }
+  }
+
+  spawn(x: number, y: number, color: number): void {
+    while (this.stars.length >= this.maxStars && this.stars.length > 0) this.retireOldest();
 
     const root = new Container();
     root.x = x; root.y = y;

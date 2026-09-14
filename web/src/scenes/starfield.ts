@@ -29,11 +29,12 @@ export class Starfield {
   }
 
   rebuild(): void {
-    this.layer.removeChildren();
+    for (const child of this.layer.removeChildren()) child.destroy();
     this.stars = [];
     this.nebulae = [];
     if (this.settings.starfield) {
-      const n = Math.min(340, Math.floor((this.w * this.h) / 6500));
+      const n = Math.round(Math.min(340, Math.floor((this.w * this.h) / 6500))
+        * this.settings.starDensity);
       for (let i = 0; i < n; i++) {
         const s = new Sprite(this.dot);
         s.anchor.set(0.5);
@@ -56,7 +57,7 @@ export class Starfield {
       }
     }
     if (this.settings.nebula) {
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < this.settings.nebulaCount; i++) {
         const s = new Sprite(this.clouds[i % this.clouds.length]) as Nebula;
         s.anchor.set(0.5);
         s.x = this.w * (0.22 + Math.random() * 0.56);
