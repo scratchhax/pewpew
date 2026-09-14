@@ -81,7 +81,8 @@ The regular `npm run build` still connects to the relay by default.
 ```
 UDM/UDR ──syslog UDP:5514──► relay (Python) ──JSON over WebSocket──► browser
                                 │                                      :8080
-                                └── also serves the built PixiJS front-end
+                                └── also serves the built viewer: the default
+                                    theme at /, every theme at /<theme>/
 ```
 
 - `relay/` — Python 3.10+ aiohttp server. Parses syslog with the vendored
@@ -108,7 +109,7 @@ same way: a shared **core** and a **theme** that only draws. Orbital Command
 | sim state + weather (`state.ts`), per-flow visual throttle (`throttle.ts`) | which effects are worth showing, on-screen caps, camera |
 | HUD, comms log, F1 panel shell, audio engine | Scene tab toggles, colour scheme, audio cues for effects it shows |
 | quality presets, auto tuner, frame loop + FPS cap (`perf.ts`, `loop.ts`) | scene budgets per quality tier |
-| boot + event pipeline (`app.ts`) | `Theme` object (`theme.ts` is the contract) |
+| boot + event pipeline (`app.ts`), theme selection (`themes/registry.ts`) | `Theme` object as the default export (`theme.ts` is the contract) |
 
 Per event, the core logs it to the HUD, feeds the noise gate and sim state,
 then hands the theme a `SceneEvent`. The theme turns it into visuals, asking
@@ -117,9 +118,26 @@ advances time (sim speed, bullet-time, FPS cap), computes the anti burn-in
 drift, and calls the theme's `frame()`. All settings live in one saved object,
 so HUD and audio preferences carry across themes.
 
-To add a theme: create `web/src/themes/<id>/index.ts` exporting a `Theme`
-(defaults, per-tier budgets, panel controls, `create()`), then boot it from
-`web/src/main.ts`.
+### Choosing a theme
+
+One relay serves every theme in the build, so different screens can show
+different themes at the same time:
+
+| URL | Theme |
+|-----|-------|
+| `http://<relay-host>:8080/` | the relay's `default_theme` (`relay.yaml`, default `scifi`) |
+| `http://<relay-host>:8080/<theme>/` | that theme, e.g. `/scifi/` (unknown themes are a 404) |
+| any URL + `?theme=<theme>` | that theme (useful on the Pages demo) |
+
+The viewer picks, in order: the theme named in the URL path, `?theme=`, the
+relay's `default_theme` from `GET /config.json`, then `scifi`. Each theme is
+built as its own chunk, so a screen only downloads the theme it shows. Other
+URL params combine as usual, e.g. `/scifi/?quality=low`.
+
+To add a theme: create `web/src/themes/<id>/index.ts` with a default export
+of a `Theme` (defaults, per-tier budgets, panel controls, `create()`). It is
+picked up automatically: the viewer registry finds it, the build writes
+`dist/<id>/index.html`, and the relay serves it at `/<id>/`.
 
 ## Run against your own network
 
@@ -292,6 +310,8 @@ to help more than any in-page setting.
 
 | Param | Effect |
 |-------|--------|
+| `/<theme>/` (path) | show that theme, e.g. `/scifi/` (see [Choosing a theme](#choosing-a-theme)) |
+| `?theme=scifi` | show that theme on any URL |
 | `?demo=1` | synthetic event generator, no relay needed |
 | `?demo=1&showreel=1` | scripted 60s calm→build→hurricane→cooldown arc, looping |
 | `?demo=1&rate=40` | demo at ~40 events/sec |
@@ -308,6 +328,7 @@ to help more than any in-page setting.
 
 - `GET /healthz` — per-host syslog line counters, WS clients, event counters
 - `GET /drops` — which drop-pattern regexes are catching what
+- `GET /config.json` — `default_theme` and the themes installed in the build
 - APs/gateway stop logging for 1–3 minutes after a relay restart — that's the
   UniFi log-forwarder's backoff, it reconnects itself.
 
@@ -344,8 +365,9 @@ cp deploy/pewpew-kiosk.desktop ~/.config/autostart/        # fullscreen chromium
 ```
 
 The kiosk entry opens `?quality=low`, the starting point for a Pi 5. Edit the URL
-in `pewpew-kiosk.desktop` to try `medium`, or to point a kiosk at a relay on
-another host (e.g. `http://192.168.1.5:8080/?quality=low`).
+in `pewpew-kiosk.desktop` to try `medium`, to point a kiosk at a relay on
+another host (e.g. `http://192.168.1.5:8080/?quality=low`), or to pin a theme
+regardless of the relay's default (e.g. `http://192.168.1.5:8080/scifi/?quality=low`).
 
 ## Credits
 

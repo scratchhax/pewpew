@@ -40,7 +40,19 @@ DEFAULTS = {
     "wan_ips": [],
     "vpn_networks": {},
     "drop_log_types": [],          # e.g. ["system"] to quiet noise
+    "default_theme": "scifi",      # viewer theme served at /
 }
+
+THEME_NAME = r"[a-z0-9][a-z0-9-]*"
+
+
+def installed_themes(static: str) -> list:
+    """Theme ids present in the web build (each has <id>/index.html)."""
+    try:
+        return sorted(d for d in os.listdir(static)
+                      if os.path.isfile(os.path.join(static, d, "index.html")))
+    except OSError:
+        return []
 
 
 class Hub:
@@ -289,8 +301,34 @@ async def main():
         async def serve_index(_):
             return web.FileResponse(index_file)
         app.router.add_get("/", serve_index)
+
+        # Viewer themes: / is the default theme (the viewer asks /config.json
+        # which one), /<theme>/ pins a theme. The build ships <theme>/index.html
+        # per theme, so a theme exists exactly when that file does.
+        async def viewer_config(_):
+            return web.json_response({"default_theme": cfg["default_theme"],
+                                      "themes": installed_themes(static)})
+        app.router.add_get("/config.json", viewer_config)
+
+        def theme_index(request):
+            # THEME_NAME allows no dots or slashes, so this stays inside dist/
+            page = os.path.join(static, request.match_info["theme"], "index.html")
+            if not os.path.isfile(page):
+                raise web.HTTPNotFound()
+            return page
+
+        async def serve_theme(request):
+            return web.FileResponse(theme_index(request))
+
+        async def theme_slash(request):
+            theme_index(request)
+            raise web.HTTPFound(f"/{request.match_info['theme']}/")
+
+        app.router.add_get("/{theme:%s}/" % THEME_NAME, serve_theme)
+        app.router.add_get("/{theme:%s}" % THEME_NAME, theme_slash)
         app.add_routes([web.static("/", static, show_index=False)])
-        logger.info("serving static from %s", static)
+        logger.info("serving static from %s (themes: %s, default: %s)", static,
+                    ", ".join(installed_themes(static)) or "none", cfg["default_theme"])
     else:
         async def no_build(_):
             return web.Response(

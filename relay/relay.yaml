@@ -7,6 +7,10 @@ syslog_port: 5514
 http_host: 0.0.0.0
 http_port: 8080
 
+# Viewer theme served at http://<host>:8080/ . Every installed theme is also
+# at /<theme>/ (e.g. /scifi/); /config.json lists them.
+default_theme: scifi
+
 # How many recent events to replay to a newly connected browser
 buffer_size: 500
 
