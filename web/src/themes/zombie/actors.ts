@@ -1,5 +1,5 @@
-import { Container, Sprite, Texture } from 'pixi.js';
-import type { Compound } from './compound';
+import { Container, Sprite } from 'pixi.js';
+import { angleDelta, type Compound } from './compound';
 import { fade, type Fx } from './fx';
 import type { ZTextures } from './textures';
 import { Point, wallPoint } from './layout';
@@ -16,6 +16,8 @@ interface Zombie {
   brute: boolean; horde: number; // horde id (0 = lone zombie)
   dying: number;               // > 0 while falling
   seen: number;                // seconds on screen (for fade-in)
+  watched: boolean;            // a guard has started turning toward it
+  baseScale: number; fallFrom: number; fallDir: number;
   color: number;
 }
 
@@ -74,7 +76,8 @@ export class Zombies {
         : lone ? (Math.random() < 0.88 ? 0.55 + Math.random() * 0.38 : null)
         : 0.5 + Math.random() * 0.45,
       phase: Math.random() * 10, weave: horde ? 22 : 6,
-      brute, horde, dying: 0, seen: 0, color,
+      brute, horde, dying: 0, seen: 0, watched: false,
+      baseScale: s.scale.x, fallFrom: 0, fallDir: 1, color,
     });
   }
 
@@ -87,9 +90,12 @@ export class Zombies {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const z = this.list[i];
       if (z.dying > 0) {
+        // topple over and sink into the ground rather than spinning away
         z.dying -= dt;
-        z.s.alpha = Math.max(0, z.dying / 0.7);
-        z.s.rotation += dt * 2.5;
+        const fall = 1 - Math.max(0, z.dying / 0.9);
+        z.s.alpha = Math.max(0, z.dying / 0.9);
+        z.s.rotation = z.fallFrom + z.fallDir * 0.9 * Math.sin(fall * Math.PI / 2);
+        z.s.scale.set(z.baseScale * (1 - 0.15 * fall));
         fade(z.eye, z.eye.alpha * Math.max(0, 1 - dt * 3));   // eyes dim out, not cut
         if (z.dying <= 0) { z.s.destroy(); z.eye.destroy(); this.list.splice(i, 1); }
         continue;
@@ -111,6 +117,12 @@ export class Zombies {
       z.eye.position.set(x + Math.cos(z.s.rotation) * 6 * L.unit, y + Math.sin(z.s.rotation) * 6 * L.unit);
       fade(z.eye, darkness * 0.45 * Math.min(1, z.seen / 1.5));   // steady, eased in
 
+      // guards start turning toward a zombie a moment before they drop it
+      if (z.killAt !== null && !z.watched && z.t >= z.killAt - 0.12) {
+        z.watched = true;
+        for (const i of this.shooters(z, { x, y })) this.compound.watch(i, { x, y });
+      }
+
       if (z.killAt !== null && z.t >= z.killAt) {
         this.kill(z, { x, y }, z.brute ? 3 : 1);
         hits.kills.push({ x, y });
@@ -125,13 +137,15 @@ export class Zombies {
     return hits;
   }
 
+  /** The nearest tower; a brute also draws the next one, but only if it's
+   *  nearly as close (so no tracers across the whole courtyard). */
+  private shooters(z: Zombie, p: Point): number[] {
+    const [a, b] = this.compound.towersNear(p);
+    return z.brute && b && b.d < a.d * 1.35 ? [a.i, b.i] : [a.i];
+  }
+
   private kill(z: Zombie, p: Point, bursts: number): void {
-    // brutes draw fire from the two closest towers; a walker from the nearest
-    const byDistance = this.compound.towers
-      .map((t, i) => ({ i, d: Math.hypot(t.base.x - p.x, t.base.y - p.y) }))
-      .sort((a, b) => a.d - b.d);
-    const shooters = byDistance.slice(0, z.brute ? 2 : 1).map((x) => x.i);
-    for (const i of shooters) {
+    for (const i of this.shooters(z, p)) {
       for (let b = 0; b < bursts; b++) {
         const muzzle = this.compound.aim(i, p);
         const jx = p.x + (Math.random() - 0.5) * 10, jy = p.y + (Math.random() - 0.5) * 10;
@@ -141,16 +155,18 @@ export class Zombies {
     this.fx.emit(p.x, p.y, BLOOD, z.brute ? 8 : 4, z.brute ? 70 : 45, 0.18, 0.6);
     this.fx.splat(p.x, p.y, z.brute ? 1.8 : 1);
     if (z.brute) this.fx.ring(p.x, p.y, z.color, 110 * this.compound.L.unit, 3.5, 0.9);
-    z.dying = 0.7;
+    z.dying = 0.9;
+    z.fallFrom = z.s.rotation;
+    z.fallDir = Math.random() < 0.5 ? -1 : 1;
   }
 }
 
 interface Walker {
   s: Sprite; prop: Sprite | null; lamp: Sprite;
   path: Point[]; seg: number; along: number;
-  speed: number; color: number;
-  fade: number;                  // fade-in, then fade-out at the end
-  exitFade: boolean;
+  speed: number;
+  rot: number;                   // eased facing, so corners are turned, not snapped
+  fade: number;                  // quick fade-in, then fade-out at the end
   onDone?: (p: Point) => void;
   kind: string;
 }
@@ -165,52 +181,54 @@ export class Walkers {
 
   count(kind?: string): number { return kind ? this.list.filter((w) => w.kind === kind).length : this.list.length; }
 
-  walk(kind: string, path: Point[], opts: {
-    speed: number; color: number; carry?: boolean;
-    exitFade?: boolean; onDone?: (p: Point) => void; unit: number; texture?: Texture;
+  walk(kind: string, route: Point[], opts: {
+    speed: number; carry?: boolean; onDone?: (p: Point) => void; unit: number;
   }): void {
-    if (path.length < 2) return;
-    const s = new Sprite(opts.texture ?? this.tex.frame(opts.carry ? 'carrier' : SURVIVORS[(Math.random() * SURVIVORS.length) | 0]));
+    if (route.length < 2) return;
+    // each survivor keeps to its own lane through shared waypoints (gates,
+    // corners) so several walkers never merge into one jittering blob
+    const lane = 9 * opts.unit;
+    const ox = (Math.random() * 2 - 1) * lane, oy = (Math.random() * 2 - 1) * lane;
+    const path = route.map((p, i) => (i === 0 || i === route.length - 1 ? p : { x: p.x + ox, y: p.y + oy }));
+    const s = new Sprite(this.tex.frame(opts.carry ? 'carrier' : SURVIVORS[(Math.random() * SURVIVORS.length) | 0]));
     s.anchor.set(0.4, 0.5);
     s.scale.set(0.85 * opts.unit);
     s.position.set(path[0].x, path[0].y);
+    const rot = Math.atan2(path[1].y - path[0].y, path[1].x - path[0].x);
+    s.rotation = rot;
     s.alpha = 0;
     let prop: Sprite | null = null;
     if (opts.carry) {
       prop = new Sprite(this.tex.frame('crate_small'));
       prop.anchor.set(0.5);
       prop.scale.set(0.55 * opts.unit);
+      prop.alpha = 0;
       this.layer.addChild(prop);
     }
     const lamp = new Sprite(this.tex.glow);
     lamp.anchor.set(0.05, 0.5); lamp.blendMode = 'add'; lamp.tint = 0xfff3d0; fade(lamp, 0);
     this.layer.addChild(s);
     this.lights.addChild(lamp);
-    this.list.push({
-      s, prop, lamp, path, seg: 0, along: 0, speed: opts.speed, color: opts.color,
-      fade: 0,
-      exitFade: opts.exitFade ?? true, onDone: opts.onDone, kind,
-    });
+    this.list.push({ s, prop, lamp, path, seg: 0, along: 0, speed: opts.speed, rot, fade: 0, onDone: opts.onDone, kind });
   }
 
   update(dt: number, darkness: number, flashlights = true): void {
     const lampDark = flashlights ? darkness : 0;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const w = this.list[i];
-      const done = w.seg >= w.path.length - 1;
-      if (done) {
-        w.fade -= dt * 1.2;
-        w.s.alpha = Math.max(0, w.fade);
-        if (w.prop) w.prop.alpha = w.s.alpha;
-        fade(w.lamp, w.s.alpha * lampDark * 0.35);
+      if (w.seg >= w.path.length - 1) {
+        // arrived: step out of view over half a second
+        w.fade = Math.max(0, w.fade - dt * 2);
+        w.s.alpha = w.fade;
+        if (w.prop) w.prop.alpha = w.fade;
+        fade(w.lamp, w.fade * lampDark * 0.35);
         if (w.fade <= 0) {
           w.s.destroy(); w.prop?.destroy(); w.lamp.destroy();
           this.list.splice(i, 1);
         }
         continue;
       }
-      w.fade = Math.min(1, w.fade + dt * 1.5);
-      w.s.alpha = w.fade;
+      w.fade = Math.min(1, w.fade + dt * 3);
       const a = w.path[w.seg], b = w.path[w.seg + 1];
       const segLen = Math.hypot(b.x - a.x, b.y - a.y) || 1;
       w.along += w.speed * dt;
@@ -220,22 +238,24 @@ export class Walkers {
         if (w.seg >= w.path.length - 1) {
           w.s.position.set(b.x, b.y);
           w.onDone?.(b);
-          if (!w.exitFade) w.fade = 0.01;
           continue;
         }
       }
       const f = w.along / segLen;
       const x = a.x + (b.x - a.x) * f, y = a.y + (b.y - a.y) * f;
       const heading = Math.atan2(b.y - a.y, b.x - a.x);
+      w.rot += angleDelta(w.rot, heading) * Math.min(1, dt * 8);
       w.s.position.set(x, y);
-      w.s.rotation = heading;
+      w.s.rotation = w.rot;
+      w.s.alpha = w.fade;
       if (w.prop) {
-        w.prop.position.set(x + Math.cos(heading) * 16 * w.s.scale.x, y + Math.sin(heading) * 16 * w.s.scale.x);
-        w.prop.rotation = heading;
+        const reach = 16 * w.s.scale.x;
+        w.prop.position.set(x + Math.cos(w.rot) * reach, y + Math.sin(w.rot) * reach);
+        w.prop.rotation = w.rot;
         w.prop.alpha = w.fade;
       }
       w.lamp.position.set(x, y);
-      w.lamp.rotation = heading;
+      w.lamp.rotation = w.rot;
       w.lamp.scale.set(2.2 * w.s.scale.x, 0.9 * w.s.scale.x);
       fade(w.lamp, lampDark * 0.35 * w.fade);
     }

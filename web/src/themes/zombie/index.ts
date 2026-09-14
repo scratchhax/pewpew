@@ -158,7 +158,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
               throttle.allow(`con|${ev.src_ip}|${ev.dst_ip}`, 10)) {
             const a = compound.campSpot(ev.src_ip), b = compound.campSpot(ev.dst_ip);
             if (Math.hypot(a.x - b.x, a.y - b.y) > 20) {
-              walkers.walk('courier', [a, b], { speed: walkSpeed(), color: COLORS.allow, unit: L.unit });
+              walkers.walk('courier', [a, b], { speed: walkSpeed(), unit: L.unit });
             }
           }
           break;
@@ -171,13 +171,13 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
           const dst = compound.campSpot(ev.dst_ip ?? 'lan');
           const path = outboundPath(dst, angle).reverse();
           walkers.walk('run', path, {
-            speed: walkSpeed(), color: COLORS.allow, carry: true, unit: L.unit,
+            speed: walkSpeed(), carry: true, unit: L.unit,
             onDone: (p) => fx.ring(p.x, p.y, COLORS.allow, 34 * L.unit),
           });
         } else {
           // a scavenger heads out on a supply run
           const src = compound.campSpot(ev.src_ip ?? 'lan');
-          walkers.walk('run', outboundPath(src, angle), { speed: runSpeed(), color: COLORS.allow, unit: L.unit });
+          walkers.walk('run', outboundPath(src, angle), { speed: runSpeed(), unit: L.unit });
         }
         audio.cueSong('allow', ev.src_ip ?? ev.dst_ip ?? undefined);
         break;
@@ -211,7 +211,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
             if (isNew) {
               walkPath.push(pos);
               walkers.walk('arrive', walkPath, {
-                speed: walkSpeed(), color: COLORS.dhcp, unit: L.unit,
+                speed: walkSpeed(), unit: L.unit,
                 onDone: (p) => fx.ring(p.x, p.y, COLORS.dhcp, 30 * L.unit, 2, 0.8),
               });
             } else {
@@ -234,15 +234,18 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
         const bad = se.wifi === 'bad', joined = se.wifi === 'joined';
         compound.buildingEvent(ev.syslog_host, bad ? 'bad' : 'good', COLORS.wifi);
         const door = compound.door(ev.syslog_host);
-        const out = { x: door.x, y: door.y + (door.y < L.cy ? 1 : -1) * 48 * L.unit };
-        if (joined) {
-          walkers.walk('visit', [out, door], {
-            speed: walkSpeed(), color: COLORS.wifi, unit: L.unit,
+        // a real walk between the client's spot in the camp and the door, so the
+        // visitor is solidly on screen instead of a brief ghost at the doorway
+        const spot = compound.campSpot(ev.mac_address ?? ev.syslog_host);
+        const step = { x: door.x, y: door.y + (door.y < L.cy ? 1 : -1) * 30 * L.unit };
+        if (joined && walkers.count('visit') < 8) {
+          walkers.walk('visit', [spot, step, door], {
+            speed: walkSpeed(), unit: L.unit,
             onDone: (p) => fx.ring(p.x, p.y, COLORS.wifi, 28 * L.unit, 2, 0.7),
           });
-        } else if (bad) {
-          walkers.walk('visit', [door, out], {
-            speed: runSpeed(), color: COLORS.wifi, unit: L.unit,
+        } else if (bad && walkers.count('visit') < 8) {
+          walkers.walk('visit', [door, step, spot], {
+            speed: walkSpeed(), unit: L.unit,
             onDone: (p) => { fx.emit(p.x, p.y, COLORS.wifi, 5, 40, 0.2, 0.8); fx.ring(p.x, p.y, COLORS.wifi, 36 * L.unit, 2.5, 1); },
           });
         } else {
