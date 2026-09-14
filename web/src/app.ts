@@ -129,8 +129,16 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
   void syncTracks();
   setInterval(() => { void syncTracks(); }, 20_000);
 
+  hud.logs.beforeOpen = () => panel.hide();
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'F1') { e.preventDefault(); panel.toggle(); }
+    if (e.key === 'F1') { e.preventDefault(); hud.logs.close(); panel.toggle(); }
+    const target = e.target as HTMLElement;
+    if (e.key.toLowerCase() === 'l' && !e.ctrlKey && !e.metaKey && !e.altKey &&
+        !target.closest('input, textarea, select, [contenteditable="true"]')) {
+      e.preventDefault();
+      if (hud.logs.isOpen) hud.logs.close();
+      else hud.logs.open();
+    }
   });
 
   // ── event pipeline: HUD log + audio see every event; the theme decides
@@ -159,6 +167,7 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
     (events, meta) => {
       if (meta?.demo) hud.showDemo(true);
       hud.setConnected(true);
+      hud.logs.store.seed(events);
       for (const ev of events) route(ev, true);
     },
   );

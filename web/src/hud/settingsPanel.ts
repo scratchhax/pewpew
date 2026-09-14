@@ -234,6 +234,8 @@ export class SettingsPanel {
     ).join('');
   }
 
+  hide(): void { this.visible = false; this.root.style.display = 'none'; }
+
   toggle(): void {
     this.visible = !this.visible;
     this.root.style.display = this.visible ? '' : 'none';

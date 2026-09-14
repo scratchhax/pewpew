@@ -577,6 +577,53 @@ Pi 5. Edit the URL to point at a relay on another host
 (`http://192.168.1.5:8080/zombie/?quality=low`). The kiosk's browser still
 needs one tap or keypress before it can play sound.
 
+### Explore the COMMS LOG
+
+Click **Expand ↗** on the COMMS LOG or press **L** to open the tactical
+inspector. The scene and soundtrack keep running underneath. Press **Esc**
+to close; **F1** switches to settings. The L shortcut also works when the
+compact log is hidden in settings, and does not activate while typing.
+
+- Search retained fields and raw text, or filter by type, action, and exact
+  syslog host. Select a row for structured details, endpoint information, raw
+  syslog (when available), and copy controls.
+- Click an IP, MAC, or host in the details to follow matching events across
+  event types. **Back**, the removable identity chip, and **Reset filters**
+  let you return to the previous view. Matches use explicit event fields;
+  the inspector does not guess which IPs belong to the same device.
+- Selecting a row or scrolling pauses following. **Follow live** resumes;
+  the counter shows newly received events while paused. Arrow keys, Home/End,
+  and Page Up/Down navigate the event list.
+- History stays in browser memory: at most **5,000 events or 8 MiB of event
+  text**, whichever comes first. Each event retains at most **16 KiB of
+  text**, with individual structured strings limited to 512 characters and
+  remaining space used for raw syslog. Truncation is marked in the details.
+  These are text budgets, not total browser heap limits.
+- Pausing does not stop ingestion or eviction. If a selected event expires,
+  its details are released. **Clear history** releases the retained events
+  and clears the compact log; reloading also clears history and filters.
+  Only the first relay snapshot seeds history, so reconnect snapshots do
+  not repeat already-seen events.
+
+The inspector mounts only visible rows, refreshes at most ten times per
+second, and stops rendering when closed. Its traffic sparkline covers the
+last 60 seconds. Reduced-motion preferences disable inspector animations.
+
+Developer checks:
+
+```bash
+cd web
+npm test
+npm run build
+# With the Vite dev server running on 127.0.0.1:5173:
+npm run test:browser
+npm run test:browser -- --stress
+```
+
+Browser checks use installed Chrome (`CHROME_BIN` overrides its path). The
+optional stress check runs the inspector in isolation at 200 events/second
+for five minutes, checks bounded rows and retention, and samples post-GC heap.
+
 ## How it works
 
 ```

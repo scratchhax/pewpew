@@ -132,6 +132,77 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
 .log-wifi { color: #c08cff; text-shadow: 0 0 6px rgba(192,140,255,0.35); }
 .log-system { color: #7d99b3; }
 
+/* Bounded, virtualized session inspector. Log payloads are always text nodes. */
+#expand-log { pointer-events: auto; float: right; cursor: pointer; color: var(--accent); background: transparent; border: 0; font: inherit; letter-spacing: 1px; }
+#log-inspector {
+  position: fixed; inset: 0; margin: auto; width: min(1400px, 94vw); height: 88dvh;
+  max-width: 100vw; max-height: 100dvh; padding: 18px; overflow: hidden;
+  color: #bfe6ff; background: linear-gradient(135deg, #071b29f5, #030b14fa);
+  border: 1px solid #46f0d970; border-radius: 8px;
+  box-shadow: 0 0 36px #46f0d925; font: 12px/1.5 'Courier New', monospace;
+}
+#log-inspector[open] { display: flex; flex-direction: column; gap: 12px; animation: log-open 180ms ease-out; }
+#log-inspector::backdrop { background: #0008; }
+#log-inspector button, #log-inspector input, #log-inspector select {
+  font: inherit; color: #c8e8f5; background: #0b2332; border: 1px solid #42677a;
+  border-radius: 4px; padding: 6px 9px; min-width: 0;
+}
+#log-inspector button { cursor: pointer; }
+#log-inspector button:hover { border-color: var(--accent); background: #123447; }
+#log-inspector :focus-visible, #expand-log:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.log-heading, .log-toolbar, .log-meter { display: flex; align-items: center; gap: 12px; }
+.log-heading h2 { color: var(--accent); font-size: 16px; letter-spacing: 2px; }
+.log-heading button { margin-left: auto; }
+.log-session { color: #83a6b7; font-size: 10px; }
+.log-toolbar { flex-wrap: wrap; align-items: end; }
+.log-toolbar label { display: flex; flex-direction: column; gap: 3px; font-size: 10px; color: #99b4c5; }
+.log-toolbar label:first-child { flex: 1; min-width: 180px; }
+.log-chips { display: flex; gap: 6px; flex-wrap: wrap; max-height: 70px; overflow: auto; }
+.log-chips:empty { display: none; }
+.log-chips button { max-width: 100%; overflow-wrap: anywhere; }
+.log-meter { justify-content: space-between; color: #8cbdce; min-height: 28px; }
+.log-meter canvas { flex: 0 0 180px; }
+.log-workspace { display: grid; grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr); gap: 16px; min-height: 0; flex: 1; }
+.log-list { overflow: auto; position: relative; min-height: 100px; border: 1px solid #315164; border-radius: 4px; overscroll-behavior: contain; overflow-anchor: none; }
+.log-space { position: relative; }
+.log-rows { position: absolute; top: 0; left: 0; right: 0; }
+.log-row { height: 36px; display: flex; gap: 10px; align-items: center; padding: 0 10px; border-bottom: 1px solid #ffffff09; cursor: pointer; }
+.log-row:hover { background: #ffffff09; }
+.log-row.selected { background: #46f0d917; box-shadow: inset 3px 0 var(--accent); }
+.log-row time { color: #8fabbc; flex: 0 0 60px; font-size: 11px; }
+.log-badge { font-size: 10px; flex: 0 0 60px; letter-spacing: 1px; }
+.log-summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-rows.arriving .log-row:last-child { animation: log-arrival 400ms ease-out; }
+.log-detail { overflow: auto; min-width: 0; padding: 0 10px 12px 0; overscroll-behavior: contain; overflow-wrap: anywhere; }
+.log-detail h3 { letter-spacing: 2px; margin-bottom: 8px; }
+.log-detail dl { display: grid; grid-template-columns: minmax(80px, 1fr) minmax(0, 2fr); gap: 7px 12px; margin: 16px 0; }
+.log-detail dt { color: #89a9bc; text-transform: capitalize; }
+.log-detail dd { min-width: 0; }
+.log-detail dd button { max-width: 100%; overflow-wrap: anywhere; text-align: left; }
+.log-detail details { margin-top: 16px; }
+.log-detail summary { cursor: pointer; color: var(--accent); }
+.log-detail pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 10px 0; padding: 10px; background: #0005; font: inherit; }
+.log-endpoints { margin-top: 14px; padding: 14px; border: 1px solid #46f0d940; border-radius: 4px; background: #46f0d906; color: var(--accent); }
+.log-truncated { margin-top: 12px; color: #ffd84d; }
+.log-empty { padding: 18px; color: #93afbf; }
+#log-inspector footer { color: #819eaf; font-size: 10px; }
+@keyframes log-open { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes log-arrival { from { background: #46f0d92b; } to { background: transparent; } }
+@media (max-width: 760px) {
+  #log-inspector { width: 100vw; height: 100dvh; border-radius: 0; padding: 10px; gap: 8px; }
+  .log-workspace { grid-template-columns: 1fr; grid-template-rows: minmax(120px, 1fr) minmax(120px, 1fr); gap: 8px; }
+  .log-session { display: none; }
+  .log-heading h2 { font-size: 12px; }
+  .log-toolbar { gap: 6px; }
+  .log-toolbar label { flex: 1; }
+  .log-toolbar label:first-child { flex-basis: 100%; }
+  .log-meter canvas { flex-basis: 90px; width: 90px; }
+  .log-row { gap: 6px; padding: 0 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #log-inspector[open], .log-rows.arriving .log-row:last-child { animation: none; }
+}
+
 #hint { position: absolute; bottom: 6px; right: 64px; font-size: 10px; opacity: 0.35; }
 
 #demo-badge {

@@ -1,5 +1,6 @@
 import type { State, Weather } from '../state';
 import { isInternalIp } from '../state';
+import { LogInspector } from './logInspector';
 import type { CoreSettings as Settings } from '../settings';
 import type { Audio } from '../audio';
 import type { NetEvent } from '../types';
@@ -69,6 +70,9 @@ export function hudLabels(o: HudLabelOverrides = {}): HudLabels {
 }
 
 export class Hud {
+  readonly logs = new LogInspector(() => {
+    this.queue = []; this.terminal.replaceChildren(); this.scrollY = 0;
+  });
   private root: HTMLElement;
   private threatFill!: HTMLElement;
   private energyFill!: HTMLElement;
@@ -156,11 +160,11 @@ export class Hud {
         <canvas id="radar" width="110" height="110"></canvas>
       </div>
       <div id="terminal" class="panel">
-        <div class="panel-head">◢ ${L.comms}<span class="cursor">▮</span></div>
+        <div class="panel-head">◢ ${L.comms}<span class="cursor">▮</span><button id="expand-log" type="button" aria-label="Open log inspector">Expand ↗</button></div>
         <div class="log-wrap"><div id="terminal-body"></div></div>
       </div>
       <div id="demo-badge" style="display:none">${L.demo}</div>
-      <div id="hint">F1 settings</div>`;
+      <div id="hint">F1 settings · L logs</div>`;
     document.body.appendChild(this.root);
 
     this.threatFill = q('threat-fill');
@@ -169,6 +173,7 @@ export class Hud {
     this.rateEl = q('rate');
     this.connEl = q('conn-dot');
     this.terminal = q('terminal-body');
+    q('expand-log').addEventListener('click', () => this.logs.open());
     this.scope = q('scope') as HTMLCanvasElement;
     this.scopeCtx = this.scope.getContext('2d')!;
     this.radar = q('radar') as HTMLCanvasElement;
@@ -202,40 +207,43 @@ export class Hud {
   private names = new Map<string, string>();   // MAC → hostname learned from DHCP
 
   log(ev: NetEvent): void {
-    if (ev.mac_address && ev.hostname) this.names.set(ev.mac_address.toLowerCase(), ev.hostname);
-    const t = (ev.timestamp || '').slice(11, 19);
-    const who = ev.mac_address
-      ? (this.names.get(ev.mac_address.toLowerCase()) ?? `:${ev.mac_address.slice(-5)}`)
+    // The store owns the retained copy; the compact feed renders from it so
+    // both views show the same (bounded) text.
+    const e = this.logs.store.add(ev).event;
+    if (e.mac_address && e.hostname) this.names.set(e.mac_address.toLowerCase(), e.hostname);
+    const t = (e.timestamp || '').slice(11, 19);
+    const who = e.mac_address
+      ? (this.names.get(e.mac_address.toLowerCase()) ?? `:${e.mac_address.slice(-5)}`)
       : '';
     let msg = '';
-    switch (ev.log_type) {
+    switch (e.log_type) {
       case 'firewall': {
-        const dir = isInternalIp(ev.src_ip) && isInternalIp(ev.dst_ip)
-          ? 'internal' : (ev.direction ?? '-');
-        if (ev.threat) {
-          msg = `THREAT ${ev.dst_ip ?? '?'} → ${ev.service_name ?? ev.dst_port ?? ''}` +
-                ` [${dir}]` + (ev.rule_desc ? ` (${ev.rule_desc})` : '');
+        const dir = isInternalIp(e.src_ip) && isInternalIp(e.dst_ip)
+          ? 'internal' : (e.direction ?? '-');
+        if (e.threat) {
+          msg = `THREAT ${e.dst_ip ?? '?'} → ${e.service_name ?? e.dst_port ?? ''}` +
+                ` [${dir}]` + (e.rule_desc ? ` (${e.rule_desc})` : '');
         } else {
-          msg = `${(ev.rule_action ?? '?').toUpperCase()} ${ev.src_ip} → ${ev.dst_ip}` +
-                ` ${ev.service_name ?? ev.dst_port ?? ''} [${dir}]` +
-                (ev.rule_name ? ` (${ev.rule_name})` : '');
+          msg = `${(e.rule_action ?? '?').toUpperCase()} ${e.src_ip} → ${e.dst_ip}` +
+                ` ${e.service_name ?? e.dst_port ?? ''} [${dir}]` +
+                (e.rule_name ? ` (${e.rule_name})` : '');
         }
         break;
       }
       case 'dns':
-        msg = `DNS ${ev.src_ip ? ev.src_ip + ' → ' : ''}${ev.dns_query ?? ''}` +
-              (ev.dns_answer ? ` → ${ev.dns_answer}` : '');
+        msg = `DNS ${e.src_ip ? e.src_ip + ' → ' : ''}${e.dns_query ?? ''}` +
+              (e.dns_answer ? ` → ${e.dns_answer}` : '');
         break;
       case 'dhcp':
-        msg = `DHCP ${ev.dhcp_event ?? ''} ${ev.hostname || who} ${ev.src_ip ?? ''}` +
-              (ev.syslog_host ? ` @ ${ev.syslog_host}` : '');
+        msg = `DHCP ${e.dhcp_event ?? ''} ${e.hostname || who} ${e.src_ip ?? ''}` +
+              (e.syslog_host ? ` @ ${e.syslog_host}` : '');
         break;
       case 'wifi':
-        msg = `WIFI ${ev.wifi_event ?? '?'} ${who}` +
-              (ev.wifi_reason ? ` (${ev.wifi_reason})` : '') +
-              (ev.syslog_host ? ` @ ${ev.syslog_host}` : '');
+        msg = `WIFI ${e.wifi_event ?? '?'} ${who}` +
+              (e.wifi_reason ? ` (${e.wifi_reason})` : '') +
+              (e.syslog_host ? ` @ ${e.syslog_host}` : '');
         break;
-      default: msg = `SYS ${syslogMsg(ev.raw_log)}`;
+      default: msg = `SYS ${syslogMsg(e.raw_log)}`;
     }
     const key = msg.replace(/\s+/g, ' ').trim();
     const tail = this.queue[this.queue.length - 1];
@@ -243,8 +251,8 @@ export class Hud {
       tail.count++;
       tail.text = `${t}  ${key}`;          // keep newest timestamp
     } else {
-      const cls = `log-${ev.log_type}`
-        + (ev.threat ? ' log-threat' : ev.rule_action === 'block' ? ' log-block' : '');
+      const cls = `log-${e.log_type}`
+        + (e.threat ? ' log-threat' : e.rule_action === 'block' ? ' log-block' : '');
       this.queue.push({ text: `${t}  ${key}`, key, cls, count: 1 });
       if (this.queue.length > 1200) this.queue.shift();
     }
@@ -290,7 +298,7 @@ export class Hud {
     while (this.scrollY >= LINE) {
       const next = this.queue.shift();
       if (!next) { this.scrollY = LINE - 0.01; break; }
-      this.terminal.removeChild(this.terminal.firstChild!);
+      this.terminal.firstChild?.remove();
       this.appendLine(next);
       this.scrollY -= LINE;
     }
@@ -300,7 +308,7 @@ export class Hud {
   private appendLine(item: { text: string; cls: string; count: number }): void {
     const div = document.createElement('div');
     div.className = item.cls;
-    div.textContent = item.count > 1 ? `${item.text}  \u00d7${item.count}` : item.text;
+    div.textContent = item.count > 1 ? `${item.text}  ×${item.count}` : item.text;
     this.terminal.appendChild(div);
   }
 
