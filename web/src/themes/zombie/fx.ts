@@ -1,14 +1,28 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 
-interface Particle { s: Sprite; vx: number; vy: number; life: number; max: number; drag: number; grow: number }
-interface Tracer { x1: number; y1: number; x2: number; y2: number; life: number; color: number }
-interface Ring { x: number; y: number; r: number; maxR: number; life: number; max: number; color: number; width: number }
-interface Dash { x1: number; y1: number; x2: number; y2: number; life: number; max: number; color: number }
+interface Particle { s: Sprite; vx: number; vy: number; age: number; life: number; drag: number; peak: number }
+interface Tracer { x1: number; y1: number; x2: number; y2: number; age: number; color: number }
+interface Ring { x: number; y: number; r: number; maxR: number; age: number; life: number; color: number; width: number }
+interface Dash { x1: number; y1: number; x2: number; y2: number; age: number; life: number; color: number }
 interface Decal { s: Sprite; age: number }
 
+/** Gunfire streaks rise and fall over this long. */
+const TRACER_LIFE = 0.35;
+
 /**
- * Short-lived effects: additive particles, gunfire tracers, expanding rings,
- * dashed radio lines, and blood decals that stay on the ground a while.
+ * Soft in-and-out envelope for effects: 0 at birth, 1 at the middle, 0 at the
+ * end. Nothing in this theme appears at full strength in a single frame.
+ */
+function envelope(age: number, life: number): number {
+  const p = Math.max(0, Math.min(1, age / life));
+  return Math.sin(Math.PI * p);
+}
+
+/**
+ * Short-lived effects: soft (non-glowing) particles, gunfire streaks,
+ * expanding rings, dashed radio lines, and blood decals that stay a while.
+ * No additive blending and no pops: every effect fades in and back out, so
+ * small things never twinkle against the dark.
  */
 export class Fx {
   private particles: Particle[] = [];
@@ -24,46 +38,36 @@ export class Fx {
 
   constructor(private layer: Container, private decalLayer: Container,
               private glow: Texture, private splats: Texture[]) {
-    this.g.blendMode = 'add';
     layer.addChild(this.g);
   }
 
   emit(x: number, y: number, color: number, count: number, speed = 60, size = 0.2, life = 0.6): void {
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= this.maxParticles) return;
-      const s = this.pool.pop() ?? Object.assign(new Sprite(this.glow), { blendMode: 'add' as const });
+      const s = this.pool.pop() ?? new Sprite(this.glow);
       s.anchor.set(0.5);
       s.visible = true;
+      s.alpha = 0;
       s.x = x; s.y = y;
       s.tint = color;
       s.scale.set(size * (0.6 + Math.random() * 0.8));
       const a = Math.random() * Math.PI * 2, v = speed * (0.3 + Math.random() * 0.7);
-      const l = life * (0.6 + Math.random() * 0.7);
-      this.particles.push({ s, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: l, max: l, drag: 0.92, grow: 0 });
+      const l = life * (0.8 + Math.random() * 0.6);
+      this.particles.push({ s, vx: Math.cos(a) * v, vy: Math.sin(a) * v, age: 0, life: l, drag: 0.92, peak: 0.55 });
       this.layer.addChild(s);
     }
   }
 
-  /** Muzzle flash: a hot pop at the gun. */
-  flash(x: number, y: number, color = 0xfff1b0, size = 0.5): void {
-    if (this.particles.length >= this.maxParticles) return;
-    const s = this.pool.pop() ?? Object.assign(new Sprite(this.glow), { blendMode: 'add' as const });
-    s.anchor.set(0.5); s.visible = true;
-    s.x = x; s.y = y; s.tint = color; s.scale.set(size * 0.4);
-    this.particles.push({ s, vx: 0, vy: 0, life: 0.09, max: 0.09, drag: 1, grow: size * 6 });
-    this.layer.addChild(s);
+  tracer(x1: number, y1: number, x2: number, y2: number, color = 0xd8b48a): void {
+    this.tracers.push({ x1, y1, x2, y2, age: 0, color });
   }
 
-  tracer(x1: number, y1: number, x2: number, y2: number, color = 0xffd27a): void {
-    this.tracers.push({ x1, y1, x2, y2, life: 0.12, color });
+  ring(x: number, y: number, color: number, maxR = 60, width = 2, life = 0.9): void {
+    this.rings.push({ x, y, r: maxR * 0.3, maxR, age: 0, life: Math.max(life, 0.9), color, width });
   }
 
-  ring(x: number, y: number, color: number, maxR = 60, width = 2, life = 0.7): void {
-    this.rings.push({ x, y, r: 4, maxR, life, max: life, color, width });
-  }
-
-  dash(x1: number, y1: number, x2: number, y2: number, color: number, life = 0.9): void {
-    this.dashes.push({ x1, y1, x2, y2, life, max: life, color });
+  dash(x1: number, y1: number, x2: number, y2: number, color: number, life = 1.2): void {
+    this.dashes.push({ x1, y1, x2, y2, age: 0, life, color });
   }
 
   /** Blood on the ground; oldest decals go first once over budget. */
@@ -74,7 +78,7 @@ export class Fx {
     s.x = x; s.y = y;
     s.rotation = Math.random() * Math.PI * 2;
     s.scale.set((0.4 + Math.random() * 0.3) * size);
-    s.alpha = 0.8;
+    s.alpha = 0;
     this.decalLayer.addChild(s);
     this.decals.push({ s, age: 0 });
     this.trimDecals();
@@ -94,8 +98,8 @@ export class Fx {
   update(dt: number): void {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
-      p.life -= dt;
-      if (p.life <= 0) {
+      p.age += dt;
+      if (p.age >= p.life) {
         this.layer.removeChild(p.s);
         p.s.visible = false;
         this.pool.push(p.s);
@@ -104,18 +108,15 @@ export class Fx {
       }
       p.vx *= p.drag; p.vy *= p.drag;
       p.s.x += p.vx * dt; p.s.y += p.vy * dt;
-      if (p.grow) p.s.scale.set(p.s.scale.x + p.grow * dt);
-      p.s.alpha = Math.min(1, (p.life / p.max) * 1.6);
+      p.s.alpha = p.peak * envelope(p.age, p.life);
     }
 
-    // decals slowly dry out over ~2 minutes
+    // decals soak in over half a second, then slowly dry out over ~2 minutes
     for (let i = this.decals.length - 1; i >= 0; i--) {
       const d = this.decals[i];
       d.age += dt;
-      if (d.age > 90) {
-        d.s.alpha = Math.max(0, 0.8 - (d.age - 90) / 40);
-        if (d.s.alpha <= 0) { d.s.destroy(); this.decals.splice(i, 1); }
-      }
+      d.s.alpha = d.age < 0.5 ? 0.8 * (d.age / 0.5) : Math.max(0, 0.8 - Math.max(0, d.age - 90) / 40);
+      if (d.age > 90 && d.s.alpha <= 0) { d.s.destroy(); this.decals.splice(i, 1); }
     }
     this.trimDecals();
 
@@ -123,33 +124,30 @@ export class Fx {
     g.clear();
     for (let i = this.tracers.length - 1; i >= 0; i--) {
       const t = this.tracers[i];
-      t.life -= dt;
-      if (t.life <= 0) { this.tracers.splice(i, 1); continue; }
-      const a = t.life / 0.12;
-      g.moveTo(t.x1, t.y1).lineTo(t.x2, t.y2).stroke({ width: 4, color: t.color, alpha: 0.25 * a });
-      g.moveTo(t.x1, t.y1).lineTo(t.x2, t.y2).stroke({ width: 1.4, color: 0xffffff, alpha: a });
+      t.age += dt;
+      if (t.age >= TRACER_LIFE) { this.tracers.splice(i, 1); continue; }
+      g.moveTo(t.x1, t.y1).lineTo(t.x2, t.y2)
+        .stroke({ width: 1.5, color: t.color, alpha: 0.3 * envelope(t.age, TRACER_LIFE) });
     }
     for (let i = this.rings.length - 1; i >= 0; i--) {
       const r = this.rings[i];
-      r.life -= dt;
-      if (r.life <= 0) { this.rings.splice(i, 1); continue; }
-      r.r += (r.maxR - r.r) * Math.min(1, dt * 6);
-      const a = r.life / r.max;
-      g.circle(r.x, r.y, r.r).stroke({ width: r.width * a + 0.5, color: r.color, alpha: a * 0.85 });
+      r.age += dt;
+      if (r.age >= r.life) { this.rings.splice(i, 1); continue; }
+      r.r += (r.maxR - r.r) * Math.min(1, dt * 2.5);
+      g.circle(r.x, r.y, r.r).stroke({ width: r.width, color: r.color, alpha: 0.4 * envelope(r.age, r.life) });
     }
     for (let i = this.dashes.length - 1; i >= 0; i--) {
       const d = this.dashes[i];
-      d.life -= dt;
-      if (d.life <= 0) { this.dashes.splice(i, 1); continue; }
-      const a = d.life / d.max;
+      d.age += dt;
+      if (d.age >= d.life) { this.dashes.splice(i, 1); continue; }
       const len = Math.hypot(d.x2 - d.x1, d.y2 - d.y1) || 1;
       const ux = (d.x2 - d.x1) / len, uy = (d.y2 - d.y1) / len;
-      const shift = ((1 - a) * 40) % 14;           // dashes crawl toward the mast
+      const shift = (d.age * 30) % 14;           // dashes crawl toward the mast
       for (let s = shift; s < len; s += 14) {
         const e = Math.min(len, s + 7);
         g.moveTo(d.x1 + ux * s, d.y1 + uy * s).lineTo(d.x1 + ux * e, d.y1 + uy * e);
       }
-      g.stroke({ width: 2, color: d.color, alpha: a * 0.9 });
+      g.stroke({ width: 2, color: d.color, alpha: 0.5 * envelope(d.age, d.life) });
     }
   }
 }

@@ -338,13 +338,14 @@ export class Hud {
         target = 0.07 + Math.min(1, this.spec[i]) * 0.55
           + wave * (0.08 + Math.min(1, this.spec[i]) * 0.4);
       }
-      this.specView[i] += (target - this.specView[i]) * Math.min(1, dt * (live ? 14 : 6));
+      // bars glide rather than jitter: slow enough that the panel never flickers
+      this.specView[i] += (target - this.specView[i]) * Math.min(1, dt * (live ? 4 : 3));
       const v = Math.min(1, this.specView[i]);
       const bh = v * (h - 6);
       c.fillStyle = Hud.BAND_COLOR[i];
       c.globalAlpha = 0.35 + v * 0.6;
       c.fillRect(i * (bw + 2), h - bh, bw, bh);
-      c.globalAlpha = 0.9;
+      c.globalAlpha = 0.6;
       c.fillRect(i * (bw + 2), h - bh, bw, 2);
     }
     c.globalAlpha = 1;
@@ -459,20 +460,21 @@ export class Hud {
     c.moveTo(mid, mid);
     c.lineTo(mid + Math.cos(this.sweep) * R, mid + Math.sin(this.sweep) * R);
     c.stroke();
-    // blips light up as the sweep passes over them, then decay
+    // blips brighten smoothly as the sweep passes over them, then decay.
+    // Raised-cosine falloff around the sweep (no on/off lit state) and a short
+    // fade-in, so the little dots never blink.
     for (let i = this.blips.length - 1; i >= 0; i--) {
       const b = this.blips[i];
       b.age += dt;
       if (b.age > 6) { this.blips.splice(i, 1); continue; }
       let d = this.sweep - b.a;
       d = Math.atan2(Math.sin(d), Math.cos(d));   // angular sep to sweep, [-PI,PI]
-      const lit = Math.abs(d) < 0.18 ? 1 : 0;     // sweep passing over the blip
-      const base = Math.max(0, 1 - b.age / 6);
-      const alpha = Math.max(lit, base * 0.25 + (lit ? base : 0));
+      const near = Math.abs(d) < 0.7 ? 0.5 + 0.5 * Math.cos((Math.abs(d) / 0.7) * Math.PI) : 0;
+      const life = Math.max(0, 1 - b.age / 6) * Math.min(1, b.age / 0.6);
       c.fillStyle = b.color;
-      c.globalAlpha = Math.min(1, alpha * (lit ? 1 : base));
+      c.globalAlpha = life * (0.25 + 0.45 * near);
       c.beginPath();
-      c.arc(mid + Math.cos(b.a) * R * b.r, mid + Math.sin(b.a) * R * b.r, lit ? 2.4 : 1.6, 0, Math.PI * 2);
+      c.arc(mid + Math.cos(b.a) * R * b.r, mid + Math.sin(b.a) * R * b.r, 1.6 + 0.5 * near, 0, Math.PI * 2);
       c.fill();
       c.globalAlpha = 1;
     }
