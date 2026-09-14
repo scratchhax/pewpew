@@ -470,6 +470,87 @@ export class Synth {
     this.noiseHit(bus, t, { type: 'highpass', f: 3500, g, a: 0.002, r: 0.04 + Math.random() * 0.06, pan, rate: 0.4 + Math.random() * 0.6 });
   }
 
+  // ── street ──
+  private driveCurve: Float32Array | null = null;
+  /** A soft-clipping curve for distorted guitars. */
+  private drive(): Float32Array {
+    if (!this.driveCurve) {
+      const n = 2048, k = 40;
+      this.driveCurve = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const x = (i / (n - 1)) * 2 - 1;
+        this.driveCurve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+      }
+    }
+    return this.driveCurve;
+  }
+
+  /** Distorted power chord (root + fifth + octave); `mute` palm-mutes it short. */
+  guitar(bus: Bus, t: number, f: number, g: number, mute: boolean, pan = 0): void {
+    if (this.busy(4)) return;
+    const a = 0.004, h = mute ? 0.05 : 0.35, r = mute ? 0.08 : 0.5, end = t + a + h + r;
+    const env = this.env(t, g, a, h, r);
+    if (!env) return;
+    const pre = this.gain(0.5);
+    for (const [m, det] of [[1, -6], [1.498, 5], [2, 0]] as const) this.osc('sawtooth', f * m, t, end, det).connect(pre);
+    const shaper = this.ctx.createWaveShaper();
+    shaper.curve = this.drive() as Float32Array<ArrayBuffer>;
+    shaper.oversample = '2x';
+    const cab = this.filter('lowpass', mute ? 1400 : 2600, 0.9);
+    const body = this.filter('peaking', 700, 1);
+    body.gain.value = 4;
+    pre.connect(shaper).connect(body).connect(cab).connect(env);
+    this.out(env, bus, pan, 0.2);
+  }
+
+  /** Reese bass: two detuned saws breathing through a low-pass. */
+  reese(bus: Bus, t: number, f: number, g: number, hold: number): void {
+    this.tone(bus, t, f, { type: 'sawtooth', g, a: 0.02, h: hold, r: 0.3, detune: 22, lp: 420, lpTo: 900, q: 2 });
+    this.tone(bus, t, f / 2, { g: g * 0.8, a: 0.02, h: hold, r: 0.3 });
+  }
+
+  /** 808: a long sine kick that slides down onto the note. */
+  eight08(bus: Bus, t: number, f: number, g: number, len: number, slideFrom = 0): void {
+    this.tone(bus, t, slideFrom || f * 1.6, { g, a: 0.003, h: len * 0.5, r: len, glide: f / (slideFrom || f * 1.6) });
+    this.tone(bus, t, f * 2, { type: 'triangle', g: g * 0.15, a: 0.003, r: 0.12, lp: 900 });
+  }
+
+  /** Supersaw stab: five detuned saws. */
+  supersaw(bus: Bus, t: number, f: number, g: number, len: number, pan = 0): void {
+    if (this.busy(6)) return;
+    const a = 0.005, r = 0.25, end = t + a + len + r;
+    const env = this.env(t, g, a, len, r);
+    if (!env) return;
+    const lp = this.filter('lowpass', 5200, 0.6);
+    for (const det of [-24, -11, 0, 11, 24]) this.osc('sawtooth', f, t, end, det).connect(this.gain(0.25)).connect(lp);
+    lp.connect(env);
+    this.out(env, bus, pan, 0.35, 0.25);
+  }
+
+  /** Car horn: two square tones a fifth apart. */
+  horn(bus: Bus, t: number, f: number, g: number, pan: number): void {
+    for (const m of [1, 1.5]) this.tone(bus, t, f * m, { type: 'square', g: g * 0.5, a: 0.01, h: 0.22, r: 0.08, lp: 1800, pan, rev: 0.2 });
+  }
+
+  /** Metal crash: a blast plus scattered clangs. */
+  crash(bus: Bus, t: number, g: number, pan: number, ring: number): void {
+    this.blast(bus, t, g, pan, ring, false);
+    for (const [dt, m] of [[0.04, 2.1], [0.11, 3.3], [0.19, 2.7]] as const) {
+      this.tone(bus, t + dt, ring * m, { type: 'triangle', g: g * 0.06, a: 0.002, r: 0.35, pan: pan + (Math.random() - 0.5) * 0.6, rev: 0.4 });
+    }
+    this.noiseHit(bus, t + 0.05, { type: 'highpass', f: 3000, g: g * 0.3, a: 0.002, r: 0.3, pan, rev: 0.4 });
+  }
+
+  /** Turbo blow-off: a short hiss that falls away. */
+  blowoff(bus: Bus, t: number, g: number): void {
+    this.noiseHit(bus, t, { type: 'bandpass', f: 5000, fTo: 1800, q: 1.2, g, a: 0.005, r: 0.35, pan: 0.1, rev: 0.2 });
+  }
+
+  /** A car flashing past: an engine note that drops with doppler. */
+  passBy(bus: Bus, t: number, f: number, g: number, pan: number): void {
+    this.tone(bus, t, f * 1.2, { type: 'sawtooth', g, a: 0.25, h: 0.1, r: 0.7, glide: 0.7, lp: 1400, lpTo: 500, pan, rev: 0.3 });
+  }
+
   /** Metal dragged on metal, far away. */
   scrape(bus: Bus, t: number, f: number, g: number, pan = 0): void {
     if (this.busy(4)) return;
