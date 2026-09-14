@@ -1,7 +1,7 @@
 import { Container, Sprite, Texture } from 'pixi.js';
-import type { Settings } from '../settings';
-import type { State } from '../state';
-import { hsl } from '../palette';
+import type { SciFiSettings as Settings } from '../settings';
+import type { State } from '../../../state';
+import { hsl } from '../../../palette';
 
 interface Star { s: Sprite; speed: number; vx: number; baseAlpha: number; phase: number; tw: number; }
 interface Nebula extends Sprite {

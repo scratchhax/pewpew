@@ -1,6 +1,6 @@
 import type { State, Weather } from '../state';
 import { isInternalIp } from '../state';
-import type { Settings } from '../settings';
+import type { CoreSettings as Settings } from '../settings';
 import type { Audio } from '../audio';
 import type { NetEvent } from '../types';
 

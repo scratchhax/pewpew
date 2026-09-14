@@ -48,6 +48,13 @@ export class Rings {
 
   resize(w: number, h: number): void { this.w = w; this.h = h; this.rebuildFog(); }
 
+  /** The small dots orbiting on each ring ("Ring objects" toggle). */
+  private showObjects = true;
+  setObjects(on: boolean): void {
+    this.showObjects = on;
+    this.objLayer.visible = on;
+  }
+
   /** Distribute soft glow blobs around each ring so the whole circle can be
    *  wrapped in the same fog/cloud that makes the station core bloom. */
   private rebuildFog(): void {
@@ -89,7 +96,7 @@ export class Rings {
       st.pulse = Math.min(3.0, st.pulse + amp);
     }
     st.count++;
-    if (st.count % def.every === 0 && st.objs.length < def.cap) {
+    if (this.showObjects && st.count % def.every === 0 && st.objs.length < def.cap) {
       const s = new Sprite(this.dot);
       s.anchor.set(0.5);
       s.tint = def.color;

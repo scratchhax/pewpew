@@ -1,72 +1,64 @@
-import { Settings, lockSetting } from './settings';
+import { CoreSettings, ThemeSettings, lockSetting } from './settings';
 
 /**
  * Performance presets + auto tuning.
  *
  * The relay does no rendering: every viewer draws the scene on its own GPU,
  * and viewers range from a gaming PC to a Pi 5 kiosk. A quality tier bundles
- * every knob that trades looks for frame time. HIGH is exactly how the scene
- * ran before tiers existed, so a capable machine sees no change.
+ * every knob that trades looks for frame time: the renderer knobs here, plus
+ * the scene budgets the active theme declares. HIGH is the classic look, so a
+ * capable machine sees no change.
  */
 
 export type Tier = 'low' | 'medium' | 'high' | 'ultra';
 export const TIERS: Tier[] = ['low', 'medium', 'high', 'ultra'];
 
-export type PerfValues = Pick<Settings, 'renderScale' | 'fpsCap' | 'antialias' | 'powerPref'
-  | 'maxParticles' | 'starDensity' | 'nebulaCount' | 'dustCount' | 'fxDetail'
-  | 'maxIpStars' | 'maxEventStars'>;
-export type PerfKey = keyof PerfValues;
+export type RendererPerf = Pick<CoreSettings, 'renderScale' | 'fpsCap' | 'antialias' | 'powerPref'>;
 
 /** Read once by the renderer at init; changing them needs a page reload. */
-export const INIT_ONLY_KEYS: PerfKey[] = ['antialias', 'powerPref'];
+export const INIT_ONLY_KEYS: string[] = ['antialias', 'powerPref'];
 
-export function presetValues(tier: Tier): PerfValues {
+export function rendererPreset(tier: Tier): RendererPerf {
   switch (tier) {
-    case 'low': return {
-      renderScale: 0.6, fpsCap: 30, antialias: false, powerPref: 'low-power',
-      maxParticles: 800, starDensity: 0.4, nebulaCount: 3, dustCount: 20,
-      fxDetail: 0.5, maxIpStars: 60, maxEventStars: 100,
-    };
-    case 'medium': return {
-      renderScale: 0.8, fpsCap: 60, antialias: false, powerPref: 'default',
-      maxParticles: 2000, starDensity: 0.7, nebulaCount: 5, dustCount: 45,
-      fxDetail: 0.75, maxIpStars: 100, maxEventStars: 180,
-    };
-    case 'high': return {
-      renderScale: 1, fpsCap: 0, antialias: false, powerPref: 'low-power',
-      maxParticles: 4000, starDensity: 1, nebulaCount: 7, dustCount: 70,
-      fxDetail: 1, maxIpStars: 140, maxEventStars: 260,
-    };
+    case 'low': return { renderScale: 0.6, fpsCap: 30, antialias: false, powerPref: 'low-power' };
+    case 'medium': return { renderScale: 0.8, fpsCap: 60, antialias: false, powerPref: 'default' };
+    case 'high': return { renderScale: 1, fpsCap: 0, antialias: false, powerPref: 'low-power' };
     case 'ultra': return {
       renderScale: Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
       fpsCap: 0, antialias: true, powerPref: 'high-performance',
-      maxParticles: 8000, starDensity: 1.5, nebulaCount: 9, dustCount: 140,
-      fxDetail: 1, maxIpStars: 200, maxEventStars: 400,
     };
   }
 }
 
-export const PERF_KEYS = Object.keys(presetValues('high')) as PerfKey[];
+export const RENDERER_KEYS = Object.keys(rendererPreset('high'));
+
+/** The active theme's scene budgets per tier (see Theme.budgets). */
+export type Budgets = Record<Tier, Partial<ThemeSettings>>;
+
+/** Every key a preset writes: moving any of them by hand means `custom`. */
+export function perfKeys(budgets: Budgets): string[] {
+  return [...RENDERER_KEYS, ...Object.keys(budgets.high)];
+}
 
 /** Values pinned by URL params (?scale, ?fps): re-applied over every preset. */
-const urlPins: Partial<PerfValues> = {};
+const urlPins: Partial<RendererPerf> = {};
 
 /**
  * Write a tier's values into the live settings. `live` skips the init-only
  * keys, so an auto step-down never leaves a phantom "reload pending".
  */
-export function applyTier(s: Settings, tier: Tier, live = false): void {
-  const v = presetValues(tier) as Partial<PerfValues>;
+export function applyTier(s: CoreSettings, budgets: Budgets, tier: Tier, live = false): void {
+  const v: Record<string, unknown> = { ...rendererPreset(tier), ...budgets[tier] };
   if (live) for (const k of INIT_ONLY_KEYS) delete v[k];
   Object.assign(s, v, urlPins);
 }
 
 /** `?quality=low|medium|high|ultra|auto`, `?scale=0.6`, `?fps=30`. */
-function readUrlOverrides(s: Settings): void {
+function readUrlOverrides(s: CoreSettings): void {
   const q = new URLSearchParams(location.search);
   const quality = q.get('quality');
   if (quality && (quality === 'auto' || (TIERS as string[]).includes(quality))) {
-    s.quality = quality as Settings['quality'];
+    s.quality = quality as CoreSettings['quality'];
     lockSetting('quality');
   }
   const scale = parseFloat(q.get('scale') ?? '');
@@ -128,7 +120,7 @@ export interface BootPerf {
  * Resolve the perf settings before the renderer exists: URL params first,
  * then the saved quality, then (for auto) a hardware guess.
  */
-export function resolveBootPerf(s: Settings): BootPerf {
+export function resolveBootPerf(s: CoreSettings, budgets: Budgets): BootPerf {
   readUrlOverrides(s);
   const gpu = probeGpu();
   if (s.quality === 'custom') {
@@ -137,10 +129,10 @@ export function resolveBootPerf(s: Settings): BootPerf {
   }
   if (s.quality === 'auto') {
     const g = guessTier(gpu);
-    applyTier(s, g.tier);
+    applyTier(s, budgets, g.tier);
     return { tier: g.tier, gpu, why: g.why };
   }
-  applyTier(s, s.quality);
+  applyTier(s, budgets, s.quality);
   return { tier: s.quality, gpu, why: 'preset' };
 }
 
@@ -161,7 +153,8 @@ export class AutoTuner {
   private holdUntil = 0;
   private lastFrame = 0;
 
-  constructor(private s: Settings, boot: BootPerf, private onStep: (tier: Tier) => void) {
+  constructor(private s: CoreSettings, private budgets: Budgets, boot: BootPerf,
+              private onStep: (tier: Tier) => void) {
     this.tier = boot.tier;
     this.hold(WARMUP_MS);
     document.addEventListener('visibilitychange', () => this.hold(SETTLE_MS));
@@ -197,7 +190,7 @@ export class AutoTuner {
     if (this.fps < target * 0.75) {
       const next = TIERS[TIERS.indexOf(this.tier) - 1];
       this.tier = next;
-      applyTier(this.s, next, true);
+      applyTier(this.s, this.budgets, next, true);
       this.hold(SETTLE_MS);
       this.onStep(next);
     }
