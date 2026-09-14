@@ -97,7 +97,7 @@ Colors of every effect match the comms-log lines verbatim:
 | dhcp     | yellow     | station→AP yellow laser, 3rd ring |
 | wifi     | purple     | AP↔station links + crystals, 4th ring |
 | system   | grey       | grey shockwave from the station |
-| threat   | amber      | IDS/IPS detection (Enhanced/CyberSecure tier) — an inbound attack that flies a **looping** path into the core and is shot down like an asteroid; carries a MAC, no source IP |
+| threat   | amber      | IDS/IPS detection (Enhanced/CyberSecure tier) — an attack **rocket** that burns in on an evasive, weaving path from a random bearing, gets shot down close to the station with an amber detonation, and turns the core **red** while any rocket is alive; carries a MAC, no source IP |
 
 Traffic volume drives weather: **STORM** at ≥300 events/30s and **HURRICANE** at
 ≥1200 — the HUD goes amber, the station flares, and the field fills with debris
@@ -130,6 +130,12 @@ your network:
   The **Noise gate** replaces the old NOISE MODE: 0 is silent, 1 is full chaos
   (every raw event, no dedupe, scheduled sample-accurately through a pacing
   queue so bursts stay audible).
+- **Under attack** — while an IDS/IPS threat rocket is on screen, a sustained
+  menace bed swells in: detuned sub-bass saws (root + tritone) through a slowly
+  wobbling filter and a fast tremolo pulse, with a periodic target-lock ping on
+  top, all fed through reverb and echo. It rides threat *presence* — it rises as
+  the attack closes and powers down once the last rocket is shot down. Gated and
+  levelled by the Threat volume/gate sliders in F1.
 - Master volume, reverb, echo, a music-bed-vs-hits balance, and a device-voice
   mix — all in F1.
 
@@ -140,7 +146,7 @@ System**. Everything is live (no reload) and persists to localStorage.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | starfield · nebula · dust · ambient ships · DHCP planets · event stars · asteroids · crystals · IP constellations · ring objects · AP cores · screen shake |
+| **Scene** | starfield · nebula · dust · ambient ships · DHCP planets · event stars · asteroids · attack rockets · crystals · IP constellations · ring objects · AP cores · screen shake |
 | **HUD** | uplink · ship-status bars · telemetry · most-wanted · comms log · sensor flux · subspace spectrum · radar · scanlines |
 | **Audio** | additive Melody / Devices layers, per-event volume + per-event gate, the noise (chaos) gate, master / reverb / echo / music-bed, device mix |
 | **Colour** | host-mesh scheme (spectrum / event-law / mono / warm / cool) + a global hue-shift & intensity that sweeps the mesh, nebula and HUD accent |
@@ -220,6 +226,9 @@ cp deploy/pewpew-kiosk.desktop ~/.config/autostart/        # fullscreen chromium
   (MIT), stripped of database dependencies.
 - [PixiJS v8](https://pixijs.com/) for the renderer.
 - Every texture, sound and melody: generated in code.
+- IDS/IPS threat rendering (the amber attack rockets, red "under-attack" core
+  and the sustained threat audio bed) grew out of the CEF security-event parser
+  idea and initial implementation by [natechit](https://github.com/natechit).
 
 ## License
 

@@ -401,7 +401,9 @@ async function main(): Promise<void> {
 
     const hits = asteroids.update(dt, station.center.x, station.center.y);
     const th = threats.update(dt, station.center.x, station.center.y);
-    station.setAlarm(threats.count() > 0);
+    const underAttack = threats.count() > 0;
+    station.setAlarm(underAttack);
+    audio.setThreatActive(underAttack);
     if (hits.impacts.length > 0 || th.impacts.length > 0) {
       state.slowmo(0.25, 0.55);
       punch += 0.06;

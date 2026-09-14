@@ -105,6 +105,11 @@ export class Audio {
   private dbgDropped = 0;
   private timeBuf: Uint8Array | null = null;
 
+  // sustained "under attack" bed: heard only while threat rockets are alive
+  private threatLevel: GainNode | null = null;
+  private threatOn = false;
+  private alarmNext = 0;
+
   /** Read-and-reset counters + REAL output level for the ?debug=1 readout. */
   dbgStats(): { cues: number; fires: number; rate: number; queue: number;
                 alive: number; dropped: number; rms: number } {
@@ -217,8 +222,83 @@ export class Audio {
     for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
     this.noiseBuf = nb;
 
+    this.buildThreatBed();
+
     this.last = ctx.currentTime;
   }
+
+  /**
+   * Sustained "under attack" bed — a menacing detuned low drone through a
+   * slowly-wobbling filter and a tremolo pulse, fed to master + reverb + echo.
+   * Kept alive but silent (level 0); update() rides its level from threat
+   * presence so it swells while rockets are on screen and powers down after.
+   */
+  private buildThreatBed(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master) return;
+    const level = ctx.createGain();
+    level.gain.value = 0;                 // silent until a threat appears
+    this.threatLevel = level;
+
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 480;
+    lp.Q.value = 5;
+
+    // slow, ominous filter sweep so the drone breathes
+    const sweep = ctx.createOscillator();
+    sweep.type = 'sine';
+    sweep.frequency.value = 0.07;
+    const sweepAmt = ctx.createGain();
+    sweepAmt.gain.value = 260;
+    sweep.connect(sweepAmt).connect(lp.frequency);
+    sweep.start();
+
+    // detuned low saws + a sub: E1 root, dissonant-ish tritone-adjacent upper
+    const f0 = 41.2;                      // E1
+    for (const [f, det, type, amp] of [
+      [f0, -8, 'sawtooth', 0.5],
+      [f0 * 1.414, 10, 'sawtooth', 0.22],   // tritone: pure menace
+      [f0 * 2, 0, 'triangle', 0.3],
+    ] as const) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = f;
+      o.detune.value = det;
+      const g = ctx.createGain();
+      g.gain.value = amp;
+      o.connect(g).connect(lp);
+      o.start();
+    }
+
+    // tremolo pulse (fast heartbeat over the drone)
+    const trem = ctx.createGain();
+    trem.gain.value = 0.55;
+    const tremLfo = ctx.createOscillator();
+    tremLfo.type = 'sine';
+    tremLfo.frequency.value = 3.4;
+    const tremAmt = ctx.createGain();
+    tremAmt.gain.value = 0.45;
+    tremLfo.connect(tremAmt).connect(trem.gain);
+    tremLfo.start();
+
+    lp.connect(trem).connect(level);
+    level.connect(this.master);
+    if (this.reverbIn) {
+      const rs = ctx.createGain();
+      rs.gain.value = 0.6;
+      level.connect(rs).connect(this.reverbIn);
+    }
+    if (this.delay) {
+      const es = ctx.createGain();
+      es.gain.value = 0.4;
+      level.connect(es).connect(this.delay);
+    }
+  }
+
+  /** Core is under attack while this is true — the drone bed rides it. */
+  setThreatActive(on: boolean): void { this.threatOn = on; }
+
 
   /** Real FFT of the actual mix for the spectrum panel. */
   spectrumLevels(out: Uint8Array): boolean {
@@ -443,6 +523,23 @@ export class Audio {
       this.releaseAt = t + 4;
     }
     if (this.resolving && t > this.releaseAt) this.resolving = false;
+
+    // ── "under attack" bed: swells while threat rockets live, powers down ──
+    if (this.threatLevel) {
+      const active = this.threatOn && this.settings.deviceVoices
+        && this.settings.gateThreat > 0 && this.settings.gThreat > 0;
+      const lvl = active ? 0.13 * this.settings.gThreat * this.settings.gateThreat : 0;
+      // fast swell on contact, slow ominous release once the last one dies
+      this.threatLevel.gain.setTargetAtTime(lvl, t, this.threatOn ? 0.4 : 1.1);
+      // periodic target-lock ping rides over the drone while locked on
+      if (active && t >= this.alarmNext) {
+        this.alarmNext = t + 1.15;
+        const pan = (Math.random() - 0.5) * 1.4;
+        const f = 880 + Math.random() * 150;
+        this.voice(f, 'square', 0.11, 0.05 * this.settings.gThreat, pan, 0, 0.35, 0.5, t);
+        this.voice(f * 0.667, 'square', 0.13, 0.038 * this.settings.gThreat, pan, 0, 0.3, 0.5, t + 0.14);
+      }
+    }
 
     if (dt > 0) {
       const k = Math.exp(-dt * 0.5);
