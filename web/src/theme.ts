@@ -4,6 +4,7 @@ import type { Throttle } from './throttle';
 import type { SceneEvent } from './events';
 import type { Tier } from './perf';
 import type { Cue } from './audio';
+import type { HudLabelOverrides } from './hud/hud';
 
 /**
  * A viewer theme: everything that decides how network events LOOK.
@@ -19,6 +20,11 @@ export interface Theme<T extends ThemeSettings = ThemeSettings> {
   id: string;
   /** Settings panel title. */
   title: string;
+  /** Rename HUD panels and readouts (the data behind them is shared). */
+  hud?: HudLabelOverrides;
+  /** Base hue (degrees) of the HUD accent before the hue-shift knob; default 172 (cyan).
+   *  The page also gets data-theme="<id>" on <body> for theme CSS overrides. */
+  accentHue?: number;
   /** The theme's own settings with defaults (merged over the core ones). */
   defaults: T;
   /** Scene budgets per quality tier. HIGH must equal `defaults`. */

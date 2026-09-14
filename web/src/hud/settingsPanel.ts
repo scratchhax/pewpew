@@ -1,5 +1,6 @@
 import { CoreSettings, PowerPref, Quality, saveSettings, resetSettings, isLocked } from '../settings';
 import type { Control, Theme } from '../theme';
+import type { HudLabels } from './hud';
 
 type Key = keyof CoreSettings;
 
@@ -19,11 +20,10 @@ const POWER: Array<[PowerPref, string]> = [
   ['low-power', 'Low power'], ['default', 'Browser default'], ['high-performance', 'High performance'],
 ];
 
-const HUD: Array<[Key, string]> = [
-  ['uplink', 'Uplink'], ['threatBar', 'Ship status bars'], ['telemetry', 'Telemetry'],
-  ['mostWanted', 'Most wanted'], ['terminal', 'Comms log'], ['oscilloscope', 'Sensor flux'],
-  ['spectrum', 'Subspace spectrum'], ['radar', 'Scan (radar)'], ['scanlines', 'Scanlines'],
-];
+/** HUD tab order; the names come from the theme's HUD labels. */
+const HUD: Array<HudToggle> = ['uplink', 'threatBar', 'telemetry', 'mostWanted', 'terminal',
+  'oscilloscope', 'spectrum', 'radar', 'scanlines'];
+type HudToggle = keyof HudLabels['panel'];
 const EVENT_VOL: Array<[Key, string]> = [
   ['gBlock', 'Block'], ['gAllow', 'Allow'], ['gDns', 'DNS'], ['gWifi', 'WiFi'], ['gDhcp', 'DHCP'],
   ['gThreat', 'Threat'],
@@ -44,7 +44,8 @@ export class SettingsPanel {
   private root: HTMLElement;
   private visible = false;
 
-  constructor(private settings: CoreSettings, private theme: Pick<Theme, 'title' | 'controls'>,
+  constructor(private settings: CoreSettings,
+              private theme: Pick<Theme, 'title' | 'controls'> & { hudToggles: HudLabels['panel'] },
               private defaults: CoreSettings, private perfKeys: string[],
               private onChange: (key?: string) => void,
               private perfStatus: () => PerfStatus) {
@@ -144,8 +145,8 @@ export class SettingsPanel {
     if (tab === 'scene') {
       html += `<div class="cols">${this.twoCol(c.scene)}</div>`;
     } else if (tab === 'hud') {
-      html += `<div class="cols">${this.twoCol(HUD.map(([key, label]) =>
-        ({ kind: 'toggle' as const, key, label })))}</div>`;
+      html += `<div class="cols">${this.twoCol(HUD.map((key) =>
+        ({ kind: 'toggle' as const, key, label: this.theme.hudToggles[key] })))}</div>`;
     } else if (tab === 'audio') {
       html += `<div class="cols"><div class="col">
         <p class="grp">Master</p>
