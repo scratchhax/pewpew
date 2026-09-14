@@ -48,7 +48,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
   const app = new Application();
   await app.init({
     resizeTo: window,
-    background: '#2d4a24',
+    background: '#1d2119',
     antialias: init.antialias,
     powerPreference: init.powerPref === 'default' ? undefined : init.powerPref,
     resolution: init.resolution,
@@ -267,8 +267,8 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
   function frame(f: FrameInfo): void {
     const { dt, dtReal, t } = f;
 
-    const hits = zombies.update(dt, sky.darkness);
-    walkers.update(dt, sky.darkness, settings.zNightExtras);
+    const hits = zombies.update(dt, sky.darkness, walkers.positions());
+    walkers.update(dt, sky.darkness, settings.zNightExtras, zombies.positions());
     const attacked = zombies.underAttack();
     audio.setThreatActive(attacked);
     alarmKick = Math.max(0, alarmKick - dt * 0.8);

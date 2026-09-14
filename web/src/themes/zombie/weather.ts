@@ -5,14 +5,21 @@ import { fade } from './fx';
 interface Drop { s: Sprite; speed: number }
 interface Fog { s: Sprite; vx: number; phase: number }
 
+/** Darkness per traffic weather. Even a calm day is overcast and gloomy. */
+const GLOOM = { calm: 0.3, storm: 0.48, hurricane: 0.68 } as const;
+/** Low mist per weather (scaled by the fog budget toggle). */
+const MIST = { calm: 0.45, storm: 0.7, hurricane: 1 } as const;
+
 /**
- * Traffic weather as time of day: CALM is daylight, STORM is dusk with rain,
- * HURRICANE is horde night (dark, heavy rain, fog). Also paints the red
- * alarm wash while a horde is attacking. Screen space, above the world.
+ * Traffic weather as time of day: CALM is a grey overcast day, STORM is dusk
+ * with rain, HURRICANE is horde night (dark, heavy rain, thick fog). There's
+ * always a cold wash that deepens toward the edges, and some mist. Also paints the red alarm
+ * wash while a horde is attacking. Screen space, above the world.
  */
 export class Sky {
-  darkness = 0;
-  private overlay = new Graphics();
+  darkness = GLOOM.calm;
+  /** One full-screen layer for both the cold darkness and the vignette (one fill pass on a Pi). */
+  private overlay: Sprite;
   private alarmG = new Graphics();
   private rain: Drop[] = [];
   private fog: Fog[] = [];
@@ -24,12 +31,15 @@ export class Sky {
 
   /** `dark` sits under the lights; `top` (rain, fog, alarm) over everything. */
   constructor(dark: Container, private top: Container, private rainTex: Texture, private glow: Texture) {
+    this.overlay = new Sprite(gloomTexture());
     dark.addChild(this.overlay);
     top.addChild(this.alarmG, this.rainLayer);
   }
 
   resize(w: number, h: number): void {
     this.w = w; this.h = h;
+    this.overlay.width = w;
+    this.overlay.height = h;
     this.rebuild();
   }
 
@@ -68,13 +78,12 @@ export class Sky {
 
   update(dt: number, weather: Weather, dayNight: boolean, rainOn: boolean, alarm: number, fogOn = true): void {
     this.t += dt;
-    const target = !dayNight ? 0 : weather === 'hurricane' ? 0.64 : weather === 'storm' ? 0.36 : 0;
+    const target = dayNight ? GLOOM[weather] : GLOOM.calm;
     this.darkness += (target - this.darkness) * Math.min(1, dt * 0.35);
 
-    this.overlay.clear();
-    if (this.darkness > 0.005) {
-      this.overlay.rect(0, 0, this.w, this.h).fill({ color: 0x060a14, alpha: this.darkness });
-    }
+    // a cold blue-green cast that deepens toward the edges; the centre sits at
+    // exactly `darkness` (until the corners reach black)
+    this.overlay.alpha = Math.min(1, this.darkness / GLOOM_CENTRE);
 
     this.alarmG.clear();
     if (alarm > 0.01) {
@@ -94,13 +103,31 @@ export class Sky {
       }
     }
 
-    const foggy = weather === 'hurricane' && dayNight && fogOn ? 1 : 0;
+    const foggy = fogOn ? MIST[dayNight ? weather : 'calm'] : 0;
     for (const f of this.fog) {
       f.phase += dt * 0.2;
       f.s.x += f.vx * dt;
       if (f.s.x < -300) f.s.x = this.w + 300;
       if (f.s.x > this.w + 300) f.s.x = -300;
-      fade(f.s, f.s.alpha + (foggy * (0.06 + 0.03 * Math.sin(f.phase)) - f.s.alpha) * Math.min(1, dt * 0.5));
+      fade(f.s, f.s.alpha + (foggy * (0.07 + 0.03 * Math.sin(f.phase)) - f.s.alpha) * Math.min(1, dt * 0.5));
     }
   }
+}
+
+/** Centre opacity of the gloom texture (the corners are fully opaque). */
+const GLOOM_CENTRE = 0.62;
+
+/** A cold blue-green wash: GLOOM_CENTRE opaque in the middle, solid at the corners. */
+function gloomTexture(): Texture {
+  const s = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(s / 2, s / 2, s * 0.28, s / 2, s / 2, s * 0.72);
+  g.addColorStop(0, `rgba(7,17,15,${GLOOM_CENTRE})`);
+  g.addColorStop(0.6, `rgba(5,12,11,${GLOOM_CENTRE + (1 - GLOOM_CENTRE) * 0.45})`);
+  g.addColorStop(1, 'rgba(3,8,7,1)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  return Texture.from(c);
 }
