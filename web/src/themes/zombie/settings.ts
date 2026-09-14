@@ -68,7 +68,7 @@ export const ZOMBIE_CONTROLS = {
 export const ZOMBIE_HUD: HudLabelOverrides = {
   uplink: 'RADIO',
   link: 'ON AIR',
-  weather: { calm: 'DAYLIGHT', storm: 'DUSK', hurricane: 'HORDE NIGHT' },
+  weather: { calm: 'OVERCAST', storm: 'DUSK', hurricane: 'HORDE NIGHT' },
   status: 'COMPOUND',
   threat: 'DGR',
   power: 'SUP',

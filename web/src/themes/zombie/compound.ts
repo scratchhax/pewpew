@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, RenderTexture, Sprite, Text, TextStyle } from 'pixi.js';
+import { Application, ColorMatrixFilter, Container, Graphics, Rectangle, RenderTexture, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import type { FrameName } from './assets/atlas';
 import type { ZTextures } from './textures';
 import { fade } from './fx';
@@ -23,7 +23,9 @@ interface Tent { name: string; slot: number; sprite: Sprite; label: Text; age: n
 const LABEL = new TextStyle({ fill: 0xf3e6c8, fontFamily: 'monospace', fontSize: 10, stroke: { color: 0x1b140c, width: 3 } });
 const BUILDING_LABEL = new TextStyle({ fill: 0xffe2b0, fontFamily: 'monospace', fontSize: 12, fontWeight: 'bold', stroke: { color: 0x1b140c, width: 3 } });
 const WALL_DARK = 0x3a3a3a, WALL_TRIM = 0xe86a17;
-const GRASS_TINT = 0xbfcfa8, CONCRETE_TINT = 0xe0d4c0, TREE_TINT = 0xd0dcbc;
+// dead, washed-out country: tints pull the pack's bright greens toward olive and grey
+const GRASS_TINT = 0xa09a78, CONCRETE_TINT = 0xb4ab9c, TREE_TINT = 0x8e9480, DEAD_TREE_TINT = 0x8a7a6a;
+const GROUND_WASH = 0x3c382c, OLD_BLOOD = 0x4a2a22;
 /** Tent names fade out once a device has been quiet this long (seconds). */
 const LABEL_RECENT = 30;
 /** Muted canvas colours for tents (khaki, olive, rust, slate, sand). */
@@ -36,6 +38,7 @@ export class Compound {
   towers: Tower[] = [];
   private groundRT: RenderTexture | null = null;
   private groundSprite = new Sprite();
+  private drained = new Map<FrameName, Texture>();
   private wallG = new Graphics();
   private mast = new Sprite();
   private mastLight = new Sprite();
@@ -84,8 +87,8 @@ export class Compound {
     const L = this.L, rnd = seeded(L.w * 7919 + L.h);
     const build = new Container();
     const T = 64;
-    const put = (name: FrameName, x: number, y: number, opts: { rot?: number; scale?: number; alpha?: number; tint?: number } = {}) => {
-      const s = new Sprite(this.tex.frame(name));
+    const put = (name: FrameName | Texture, x: number, y: number, opts: { rot?: number; scale?: number; alpha?: number; tint?: number } = {}) => {
+      const s = new Sprite(typeof name === 'string' ? this.tex.frame(name) : name);
       s.anchor.set(0.5);
       s.position.set(x, y);
       s.rotation = opts.rot ?? 0;
@@ -97,14 +100,32 @@ export class Compound {
     const inside = (x: number, y: number, pad = 0) =>
       x > L.x0 - pad && x < L.x1 + pad && y > L.y0 - pad && y < L.y1 + pad;
 
-    // muted grass everywhere (the pack's green is loud under a busy HUD)
+    const area = (L.w * L.h) / (1920 * 1080);
+    // dying grass everywhere
     for (let y = T / 2; y < L.h + T; y += T) {
       for (let x = T / 2; x < L.w + T; x += T) {
         put((['grass_0', 'grass_1', 'grass_2', 'grass_3'] as FrameName[])[(rnd() * 4) | 0], x, y,
           { tint: GRASS_TINT });
       }
     }
-    // warm concrete courtyard, tiled from the compound corner
+    // a grey-brown wash, soft bare-earth patches and darker mottling (round, so no tile grid shows)
+    build.addChild(new Graphics().rect(0, 0, L.w, L.h).fill({ color: GROUND_WASH, alpha: 0.3 }));
+    for (let i = 0; i < 30 * area; i++) {
+      put(this.tex.glow, rnd() * L.w, rnd() * L.h,
+        { tint: 0x5a4630, alpha: 0.3 + rnd() * 0.3, scale: (2 + rnd() * 3) * L.unit });
+    }
+    for (let i = 0; i < 40 * area; i++) {
+      put(this.tex.glow, rnd() * L.w, rnd() * L.h,
+        { tint: 0x000000, alpha: 0.12 + rnd() * 0.16, scale: (3 + rnd() * 5) * L.unit });
+    }
+    // old, dried stains outside the walls: plenty have died here before
+    for (let i = 0; i < 16 * area; i++) {
+      const x = rnd() * L.w, y = rnd() * L.h;
+      if (inside(x, y, 20)) continue;
+      put(this.tex.splats[(rnd() * this.tex.splats.length) | 0], x, y,
+        { tint: OLD_BLOOD, alpha: 0.3 + rnd() * 0.25, rot: rnd() * Math.PI * 2, scale: (0.5 + rnd() * 0.6) * L.unit });
+    }
+    // cracked, grimy concrete courtyard, tiled from the compound corner
     for (let y = L.y0 + T / 2; y < L.y1 + T / 2; y += T) {
       for (let x = L.x0 + T / 2; x < L.x1 + T / 2; x += T) {
         put((['concrete_0', 'concrete_1', 'concrete_2'] as FrameName[])[(rnd() * 3) | 0],
@@ -118,7 +139,6 @@ export class Compound {
       }
     }
     // scattered scenery outside the walls
-    const area = (L.w * L.h) / (1920 * 1080);
     for (let i = 0; i < 26 * area; i++) {
       const x = rnd() * L.w, y = rnd() * L.h;
       if (inside(x, y, 70) || Math.abs(y - L.cy) < 40) continue;
@@ -139,26 +159,67 @@ export class Compound {
     }
 
     this.groundRT?.destroy(true);
-    this.groundRT = RenderTexture.create({ width: L.w, height: L.h, resolution });
-    this.app.renderer.render({ container: build, target: this.groundRT });
-    build.destroy({ children: true });
+    this.groundRT = this.bakeDrained(build, resolution);
     this.groundSprite.texture = this.groundRT;
 
     // tree canopies sit above the actors, so zombies shuffle out from under them
     for (const c of [...this.layers.canopy.children]) c.destroy();
+    const treeTex = { tree: this.drainedFrame('tree'), dead: this.drainedFrame('tree_autumn') };
     const trees = seeded(L.w + L.h * 31);
     for (let i = 0; i < 18 * area; i++) {
       const x = trees() * L.w, y = trees() * L.h;
       if (inside(x, y, 110) || Math.abs(y - L.cy) < 70) continue;
-      const s = new Sprite(this.tex.frame(trees() < 0.75 ? 'tree' : 'tree_autumn'));
+      const dead = trees() < 0.55;
+      const s = new Sprite(dead ? treeTex.dead : treeTex.tree);
       s.anchor.set(0.5);
       s.position.set(x, y);
       s.rotation = trees() * Math.PI * 2;
       s.scale.set((0.8 + trees() * 0.6) * L.unit);
-      s.tint = TREE_TINT;
+      s.tint = dead ? DEAD_TREE_TINT : TREE_TINT;
       s.alpha = 0.96;
       this.layers.canopy.addChild(s);
     }
+  }
+
+  /** Colour mostly drained and a little darkened: the grim look, applied at bake time only. */
+  private drainFilter(): ColorMatrixFilter {
+    const f = new ColorMatrixFilter();
+    f.saturate(-0.55);
+    f.brightness(0.88, true);
+    return f;
+  }
+
+  /** Render a static full-screen container once into a drained texture. */
+  private bakeDrained(build: Container, resolution: number): RenderTexture {
+    const L = this.L;
+    const drain = this.drainFilter();
+    build.filters = [drain];
+    build.filterArea = new Rectangle(0, 0, L.w, L.h);
+    const rt = RenderTexture.create({ width: L.w, height: L.h, resolution });
+    this.app.renderer.render({ container: build, target: rt, clear: true });
+    drain.destroy();
+    build.destroy({ children: true });
+    return rt;
+  }
+
+  /** An atlas frame drained once into its own small texture (cached; per-frame cost unchanged). */
+  private drainedFrame(name: FrameName): Texture {
+    const hit = this.drained.get(name);
+    if (hit) return hit;
+    const src = this.tex.frame(name);
+    const s = new Sprite(src);
+    const drain = this.drainFilter();
+    s.filters = [drain];
+    const holder = new Container();
+    holder.addChild(s);
+    holder.filterArea = new Rectangle(0, 0, src.width, src.height);
+    s.filterArea = holder.filterArea;
+    const rt = RenderTexture.create({ width: src.width, height: src.height, resolution: 2 });
+    this.app.renderer.render({ container: holder, target: rt, clear: true });
+    drain.destroy();
+    holder.destroy({ children: true });
+    this.drained.set(name, rt);
+    return rt;
   }
 
   private drawWalls(): void {

@@ -86,9 +86,16 @@ export class Zombies {
   /** Any horde brute still coming? (drives the alarm + threat audio) */
   underAttack(): boolean { return this.list.some((z) => z.brute && z.dying <= 0); }
 
-  update(dt: number, darkness: number): ZombieHits {
+  /** Where every zombie is, fallen ones included (survivors step around them). */
+  positions(): Point[] {
+    return this.list.filter((z) => z.t >= 0).map((z) => ({ x: z.s.x, y: z.s.y }));
+  }
+
+  /** `people` are survivors on the move: a zombie closing on one draws cover fire. */
+  update(dt: number, darkness: number, people: Point[] = []): ZombieHits {
     const hits: ZombieHits = { kills: [], breaches: [] };
     const L = this.compound.L;
+    const cover = 130 * L.unit;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const z = this.list[i];
       if (z.dying > 0) {
@@ -127,7 +134,10 @@ export class Zombies {
         for (const i of this.shooters(z, { x, y })) this.compound.watch(i, { x, y });
       }
 
-      if (z.killAt !== null && z.t >= z.killAt) {
+      // guards won't let a zombie reach a survivor out on the road
+      const threatening = people.some((p) => Math.hypot(p.x - x, p.y - y) < cover);
+
+      if (threatening || (z.killAt !== null && z.t >= z.killAt)) {
         this.kill(z, { x, y }, z.brute ? 3 : 1);
         hits.kills.push({ x, y });
       } else if (z.t >= 1) {
@@ -186,6 +196,7 @@ interface Walker {
   speed: number;
   rot: number;                   // eased facing, so corners are turned, not snapped
   fade: number;                  // quick fade-in, then fade-out at the end
+  dodge: number;                 // eased sideways step around zombies (px)
   onDone?: (p: Point) => void;
   kind: string;
 }
@@ -228,10 +239,16 @@ export class Walkers {
     lamp.anchor.set(0.05, 0.5); lamp.blendMode = 'add'; lamp.tint = 0xfff3d0; fade(lamp, 0);
     this.layer.addChild(s);
     this.lights.addChild(lamp);
-    this.list.push({ s, prop, lamp, path, seg: 0, along: 0, speed: opts.speed, rot, fade: 0, onDone: opts.onDone, kind });
+    this.list.push({ s, prop, lamp, path, seg: 0, along: 0, speed: opts.speed, rot, fade: 0, dodge: 0, onDone: opts.onDone, kind });
   }
 
-  update(dt: number, darkness: number, flashlights = true): void {
+  /** Survivors still walking (not the ones fading out at their destination). */
+  positions(): Point[] {
+    return this.list.filter((w) => w.seg < w.path.length - 1).map((w) => ({ x: w.s.x, y: w.s.y }));
+  }
+
+  /** `avoid` are zombies (live or falling): walkers sidestep rather than pass through. */
+  update(dt: number, darkness: number, flashlights = true, avoid: Point[] = []): void {
     const lampDark = flashlights ? darkness : 0;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const w = this.list[i];
@@ -269,8 +286,21 @@ export class Walkers {
         continue;
       }
       const f = w.along / segLen;
-      const x = a.x + (b.x - a.x) * f, y = a.y + (b.y - a.y) * f;
       const heading = Math.atan2(b.y - a.y, b.x - a.x);
+      // step to the side of any zombie near the path, easing out and back in
+      const px = -Math.sin(heading), py = Math.cos(heading);
+      const cx = a.x + (b.x - a.x) * f, cy = a.y + (b.y - a.y) * f;
+      const reach = 46 * w.s.scale.x, maxDodge = 26 * w.s.scale.x;
+      let want = 0;
+      for (const z of avoid) {
+        const d = Math.hypot(z.x - cx, z.y - cy);
+        if (d >= reach) continue;
+        const side = (z.x - cx) * px + (z.y - cy) * py;
+        want -= (side >= 0 ? 1 : -1) * maxDodge * (1 - d / reach) * 1.6;
+      }
+      want = Math.max(-maxDodge, Math.min(maxDodge, want));
+      w.dodge += (want - w.dodge) * Math.min(1, dt * 4);
+      const x = cx + px * w.dodge, y = cy + py * w.dodge;
       w.rot += angleDelta(w.rot, heading) * Math.min(1, dt * 8);
       w.s.position.set(x, y);
       w.s.rotation = w.rot;

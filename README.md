@@ -202,15 +202,19 @@ colour law is the same as above, so the radio log still matches the scene.
 |-------|-----------|
 | block | a **zombie** shambles in from a bearing fixed by the remote IP; the nearest watchtower guard turns and fires; visible rounds fly to the zombie and it topples when they land (blood, no flash). The odd one reaches the fence: a breach gives the camera a small nudge |
 | threat | a **horde**: a brute leading a weaving pack. The two nearest towers open fire, the scene takes on a steady red cast, the floodlights turn red and the threat audio bed plays while the brute lives |
-| allow (border) | **supply runs**: outbound, a scavenger runs from the camp through the nearest gate and off the map; inbound, a survivor carries a crate in. Internal (LAN↔LAN) permits are couriers strolling between tents |
+| allow (border) | **supply runs**: outbound, a scavenger runs from the camp through the nearest gate and off the map; inbound, a survivor carries a crate in. Survivors step around zombies, and the towers shoot any zombie that gets close to one. Internal (LAN↔LAN) permits are couriers strolling between tents |
 | dns | a dashed **radio call** from the client's spot in the camp to the radio mast, whose blue light warms up with traffic |
 | dhcp | a **new survivor** walks in through a gate and pitches a cot labelled with the device's hostname (renewals ring the existing tent; names fade when a device goes quiet) |
 | wifi | AP and gateway hosts are **buildings**: joins walk in the door, leaves and failures hurry out in a purple burst; the building lamp slowly warms toward the colour of its recent activity |
 | system | the **generator browns out**: the lights dim smoothly for a moment and recover |
 
-Traffic weather is **time of day**: CALM is daylight, STORM is dusk with rain,
-HURRICANE is horde night (dark, heavy rain, fog), with floodlight cones on the
-towers, lamps at the gates and zombie eyes glowing in the dark. The HUD is
+The outside is **dead country**: drained, grey-brown grass with old bloodstains
+and bare trees. The ground and trees are drained of colour once, when the scene
+is built, so it costs nothing per frame. Traffic weather is **time of day**:
+CALM is a grey overcast day, STORM is dusk with rain, HURRICANE is horde night
+(dark, heavy rain, thick fog). There is always a cold blue-green gloom that
+deepens toward the screen edges, low mist (with the fog budget on), floodlight
+cones on the towers, lamps at the gates and zombie eyes glowing in the dark. The HUD is
 relabelled to match (RADIO, COMPOUND, SURVIVAL LOG, HOT ZONES, RADIO LOG…).
 It uses the same generative soundtrack as sci-fi for now.
 
@@ -233,8 +237,8 @@ and the **System** tab's budgets per quality tier are:
 | Fog + survivor flashlights | off | on | on | on |
 
 On the CM5 kiosk (2560×1440, Auto → Low, demo traffic) Last Outpost runs at
-about 23 fps in daylight and 21 fps in horde night, against about 24 fps for
-sci-fi in the same session. Lights that are fully dark are skipped rather than
+about 25 fps on a calm day and 20 fps under heavy traffic at night, against
+about 24 fps for sci-fi. Lights that are fully dark are skipped rather than
 drawn at zero alpha, which is what keeps night affordable on a Pi.
 
 ## The audio engine
