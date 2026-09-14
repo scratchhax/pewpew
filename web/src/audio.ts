@@ -79,6 +79,22 @@ export interface Score {
   update(dt: number, state: State): void;
   /** One voice of the noise gate (raw feed), anchored at `when` (audio clock). */
   noiseVoice(kind: Cue, when: number): void;
+  /** Where the music is right now, for visuals that move with it. */
+  pulse?(): MusicPulse;
+}
+
+/** The music as heard at the speakers, for visuals that move in time with it. */
+export interface MusicPulse {
+  /** Position in beats since the current piece started (fractional). */
+  beat: number;
+  beatsPerBar: number;
+  bpm: number;
+  /** Smoothed loudness of the music, 0..1. */
+  energy: number;
+  /** Heartbeat envelope during an attack, 0..1 (decays after each beat). */
+  heart: number;
+  /** Display name of what's playing. */
+  style: string;
 }
 
 export type ScoreFactory = (engine: AudioEngine) => Score;
@@ -358,6 +374,12 @@ export class Audio {
   setThreatActive(on: boolean): void {
     this.threatOn = on;
     this.score?.setThreatActive(on);
+  }
+
+  /** The theme score's musical clock, or null (no score, or audio not started yet). */
+  pulse(): MusicPulse | null {
+    if (!this.score?.pulse || !this.ctx || this.ctx.state !== 'running') return null;
+    return this.score.pulse();
   }
 
   /** Theme sound effect; only a theme score knows what to do with it. */

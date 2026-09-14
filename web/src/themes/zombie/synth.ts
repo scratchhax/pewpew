@@ -297,6 +297,98 @@ export class Synth {
     this.noiseHit(bus, t, { type: 'lowpass', f: 260, g: g * 0.5, r: 0.9, rev: 0.6 });
   }
 
+  // ── drum machine (80s) ──
+  kick(bus: Bus, t: number, g: number): void {
+    this.tone(bus, t, 120, { g, a: 0.002, r: 0.32, glide: 0.35 });
+    this.noiseHit(bus, t, { type: 'lowpass', f: 900, g: g * 0.15, r: 0.02 });
+  }
+
+  /** A big 80s snare: short crack into a huge, abruptly cut reverb. */
+  snare(bus: Bus, t: number, g: number, pan = 0): void {
+    this.noiseHit(bus, t, { type: 'bandpass', f: 1800, q: 0.7, g, a: 0.001, h: 0.05, r: 0.16, pan, rev: 1 });
+    this.tone(bus, t, 185, { type: 'triangle', g: g * 0.5, a: 0.001, r: 0.12, glide: 0.8, pan });
+  }
+
+  hat(bus: Bus, t: number, g: number, pan = 0, open = false): void {
+    this.noiseHit(bus, t, { type: 'highpass', f: 7500, q: 0.6, g, a: 0.001, r: open ? 0.22 : 0.035, pan });
+  }
+
+  /** Brassy detuned saw lead with a slow vibrato. */
+  sawLead(bus: Bus, t: number, f: number, g: number, len: number, pan = 0): void {
+    if (this.busy(4)) return;
+    const a = 0.03, h = len, r = 0.5, end = t + a + h + r;
+    const env = this.env(t, g, a, h, r);
+    if (!env) return;
+    const lp = this.filter('lowpass', 2600, 1.5);
+    lp.frequency.setValueAtTime(3200, t);
+    lp.frequency.exponentialRampToValueAtTime(1100, end);
+    const vib = this.osc('sine', 5.5, t, end);
+    const depth = this.gain(0);
+    depth.gain.setValueAtTime(0, t);
+    depth.gain.linearRampToValueAtTime(14, t + Math.min(0.6, h));
+    vib.connect(depth);
+    for (const det of [-10, 10]) {
+      const o = this.osc('sawtooth', f, t, end, det);
+      depth.connect(o.detune);
+      o.connect(this.gain(0.5)).connect(lp);
+    }
+    lp.connect(env);
+    this.out(env, bus, pan, 0.45, 0.3);
+  }
+
+  // ── dead west ──
+  /** Banjo: very bright pluck with a fast, twangy decay. */
+  banjo(bus: Bus, t: number, f: number, g: number, pan = 0): void {
+    this.tone(bus, t, f, { type: 'sawtooth', g, a: 0.001, r: 0.45, lp: 5200, lpTo: 700, q: 2.5, pan, rev: 0.3 });
+    this.tone(bus, t, f * 2, { type: 'triangle', g: g * 0.3, r: 0.18, pan });
+    this.noiseHit(bus, t, { type: 'bandpass', f: 4200, q: 2, g: g * 0.35, r: 0.015, pan });
+  }
+
+  /** Bowed fiddle: rosin scrape on the attack, swelling vibrato. */
+  fiddle(bus: Bus, t: number, f: number, g: number, len: number, pan = 0): void {
+    if (this.busy(4)) return;
+    const a = 0.35, h = len, r = 0.8, end = t + a + h + r;
+    const env = this.env(t, g, a, h, r);
+    if (!env) return;
+    const o = this.osc('sawtooth', f, t, end);
+    const vib = this.osc('sine', 5.2, t, end);
+    const depth = this.gain(0);
+    depth.gain.setValueAtTime(0, t);
+    depth.gain.linearRampToValueAtTime(22, t + a + Math.min(0.8, h));
+    vib.connect(depth).connect(o.detune);
+    const body = this.filter('bandpass', 1200, 1.2), air = this.filter('lowpass', 3800, 0.7);
+    o.connect(body).connect(env);
+    o.connect(air).connect(this.gain(0.35)).connect(env);
+    this.noiseHit(bus, t, { type: 'bandpass', f: 3000, q: 1, g: g * 0.25, a: 0.05, r: 0.25, pan });
+    this.out(env, bus, pan, 0.5);
+  }
+
+  /** Slide guitar: a note that glides in from below. */
+  slide(bus: Bus, t: number, f: number, g: number, pan = 0): void {
+    this.tone(bus, t, f * 0.94, { type: 'triangle', g, a: 0.01, h: 0.15, r: 1.6, glide: 1 / 0.94, lp: 2400, lpTo: 900, pan, rev: 0.5, echo: 0.35 });
+    this.tone(bus, t, f * 2 * 0.94, { g: g * 0.2, a: 0.01, r: 0.6, glide: 1 / 0.94, pan });
+  }
+
+  /** Boot stomp on a wooden porch. */
+  stomp(bus: Bus, t: number, g: number): void {
+    this.tone(bus, t, 95, { g, a: 0.002, r: 0.2, glide: 0.5, rev: 0.3 });
+    this.noiseHit(bus, t, { type: 'bandpass', f: 600, q: 1, g: g * 0.35, r: 0.07, rev: 0.3 });
+  }
+
+  // ── broken lullaby ──
+  /** A music-box note on a warped tape: `warp` in cents drifts slowly. */
+  warpedBox(bus: Bus, t: number, f: number, g: number, warp: number, pan = 0): void {
+    const k = Math.pow(2, warp / 1200);
+    this.tone(bus, t, f * k, { g, r: 2.2, glide: Math.pow(2, -8 / 1200), pan, rev: 0.6, echo: 0.4 });
+    this.tone(bus, t, f * k * 3.01, { g: g * 0.2, r: 0.6, pan });
+    this.tone(bus, t, f * k * 5.9, { g: g * 0.06, r: 0.2, pan });
+  }
+
+  /** Breathy whisper swell. */
+  whisper(bus: Bus, t: number, g: number, pan = 0): void {
+    this.noiseHit(bus, t, { type: 'bandpass', f: 2200, fTo: 1400, q: 4, g, a: 0.8, h: 0.2, r: 1.2, pan, rev: 0.9, rate: 0.8 });
+  }
+
   /** Metal dragged on metal, far away. */
   scrape(bus: Bus, t: number, f: number, g: number, pan = 0): void {
     if (this.busy(4)) return;

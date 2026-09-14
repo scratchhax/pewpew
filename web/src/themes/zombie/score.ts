@@ -1,13 +1,19 @@
-import type { AudioEngine, Cue, Score, SfxOpts } from '../../audio';
+import type { AudioEngine, Cue, MusicPulse, Score, SfxOpts } from '../../audio';
 import type { State } from '../../state';
 import { Bus, Synth, type Bed } from './synth';
 
 /**
- * Last Outpost's soundtrack. Three styles take turns (or one is pinned):
+ * Last Outpost's soundtrack. Six styles take turns (or one is pinned):
  *
  *   horror synth    : a pulsing minor ostinato over a drone and cold bells
  *   lonely survivor : fingerpicked guitar and a detuned piano over the wind
+ *   80s slasher     : driving octave bass, gated snare, a brass hook
  *   dark ambient    : drones, distant swells and scraping metal
+ *   dead west       : banjo rolls, a bowed fiddle, boot stomps, slide guitar
+ *   broken lullaby  : a warped music box in 3/4
+ *
+ * `pulse()` publishes the beat, loudness and heartbeat as heard, so the scene
+ * can move in time (see groove.ts).
  *
  * The compound's sounds are part of the band: shots, groans, radio chirps,
  * creaking doors and the generator are snapped to the beat and pitched to the
@@ -15,11 +21,12 @@ import { Bus, Synth, type Bed } from './synth';
  * horde brings a heartbeat and swells that land on the downbeat.
  */
 
-export type StyleId = 'carpenter' | 'survivor' | 'ambient';
-const ORDER: StyleId[] = ['carpenter', 'survivor', 'ambient'];
+export type StyleId = 'carpenter' | 'survivor' | 'ambient' | 'slasher' | 'frontier' | 'lullaby';
+const ORDER: StyleId[] = ['carpenter', 'survivor', 'slasher', 'ambient', 'frontier', 'lullaby'];
 
 export const MUSIC_STYLES: Array<[string, string]> = [
   ['rotate', 'Rotate'], ['carpenter', 'Horror synth'], ['survivor', 'Lonely survivor'], ['ambient', 'Dark ambient'],
+  ['slasher', '80s slasher'], ['frontier', 'Dead west'], ['lullaby', 'Broken lullaby'],
 ];
 
 /** The theme settings the score reads (the rest are core audio settings). */
@@ -48,6 +55,8 @@ abstract class Style {
   abstract readonly scale: number[];       // for melody (semitones)
   abstract readonly chords: number[][];    // semitones from the tonic
   abstract readonly barsPerChord: number;
+  /** Sixteenths per bar (16 = 4/4, 12 = 3/4). */
+  readonly barSteps: number = 16;
   readonly bus: Bus;
   fadingUntil = 0;
 
@@ -57,10 +66,10 @@ abstract class Style {
 
   get stepDur(): number { return 60 / this.bpm / 4; }
   chordAt(step: number): number[] {
-    return this.chords[Math.floor(step / 16 / this.barsPerChord) % this.chords.length];
+    return this.chords[Math.floor(step / this.barSteps / this.barsPerChord) % this.chords.length];
   }
   tones(step: number, oct: number): number[] { return this.chordAt(step).map((s) => semis(this.root, s, oct)); }
-  isChordStart(step: number): boolean { return step % (16 * this.barsPerChord) === 0; }
+  isChordStart(step: number): boolean { return step % (this.barSteps * this.barsPerChord) === 0; }
   /** A scale tone near `deg` (can be negative / past an octave). */
   scaleTone(deg: number, oct: number): number {
     const n = this.scale.length;
@@ -221,6 +230,141 @@ class Ambient extends Style {
   lead(t: number, f: number, g: number, pan: number): void { this.s.glass(this.bus, t, f, g * 0.8, pan); }
 }
 
+// ── 80s slasher ────────────────────────────────────────────────────────────
+class Slasher extends Style {
+  readonly id = 'slasher';
+  readonly bpm = 112;
+  readonly root = 41.2;                                        // E
+  readonly scale = [0, 2, 3, 5, 7, 8, 10];
+  readonly chords = [[0, 3, 7], [-4, 0, 3], [5, 8, 12], [7, 11, 14]];   // Em C Am B
+  readonly barsPerChord = 1;
+  readonly leadOct = 3;
+  private hook: number[] = [];
+
+  enter(): void { this.newHook(); }
+  private newHook(): void {
+    // a four-note brass hook on chord tones, answered an octave down
+    this.hook = Array.from({ length: 4 }, () => (Math.random() * 3) | 0);
+  }
+
+  step(i: number, t: number, m: Mood): void {
+    const s = this.s, b = this.bus, pos = i % 16, bar = Math.floor(i / 16);
+    const bass = this.tones(i, 1)[0], mid = this.tones(i, 3);
+    // the engine: eighth-note bass jumping octaves, sixteenths when it's dark
+    if (pos % 2 === 0 || m.night > 0.5) {
+      const up = pos % 4 === 2;
+      s.bassPulse(b, t, up ? bass * 2 : bass, (pos % 2 ? 0.05 : 0.085) + m.night * 0.035);
+    }
+    if (this.isChordStart(i)) {
+      s.pad(b, t, this.tones(i, 2), 0.02, 16 * this.stepDur * 0.9, 900 + m.tension * 1200);
+      if (bar % 8 === 0) this.newHook();
+    }
+    // drums come in with the dusk
+    if (m.night > 0.2 || bar % 2 === 1) {
+      if (pos === 0 || pos === 8 || (m.night > 0.6 && pos === 10)) s.kick(b, t, 0.17);
+      if (pos === 4 || pos === 12) s.snare(b, t, 0.075, 0.05);
+      if (pos % 2 === 0) s.hat(b, t, pos % 4 === 2 ? 0.03 : 0.018, 0.35, pos === 14 && m.night > 0.6);
+    }
+    // brass hook every fourth bar
+    if (bar % 4 === 3 && pos % 4 === 0) {
+      s.sawLead(b, t, mid[this.hook[pos / 4]] / (pos === 12 ? 2 : 1), 0.035, 3 * this.stepDur, pos % 8 ? 0.3 : -0.3);
+    }
+    if (m.night > 0.7 && pos % 2 === 1) {
+      s.arp(b, t, this.tones(i, 4)[(pos >> 1) % 3], 0.018, 1800 + m.tension * 1500, pos % 4 === 1 ? 0.5 : -0.5);
+    }
+  }
+
+  lead(t: number, f: number, g: number, pan: number): void { this.s.sawLead(this.bus, t, f, g * 0.5, 0.25, pan); }
+}
+
+// ── dead west ──────────────────────────────────────────────────────────────
+class Frontier extends Style {
+  readonly id = 'frontier';
+  readonly bpm = 84;
+  readonly root = 41.2;                                        // E
+  readonly scale = [0, 2, 3, 5, 7, 9, 10];                     // dorian
+  readonly chords = [[0, 3, 7], [-4, 0, 3], [3, 7, 10], [-2, 2, 5]];    // Em C G D
+  readonly barsPerChord = 2;
+  readonly leadOct = 3;
+
+  step(i: number, t: number, m: Mood): void {
+    const s = this.s, b = this.bus, pos = i % 16;
+    const low = this.tones(i, 2), high = this.tones(i, 3);
+    if (this.isChordStart(i)) {
+      const hold = this.barsPerChord * 16 * this.stepDur * 0.85;
+      s.fiddle(b, t, low[0], 0.06, hold, -0.35);
+      if (m.night > 0.4) s.fiddle(b, t + 0.2, low[2], 0.035 * m.night, hold * 0.8, 0.35);
+    }
+    // a forward roll on the banjo: sparse by day, full at night
+    const roll = [low[0], high[0], high[1], low[2], high[2], high[0], high[1], high[2]];
+    if (pos % 2 === 0 && (m.night > 0.3 || pos % 4 === 0 || Math.random() < 0.4)) {
+      s.banjo(b, t, roll[pos / 2], pos === 0 ? 0.085 : 0.055, pos % 4 === 0 ? -0.1 : 0.3);
+    }
+    // boots on the porch
+    if (pos === 0 || pos === 8) s.stomp(b, t, 0.14 + m.night * 0.06);
+    if (m.night > 0.6 && (pos === 6 || pos === 14)) s.stomp(b, t, 0.07);
+    // a lonesome slide phrase now and then
+    if (pos === 12 && Math.floor(i / 16) % 4 === 3 && Math.random() < 0.7) {
+      s.slide(b, t, this.scaleTone(4 + ((Math.random() * 3) | 0), 3), 0.05, 0.2);
+    }
+  }
+
+  lead(t: number, f: number, g: number, pan: number): void { this.s.slide(this.bus, t, f, g * 0.8, pan); }
+}
+
+// ── broken lullaby ─────────────────────────────────────────────────────────
+class Lullaby extends Style {
+  readonly id = 'lullaby';
+  readonly bpm = 76;
+  readonly barSteps = 12;                                      // 3/4
+  readonly root = 32.7;                                        // C
+  readonly scale = [0, 2, 3, 5, 7, 8, 11];                     // harmonic minor
+  readonly chords = [[0, 3, 7], [-4, 0, 3], [5, 8, 12], [7, 11, 14]];   // Cm Ab Fm G
+  readonly barsPerChord = 2;
+  readonly leadOct = 4;
+  private tune: number[] = [];
+  private warpPhase = Math.random() * 10;
+
+  enter(): void { this.newTune(); }
+  /** Two bars of 3/4 in eighths (6 slots each): a rocking lullaby line, -1 = rest. */
+  private newTune(): void {
+    const t: number[] = [];
+    let d = 7 + ((Math.random() * 3) | 0);
+    for (let k = 0; k < 12; k++) {
+      if (k % 6 === 0) d = 7 + pick([0, 2, 4]);
+      else d += pick([-1, -1, 1, 2, -2, 0]);
+      d = Math.max(4, Math.min(12, d));
+      t.push(k % 6 === 5 || (k % 2 === 1 && Math.random() < 0.35) ? -1 : d);
+    }
+    this.tune = t;
+  }
+
+  step(i: number, t: number, m: Mood): void {
+    const s = this.s, b = this.bus, pos = i % 12, bar = Math.floor(i / 12);
+    // the tape wanders: a slow wow, deeper when the night gets bad
+    this.warpPhase += this.stepDur * 0.35;
+    const warp = Math.sin(this.warpPhase) * (10 + m.night * 22) + Math.sin(this.warpPhase * 2.7) * 5;
+    if (this.isChordStart(i)) {
+      s.glass(b, t, this.tones(i, 3)[0], 0.02, 0);
+      if (bar % 8 === 0) this.newTune();
+    }
+    // oom-pah-pah low music box
+    if (pos % 4 === 0) {
+      const low = this.tones(i, 3);
+      s.warpedBox(b, t, pos === 0 ? low[0] / 2 : low[1 + (pos / 4) % 2] / 2, pos === 0 ? 0.05 : 0.03, warp, pos === 0 ? -0.2 : 0.2);
+    }
+    // the tune on eighths
+    if (pos % 2 === 0) {
+      const d = this.tune[((bar % 2) * 6) + pos / 2];
+      if (d >= 0) s.warpedBox(b, t, this.scaleTone(d, 4), 0.055, warp, 0.15);
+    }
+    if (m.night > 0.5 && pos === 6 && Math.random() < 0.3) s.whisper(b, t, 0.03 * m.night, (Math.random() - 0.5) * 1.6);
+    if (m.night > 0.75 && pos === 0 && bar % 4 === 0) s.swell(b, t, this.tones(i, 2)[0], 0.03, 5);
+  }
+
+  lead(t: number, f: number, g: number, pan: number): void { this.s.warpedBox(this.bus, t, f, g * 0.7, 0, pan); }
+}
+
 // ── the conductor ──────────────────────────────────────────────────────────
 class Conductor implements Score {
   private s: Synth;
@@ -240,11 +384,20 @@ class Conductor implements Score {
   private wind: Bed;
   private rain: Bed;
   private musicLevel = -1;
+  private heartAt = -99;
+  private meter: AnalyserNode;
+  private meterBuf = new Float32Array(512);
+  private energy = 0;
+  private pulseAt = 0;
 
   constructor(private e: AudioEngine) {
     const ctx = e.ctx;
     this.s = new Synth(e);
     this.music = new Bus(ctx, e.out, e.reverb, e.echo, 0);
+    // a level meter on the music (not the effects) for visuals that move with it
+    this.meter = ctx.createAnalyser();
+    this.meter.fftSize = 512;
+    this.music.dry.connect(this.meter);
     // sound effects go through their own limiter so punchy shots never clip
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14; comp.knee.value = 4; comp.ratio.value = 10;
@@ -261,6 +414,9 @@ class Conductor implements Score {
       carpenter: new Carpenter(this.s, this.music),
       survivor: new Survivor(this.s, this.music),
       ambient: new Ambient(this.s, this.music),
+      slasher: new Slasher(this.s, this.music),
+      frontier: new Frontier(this.s, this.music),
+      lullaby: new Lullaby(this.s, this.music),
     };
     this.rotIdx = (Math.random() * ORDER.length) | 0;
     this.rotatedAt = ctx.currentTime;
@@ -382,12 +538,38 @@ class Conductor implements Score {
     if (!this.mood.threat || !st.deviceVoices) return;
     const g = st.gThreat * st.gateThreat;
     if (g <= 0) return;
-    if (i % 8 === 0) this.s.heart(this.sfxBus, t, 0.11 * g);
-    if (i % 64 === 32) this.s.riser(this.sfxBus, t, 32 * this.cur.stepDur, 0.03 * g);
-    if (i % 64 === 0 && i > 0) this.s.boom(this.sfxBus, t, 0.06 * g);
+    const bars4 = this.cur.barSteps * 4;
+    if (i % 8 === 0) { this.s.heart(this.sfxBus, t, 0.11 * g); this.heartAt = t; }
+    if (i % bars4 === bars4 / 2) this.s.riser(this.sfxBus, t, (bars4 / 2) * this.cur.stepDur, 0.03 * g);
+    if (i % bars4 === 0 && i > 0) this.s.boom(this.sfxBus, t, 0.06 * g);
   }
 
   setThreatActive(on: boolean): void { this.mood.threat = on; }
+
+  pulse(): MusicPulse {
+    const ctx = this.s.ctx;
+    // what the speakers are playing now, not what's scheduled
+    const heard = ctx.currentTime - (ctx.outputLatency || ctx.baseLatency || 0);
+    const cur = this.cur;
+    const wall = performance.now() / 1000;
+    const dt = Math.min(0.1, wall - this.pulseAt);
+    this.pulseAt = wall;
+    this.meter.getFloatTimeDomainData(this.meterBuf);
+    let sum = 0;
+    for (let k = 0; k < this.meterBuf.length; k++) sum += this.meterBuf[k] * this.meterBuf[k];
+    const level = Math.min(1, Math.sqrt(sum / this.meterBuf.length) / 0.08);
+    // loudness eases (about a second either way), so nothing pumps with each note
+    this.energy += (level - this.energy) * Math.min(1, dt * 1.2);
+    const sinceHeart = heard - this.heartAt;
+    return {
+      beat: (heard - this.epoch) / (cur.stepDur * 4),
+      beatsPerBar: cur.barSteps / 4,
+      bpm: cur.bpm,
+      energy: this.energy,
+      heart: sinceHeart >= 0 && this.mood.threat ? Math.exp(-sinceHeart / 0.25) : 0,
+      style: MUSIC_STYLES.find(([id]) => id === cur.id)?.[1] ?? cur.id,
+    };
+  }
 
   cue(kind: Cue, srcIp?: string): void {
     const st = this.set, s = this.s;

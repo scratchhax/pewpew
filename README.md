@@ -217,14 +217,24 @@ deepens toward the screen edges, low mist (with the fog budget on), floodlight
 cones on the towers, lamps at the gates and zombie eyes glowing in the dark. The HUD is
 relabelled to match (RADIO, COMPOUND, SURVIVAL LOG, HOT ZONES, RADIO LOG…).
 
-**Its own soundtrack** (`score.ts`, `synth.ts`), still all synthesized. Three
+**Its own soundtrack** (`score.ts`, `synth.ts`), still all synthesized. Six
 styles take turns, every 6 minutes by default:
 
 | Style | Sound |
 |-------|-------|
 | Horror synth | a pulsing minor ostinato (Am–F–Dm–E) over a saw drone, cold bell figures, a choir at night |
 | Lonely survivor | fingerpicked guitar and a slightly detuned piano phrase (Dm–B♭–F–C) over the wind, a cello at night |
+| 80s slasher | driving octave bass (Em–C–Am–B), drum machine with a big gated snare, a brassy saw hook |
 | Dark ambient | a breathing drone that glides between chords, distant swells, scraping metal, low booms at night |
+| Dead west | banjo rolls, a bowed fiddle drone, boot stomps and a lonesome slide guitar (E dorian) |
+| Broken lullaby | a music box on warped tape in 3/4 (Cm–A♭–Fm–G), glass harmonics, whispers at night |
+
+**Move with the music** (Scene tab, on by default): zombies shamble and bob in
+time, guards sweep their watch once every eight bars, the floodlights breathe
+slowly with the music's loudness, the mast light swells on each bar, and during
+a horde the red wash follows the heartbeat. The scene keeps its own clock and
+eases toward the soundtrack's beat (never more than ±50% speed), so a new song
+never makes anything jump. With audio off it keeps a steady walking tempo.
 
 The compound's sounds play along. Each one is snapped to the beat and pitched
 to the chord that's playing:

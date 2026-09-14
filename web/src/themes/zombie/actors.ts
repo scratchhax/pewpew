@@ -12,7 +12,7 @@ interface Zombie {
   sx: number; sy: number; tx: number; ty: number;
   t: number; dur: number;
   killAt: number | null;       // progress at which a tower drops it (null = reaches the wall)
-  phase: number; weave: number;
+  phase: number; weave: number;  // phase: this zombie's offset against the beat
   brute: boolean; horde: number; // horde id (0 = lone zombie)
   dying: number;               // > 0 while falling
   seen: number;                // seconds on screen (for fade-in)
@@ -94,7 +94,8 @@ export class Zombies {
   }
 
   /** `people` are survivors on the move: a zombie closing on one draws cover fire. */
-  update(dt: number, darkness: number, people: Point[] = []): ZombieHits {
+  /** `beat` is the scene's music clock: zombies shamble and bob in time with it. */
+  update(dt: number, darkness: number, people: Point[] = [], beat = 0): ZombieHits {
     const hits: ZombieHits = { kills: [], breaches: [] };
     const L = this.compound.L;
     const cover = 130 * L.unit;
@@ -116,15 +117,16 @@ export class Zombies {
       z.s.visible = true;
       z.seen += dt;
       z.s.alpha = Math.min(1, z.seen / 0.8);         // shuffle into view instead of popping in
-      z.phase += dt * (z.brute ? 3 : 5);
       const ux = z.tx - z.sx, uy = z.ty - z.sy;
       const len = Math.hypot(ux, uy) || 1;
       const px = -uy / len, py = ux / len;          // perpendicular: shamble / weave
       const k = Math.min(1, z.t);
-      const sway = Math.sin(z.phase * (z.horde ? 0.35 : 1)) * z.weave * L.unit * (1 - k * 0.6);
+      // one shamble per two beats; a horde weaves slower, a brute slowest of all
+      const step = beat * Math.PI * (z.brute ? 0.6 : 1) + z.phase;
+      const sway = Math.sin(beat * Math.PI * (z.brute ? 0.25 : z.horde ? 0.4 : 1) + z.phase) * z.weave * L.unit * (1 - k * 0.6);
       const x = z.sx + ux * k + px * sway, y = z.sy + uy * k + py * sway;
       z.s.position.set(x, y);
-      z.s.rotation = Math.atan2(uy, ux) + Math.sin(z.phase) * 0.12;
+      z.s.rotation = Math.atan2(uy, ux) + Math.sin(step) * 0.12;
       z.eye.position.set(x + Math.cos(z.s.rotation) * 6 * L.unit, y + Math.sin(z.s.rotation) * 6 * L.unit);
       fade(z.eye, darkness * 0.45 * Math.min(1, z.seen / 1.5));   // steady, eased in
 

@@ -414,7 +414,10 @@ export class Compound {
   /** System event: the generator browns out — lights dim smoothly and recover. */
   generatorFlicker(): void { this.brownout = 1; }
 
-  update(dt: number, darkness: number, alarm: number): void {
+  /** `groove`: the music (beat, loudness, downbeat) for lights and guards that move with it. */
+  update(dt: number, darkness: number, alarm: number, groove?: { beat: number; beatsPerBar: number; energy: number; downbeat: number }): void {
+    const beat = groove?.beat ?? this.t * 1.4, bpb = groove?.beatsPerBar ?? 4;
+    const energy = groove?.energy ?? 0.35, downbeat = groove?.downbeat ?? 0;
     this.t += dt;
     // everything below eases: no on/off toggles, no per-event pops
     this.brownout = Math.max(0, this.brownout - dt * 0.6);
@@ -425,7 +428,7 @@ export class Compound {
       // engaged guards turn onto their target (shortest way round); idle ones
       // drift back into a slow sweep of their watch arc. Never an instant snap.
       tw.recoil = Math.max(0, tw.recoil - dt * 0.8);
-      const want = tw.recoil > 0 ? tw.target : tw.idle + Math.sin(this.t * 0.35 + i * 1.7) * 0.9;
+      const want = tw.recoil > 0 ? tw.target : tw.idle + Math.sin((beat / (bpb * 8)) * Math.PI * 2 + i * Math.PI / 2) * 0.9;   // one sweep every eight bars
       // capped turn rate: a guard swings at most ~3.5 rad/s, never whips round
       const turn = angleDelta(tw.aim, want) * Math.min(1, dt * (tw.recoil > 0 ? 5 : 1.2));
       const maxTurn = 3.5 * dt;
@@ -433,7 +436,7 @@ export class Compound {
       tw.guard.rotation = tw.aim;
       tw.cone.rotation = tw.aim;
       tw.cone.scale.set(5.2 * this.L.unit, 1.7 * this.L.unit);
-      fade(tw.cone, night * 0.4);
+      fade(tw.cone, night * 0.4 * (0.85 + 0.3 * energy));        // floodlights breathe with the music (slowly)
       tw.cone.tint = mix(0xfff0c8, 0xff6a50, Math.min(1, alarm));   // alarm shifts to red, steadily
     });
 
@@ -441,7 +444,7 @@ export class Compound {
 
     this.mastHeat = Math.max(0, this.mastHeat - dt * 0.35);
     this.mastGlow = ease(this.mastGlow, this.mastHeat, dt, 1);
-    this.mastLight.alpha = 0.1 + night * 0.25 + this.mastGlow * 0.25;
+    this.mastLight.alpha = 0.1 + night * 0.25 + this.mastGlow * 0.25 + downbeat * 0.12;   // a soft swell on each bar
     this.mastLight.tint = 0x55b5ff;
     this.mastLight.scale.set(0.9 * this.L.unit * (1 + this.mastGlow * 0.3));
     this.genLight.tint = 0xffd27a;
