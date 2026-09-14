@@ -1,276 +1,311 @@
-# pewpew — Orbital Command
+# pewpew
 
-**Your UniFi network as a living space battle.** A real-time, browser-based
-"orbital command" visualizer + generative soundtrack for UniFi gateway/AP
-syslog. Every firewall hit, DNS lookup, DHCP lease and Wi-Fi (dis)connect
-becomes something on screen — lasers, crystals, incoming asteroids blasted by
-defensive lasers — and everything you hear is synthesized live in the browser
-from *your* traffic. No database, no cloud, no recordings: pure eye candy that
-never touches the network itself.
+**Your UniFi network as a living scene, with a soundtrack it plays itself.**
+pewpew turns UniFi gateway and AP syslog into a real-time visualizer in the
+browser. Every firewall hit, DNS lookup, DHCP lease and Wi-Fi join becomes
+something on screen, and everything you hear is synthesized live from your own
+traffic. Pick a look per screen: **Orbital Command**, a space station
+defending your network, or **Last Outpost**, a walled compound holding out
+against the internet's zombies. No database, no cloud and no recordings. It
+only reads syslog and never touches the network itself.
 
-![demo](docs/demo.gif)
+| Orbital Command (sci-fi, default) | Last Outpost (zombie) |
+|---|---|
+| ![orbital command](docs/hero.png) | ![last outpost](docs/zombie.png) |
 
-Full 42s showreel with sound — calm cruise → the F1 config tour → full storm:
-**[docs/demo.mp4](docs/demo.mp4)** · Screenshots: [hero](docs/hero.png) ·
-[storm](docs/storm.png) · [settings](docs/panel.png) · [debug](docs/debug.png)
+![last outpost in motion](docs/zombie.gif)
+
+**[Try the browser demo](https://scratchhax.github.io/pewpew/)** (synthetic
+traffic, no hardware) ·
+[Last Outpost demo](https://scratchhax.github.io/pewpew/?theme=zombie) ·
+sci-fi showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
+
+## Contents
+
+- [Highlights](#highlights)
+- [Try it](#try-it)
+- [Run it on your network](#run-it-on-your-network)
+- [Themes](#themes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Choosing a theme](#choosing-a-theme)
+- [Sound](#sound)
+- [Settings (F1)](#settings-f1)
+- [Performance and quality](#performance-and-quality)
+- [URL parameters](#url-parameters)
+- [Deploying on a Raspberry Pi](#deploying-on-a-raspberry-pi)
+- [How it works](#how-it-works)
+- [Health, privacy, troubleshooting](#health-and-diagnostics)
+- [Credits](#credits)
 
 ## Highlights
 
-- **Living scene** (PixiJS v8) — an orbital station at the center of your
-  network; hosts drift in as stars and grow into constellations, blocked
-  inbound traffic becomes asteroids the station shoots down, and the whole
-  thing rides a parallax nebula.
-- **Pick a theme** — the same traffic as **Orbital Command** (sci-fi, the
-  default) or **[Last Outpost](#last-outpost-zombie-theme)**, a top-down
-  zombie survival compound. Different screens can show different themes off
-  one relay.
-- **Generative soundtrack** — a 4-song "band" that listens to your traffic and
-  plays it back: set-list rotation, song structure, tension & release — every
-  note synthesized live with the WebAudio API. **No audio files anywhere.**
-- **Mixable, layered audio** — additive **Melody / Devices / Noise** layers,
-  each with per-event *volume* **and** *gate* controls, plus reverb, echo and a
-  music-bed balance. All live in the F1 panel (below).
-- **Colour system** — a fixed event colour-law (block=red, allow=green…) so the
-  picture stays readable, *plus* a 48-hue host-mesh you can reskin
-  (spectrum / event-law / mono / warm / cool) with a global hue-shift & intensity.
-- **Runs on anything** — quality presets (Low / Medium / High / Ultra) with an
-  **Auto** mode that sizes the scene to the viewing device, from a gaming PC
-  down to a Raspberry Pi 5 kiosk. High is the full classic look.
-- **Zero footprint** — syslog parsed in RAM and fanned out over WebSocket;
-  nothing written to disk, no cloud, no accounts, no telemetry.
+- **Two themes, one relay.** Orbital Command and Last Outpost draw the same
+  traffic. Every screen picks its own theme, so the kiosk in the hall and the
+  laptop on your desk can show different worlds at the same time.
+- **A readable picture.** One fixed colour per event type (block is red,
+  allow green, DNS blue, DHCP yellow, Wi-Fi purple, threats amber) in both
+  themes and in the scrolling log, so you can tell what's happening at a glance.
+- **Generative soundtrack.** A band that listens to your network. Sci-fi has a
+  space-rock set list; Last Outpost has six horror styles in rotation, with its
+  gunfire, groans, radio chirps and creaking doors played on the beat and in
+  key. No audio files anywhere.
+- **The scene moves with the music.** In Last Outpost, zombies shamble in
+  time, guards sweep with the bars, and during a horde the lights follow the
+  heartbeat.
+- **Runs on anything.** Quality presets with an Auto mode size the scene to
+  the device looking at it, from a gaming PC down to a Raspberry Pi 5 kiosk.
+- **Zero footprint.** Syslog is parsed in RAM and fanned out over WebSocket.
+  Nothing is written to disk and there are no accounts or telemetry.
 
-## See it right now (no hardware needed)
+## Try it
 
-**[Browser demo](https://scratchhax.github.io/pewpew/)** ·
-**[Looping showreel](https://scratchhax.github.io/pewpew/?showreel=1)**
-(synthetic traffic, redeployed on every change to `web/` on `main`).
+**In the browser:** the [GitHub Pages demo](https://scratchhax.github.io/pewpew/)
+runs on synthetic traffic. Click once to start the sound (browser autoplay
+rules) and press **F1** for settings. Add `?theme=zombie` for Last Outpost,
+`?showreel=1` for a looping calm → storm → cooldown story, or
+`?rate=40&block=65` to turn up the traffic.
 
-```bash
-cd web && npm install && npm run dev
-open http://localhost:5173/?demo=1&showreel=1
-```
-
-`?demo=1` runs a fully synthetic event generator (fake IPs/MACs/hosts —
-nothing real), `showreel=1` scripts a 60s arc: calm cruise → traffic build →
-**hurricane** → cooldown. Click once to wake the audio engine (browser autoplay
-policy). Press **F1** any time to open the settings panel. See
-[URL params](#url-params) for dialing the intensity by hand.
-
-### GitHub Pages demo
-
-The workflow in `.github/workflows/pages.yml` publishes the demo whenever
-`web/` or the workflow changes on `main` (or run **Deploy demo to GitHub
-Pages** from the Actions tab). On a fork, first select **GitHub Actions** as
-the source under **Settings → Pages → Build and deployment**.
-
-The Pages build always uses synthetic traffic, including when opened without
-URL parameters, and needs no relay. Add `?showreel=1` for the looping storm
-sequence or `?rate=40&block=65` to tune traffic. Click to enable sound; press
-**F1** for settings. Relative asset URLs support repository paths and custom
-domains. Forks use their own GitHub Pages URL.
-
-Preview the same build locally:
+**Locally:**
 
 ```bash
 cd web
-npm ci
-npm run build:demo
-npm run preview
+npm install
+npm run dev
 ```
 
-The regular `npm run build` still connects to the relay by default.
+Then open `http://localhost:5173/?demo=1` (or `/zombie/?demo=1`). `?demo=1`
+generates fake IPs, MACs and hostnames, so it's safe to screenshot and share.
 
-## How it works
+The Pages site is rebuilt by `.github/workflows/pages.yml` whenever `web/`
+changes on `main`, or from **Actions → Deploy demo to GitHub Pages**. That
+build (`npm run build:demo`) always uses synthetic traffic and needs no relay.
+On a fork, set **Settings → Pages → Build and deployment** to **GitHub
+Actions** first.
 
-```
-UDM/UDR ──syslog UDP:5514──► relay (Python) ──JSON over WebSocket──► browser
-                                │                                      :8080
-                                └── also serves the built viewer: the default
-                                    theme at /, every theme at /<theme>/
-```
+## Run it on your network
 
-- `relay/` — Python 3.10+ aiohttp server. Parses syslog with the vendored
-  [UniFi-Insights-Plus](https://github.com/jmasarweh/UniFi-Insights-Plus)
-  parsers (DB/policy deps stripped), broadcasts every event to all browsers,
-  replays the last 500 events to each new tab. Regex drop-list filters the
-  known UDM/AP log spam. `--demo` generates fake events server-side too.
-- `web/` — Vite + TypeScript + [PixiJS v8](https://pixijs.com/). The audio
-  synth and the sci-fi theme (starfield, ships, lasers, particles) are generated
-  procedurally with zero image or audio files; the zombie theme uses one small
-  sprite atlas from Kenney's CC0 Top-down Shooter pack.
-- `deploy/` — systemd unit + kiosk autostart entry (built to run fullscreen
-  on a Raspberry Pi, but any Chromium/Chrome/Firefox will do).
-
-### Viewer architecture: core + themes
-
-The relay knows nothing about how events look, and the viewer is split the
-same way: a shared **core** and a **theme** that only draws. There are two
-themes: Orbital Command (`web/src/themes/scifi/`) and Last Outpost
-(`web/src/themes/zombie/`).
-
-| Core (`web/src/*`) | Theme (`web/src/themes/<id>/`) |
-|--------------------|--------------------------------|
-| relay feed + demo generator (`ws.ts`) | its renderer (PixiJS for both current themes) and scene |
-| event classification (`events.ts`): allow / block / threat / dns / dhcp / wifi / system, direction, Wi-Fi outcome (joined / bad / other) | what each classified event becomes on screen |
-| sim state + weather (`state.ts`), per-flow visual throttle (`throttle.ts`) | which effects are worth showing, on-screen caps, camera |
-| HUD, comms log, F1 panel shell, audio engine (context, master, reverb, echo, analyser, noise gate) plus the built-in band | Scene tab toggles, colour scheme, HUD panel names + accent hue (and optional `body[data-theme]` CSS), audio cues for effects it shows, and optionally its own `score` (music + sound design) with Audio tab controls |
-| quality presets, auto tuner, frame loop + FPS cap (`perf.ts`, `loop.ts`) | scene budgets per quality tier |
-| boot + event pipeline (`app.ts`), theme selection (`themes/registry.ts`) | `Theme` object as the default export (`theme.ts` is the contract) |
-
-Per event, the core logs it to the HUD, feeds the noise gate and sim state,
-then hands the theme a `SceneEvent`. The theme turns it into visuals, asking
-the shared throttle before drawing repeated flows. Each frame the core
-advances time (sim speed, bullet-time, FPS cap), computes the anti burn-in
-drift, and calls the theme's `frame()`. All settings live in one saved object,
-so HUD and audio preferences carry across themes.
-
-### Choosing a theme
-
-One relay serves every theme in the build, so different screens can show
-different themes at the same time:
-
-| URL | Theme |
-|-----|-------|
-| `http://<relay-host>:8080/` | the relay's `default_theme` (`relay.yaml`, default `scifi`) |
-| `http://<relay-host>:8080/<theme>/` | that theme: `/scifi/` or `/zombie/` (unknown themes are a 404) |
-| any URL + `?theme=<theme>` | that theme (useful on the Pages demo) |
-
-The viewer picks, in order: the theme named in the URL path, `?theme=`, the
-relay's `default_theme` from `GET /config.json`, then `scifi`. Each theme is
-built as its own chunk, so a screen only downloads the theme it shows. Other
-URL params combine as usual, e.g. `/scifi/?quality=low`.
-
-To add a theme: create `web/src/themes/<id>/index.ts` with a default export
-of a `Theme` (defaults, per-tier budgets, panel controls, `create()`). It is
-picked up automatically: the viewer registry finds it, the build writes
-`dist/<id>/index.html`, and the relay serves it at `/<id>/`.
-
-## Run against your own network
-
-1. Start the relay:
+1. **Start the relay** (Python 3.10+):
 
    ```bash
-   cd relay && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+   cd relay
+   python3 -m venv .venv
+   .venv/bin/pip install -r requirements.txt
    .venv/bin/python pewpew_relay.py
    ```
 
-2. UniFi OS console: **Settings → Advanced → Remote Syslog → host = this
-   machine, port = 5514**. Enable logging on the firewall zones/rules you
-   want to see.
+2. **Build the viewer** (Node 18+, on any machine): `cd web && npm ci && npm run build`.
+   The relay serves `web/dist/` with no-cache headers, so a refresh always gets
+   the current build.
 
-3. Open `http://<relay-host>:8080`. Adjust `wan_interfaces` in
-   `relay/relay.yaml` if inbound/outbound classification looks wrong
-   (`ppp0` for DSL, `eth8`–`eth10` on many UDM/UDR setups). The `IN=` /
-   `OUT=` fields of your gateway's firewall syslog lines show which interface
-   is the WAN.
+3. **Point UniFi at it.** In your UniFi OS console, go to **Settings →
+   Advanced → Remote Syslog** and set the host to the relay machine and the
+   port to **5514**. Enable logging on the firewall rules and zones you want
+   to see.
 
-4. Production build: `cd web && npm run build` — the relay serves `dist/`
-   automatically (with `Cache-Control: no-cache`, so refreshes always get the
-   current build).
+4. **Open** `http://<relay-host>:8080/`.
 
-## The visual language
+### `relay/relay.yaml`
 
-Colors of every effect match the comms-log lines verbatim:
+| Key | Default | What it does |
+|-----|---------|--------------|
+| `syslog_bind`, `syslog_port` | `0.0.0.0`, `5514` | where syslog (UDP) is received |
+| `http_host`, `http_port` | `0.0.0.0`, `8080` | the viewer, WebSocket and health endpoints |
+| `default_theme` | `scifi` | theme served at `/` (every theme is also at `/<theme>/`) |
+| `buffer_size` | `500` | recent events replayed to each newly opened browser |
+| `wan_interfaces` | `[ppp0]` | which gateway interfaces count as WAN, for inbound/outbound. Look at the `IN=`/`OUT=` fields of your firewall log lines; `eth8`–`eth10` are common on UDM/UDR |
+| `drop_log_types` | `[]` | log types to hide, e.g. `[system]` |
+| `drop_patterns` | UDM/AP chatter | regexes matched against raw lines and dropped before parsing (see `/drops`) |
 
-| Event    | Color      | On screen |
-|----------|------------|-----------|
-| allow    | green      | crystals core↔device + star-to-star links, inner ring |
-| block    | red        | inbound asteroid → station laser intercept, shake + flash |
-| dns      | blue       | blue laser client→station ("the resolver is you"), 2nd ring |
-| dhcp     | yellow     | a labelled planet (the client's hostname) drifts across the field, the logging AP core ripples yellow, 3rd ring |
-| wifi     | purple     | client **joins** (associated / authenticated) send a crystal AP core → station; **leaves** and failures (deauth, disassoc, rejects) fire a laser station → AP core; a faint event star marks each one; 4th ring |
-| system   | grey       | grey shockwave from the station |
-| threat   | amber      | IDS/IPS detection (Enhanced/CyberSecure tier) — an attack **rocket** that burns in on an evasive, weaving path from a random bearing, gets shot down close to the station with an amber detonation, and turns the core **red** while any rocket is alive; carries a MAC, no source IP |
+The relay understands both the classic iptables-style firewall logs and the
+CEF security events from gateways on the CyberSecure/Enhanced tier (IDS/IPS
+threats included). `python3 relay/test_cef.py` self-checks the CEF parser.
+`pewpew_relay.py --demo` generates fake events on the server side too.
 
-Traffic volume drives weather: **STORM** at ≥300 events/30s and **HURRICANE** at
-≥1200 — the weather readout turns amber (STORM) or red (HURRICANE), the
-station flares, and the field fills with debris and intercept fire.
-IPs you talk to a lot grow into constellations; blocked destinations rack up
-on the **MOST WANTED** board. The fleet drifting through the scene is a
-hand-drawn (procedurally generated) honor squad.
+## Themes
 
-## Last Outpost (zombie theme)
+### Orbital Command
 
-![last outpost](docs/zombie.png)
+![orbital command storm](docs/storm.png)
+
+Your network is an orbital station. Hosts drift in as stars and grow into
+constellations, blocked traffic comes in as asteroids the station shoots down,
+and the whole thing rides a parallax nebula.
+
+| Event | Colour | On screen |
+|-------|--------|-----------|
+| allow | green | crystals between the core and a device, star-to-star links, the inner ring |
+| block | red | an inbound asteroid intercepted by the station's laser, with a shake and flash |
+| dns | blue | a blue laser from the client to the station, the second ring |
+| dhcp | yellow | a planet labelled with the client's hostname drifts across; the logging AP core ripples |
+| wifi | purple | joins send a crystal from the AP core to the station; leaves and failures fire a laser back |
+| system | grey | a grey shockwave from the station |
+| threat | amber | an IDS/IPS attack rocket weaves in on an evasive path, is shot down near the station, and turns the core red while any rocket is alive |
+
+Traffic volume sets the weather: **STORM** at 300 events per 30 seconds and
+**HURRICANE** at 1200. The readout turns amber or red, the station flares and
+the field fills with debris and intercept fire. Busy IPs grow into
+constellations, and blocked destinations rank on the **MOST WANTED** board.
+
+### Last Outpost
+
+![last outpost horde night](docs/zombie-night.png)
 
 The same traffic as a walled compound seen from above: your network is inside
-the walls, the internet is everything outside. Open `/zombie/` on the relay (or
-set `default_theme: zombie` in `relay.yaml`, or add `?theme=zombie`). The event
-colour law is the same as above, so the radio log still matches the scene.
+the walls, the internet is everything outside. The HUD is relabelled to match
+(RADIO, COMPOUND, SURVIVAL LOG, HOT ZONES, RADIO LOG…).
 
 | Event | On screen |
 |-------|-----------|
-| block | a **zombie** shambles in from a bearing fixed by the remote IP; the nearest watchtower guard turns and fires; visible rounds fly to the zombie and it topples when they land (blood, no flash). The odd one reaches the fence: a breach gives the camera a small nudge |
-| threat | a **horde**: a brute leading a weaving pack. The two nearest towers open fire, the scene takes on a steady red cast, the floodlights turn red and the threat audio bed plays while the brute lives |
-| allow (border) | **supply runs**: outbound, a scavenger runs from the camp through the nearest gate and off the map; inbound, a survivor carries a crate in. Survivors step around zombies, and the towers shoot any zombie that gets close to one. Internal (LAN↔LAN) permits are couriers strolling between tents |
-| dns | a dashed **radio call** from the client's spot in the camp to the radio mast, whose blue light warms up with traffic |
-| dhcp | a **new survivor** walks in through a gate and pitches a cot labelled with the device's hostname (renewals ring the existing tent; names fade when a device goes quiet) |
-| wifi | AP and gateway hosts are **buildings**: joins walk in the door, leaves and failures hurry out in a purple burst; the building lamp slowly warms toward the colour of its recent activity |
-| system | the **generator browns out**: the lights dim smoothly for a moment and recover |
+| block | a zombie shambles in from a bearing fixed by the remote IP. The nearest tower guard turns and fires; rounds fly to it and it topples when they land. The odd one reaches the fence (a breach nudges the camera) |
+| threat | a horde: a brute leading a weaving pack. The nearest towers open fire with bursts, the scene takes on a steady red cast and the floodlights turn red while the brute lives |
+| allow (border) | supply runs: outbound, a scavenger runs from the camp through a gate and off the map; inbound, a survivor carries a crate in. Survivors step around zombies, and the towers shoot any zombie that gets close to one |
+| allow (LAN↔LAN) | a courier strolls between two tents |
+| dns | a dashed radio call from the client's tent to the mast, whose blue light warms with traffic |
+| dhcp | a new survivor walks in through a gate and pitches a tent labelled with the device's hostname. Renewals ring the tent; names fade when a device goes quiet |
+| wifi | AP and gateway hosts are buildings: joins walk in the door, leaves and failures hurry out, and the building's lamp warms toward its recent activity |
+| system | the generator browns out: every light dims smoothly and recovers |
 
-The outside is **dead country**: drained, grey-brown grass with old bloodstains
-and bare trees. The ground and trees are drained of colour once, when the scene
-is built, so it costs nothing per frame. Traffic weather is **time of day**:
-CALM is a grey overcast day, STORM is dusk with rain, HURRICANE is horde night
-(dark, heavy rain, thick fog). There is always a cold blue-green gloom that
-deepens toward the screen edges, low mist (with the fog budget on), floodlight
-cones on the towers, lamps at the gates and zombie eyes glowing in the dark. The HUD is
-relabelled to match (RADIO, COMPOUND, SURVIVAL LOG, HOT ZONES, RADIO LOG…).
+**Dead country.** The ground and trees are drained to grey-brown, with old
+bloodstains outside the walls. That happens once when the scene is built, so
+it costs nothing per frame. Traffic weather is the time of day: CALM is an
+overcast day, STORM is dusk with rain, HURRICANE is horde night with heavy
+rain and thick fog. A cold gloom always deepens toward the screen edges.
 
-**Its own soundtrack** (`score.ts`, `synth.ts`), still all synthesized. Six
-styles take turns, every 6 minutes by default:
+**No flashing.** Every light and colour change in this theme eases over about
+a second. Nothing strobes or blinks, and routine kills don't shake the screen.
+
+**Move with the music** (on by default). Zombies shamble and bob in time with
+the soundtrack, guards sweep their watch once every eight bars, the
+floodlights breathe slowly with the music's loudness, the mast light swells on
+each bar, and during a horde the red wash follows the heartbeat. The scene
+keeps its own clock and eases toward the music's beat (never more than ±50%
+speed), so a new song never makes anything jump. With the sound off it keeps a
+steady walking tempo.
+
+Sprites are from Kenney's CC0 [Top-down Shooter](https://kenney.nl/assets/top-down-shooter) pack.
+
+### Choosing a theme
+
+One relay serves every theme, so different screens can show different themes
+at once:
+
+| URL | Theme |
+|-----|-------|
+| `http://<relay-host>:8080/` | the relay's `default_theme` |
+| `http://<relay-host>:8080/scifi/`, `/zombie/` | that theme (unknown names are a 404) |
+| any URL + `?theme=zombie` | that theme (handy on the Pages demo) |
+
+The viewer checks the URL path, then `?theme=`, then the relay's
+`/config.json`, and falls back to `scifi`. Each theme is its own bundle, so a
+screen only downloads the theme it shows.
+
+## Sound
+
+All sound is synthesized in the browser with the WebAudio API. Browsers only
+allow audio after a click or keypress, so click once to start it.
+
+### Orbital Command's band
+
+- **Set list:** a bank of four melodies (arpeggios, riffs, cascades,
+  wanderings) rotated every 75–165 seconds, each with its own bass groove, lead
+  sound and register, mutating as it goes.
+- **Song form:** intro, verse, chorus, bridge and outro, driven by traffic.
+  Blocked traffic builds tension and a lull after a storm resolves it.
+- **Device voices:** every IP gets its own notes from a hash, so your laptop
+  always plays "its" phrase; chatty devices get quieter.
+- **Under attack:** while a threat rocket is alive, a low detuned drone swells
+  in with a target-lock ping, and powers down once the last rocket is gone.
+
+### Last Outpost's soundtrack
+
+Six styles take turns, every 6 minutes by default, crossfading between them:
 
 | Style | Sound |
 |-------|-------|
-| Horror synth | a pulsing minor ostinato (Am–F–Dm–E) over a saw drone, cold bell figures, a choir at night |
-| Lonely survivor | fingerpicked guitar and a slightly detuned piano phrase (Dm–B♭–F–C) over the wind, a cello at night |
+| Horror synth | a pulsing minor ostinato (Am–F–Dm–E) over a saw drone, cold bells, a choir at night |
+| Lonely survivor | fingerpicked guitar and a slightly detuned piano (Dm–B♭–F–C) over the wind, a cello at night |
 | 80s slasher | driving octave bass (Em–C–Am–B), drum machine with a big gated snare, a brassy saw hook |
-| Dark ambient | a breathing drone that glides between chords, distant swells, scraping metal, low booms at night |
-| Dead west | banjo rolls, a bowed fiddle drone, boot stomps and a lonesome slide guitar (E dorian) |
+| Dark ambient | a breathing drone gliding between chords, distant swells, scraping metal |
+| Dead west | banjo rolls, a bowed fiddle drone, boot stomps and a slide guitar (E dorian) |
 | Broken lullaby | a music box on warped tape in 3/4 (Cm–A♭–Fm–G), glass harmonics, whispers at night |
 
-**Move with the music** (Scene tab, on by default): zombies shamble and bob in
-time, guards sweep their watch once every eight bars, the floodlights breathe
-slowly with the music's loudness, the mast light swells on each bar, and during
-a horde the red wash follows the heartbeat. The scene keeps its own clock and
-eases toward the soundtrack's beat (never more than ±50% speed), so a new song
-never makes anything jump. With audio off it keeps a steady walking tempo.
-
-The compound's sounds play along. Each one is snapped to the beat and pitched
-to the chord that's playing:
+The compound's sounds are part of the band. Each is snapped to the beat and
+pitched to the chord that's playing:
 
 | Event | Sound |
 |-------|-------|
-| guards fire | a punchy rifle shot with a ring in key; a brute's burst lands as a roll on the 32nd-note grid |
-| block | a zombie groan pitched to the chord root |
-| threat | a horde roar (three groans on the chord) and a boom; while the horde attacks, a heartbeat on the beat and a swell into every fourth bar |
-| allow | traffic plays the melody on the style's lead (bell, piano or glass) |
+| guards fire | a punchy rifle shot with a ring in key; a brute's burst lands as a roll |
+| block | a zombie groan on the chord root |
+| threat | a horde roar and a boom; during the attack, a heartbeat and swells into every fourth bar |
+| allow | traffic plays the melody on the style's lead instrument |
 | dns | a radio chirp |
 | wifi | a door creaking open (join) or shut |
 | dhcp | a strummed music-box chord |
 | system | the generator sputtering |
 | breach | a boom and a metal clang |
 
-Night (traffic weather) thickens the arrangement: 16ths instead of 8ths, toms,
-a choir or cello. Wind is always there, and rain comes in with the weather. The
-**Audio** tab adds **Music** (Rotate, or pin one style), **Rotate every
-(min)**, **Gunfire** volume and **Wind & rain**. The core sliders still
-apply: Melody and Music bed control the music, the event gates and volumes
-control the compound's sounds, and Threat controls the horde. Effects run
-through their own limiter, so a busy night stays loud without clipping. On the
-CM5 kiosk the soundtrack costs about 1 fps more than sci-fi's band.
+Night thickens the arrangement (sixteenths instead of eighths, drums, choir
+or cello). Wind is always there and rain comes in with the weather. Effects go
+through their own limiter, so a busy night stays punchy without clipping.
 
-**No flashing.** Every light and colour change in this theme eases over about a
-second: nothing strobes or blinks (including the HUD cursor and demo badge), and
-routine kills don't shake the screen. Measured on demo traffic, the largest
-frame-to-frame brightness swing is a quarter of what the first version had.
+### Mixing
 
-Its **Scene** tab has toggles for zombies, hordes, supply runs, couriers, DNS
-radio, DHCP arrivals, AP buildings, day/night, rain, blood and screen shake,
-and the **System** tab's budgets per quality tier are:
+The **Audio** tab is shared by both themes:
 
-| Budget | Low | Medium | **High** | Ultra |
-|--------|-----|--------|----------|-------|
+- **Melody** and **Devices** are layers that add together: the music, and the
+  sounds triggered by events.
+- Every event type has a **volume** (how loud) and a **gate** (how often it
+  sounds, from 0 = never to 1 = every time). Gates thin a busy stream without
+  changing its level.
+- **Noise (chaos)** fires a short sound on a fraction of *raw* events, straight
+  from the feed. 0 is off, 1 is every event.
+- **Reverb**, **echo** and **Music bed** (music against event sounds).
+
+Last Outpost adds **Music** (Rotate, or pin one style), **Rotate every (min)**,
+**Gunfire** volume and **Wind & rain**.
+
+![last outpost audio settings](docs/panel-audio.png)
+
+## Settings (F1)
+
+Press **F1** for the settings panel. Changes apply live and are saved in the
+browser. The two renderer options, antialias and GPU power, apply after the
+panel's *Apply & reload*.
+
+| Tab | What's in it |
+|-----|--------------|
+| **Scene** | the theme's toggles. Sci-fi: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music |
+| **HUD** | each HUD panel on or off (names follow the theme), plus scanlines |
+| **Audio** | see [Mixing](#mixing) |
+| **Colour** | global hue shift and intensity for the HUD accent; sci-fi also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
+| **System** | quality preset, render scale, FPS cap, the theme's scene budgets, antialias and GPU power, simulation speed, reset to defaults |
+
+![settings panel](docs/panel.png)
+
+## Performance and quality
+
+The relay never renders anything: each browser draws the scene on its own GPU.
+How smooth it runs depends on the device *viewing* it, and a quality tier
+bundles every setting that trades looks for frame time.
+
+![system tab](docs/perf.png)
+
+| Renderer | Low | Medium | **High** | Ultra |
+|----------|-----|--------|----------|-------|
+| Render scale | 0.6 | 0.8 | 1.0 | device pixel ratio (≤2) |
+| FPS cap | 30 | 60 | none | none |
+| Antialias | off | off | off | on |
+| GPU power | low-power | browser default | low-power | high-performance |
+
+| Orbital Command budgets | Low | Medium | **High** | Ultra |
+|-------------------------|-----|--------|----------|-------|
+| Particles | 800 | 2000 | 4000 | 8000 |
+| Star density | 0.4 | 0.7 | 1.0 | 1.5 |
+| Nebula clouds | 3 | 5 | 7 | 9 |
+| Dust motes | 20 | 45 | 70 | 140 |
+| Effect detail | 0.5 | 0.75 | 1.0 | 1.0 |
+| IP stars / event stars | 60 / 100 | 100 / 180 | 140 / 260 | 200 / 400 |
+
+| Last Outpost budgets | Low | Medium | **High** | Ultra |
+|----------------------|-----|--------|----------|-------|
 | Particles | 600 | 1500 | 3000 | 6000 |
 | Zombies at once | 8 | 10 | 12 | 18 |
 | Blood decals | 30 | 70 | 140 | 260 |
@@ -278,226 +313,163 @@ and the **System** tab's budgets per quality tier are:
 | Tents | 16 | 22 | 28 | 36 |
 | Fog + survivor flashlights | off | on | on | on |
 
-On the CM5 kiosk (2560×1440, Auto → Low, demo traffic) Last Outpost runs at
-about 25 fps on a calm day and 20 fps under heavy traffic at night, against
-about 24 fps for sci-fi. Lights that are fully dark are skipped rather than
-drawn at zero alpha, which is what keeps night affordable on a Pi.
-
-## The audio engine
-
-All sound is synthesized in the browser with the WebAudio API — there is no
-audio file anywhere in this repo. The engine is shared, and a theme can bring
-its own score (Last Outpost does, see above). Without one, the built-in band
-plays. Think of it as a small band that listens to your network:
-
-- **Generative set list** — a 4-song bank of distinct melodies (arpeggios,
-  riffs, cascades, wanderings) rotated every 75–165s, each with its own bass
-  groove, lead timbre and register. Mutations and key slides evolve each song
-  in between.
-- **Song structure** — the band moves through intro / verse / chorus / bridge
-  / outro, driven by how heavy your traffic is. Block *pressure* (ratio of
-  denied traffic) builds tension; a lull after a storm resolves it.
-- **Device voices** — every MAC/IP gets a hash-derived musical identity, so
-  your laptop plays "its" notes; overly chatty devices get fame-limited.
-- **Additive layers** (F1) — three sound sources you mix in and out, they sum:
-  **Melody** (the generative band), **Devices** (gated per-event hits — block
-  kick, DNS sparkle, WiFi glide, DHCP chord, allow data-tick — plus the per-host
-  identity notes), and **Noise** (a chaos texture fired 1:1 on raw events).
-- **Volume vs gate** (F1) — every event type has its own *volume* (how loud)
-  and its own *gate* (how often it passes, 0 = choked off → 1 = every hit).
-  The **Noise gate** replaces the old NOISE MODE: 0 is silent, 1 is full chaos
-  (every raw event, no dedupe, scheduled sample-accurately through a pacing
-  queue so bursts stay audible).
-- **Under attack** — while an IDS/IPS threat rocket is on screen, a sustained
-  menace bed swells in: detuned sub-bass saws (root + tritone) through a slowly
-  wobbling filter and a fast tremolo pulse, with a periodic target-lock ping on
-  top, all fed through reverb and echo. It rides threat *presence* — it rises as
-  the attack closes and powers down once the last rocket is shot down. Gated and
-  levelled by the Threat volume/gate sliders in F1.
-- Master volume, reverb, echo, a music-bed-vs-hits balance, and a device-voice
-  mix — all in F1.
-
-## F1 settings panel
-
-Press **F1** for a tabbed control surface — **Scene / HUD / Audio / Colour /
-System**. Changes apply live and persist to localStorage, except antialias
-and GPU power, which the renderer reads at startup (the panel offers
-*Apply & reload*).
-
-| Tab | What's in it |
-|-----|--------------|
-| **Scene** | the theme's own toggles. Sci-fi: starfield · nebula · dust · ambient ships · DHCP planets · event stars · asteroids · attack rockets · crystals · IP constellations · ring objects (dots orbiting the event rings) · AP cores · screen shake. Zombie: see [Last Outpost](#last-outpost-zombie-theme) |
-| **HUD** | uplink · ship-status bars · telemetry · most-wanted · comms log · sensor flux · subspace spectrum · radar · scanlines |
-| **Audio** | additive Melody / Devices layers, per-event volume + per-event gate, the noise (chaos) gate, master / reverb / echo / music-bed, device mix |
-| **Colour** | host-mesh scheme (spectrum / event-law / mono / warm / cool) + a global hue-shift & intensity that sweeps the mesh, nebula and HUD accent |
-| **System** | quality preset (auto / low / medium / high / ultra / custom) · render scale · FPS cap · particle, star density, nebula, dust, effect-detail budgets · IP star and event star caps · antialias + GPU power (reload) · simulation speed · reset-to-defaults |
-
-### Audio: volume vs gate
-
-Two knobs per event type, and they do very different jobs:
-
-- **Volume** — how *loud* that event's sound is.
-- **Gate** — how *often* it passes (0 = choked off → 1 = every hit). Gates are
-  densities: they thin a busy stream without changing its level.
-- **Noise (chaos) gate** — replaces the old NOISE MODE. Fires a noise burst on
-  a fraction of raw events; 0 = off, 1 = every single event (full chaos).
-
-Flip the **Melody** and **Devices** toggles to add or subtract whole layers —
-everything sums, so you can run melody-only, devices-only, or stack both under
-noise. (The pitched impacts fire once per sequencer step, so they're a per-step
-summary; the noise gate fires 1:1 on raw events — that's why noise ≠ a wide-open
-gate.)
-
-### Performance & quality
-
-The relay never renders anything: every browser that opens the page draws the
-scene on its own GPU. So how smooth it runs depends on the *viewing* device,
-and a quality tier bundles every knob that trades looks for frame time.
-
-| Setting | Low | Medium | **High** | Ultra |
-|---------|-----|--------|----------|-------|
-| Render scale | 0.6 | 0.8 | 1.0 | device pixel ratio (≤2) |
-| FPS cap | 30 | 60 | none | none |
-| Antialias | off | off | off | on |
-| GPU power preference | low-power | browser default | low-power | high-performance |
-| Particles | 800 | 2000 | 4000 | 8000 |
-| Star density | 0.4 | 0.7 | 1.0 | 1.5 |
-| Nebula clouds | 3 | 5 | 7 | 9 |
-| Dust motes | 20 | 45 | 70 | 140 |
-| Effect detail (station aura, crystal trails) | 0.5 | 0.75 | 1.0 | 1.0 |
-| IP stars / event stars | 60 / 100 | 100 / 180 | 140 / 260 | 200 / 400 |
-
-- **High** is exactly how the scene looked before presets existed.
-- **Auto** (the default) guesses a tier when the page loads (Pi / phone GPUs,
-  software renderers and browsers without WebGL start at Low; touch devices,
-  ≤4-core or ≤4 GB machines and Intel HD/UHD integrated graphics at Medium;
-  everything else at High), then watches the real frame rate. If it
-  stays under ~75% of target for 5 seconds, it drops one tier. It only ever
-  steps **down**, so it can't flap; a reload starts from the guess again. The
-  System tab shows which tier Auto is running and why.
-- Moving any individual value switches the preset to **Custom** and keeps your
+- **Auto** (the default) guesses a tier at load, then watches the real frame
+  rate. Software renderers, Pi and phone GPUs, and browsers without WebGL
+  start at Low. Touch devices, machines with ≤4 cores or ≤4 GB of memory, and
+  Intel HD/UHD graphics start at Medium. Everything else starts at High. If
+  frames stay under 75% of the target for 5 seconds, Auto drops one tier. It
+  never steps back up, so it can't flap, and the System tab says which tier
+  it's running and why.
+- Moving any single value switches the preset to **Custom** and keeps your
   numbers.
-- **Render scale** trades sharpness for GPU fill: 0.6 draws about a third of
-  the pixels of 1.0. The HTML HUD and page compositing are *not* scaled, so on
-  a small board driving a big display the browser itself is often the ceiling
-  (see the measurements below).
-- **Antialias** and **GPU power** are read once when the renderer starts; the
-  panel offers *Apply & reload* when you change them.
-- Pin a device from the URL instead of the panel (handy for a kiosk with no
-  keyboard): `?quality=low`, `?scale=0.6`, `?fps=30`. URL values apply to that
-  page load only and are never saved. `?debug=1` shows FPS, worst frame time,
-  the active tier and render scale.
-- Settings saved before presets existed keep a hand-tuned particle budget as
-  **Custom**; untouched ones move to **Auto**.
+- **Render scale** trades sharpness for GPU work: 0.6 draws about a third of
+  the pixels of 1.0. The HTML HUD isn't scaled, so on a small board driving a
+  big display the browser's own compositing is often the limit.
+- On a kiosk without a keyboard, pin values in the URL: `?quality=low`,
+  `?scale=0.6`, `?fps=30`. These apply to that load only and aren't saved.
 
-![quality settings](docs/perf.png)
+**Measured on a Raspberry Pi Compute Module 5** (Chromium kiosk at
+2560×1440, Auto → Low, demo traffic):
 
-**Measured on a Raspberry Pi Compute Module 5** (Chromium kiosk, 2560×1440
-@ 75Hz, heavy demo traffic `?demo=1&rate=40&block=65`):
+| Scene | FPS |
+|-------|-----|
+| Orbital Command, normal traffic | about 24–26 |
+| Orbital Command, heavy traffic (`rate=40&block=65`) | 23.6 |
+| Last Outpost, calm day | 25.5 |
+| Last Outpost, heavy traffic at night | 20.3 |
 
-| Tier | Canvas | FPS |
-|------|--------|-----|
-| High | 2560×1440 | 17.7 |
-| Medium | 2048×1152 | 20.9 |
-| Low | 1536×864 | 23.6 (25.4 in normal traffic) |
+With the soundtrack playing, expect 2–3 fps less (sci-fi's band cost 2.0,
+Last Outpost's 2.9 in the same test). Chromium painting a 1440p page is the
+real ceiling on that board: running the display at 1080p helps more than any
+setting.
 
-Auto guessed Low on its own ("embedded GPU"). Forced to start at High, it
-stepped to Medium after 9s and Low after 18s. The scene logic costs ~4ms and
-the render calls ~8ms per frame; the rest is Chromium painting and compositing
-a 1440p page: hiding the HUD alone reached 33fps, and hiding the whole WebGL
-scene only 27fps. On a board like this, running the display at 1080p is likely
-to help more than any in-page setting.
+## URL parameters
 
-These numbers predate the core/theme split. After it, the same kiosk ran Auto
-(Low) at 26.4fps on live STORM traffic, in line with the numbers above.
+| Parameter | Effect |
+|-----------|--------|
+| `/<theme>/` (path) or `?theme=` | pick the theme: `scifi` or `zombie` |
+| `?demo=1` | synthetic traffic, no relay needed |
+| `?showreel=1` | with the demo: a looping 60-second calm → build → hurricane → cooldown arc |
+| `?rate=40` | with the demo: about 40 events per second |
+| `?block=65` | with the demo: 65% of firewall hits blocked |
+| `?hosts=Router,Kitchen-AP` | with the demo: hostnames to use |
+| `?quality=low` | pin the quality tier (`auto`, `low`, `medium`, `high`, `ultra`) |
+| `?scale=0.6` | pin the render scale (0.25–2) |
+| `?fps=30` | pin the FPS cap (`0` = uncapped) |
+| `?debug=1` | overlay with FPS, worst frame, quality tier, render scale, scene nodes, events per second and audio stats |
+| `?diag=1` | developer hook: exposes the scene objects on `window.__diag` |
 
-![config tour](docs/config.gif)
+![debug overlay](docs/debug.png)
 
-![settings](docs/panel.png)
+## Deploying on a Raspberry Pi
 
-## URL params
+```bash
+sudo cp deploy/pewpew-relay.service /etc/systemd/system/   # adjust paths and user
+sudo systemctl enable --now pewpew-relay
+cp deploy/pewpew-kiosk.desktop ~/.config/autostart/        # fullscreen Chromium
+```
 
-| Param | Effect |
-|-------|--------|
-| `/<theme>/` (path) | show that theme, e.g. `/scifi/` (see [Choosing a theme](#choosing-a-theme)) |
-| `?theme=zombie` | show that theme (`scifi` / `zombie`) on any URL |
-| `?demo=1` | synthetic event generator, no relay needed |
-| `?demo=1&showreel=1` | scripted 60s calm→build→hurricane→cooldown arc, looping |
-| `?demo=1&rate=40` | demo at ~40 events/sec |
-| `?demo=1&rate=40&block=65` | …with 65% of firewall hits blocked |
-| `?hosts=Router,Kitchen-AP` | demo hostnames |
-| `?quality=low` | pin the quality tier (`auto` / `low` / `medium` / `high` / `ultra`) for this load |
-| `?scale=0.6` | pin the render scale (0.25–2) for this load |
-| `?fps=30` | pin the FPS cap (`0` = uncapped) for this load |
-| `?debug=1` | perf/audio overlay (FPS, worst frame, quality tier, render scale, scene nodes, events/s, scheduler queue, voices alive, RMS) |
+A Pi doesn't need Node. Build the viewer on another machine and copy it into
+the relay's checkout:
 
-![debug](docs/debug.png)
+```bash
+cd web && npm ci && npm run build
+rsync -a --delete dist/ pi@<relay-host>:pewpew-ui/web/dist/
+```
 
-## Health & diagnostics
+Static files update without a restart. Restart `pewpew-relay` only when
+`relay/` changes; UniFi devices then take 1–3 minutes to resume logging.
 
-- `GET /healthz` — per-host syslog line counters, WS clients, event counters
-- `GET /drops` — which drop-pattern regexes are catching what
-- `GET /config.json` — `default_theme` and the themes installed in the build
-- APs/gateway stop logging for 1–3 minutes after a relay restart — that's the
-  UniFi log-forwarder's backoff, it reconnects itself.
+The kiosk entry opens `http://localhost:8080/?quality=low`, a good start for a
+Pi 5. Edit the URL to point at a relay on another host
+(`http://192.168.1.5:8080/?quality=low`) or to pin a theme
+(`http://192.168.1.5:8080/zombie/?quality=low`). The kiosk's browser still
+needs one tap or keypress before it can play sound.
+
+## How it works
+
+```
+UDM / UDR / APs ──syslog UDP :5514──► relay (Python) ──JSON over WebSocket──► browsers
+                                        │                                       :8080
+                                        └── also serves the built viewer:
+                                            the default theme at /, every theme at /<theme>/
+```
+
+- **`relay/`**: an aiohttp server. It parses syslog with parsers vendored from
+  [UniFi-Insights-Plus](https://github.com/jmasarweh/UniFi-Insights-Plus)
+  (database and policy dependencies removed), drops known log spam, keeps a
+  ring buffer of recent events, and broadcasts every event to every browser.
+- **`web/`**: Vite, TypeScript and [PixiJS v8](https://pixijs.com/). The
+  audio and the sci-fi graphics are generated in code; Last Outpost adds one
+  small sprite atlas.
+- **`deploy/`**: the systemd unit and the kiosk autostart entry.
+
+### Viewer: core and themes
+
+| Core (`web/src/`) | Theme (`web/src/themes/<id>/`) |
+|-------------------|--------------------------------|
+| relay feed and demo generator (`ws.ts`) | its renderer and scene |
+| event classification (`events.ts`): allow, block, threat, dns, dhcp, wifi, system, plus direction and Wi-Fi outcome | what each event becomes on screen, and which repeats are worth drawing |
+| sim state and weather (`state.ts`), per-flow throttle (`throttle.ts`) | Scene tab toggles, colour options, HUD names and accent colour |
+| HUD, log, F1 panel, audio engine and the built-in band (`audio.ts`) | optionally its own `score`: music and sound design, with Audio tab controls |
+| quality presets, auto tuner, frame loop (`perf.ts`, `loop.ts`) | scene budgets per quality tier |
+| boot and event pipeline (`app.ts`), theme registry | a `Theme` object as the default export (`theme.ts` is the contract) |
+
+For each event the core logs it to the HUD, feeds the noise gate and the sim
+state, then hands the theme a classified event. Each frame the core advances
+time (sim speed, slow motion, FPS cap), computes a slow anti-burn-in drift, and
+calls the theme's `frame()`. All settings live in one saved object, so HUD and
+audio preferences carry across themes.
+
+**Adding a theme:** create `web/src/themes/<id>/index.ts` with a default
+export of a `Theme` (defaults, per-tier budgets, panel controls, `create()`).
+The registry finds it, the build writes `dist/<id>/index.html` and the relay
+serves it at `/<id>/`. To give it its own music, set `score` to a function
+that receives the shared `AudioEngine` (context, output, reverb and echo sends,
+settings) and returns a `Score`. Last Outpost's `score.ts` and `synth.ts` are
+a worked example, and its `groove.ts` shows how visuals can follow
+`audio.pulse()`.
+
+## Health and diagnostics
+
+- `GET /healthz`: syslog lines per host, WebSocket clients, event counters
+- `GET /drops`: which drop patterns are catching what
+- `GET /config.json`: the default theme and the themes in the build
+- After a relay restart, APs and gateways stop logging for 1–3 minutes. That's
+  UniFi's log forwarder backing off; it reconnects on its own.
 
 ## Privacy
 
-- Everything runs on your LAN. No outbound connections, no telemetry,
-  no analytics, no accounts.
-- Syslog is parsed in RAM and fanned out over WebSocket; nothing is written
-  to disk. Settings live in your browser's localStorage.
-- Demo mode generates fake IPs/MACs/hostnames — safe to screenshot and share.
+- Everything runs on your LAN: no outbound connections, telemetry, analytics
+  or accounts.
+- Syslog is parsed in memory and sent over WebSocket; nothing is written to
+  disk. Settings live in your browser's local storage.
+- Demo mode uses fake IPs, MACs and hostnames.
 
 ## Troubleshooting
 
-- **No sound** — browsers require a click/keypress before audio can start.
-  One click, then the engine wakes up.
-- **Everything looks soft/wrong after an update** — hard-refresh (Ctrl+Shift+R);
-  the relay sends no-cache headers, but be paranoid.
-- **Wrong direction classification** — fix `wan_interfaces` in `relay.yaml`.
-- **Weak GPU / choppy** — Auto should settle on its own within ~30s. If not,
-  pick **Low** in F1 → System or add `?quality=low`, then lower **Render
-  scale** further. `?debug=1` shows the FPS you're actually getting. On a Pi
-  driving a 1440p/4K screen, a 1080p display mode helps most.
-- **Looks soft** — you're on a lower tier or render scale; F1 → System shows
-  which. Pick **High** (or **Ultra** on a HiDPI screen) if the GPU can take it.
-- **Windows LAN IP changed and the viewer is blank** — it's pointing at the
-  old relay IP; open the new one.
-
-## Deploying (Raspberry Pi kiosk)
-
-```bash
-sudo cp deploy/pewpew-relay.service /etc/systemd/system/   # adjust paths/user
-sudo systemctl enable --now pewpew-relay
-cp deploy/pewpew-kiosk.desktop ~/.config/autostart/        # fullscreen chromium
-```
-
-The relay serves `web/dist/`, which needs Node 18+ to build. A Pi doesn't
-need Node: build on any machine (`cd web && npm ci && npm run build`) and
-copy `web/dist/` into the relay's checkout, e.g.
-`rsync -a --delete web/dist/ pi@<relay-host>:pewpew-ui/web/dist/`. Static files
-update without a restart; restart `pewpew-relay` only when `relay/` changes
-(UniFi devices then take 1–3 minutes to resume logging).
-
-The kiosk entry opens `?quality=low`, the starting point for a Pi 5. Edit the URL
-in `pewpew-kiosk.desktop` to try `medium`, to point a kiosk at a relay on
-another host (e.g. `http://192.168.1.5:8080/?quality=low`), or to pin a theme
-regardless of the relay's default (e.g. `http://192.168.1.5:8080/scifi/?quality=low`).
+- **No sound:** click or press a key once; browsers block audio until you do.
+- **Blank or stale after an update:** hard refresh (Ctrl+Shift+R).
+- **Inbound and outbound look swapped:** set `wan_interfaces` in `relay.yaml`.
+- **Choppy:** Auto should settle within about 30 seconds. If not, choose
+  **Low** in F1 → System or add `?quality=low`, then lower **Render scale**.
+  `?debug=1` shows the FPS you're getting. On a Pi driving a 1440p or 4K
+  screen, a 1080p display mode helps most.
+- **Soft or blurry:** you're on a lower tier or render scale; F1 → System
+  shows which. Choose **High** (or **Ultra** on a high-DPI screen).
 
 ## Credits
 
-- Syslog parsing: vendored from
-  [UniFi-Insights-Plus](https://github.com/jmasarweh/UniFi-Insights-Plus)
-  (MIT), stripped of database dependencies.
-- [PixiJS v8](https://pixijs.com/) for the renderer.
-- Every sound and melody, and every sci-fi texture: generated in code.
+- Syslog parsing vendored from
+  [UniFi-Insights-Plus](https://github.com/jmasarweh/UniFi-Insights-Plus) (MIT).
+- [PixiJS v8](https://pixijs.com/) renders both themes.
+- Every sound, melody and sci-fi texture is generated in code.
 - Last Outpost sprites: [Top-down Shooter](https://kenney.nl/assets/top-down-shooter)
   by [Kenney](https://kenney.nl) (CC0), packed into
-  `web/src/themes/zombie/assets/atlas.png`; license in `LICENSE-kenney.txt` beside it.
-- IDS/IPS threat rendering (the amber attack rockets, red "under-attack" core
-  and the sustained threat audio bed) grew out of the CEF security-event parser
-  idea and initial implementation by [natechit](https://github.com/natechit).
+  `web/src/themes/zombie/assets/atlas.png` with its license beside it.
+- IDS/IPS threat support (the attack rockets, the red core and the threat
+  audio) grew out of the CEF security-event parser idea and first
+  implementation by [natechit](https://github.com/natechit).
 
 ## License
 
