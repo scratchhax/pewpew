@@ -123,6 +123,10 @@ export class Station {
    *  the last one is shot down (then fades back). */
   setAlarm(on: boolean): void { this.alarmOn = on; }
 
+  /** Breathe with the music: the core swells once every two beats instead of on its own clock. */
+  private beat: number | null = null;
+  setGroove(beat: number | null): void { this.beat = beat; }
+
   /** Soft event-colored cloud blooming around the core, drifting outward.
    *  Per-color throttle keeps constant allow traffic from turning the core
    *  into permanent green fog — clouds need dark time between blooms. */
@@ -192,7 +196,7 @@ export class Station {
         | Math.round(tb + (34 - tb) * d));
     }
 
-    const breathe = 1 + Math.sin(this.t * 2.2) * 0.05 + this.pulse * 0.5
+    const breathe = 1 + Math.sin(this.beat === null ? this.t * 2.2 : this.beat * Math.PI) * 0.05 + this.pulse * 0.5
                     + state.energy * 0.35
                     + this.danger * (0.10 + 0.08 * Math.sin(this.t * 9));
     this.bloom.x = cx;

@@ -1,4 +1,4 @@
-import type { AudioEngine } from '../../audio';
+import type { AudioEngine } from '../audio';
 
 /**
  * A mixer channel: dry, reverb-send and echo-send gains that always move
@@ -74,7 +74,7 @@ export interface Bed {
 const clampPan = (p: number) => Math.max(-1, Math.min(1, p));
 
 /**
- * Synth building blocks for the zombie score, on top of the engine's graph.
+ * Synth building blocks shared by theme scores, on top of the engine's graph.
  * Every note is a handful of short-lived nodes; `budget` caps how many
  * oscillators and noise sources are sounding so a busy night can't choke a Pi.
  */
@@ -387,6 +387,87 @@ export class Synth {
   /** Breathy whisper swell. */
   whisper(bus: Bus, t: number, g: number, pan = 0): void {
     this.noiseHit(bus, t, { type: 'bandpass', f: 2200, fTo: 1400, q: 4, g, a: 0.8, h: 0.2, r: 1.2, pan, rev: 0.9, rate: 0.8 });
+  }
+
+  // ── space ──
+  /** Pipe organ: stacked octaves with a slow breath of air on the attack. */
+  organ(bus: Bus, t: number, f: number, g: number, hold: number, pan = 0): void {
+    if (this.busy(5)) return;
+    const a = 0.06, r = 0.45;
+    for (const [m, k] of [[0.5, 0.5], [1, 1], [2, 0.55], [4, 0.22], [3, 0.12]] as const) {
+      this.tone(bus, t, f * m, { g: g * k, a, h: hold, r, pan, rev: 0.75, echo: 0.1 });
+    }
+  }
+
+  /** Chiptune square: raw and bright, no filter sweep. */
+  chip(bus: Bus, t: number, f: number, g: number, len: number, pan = 0, slide = 0): void {
+    this.tone(bus, t, f, { type: 'square', g, a: 0.002, h: len, r: 0.04, lp: 7000, glide: slide || undefined, pan, echo: 0.15 });
+  }
+
+  /** Chip noise drum: `snap` short and high (snare/hat), else a thud. */
+  chipDrum(bus: Bus, t: number, g: number, snap: boolean): void {
+    if (snap) this.noiseHit(bus, t, { type: 'highpass', f: 2500, g, a: 0.001, r: 0.07, rate: 0.5 });
+    else this.tone(bus, t, 160, { type: 'square', g: g * 0.8, a: 0.001, r: 0.09, glide: 0.3, lp: 1200 });
+  }
+
+  /** Sharp string stab (for ostinatos): detuned saws, quick decay. */
+  strings(bus: Bus, t: number, f: number, g: number, pan = 0): void {
+    this.tone(bus, t, f, { type: 'sawtooth', g, a: 0.004, r: 0.16, detune: 16, lp: 2600, lpTo: 900, q: 0.8, pan, rev: 0.35 });
+  }
+
+  /** A big drum struck with a mallet. */
+  taiko(bus: Bus, t: number, g: number, pan = 0): void {
+    this.tone(bus, t, 70, { g, a: 0.003, r: 0.7, glide: 0.7, pan, rev: 0.6 });
+    this.noiseHit(bus, t, { type: 'lowpass', f: 700, g: g * 0.4, a: 0.002, r: 0.12, pan, rev: 0.6 });
+  }
+
+  /** Pulsar ping: a pure tone with a long echo tail. */
+  ping(bus: Bus, t: number, f: number, g: number, pan = 0): void {
+    this.tone(bus, t, f, { g, a: 0.003, r: 0.5, pan, rev: 0.6, echo: 0.6 });
+  }
+
+  /** Defense laser: a bright tone diving down to the note. */
+  zap(bus: Bus, t: number, f: number, g: number, pan: number): void {
+    this.tone(bus, t, f * 4, { type: 'square', g: g * 0.6, a: 0.001, r: 0.16, glide: 0.25, lp: 6000, lpTo: 900, pan, rev: 0.25, echo: 0.2 });
+    this.tone(bus, t, f * 2, { g, a: 0.001, r: 0.22, glide: 0.5, pan, rev: 0.3 });
+  }
+
+  /** Explosion: a noise burst that closes down, a sub thump and a metal ring in key. */
+  blast(bus: Bus, t: number, g: number, pan: number, ring: number, big = false): void {
+    const len = big ? 1.3 : 0.6;
+    this.noiseHit(bus, t, { type: 'lowpass', f: big ? 5000 : 3500, fTo: 180, q: 0.6, g: g * 0.9, a: 0.002, r: len, pan, rev: 0.55 });
+    this.tone(bus, t, big ? 90 : 120, { g: g * 0.9, a: 0.002, r: big ? 0.9 : 0.35, glide: 0.35, pan });
+    this.tone(bus, t, ring, { type: 'triangle', g: g * 0.08, a: 0.003, r: big ? 1.4 : 0.6, pan, rev: 0.6, echo: 0.2 });
+    if (big) this.tone(bus, t, ring * 1.5, { g: g * 0.05, a: 0.003, r: 1.1, pan, rev: 0.6 });
+  }
+
+  /** Warp-in whoosh: filtered noise sweeping down onto a soft tone. */
+  warp(bus: Bus, t: number, f: number, g: number, pan = 0): void {
+    this.noiseHit(bus, t, { type: 'bandpass', f: 4200, fTo: 300, q: 4, g, a: 0.25, r: 0.6, pan, rev: 0.6 });
+    this.tone(bus, t + 0.3, f, { g: g * 0.6, a: 0.05, h: 0.2, r: 1.4, pan, rev: 0.6, echo: 0.3 });
+  }
+
+  /** Rocket launch: a rising, growling engine. */
+  launch(bus: Bus, t: number, f: number, g: number, pan: number): void {
+    this.tone(bus, t, f, { type: 'sawtooth', g, a: 0.3, h: 0.3, r: 0.6, glide: 2, lp: 900, lpTo: 2400, q: 3, pan, rev: 0.4 });
+    this.noiseHit(bus, t, { type: 'bandpass', f: 600, fTo: 2200, q: 1.5, g: g * 0.6, a: 0.3, h: 0.3, r: 0.5, pan, rev: 0.4 });
+  }
+
+  /** Red alert: two alternating tones, soft-edged. */
+  alert(bus: Bus, t: number, f: number, g: number, beat: number): void {
+    this.tone(bus, t, f, { type: 'triangle', g, a: 0.03, h: beat * 0.35, r: 0.12, lp: 2200, rev: 0.3 });
+    this.tone(bus, t + beat * 0.5, f * 0.84, { type: 'triangle', g: g * 0.9, a: 0.03, h: beat * 0.35, r: 0.12, lp: 2200, rev: 0.3 });
+  }
+
+  /** Shockwave: a low tone that sweeps a filter open and shut. */
+  shock(bus: Bus, t: number, f: number, g: number): void {
+    this.tone(bus, t, f, { type: 'sawtooth', g, a: 0.01, h: 0.1, r: 1.1, lp: 1800, lpTo: 90, q: 6, rev: 0.6 });
+    this.tone(bus, t, f / 2, { g: g * 0.8, a: 0.01, r: 0.9, glide: 0.7 });
+  }
+
+  /** Radio static crackle. */
+  crackle(bus: Bus, t: number, g: number, pan: number): void {
+    this.noiseHit(bus, t, { type: 'highpass', f: 3500, g, a: 0.002, r: 0.04 + Math.random() * 0.06, pan, rate: 0.4 + Math.random() * 0.6 });
   }
 
   /** Metal dragged on metal, far away. */

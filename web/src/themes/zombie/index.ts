@@ -10,7 +10,7 @@ import { Fx } from './fx';
 import { Zombies, Walkers } from './actors';
 import { Sky } from './weather';
 import { zombieScore } from './score';
-import { Groove } from './groove';
+import { Groove } from '../../sound/groove';
 import './hud.css';
 
 /** The event colour law, shared with the radio log legend. */
