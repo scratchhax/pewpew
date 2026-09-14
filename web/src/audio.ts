@@ -37,7 +37,51 @@ function degreeToFreq(d: number): number {
   return BASE * Math.pow(2, oct + semi / 12);
 }
 
-export type Cue = 'block' | 'allow' | 'dns' | 'dhcp' | 'wifi' | 'threat';
+export type Cue = 'block' | 'allow' | 'dns' | 'dhcp' | 'wifi' | 'threat' | 'system';
+
+/** Extra detail a theme can pass with a sound effect. */
+export interface SfxOpts {
+  /** Stereo position -1 (left) … 1 (right). */
+  pan?: number;
+  /** How many (e.g. rounds in a burst). */
+  count?: number;
+}
+
+/**
+ * What a theme's score gets from the engine: the shared audio graph (master
+ * volume → analyser → speakers, the reverb and echo the user's sliders ride)
+ * and the live settings object (core + the theme's own keys).
+ */
+export interface AudioEngine {
+  readonly ctx: AudioContext;
+  /** Dry output into the master bus. */
+  readonly out: AudioNode;
+  /** Send into the shared reverb. */
+  readonly reverb: AudioNode;
+  /** Send into the shared echo. */
+  readonly echo: AudioNode;
+  readonly settings: Settings;
+  /** Retune the shared echo (seconds), e.g. to a dotted eighth at the score's tempo. */
+  setEchoTime(seconds: number): void;
+}
+
+/**
+ * A theme's own music and sound design. Without one, the built-in score below
+ * plays (the sci-fi space-rock band).
+ */
+export interface Score {
+  /** A musical cue for something the theme showed. */
+  cue(kind: Cue, srcIp?: string): void;
+  /** A theme-specific sound effect (e.g. 'shot'); unknown names are ignored. */
+  sfx(name: string, opts?: SfxOpts): void;
+  setThreatActive(on: boolean): void;
+  /** Every frame, with seconds since the last one. */
+  update(dt: number, state: State): void;
+  /** One voice of the noise gate (raw feed), anchored at `when` (audio clock). */
+  noiseVoice(kind: Cue, when: number): void;
+}
+
+export type ScoreFactory = (engine: AudioEngine) => Score;
 
 interface HostVoice {
   deg: number; cell: number[]; cellIdx: number;
@@ -55,7 +99,10 @@ export class Audio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noiseBuf: AudioBuffer | null = null;
-  private pending: Record<Cue, number> = { block: 0, allow: 0, dns: 0, dhcp: 0, wifi: 0, threat: 0 };
+  private pending: Record<Cue, number> = { block: 0, allow: 0, dns: 0, dhcp: 0, wifi: 0, threat: 0, system: 0 };
+  /** A theme's score, when it brings one (replaces the built-in band). */
+  private scoreFactory: ScoreFactory | null = null;
+  private score: Score | null = null;
   private last = 0;
   private stepAcc = 0;
   private melodyIdx = 12;
@@ -133,7 +180,9 @@ export class Audio {
   private gestured = false;
   private wantRec = false;
 
-  constructor(private settings: Settings) {
+  /** `score`: a theme's own music and sound design, replacing the built-in band. */
+  constructor(private settings: Settings, score?: ScoreFactory) {
+    this.scoreFactory = score ?? null;
     window.addEventListener('pointerdown', () => this.onGesture());
     window.addEventListener('keydown', () => this.onGesture());
     document.addEventListener('visibilitychange', () => {
@@ -222,10 +271,19 @@ export class Audio {
     for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
     this.noiseBuf = nb;
 
-    this.buildThreatBed();
+    if (this.scoreFactory) {
+      const delay = this.delay;
+      this.score = this.scoreFactory({
+        ctx, out: this.master, reverb: this.reverbIn, echo: this.delay, settings: this.settings,
+        setEchoTime: (s) => delay.delayTime.setTargetAtTime(Math.min(1.4, s), ctx.currentTime, 0.3),
+      });
+    } else {
+      this.buildThreatBed();
+    }
 
     this.last = ctx.currentTime;
   }
+
 
   /**
    * Sustained "under attack" bed — a menacing detuned low drone through a
@@ -297,7 +355,15 @@ export class Audio {
   }
 
   /** Core is under attack while this is true — the drone bed rides it. */
-  setThreatActive(on: boolean): void { this.threatOn = on; }
+  setThreatActive(on: boolean): void {
+    this.threatOn = on;
+    this.score?.setThreatActive(on);
+  }
+
+  /** Theme sound effect; only a theme score knows what to do with it. */
+  sfx(name: string, opts?: SfxOpts): void {
+    if (this.settings.audio) this.score?.sfx(name, opts);
+  }
 
 
   /** Real FFT of the actual mix for the spectrum panel. */
@@ -367,6 +433,8 @@ export class Audio {
   /** Composition-mode cue (fires after visual gates). */
   cueSong(kind: Cue, srcIp?: string): void {
     if (!this.settings.audio) return;
+    if (this.score) { this.score.cue(kind, srcIp); return; }
+    if (kind === 'system') return;               // the built-in band has no part for it
     this.ingest(kind, srcIp);
   }
 
@@ -419,6 +487,7 @@ export class Audio {
   private playNoiseVoice(kind: Cue, when: number): void {
     if (!this.ctx || !this.master) return;
     this.dbgFires++;
+    if (this.score) { this.score.noiseVoice(kind, when); return; }
     const pan = (Math.random() - 0.5) * 1.6;
     if (kind === 'block') {
       this.bong(when, this.gOf('block'));
@@ -506,6 +575,15 @@ export class Audio {
 
     const dt = t - this.last;
     this.last = t;
+
+    if (this.score) {
+      // a theme score composes on its own; the engine still paces noise mode
+      if (dt > 0) this.trackNoiseRate(dt);
+      this.paceNoise();
+      this.score.update(dt, state);
+      return;
+    }
+
     // tension bleeds away slowly; the tritone pad rides it
     this.tension = Math.max(0, this.tension - dt * 0.028);
     this.tensionPeak = Math.max(this.tensionPeak, this.tension);
@@ -544,18 +622,33 @@ export class Audio {
     if (dt > 0) {
       const k = Math.exp(-dt * 0.5);
       for (const v of this.hosts.values()) v.ema *= k;
-      this.noiseRate *= Math.exp(-dt * 1.2);
-      this.rateWinT += dt;
-      if (this.rateWinT >= 1) {
-        const inst = this.noiseArrivals / this.rateWinT;
-        // fast attack, slow release: burst spacing must survive the quiet
-        // seconds while the queue still drains
-        this.noiseRatePerSec = Math.max(inst, this.noiseRatePerSec * 0.7);
-        this.noiseArrivals = 0;
-        this.rateWinT = 0;
-      }
+      this.trackNoiseRate(dt);
     }
 
+    this.paceNoise();
+
+    this.stepAcc += dt;
+    let guard = 0;
+    while (this.stepAcc >= GRID && guard++ < 4) {
+      this.stepAcc -= GRID;
+      this.composingStep();
+    }
+  }
+
+  private trackNoiseRate(dt: number): void {
+    this.noiseRate *= Math.exp(-dt * 1.2);
+    this.rateWinT += dt;
+    if (this.rateWinT >= 1) {
+      const inst = this.noiseArrivals / this.rateWinT;
+      // fast attack, slow release: burst spacing must survive the quiet
+      // seconds while the queue still drains
+      this.noiseRatePerSec = Math.max(inst, this.noiseRatePerSec * 0.7);
+      this.noiseArrivals = 0;
+      this.rateWinT = 0;
+    }
+  }
+
+  private paceNoise(): void {
     // noise pacing scheduler: spacing follows the higher of arrival rate or
     // the backlog (everything queued must clear within ~2s), so a burst
     // plays out crisply instead of trickling at the idle rate
@@ -570,13 +663,6 @@ export class Audio {
         this.playNoiseVoice(this.noiseQueue.shift()!, this.nextSlot);
         this.nextSlot += spacing;
       }
-    }
-
-    this.stepAcc += dt;
-    let guard = 0;
-    while (this.stepAcc >= GRID && guard++ < 4) {
-      this.stepAcc -= GRID;
-      this.composingStep();
     }
   }
 

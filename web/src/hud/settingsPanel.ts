@@ -159,6 +159,8 @@ export class SettingsPanel {
         ${GATES.map(([k, l]) => this.rng(k, l, 0, 1, 0.05)).join('')}
         ${this.rng('noiseGate', 'Noise (chaos)', 0, 1, 0.05)}
         </div><div class="col">
+        ${c.audio?.length ? `<p class="grp">${this.theme.title}</p>
+        ${c.audio.map((ctl) => this.control(ctl)).join('')}` : ''}
         <p class="grp">Event volumes</p>
         ${EVENT_VOL.map(([k, l]) => this.rng(k, l, 0, 1, 0.05)).join('')}
         <p class="grp">Space & balance</p>

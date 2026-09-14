@@ -9,6 +9,7 @@ import { Compound, Layers } from './compound';
 import { Fx } from './fx';
 import { Zombies, Walkers } from './actors';
 import { Sky } from './weather';
+import { zombieScore } from './score';
 import './hud.css';
 
 /** The event colour law, shared with the radio log legend. */
@@ -36,6 +37,7 @@ export const zombie: Theme<typeof ZOMBIE_DEFAULTS> = {
   accentHue: 30,
   defaults: ZOMBIE_DEFAULTS,
   budgets: ZOMBIE_BUDGETS,
+  score: zombieScore,
   controls: ZOMBIE_CONTROLS,
   create,
 };
@@ -77,6 +79,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
   const fx = new Fx(fxLayer, layers.decals, tex.glow, tex.splats, tex.bullet);
   const compound = new Compound(app, layers, tex);
   const zombies = new Zombies(layers.actors, layers.lights, tex, compound, fx);
+  zombies.onShot = (x, rounds) => audio.sfx('shot', { pan: ((x / L.w) * 2 - 1) * 0.8, count: rounds });
   const walkers = new Walkers(layers.actors, layers.lights, tex);
   const sky = new Sky(dark, top, tex.rain, tex.glow);
 
@@ -146,7 +149,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
         if (settings.zZombies && zombies.count() < settings.zMaxZombies &&
             throttle.allow(`blk|${ev.src_ip}|${ev.dst_ip}|${ev.dst_port}`, 3)) {
           zombies.spawn(externalAngle(se), COLORS.block);
-          audio.cueSong('block');
+          audio.cueSong('block', ev.src_ip ?? undefined);
         }
         break;
       }
@@ -257,6 +260,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
       case 'system': {
         if (!throttle.allow(`sys|${ev.syslog_host}`, 4)) break;
         compound.generatorFlicker();
+        audio.cueSong('system');
         fx.ring(L.generator.x, L.generator.y, COLORS.system, 70 * L.unit, 2, 0.9);
         if (ev.syslog_host && settings.zBuildings) compound.buildingEvent(ev.syslog_host, 'info', COLORS.system);
         break;
@@ -276,6 +280,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
     // the alarm fades in over ~1s and out over ~2s: a mood, never a strobe
     alarm += (alarmTarget - alarm) * Math.min(1, dt * (alarmTarget > alarm ? 1.2 : 0.6));
     // only a real breach nudges the camera; routine kills don't jolt the screen
+    for (const b of hits.breaches) audio.sfx('breach', { pan: (b.x / L.w) * 2 - 1 });
     if (hits.breaches.length > 0) {
       state.slowmo(0.35, 0.4);
       punch += 0.012;

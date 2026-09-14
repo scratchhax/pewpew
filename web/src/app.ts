@@ -32,7 +32,7 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
   document.body.dataset.theme = theme.id;
   const labels = hudLabels(theme.hud);
   const hud = new Hud(settings, labels);
-  const audio = new Audio(settings);
+  const audio = new Audio(settings, theme.score);
   hud.attachAudio(audio);
   const throttle = new Throttle();
 
