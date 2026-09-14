@@ -5,19 +5,23 @@ pewpew turns UniFi gateway and AP syslog into a real-time visualizer in the
 browser. Every firewall hit, DNS lookup, DHCP lease and Wi-Fi join becomes
 something on screen, and everything you hear is synthesized live from your own
 traffic. Pick a look per screen: **Orbital Command**, a space station
-defending your network, or **Last Outpost**, a walled compound holding out
-against the internet's zombies. No database, no cloud and no recordings. It
-only reads syslog and never touches the network itself.
+defending your network; **Last Outpost**, a walled compound holding out
+against the internet's zombies; or **Midnight Run**, a 3D street race through a
+neon city at night. No database, no cloud and no recordings. It only reads
+syslog and never touches the network itself.
 
-| Orbital Command (sci-fi, default) | Last Outpost (zombie) |
+| Orbital Command (sci-fi, default) | Last Outpost (zombie) | Midnight Run (racing) |
+|---|---|---|
+| ![orbital command](docs/hero.png) | ![last outpost](docs/zombie.png) | ![midnight run](docs/racing.png) |
+
+| Midnight Run | Last Outpost |
 |---|---|
-| ![orbital command](docs/hero.png) | ![last outpost](docs/zombie.png) |
-
-![last outpost in motion](docs/zombie.gif)
+| ![midnight run in motion](docs/racing.gif) | ![last outpost in motion](docs/zombie.gif) |
 
 **[Try the browser demo](https://scratchhax.github.io/pewpew/)** (synthetic
 traffic, no hardware) ·
 [Last Outpost demo](https://scratchhax.github.io/pewpew/?theme=zombie) ·
+[Midnight Run demo](https://scratchhax.github.io/pewpew/?theme=racing) ·
 sci-fi showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 
 ## Contents
@@ -25,7 +29,7 @@ sci-fi showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - [Highlights](#highlights)
 - [Try it](#try-it)
 - [Run it on your network](#run-it-on-your-network)
-- [Themes](#themes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Choosing a theme](#choosing-a-theme)
+- [Themes](#themes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Choosing a theme](#choosing-a-theme)
 - [Sound](#sound)
 - [Settings (F1)](#settings-f1)
 - [Performance and quality](#performance-and-quality)
@@ -37,19 +41,21 @@ sci-fi showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 
 ## Highlights
 
-- **Two themes, one relay.** Orbital Command and Last Outpost draw the same
-  traffic. Every screen picks its own theme, so the kiosk in the hall and the
-  laptop on your desk can show different worlds at the same time.
+- **Three themes, one relay.** Orbital Command, Last Outpost and Midnight Run
+  draw the same traffic. Every screen picks its own theme, so the kiosk in the
+  hall and the laptop on your desk can show different worlds at the same time.
+  Two are 2D (PixiJS), one is full 3D (three.js); a screen only downloads the
+  renderer its theme uses.
 - **A readable picture.** One fixed colour per event type (block is red,
   allow green, DNS blue, DHCP yellow, Wi-Fi purple, threats amber) in both
   themes and in the scrolling log, so you can tell what's happening at a glance.
 - **Generative soundtracks.** Each theme has six styles in rotation (synthwave,
-  a pipe organ, chiptune and more in space; horror synth, dead west and more in
-  the compound), and the scene's own sounds play along on the beat and in key:
-  lasers and explosions, gunfire and groans. No audio files anywhere.
+  a pipe organ and chiptune in space; horror synth and dead west in the
+  compound; drum and bass, eurobeat and a nu-metal riff on the street), and the
+  scene's own sounds play along on the beat and in key: lasers, gunfire, an
+  engine that shifts gears in time. No audio files anywhere.
 - **The scene moves with the music.** The station's core breathes on the beat;
-  zombies shamble in time, guards sweep with the bars, and during a horde the
-  lights follow the heartbeat.
+  zombies shamble in time; the city's neon swells on every bar.
 - **Runs on anything.** Quality presets with an Auto mode size the scene to
   the device looking at it, from a gaming PC down to a Raspberry Pi 5 kiosk.
 - **Zero footprint.** Syslog is parsed in RAM and fanned out over WebSocket.
@@ -182,6 +188,32 @@ steady walking tempo.
 
 Sprites are from Kenney's CC0 [Top-down Shooter](https://kenney.nl/assets/top-down-shooter) pack.
 
+### Midnight Run
+
+![midnight run in the rain](docs/racing-night.png)
+
+The network as a street race through a neon city at night, in real 3D
+(three.js) with a chase camera. The road is straight; a curved-world shader
+bends everything ahead of the car into sweeping corners and hills. Wet asphalt
+reflects the street lights and taillights, and bloom makes the neon glow.
+Everything is built in code: the car, the city, the signs and textures.
+
+| Event | On screen |
+|-------|-----------|
+| allow | cars on the road: outbound traffic ahead that you pass, inbound traffic coming up from behind to overtake |
+| block | a striped barricade across one or two lanes. Your car swerves into the lane with the most room, or smashes through in a spray of sparks |
+| threat | a police chase: a black-and-white closes in and runs alongside, its light bar swaying softly between red and blue, until the heat dies down |
+| dhcp | a rival appears up ahead with the device's hostname on a plate. You reel it in, race side by side, then it boosts away |
+| dns | the next neon billboard over the horizon shows the domain, in DNS blue |
+| wifi | a neon gate over the road labelled with the AP: a full arch for a join, a broken dim one for a failure |
+| system | the street lights brown out in a wave rolling away down the road |
+
+Traffic sets the pace (about 100 km/h on a quiet network, over 200 when it's
+busy), and a sudden burst lights the nitro: the camera pulls back, the field of
+view widens, and blue flames and speed lines kick in. Traffic weather is the
+rain: a dry (but always damp) night, then a wet storm, then a monsoon. Like
+Last Outpost, it never flashes: police lights, neon and brownouts all ease.
+
 ### Choosing a theme
 
 One relay serves every theme, so different screens can show different themes
@@ -190,8 +222,8 @@ at once:
 | URL | Theme |
 |-----|-------|
 | `http://<relay-host>:8080/` | the relay's `default_theme` |
-| `http://<relay-host>:8080/scifi/`, `/zombie/` | that theme (unknown names are a 404) |
-| any URL + `?theme=zombie` | that theme (handy on the Pages demo) |
+| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/` | that theme (unknown names are a 404) |
+| any URL + `?theme=racing` | that theme (handy on the Pages demo) |
 
 The viewer checks the URL path, then `?theme=`, then the relay's
 `/config.json`, and falls back to `scifi`. Each theme is its own bundle, so a
@@ -269,9 +301,38 @@ Night thickens the arrangement (sixteenths instead of eighths, drums, choir
 or cello). Wind is always there and rain comes in with the weather. Effects go
 through their own limiter, so a busy night stays punchy without clipping.
 
+### Midnight Run's soundtrack
+
+Six styles take turns, every 6 minutes by default:
+
+| Style | Sound |
+|-------|-------|
+| Street breaks | big-beat breakbeats at 132 bpm, a squelchy acid bass line, supersaw stabs when it's busy |
+| Night drive | slow synthwave (Em–C–A–D): octave bass, arpeggios, a saw lead melody |
+| Liquid DnB | 172 bpm rollers, a reese bass and airy seventh-chord pads |
+| Chrome riff | drop-D palm-muted power chords through a distortion curve, a heavy backbeat |
+| Trap lights | half-time 808s that slide between notes, hi-hat rolls, a bell line |
+| Eurobeat rush | four-on-the-floor, offbeat octave bass, supersaw riffs (for the Initial D fans) |
+
+The car is part of the band:
+
+| Event | Sound |
+|-------|-------|
+| driving | an engine note pitched to the chord that climbs through each gear with speed; shifts wait for the beat and land with a turbo blow-off |
+| nitro | a whoosh and a roar as it lights |
+| barricade smashed | a metal crash ringing in key |
+| block | a horn honking a fifth |
+| threat | a soft siren wail across two chord tones while the police are on you |
+| dhcp | a rival's engine revving past |
+| allow | traffic plays the melody on the style's lead |
+| dns / wifi / system | a radio chirp / rising pings / a power-grid shockwave |
+
+Road roar rises with speed and rain comes in with the weather. **Move with the
+music** (Scene tab) makes the curb neon and your underglow swell on every bar.
+
 ### Mixing
 
-The **Audio** tab is shared by both themes:
+The **Audio** tab is shared by every theme:
 
 - **Melody** and **Devices** are layers that add together: the music, and the
   sounds triggered by events.
@@ -285,7 +346,8 @@ The **Audio** tab is shared by both themes:
 Each theme adds **Music** (Rotate, or pin one style; sci-fi also has Classic
 band), **Rotate every (min)**, and two volumes of its own: **Lasers &
 blasts** and **Station hum** for Orbital Command, **Gunfire** and **Wind &
-rain** for Last Outpost. Each theme keeps its own choices.
+rain** for Last Outpost, **Engine & nitro** and **Road & rain** for Midnight
+Run. Each theme keeps its own choices.
 
 ![last outpost audio settings](docs/panel-audio.png)
 
@@ -297,7 +359,7 @@ panel's *Apply & reload*.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the theme's toggles. Sci-fi: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music |
+| **Scene** | the theme's toggles. Sci-fi: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music |
 | **HUD** | each HUD panel on or off (names follow the theme), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | global hue shift and intensity for the HUD accent; sci-fi also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -338,6 +400,18 @@ bundles every setting that trades looks for frame time.
 | Tents | 16 | 22 | 28 | 36 |
 | Fog + survivor flashlights | off | on | on | on |
 
+| Midnight Run budgets | Low | Medium | **High** | Ultra |
+|----------------------|-----|--------|----------|-------|
+| Cars on the road | 8 | 14 | 20 | 32 |
+| Draw distance (m) | 380 | 520 | 700 | 900 |
+| Rain | 0.35 | 0.6 | 1.0 | 1.5 |
+| Bloom | off | on | on | on |
+| Lens (vignette, colour fringe) | off | off | on | on |
+
+Midnight Run is a full 3D scene built to look good first; it's meant for a
+desktop or laptop GPU. Its Low tier is a starting point for smaller devices,
+not yet tuned for a Pi.
+
 - **Auto** (the default) guesses a tier at load, then watches the real frame
   rate. Software renderers, Pi and phone GPUs, and browsers without WebGL
   start at Low. Touch devices, machines with ≤4 cores or ≤4 GB of memory, and
@@ -372,7 +446,7 @@ setting.
 
 | Parameter | Effect |
 |-----------|--------|
-| `/<theme>/` (path) or `?theme=` | pick the theme: `scifi` or `zombie` |
+| `/<theme>/` (path) or `?theme=` | pick the theme: `scifi`, `zombie` or `racing` |
 | `?demo=1` | synthetic traffic, no relay needed |
 | `?showreel=1` | with the demo: a looping 60-second calm → build → hurricane → cooldown arc |
 | `?rate=40` | with the demo: about 40 events per second |
@@ -424,16 +498,17 @@ UDM / UDR / APs ──syslog UDP :5514──► relay (Python) ──JSON over W
   [UniFi-Insights-Plus](https://github.com/jmasarweh/UniFi-Insights-Plus)
   (database and policy dependencies removed), drops known log spam, keeps a
   ring buffer of recent events, and broadcasts every event to every browser.
-- **`web/`**: Vite, TypeScript and [PixiJS v8](https://pixijs.com/). The
-  audio and the sci-fi graphics are generated in code; Last Outpost adds one
-  small sprite atlas.
+- **`web/`**: Vite and TypeScript. Orbital Command and Last Outpost render
+  with [PixiJS v8](https://pixijs.com/), Midnight Run with
+  [three.js](https://threejs.org/). The audio and nearly all graphics are
+  generated in code; Last Outpost adds one small sprite atlas.
 - **`deploy/`**: the systemd unit and the kiosk autostart entry.
 
 ### Viewer: core and themes
 
 | Core (`web/src/`) | Theme (`web/src/themes/<id>/`) |
 |-------------------|--------------------------------|
-| relay feed and demo generator (`ws.ts`) | its renderer and scene |
+| relay feed and demo generator (`ws.ts`) | its renderer (any: PixiJS, three.js, …) and scene |
 | event classification (`events.ts`): allow, block, threat, dns, dhcp, wifi, system, plus direction and Wi-Fi outcome | what each event becomes on screen, and which repeats are worth drawing |
 | sim state and weather (`state.ts`), per-flow throttle (`throttle.ts`) | Scene tab toggles, colour options, HUD names and accent colour |
 | HUD, log, F1 panel, audio engine and the classic band (`audio.ts`), shared score machinery (`sound/`: synth, conductor, groove) | optionally its own `score`: music and sound design, with Audio tab controls |
@@ -454,8 +529,10 @@ that receives the shared `AudioEngine` (context, output, reverb and echo sends,
 settings) and returns a `Score`. The easy way is to extend `Conductor` from
 `sound/conductor.ts`: it handles the clock, style rotation, snapping sounds to
 the beat, chord lookup and the pulse, so a theme only writes its styles and
-what each event sounds like. Both themes' `score.ts` files are worked
-examples, and `sound/groove.ts` shows how visuals can follow `audio.pulse()`.
+what each event sounds like. Every theme's `score.ts` is a worked example, and
+`sound/groove.ts` shows how visuals can follow `audio.pulse()`. Nothing in the
+core imports a renderer, so a theme can use whatever it likes: Midnight Run
+brings three.js, and only screens showing it download it.
 
 ## Health and diagnostics
 
@@ -489,8 +566,10 @@ examples, and `sound/groove.ts` shows how visuals can follow `audio.pulse()`.
 
 - Syslog parsing vendored from
   [UniFi-Insights-Plus](https://github.com/jmasarweh/UniFi-Insights-Plus) (MIT).
-- [PixiJS v8](https://pixijs.com/) renders both themes.
-- Every sound, melody and sci-fi texture is generated in code.
+- [PixiJS v8](https://pixijs.com/) renders Orbital Command and Last Outpost;
+  [three.js](https://threejs.org/) renders Midnight Run.
+- Every sound and melody, every sci-fi texture, and Midnight Run's car, city
+  and signs are generated in code.
 - Last Outpost sprites: [Top-down Shooter](https://kenney.nl/assets/top-down-shooter)
   by [Kenney](https://kenney.nl) (CC0), packed into
   `web/src/themes/zombie/assets/atlas.png` with its license beside it.
