@@ -122,6 +122,7 @@ async function create(host: ThemeHost<typeof SCIFI_DEFAULTS>,
   const eventStars = new EventStars(eventStarLayer, textures.dot, textures.glow);
   const planets = new Planets(planetLayer, textures.planets, w, h);
   const constellation = new Constellation(constellationLayer, textures.dot, textures.glow, w, h);
+  rings.setObjects(settings.ringObjects);
 
   function applyBudgets(): void {
     fx.setMax(settings.maxParticles);
@@ -139,8 +140,10 @@ async function create(host: ThemeHost<typeof SCIFI_DEFAULTS>,
     }
   }
 
-  window.addEventListener('resize', () => {
-    w = app.screen.width; h = app.screen.height;
+  // The renderer's own resize event: PixiJS applies window resizes on the next
+  // animation frame, so a window 'resize' listener would read the old size.
+  app.renderer.on('resize', (width: number, height: number) => {
+    w = width; h = height;
     starfield.resize(w, h);
     dust.resize(w, h);
     station.resize(w, h);
@@ -359,6 +362,7 @@ async function create(host: ThemeHost<typeof SCIFI_DEFAULTS>,
     settingsChanged(key) {
       if (key === undefined || STARFIELD_KEYS.has(key)) starfield.rebuild();
       if (!settings.constellations) clearConstellation();
+      rings.setObjects(settings.ringObjects);
     },
     setResolution(scale) {
       if (app.renderer.resolution !== scale) app.renderer.resolution = scale;

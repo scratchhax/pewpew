@@ -39,7 +39,7 @@ Full 42s showreel with sound — calm cruise → the F1 config tour → full sto
 
 **[Browser demo](https://scratchhax.github.io/pewpew/)** ·
 **[Looping showreel](https://scratchhax.github.io/pewpew/?showreel=1)**
-(available once GitHub Pages is enabled and the first deployment completes).
+(synthetic traffic, redeployed on every change to `web/` on `main`).
 
 ```bash
 cd web && npm install && npm run dev
@@ -54,10 +54,10 @@ policy). Press **F1** any time to open the settings panel. See
 
 ### GitHub Pages demo
 
-In the repository's **Settings → Pages → Build and deployment**, select
-**GitHub Actions** as the source. Push this change to `main`, or run
-**Deploy demo to GitHub Pages** from the Actions tab on `main`. Subsequent
-changes to `web/` or the workflow on `main` deploy automatically.
+The workflow in `.github/workflows/pages.yml` publishes the demo whenever
+`web/` or the workflow changes on `main` (or run **Deploy demo to GitHub
+Pages** from the Actions tab). On a fork, first select **GitHub Actions** as
+the source under **Settings → Pages → Build and deployment**.
 
 The Pages build always uses synthetic traffic, including when opened without
 URL parameters, and needs no relay. Add `?showreel=1` for the looping storm
@@ -104,7 +104,7 @@ same way: a shared **core** and a **theme** that only draws. Orbital Command
 | Core (`web/src/*`) | Theme (`web/src/themes/<id>/`) |
 |--------------------|--------------------------------|
 | relay feed + demo generator (`ws.ts`) | its renderer (PixiJS for sci-fi) and scene |
-| event classification (`events.ts`): allow / block / threat / dns / dhcp / wifi / system, direction, Wi-Fi outcome | what each classified event becomes on screen |
+| event classification (`events.ts`): allow / block / threat / dns / dhcp / wifi / system, direction, Wi-Fi outcome (joined / bad / other) | what each classified event becomes on screen |
 | sim state + weather (`state.ts`), per-flow visual throttle (`throttle.ts`) | which effects are worth showing, on-screen caps, camera |
 | HUD, comms log, F1 panel shell, audio engine | Scene tab toggles, colour scheme, audio cues for effects it shows |
 | quality presets, auto tuner, frame loop + FPS cap (`perf.ts`, `loop.ts`) | scene budgets per quality tier |
@@ -152,7 +152,7 @@ Colors of every effect match the comms-log lines verbatim:
 | block    | red        | inbound asteroid → station laser intercept, shake + flash |
 | dns      | blue       | blue laser client→station ("the resolver is you"), 2nd ring |
 | dhcp     | yellow     | station→AP yellow laser, 3rd ring |
-| wifi     | purple     | AP↔station links + crystals, 4th ring |
+| wifi     | purple     | client **joins** (associated / authenticated) send a crystal AP core → station; **leaves** and failures (deauth, disassoc, rejects) fire a laser station → AP core; a faint event star marks each one; 4th ring |
 | system   | grey       | grey shockwave from the station |
 | threat   | amber      | IDS/IPS detection (Enhanced/CyberSecure tier) — an attack **rocket** that burns in on an evasive, weaving path from a random bearing, gets shot down close to the station with an amber detonation, and turns the core **red** while any rocket is alive; carries a MAC, no source IP |
 
@@ -203,7 +203,7 @@ System**. Everything is live (no reload) and persists to localStorage.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | starfield · nebula · dust · ambient ships · DHCP planets · event stars · asteroids · attack rockets · crystals · IP constellations · ring objects · AP cores · screen shake |
+| **Scene** | starfield · nebula · dust · ambient ships · DHCP planets · event stars · asteroids · attack rockets · crystals · IP constellations · ring objects (dots orbiting the event rings) · AP cores · screen shake |
 | **HUD** | uplink · ship-status bars · telemetry · most-wanted · comms log · sensor flux · subspace spectrum · radar · scanlines |
 | **Audio** | additive Melody / Devices layers, per-event volume + per-event gate, the noise (chaos) gate, master / reverb / echo / music-bed, device mix |
 | **Colour** | host-mesh scheme (spectrum / event-law / mono / warm / cool) + a global hue-shift & intensity that sweeps the mesh, nebula and HUD accent |

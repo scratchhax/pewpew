@@ -20,6 +20,8 @@ export interface SceneEvent {
 }
 
 const WIFI_BAD = /deauth|disassoc|left|leave|fail|kick|reject|disallow|status [1-9]/;
+// matched against the event name alone: the reason is often empty
+const WIFI_JOINED = /^(associated|authenticated|joined)$/i;
 
 /** null for a log type the core doesn't know (the HUD still logs it). */
 export function classify(ev: NetEvent): SceneEvent | null {
@@ -32,7 +34,7 @@ export function classify(ev: NetEvent): SceneEvent | null {
     case 'wifi': {
       const e = `${ev.wifi_event ?? ''} ${ev.wifi_reason ?? ''}`.toLowerCase();
       const wifi: WifiOutcome = WIFI_BAD.test(e) ? 'bad'
-        : e === 'associated' || e === 'authenticated' || e === 'joined' ? 'joined' : 'other';
+        : WIFI_JOINED.test((ev.wifi_event ?? '').trim()) ? 'joined' : 'other';
       return { ev, scope, kind: 'wifi', wifi };
     }
     case 'dns':
