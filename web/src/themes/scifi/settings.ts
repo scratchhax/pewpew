@@ -1,6 +1,7 @@
 import type { CoreSettings } from '../../settings';
 import type { Budgets } from '../../perf';
 import type { Control } from '../../theme';
+import { SCIFI_MUSIC } from './score';
 
 export type MeshMode = 'law' | 'spectrum' | 'mono' | 'warm' | 'cool';
 
@@ -18,6 +19,13 @@ export const SCIFI_DEFAULTS = {
   eventStars: true,
   planets: true,
   screenShake: true,
+
+  // soundtrack (s-prefixed: separate from Last Outpost's choices)
+  sMusicStyle: 'rotate' as string,   // rotate | a style id | classic
+  sMusicRotate: 6,                   // minutes per style while rotating
+  sWeapons: 0.8,                     // lasers and explosions
+  sAmbience: 0.5,                    // station hum, space wind, radio crackle
+  sMusicVisuals: true,               // the core breathes and stars drift with the music
   ambientShips: true,
   meshMode: 'spectrum' as MeshMode,   // host-mesh colouring scheme
 
@@ -66,6 +74,7 @@ export const SCIFI_CONTROLS = {
     toggle('crystals', 'Allow crystals'),
     toggle('constellations', 'IP constellations'), toggle('ringObjects', 'Ring objects'),
     toggle('apCores', 'AP cores'), toggle('screenShake', 'Screen shake'),
+    toggle('sMusicVisuals', 'Move with the music'),
   ],
   budgets: [
     range('maxParticles', 'Particles', 200, 8000, 100),
@@ -83,6 +92,12 @@ export const SCIFI_CONTROLS = {
       ['mono', 'Mono (cyan)'], ['warm', 'Warm'], ['cool', 'Cool'],
     ],
   }] as Control[],
+  audio: [
+    { kind: 'select', key: 'sMusicStyle', label: 'Music', options: SCIFI_MUSIC } as Control,
+    range('sMusicRotate', 'Rotate every (min)', 1, 30, 1),
+    range('sWeapons', 'Lasers & blasts', 0, 1, 0.05),
+    range('sAmbience', 'Station hum', 0, 1, 0.05),
+  ],
   colorGroup: 'Host-mesh palette',
   colorHint: `Hue shift & intensity sweep the mesh, nebula and HUD
         accent. Event colours (block/allow/dns/dhcp/wifi) and the terminal

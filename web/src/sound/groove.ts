@@ -1,4 +1,4 @@
-import type { MusicPulse } from '../../audio';
+import type { MusicPulse } from '../audio';
 
 /** Tempo the scene keeps when there's no music to follow (audio off or not started). */
 const IDLE_BPM = 84;

@@ -6,6 +6,8 @@ import { ipAngle, hash01 } from '../../state';
 import { buildTextures } from './textures';
 import { pathColorFor } from './palette';
 import { SCIFI_DEFAULTS, SCIFI_BUDGETS, SCIFI_CONTROLS } from './settings';
+import { scifiScore } from './score';
+import { Groove } from '../../sound/groove';
 import { Starfield } from './scenes/starfield';
 import { Dust } from './scenes/dust';
 import { Station } from './scenes/station';
@@ -61,6 +63,7 @@ export const sciFi: Theme<typeof SCIFI_DEFAULTS> = {
   title: 'ORBITAL COMMAND',
   defaults: SCIFI_DEFAULTS,
   budgets: SCIFI_BUDGETS,
+  score: scifiScore,
   controls: SCIFI_CONTROLS,
   create,
 };
@@ -115,6 +118,7 @@ async function create(host: ThemeHost<typeof SCIFI_DEFAULTS>,
   const dust = new Dust(dustLayer, textures.glow, w, h, settings.dustCount);
   const ambient = new AmbientShips(shipLayer, [...textures.icons, ...textures.ships], w, h);
   const station = new Station(stationLayer, textures.glow, w, h);
+  const groove = new Groove();
   const rings = new Rings(ringsLayer, textures.dot, textures.glow, w, h);
   const crystals = new Crystals(fxLayer, textures.crystal, textures.glow, fx);
   const asteroids = new Asteroids(fxLayer, textures.asteroids, fx);
@@ -284,6 +288,7 @@ async function create(host: ThemeHost<typeof SCIFI_DEFAULTS>,
         if (!throttle.allow(`wifi|${ev.syslog_host}|${ev.mac_address}|${ev.wifi_event}`, 3)) break;
         // background marker: faint star at a random map spot, hue = event type
         audio.cueSong('wifi');
+        audio.sfx('wifi', { variant: se.wifi });
         if (settings.eventStars) {
           eventStars.spawn(
             40 + Math.random() * Math.max(100, w - 80),
@@ -306,6 +311,7 @@ async function create(host: ThemeHost<typeof SCIFI_DEFAULTS>,
       case 'system': {
         if (!replay && throttle.allow(`sys|${ev.syslog_host}`, 4)) {
           fx.shockwave(cx, cy, COLORS.system, 90, 1.5);
+          audio.cueSong('system');
           if (ev.syslog_host && settings.apCores) {
             apCores.event(ev.syslog_host, 'info', COLORS.system);
           }
@@ -318,14 +324,22 @@ async function create(host: ThemeHost<typeof SCIFI_DEFAULTS>,
   function frame(f: FrameInfo): void {
     const { dt, dtReal, t } = f;
 
-    starfield.update(dt, state);
-    if (settings.dust) dust.update(dt, state.weather === 'hurricane' ? 2.2 : 1);
+    // the music sets the pace: stars and dust drift a little faster when it's loud (eased)
+    groove.update(dtReal, settings.sMusicVisuals ? audio.pulse() : null);
+    const drift = settings.sMusicVisuals && groove.style ? 0.8 + groove.energy * 0.5 : 1;
+    starfield.update(dt * drift, state);
+    if (settings.dust) dust.update(dt * drift, state.weather === 'hurricane' ? 2.2 : 1);
     if (settings.ambientShips) ambient.update(dt, state.weather === 'hurricane' ? 2 : 1);
     rings.update(dt, station.center.x, station.center.y);
     crystals.update(dt);
 
     const hits = asteroids.update(dt, station.center.x, station.center.y);
     const th = threats.update(dt, station.center.x, station.center.y);
+    const pan = (x: number) => Math.max(-1, Math.min(1, (x / w) * 2 - 1));
+    for (const p of hits.intercepts) audio.sfx('intercept', { pan: pan(p.x) });
+    for (const p of th.intercepts) audio.sfx('rocket', { pan: pan(p.x) });
+    for (const p of [...hits.impacts, ...th.impacts]) audio.sfx('impact', { pan: pan(p.x) });
+    station.setGroove(settings.sMusicVisuals && groove.style ? groove.beat : null);
     const underAttack = threats.count() > 0;
     station.setAlarm(underAttack);
     audio.setThreatActive(underAttack);
@@ -369,7 +383,7 @@ async function create(host: ThemeHost<typeof SCIFI_DEFAULTS>,
       if (app.renderer.resolution !== scale) app.renderer.resolution = scale;
     },
     stats: () => ({ nodes: countNodes(app.stage) }),
-    diag: () => ({ app }),
+    diag: () => ({ app, groove, audio }),
   };
 }
 

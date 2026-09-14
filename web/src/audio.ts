@@ -45,6 +45,8 @@ export interface SfxOpts {
   pan?: number;
   /** How many (e.g. rounds in a burst). */
   count?: number;
+  /** Which flavour, e.g. a Wi-Fi 'joined' or 'bad'. */
+  variant?: string;
 }
 
 /**
@@ -81,6 +83,8 @@ export interface Score {
   noiseVoice(kind: Cue, when: number): void;
   /** Where the music is right now, for visuals that move with it. */
   pulse?(): MusicPulse;
+  /** True while the score hands everything back to the built-in band (e.g. a "classic" option). */
+  passthrough?(): boolean;
 }
 
 /** The music as heard at the speakers, for visuals that move in time with it. */
@@ -119,6 +123,7 @@ export class Audio {
   /** A theme's score, when it brings one (replaces the built-in band). */
   private scoreFactory: ScoreFactory | null = null;
   private score: Score | null = null;
+  private wasClassic = false;
   private last = 0;
   private stepAcc = 0;
   private melodyIdx = 12;
@@ -376,15 +381,18 @@ export class Audio {
     this.score?.setThreatActive(on);
   }
 
+  /** The score is handing the soundtrack back to the built-in band. */
+  private classic(): boolean { return !!this.score?.passthrough?.(); }
+
   /** The theme score's musical clock, or null (no score, or audio not started yet). */
   pulse(): MusicPulse | null {
-    if (!this.score?.pulse || !this.ctx || this.ctx.state !== 'running') return null;
+    if (!this.score?.pulse || this.classic() || !this.ctx || this.ctx.state !== 'running') return null;
     return this.score.pulse();
   }
 
   /** Theme sound effect; only a theme score knows what to do with it. */
   sfx(name: string, opts?: SfxOpts): void {
-    if (this.settings.audio) this.score?.sfx(name, opts);
+    if (this.settings.audio && !this.classic()) this.score?.sfx(name, opts);
   }
 
 
@@ -455,7 +463,7 @@ export class Audio {
   /** Composition-mode cue (fires after visual gates). */
   cueSong(kind: Cue, srcIp?: string): void {
     if (!this.settings.audio) return;
-    if (this.score) { this.score.cue(kind, srcIp); return; }
+    if (this.score && !this.classic()) { this.score.cue(kind, srcIp); return; }
     if (kind === 'system') return;               // the built-in band has no part for it
     this.ingest(kind, srcIp);
   }
@@ -509,7 +517,7 @@ export class Audio {
   private playNoiseVoice(kind: Cue, when: number): void {
     if (!this.ctx || !this.master) return;
     this.dbgFires++;
-    if (this.score) { this.score.noiseVoice(kind, when); return; }
+    if (this.score && !this.classic()) { this.score.noiseVoice(kind, when); return; }
     const pan = (Math.random() - 0.5) * 1.6;
     if (kind === 'block') {
       this.bong(when, this.gOf('block'));
@@ -600,10 +608,18 @@ export class Audio {
 
     if (this.score) {
       // a theme score composes on its own; the engine still paces noise mode
-      if (dt > 0) this.trackNoiseRate(dt);
-      this.paceNoise();
       this.score.update(dt, state);
-      return;
+      const classic = this.classic();
+      if (!classic) {
+        if (this.wasClassic) this.threatLevel?.gain.setTargetAtTime(0, t, 0.6);
+        this.wasClassic = false;
+        if (dt > 0) this.trackNoiseRate(dt);
+        this.paceNoise();
+        return;
+      }
+      // the score asked for the built-in band: build its drone bed on first use
+      if (!this.threatLevel) this.buildThreatBed();
+      this.wasClassic = true;
     }
 
     // tension bleeds away slowly; the tritone pad rides it

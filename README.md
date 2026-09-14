@@ -43,13 +43,13 @@ sci-fi showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - **A readable picture.** One fixed colour per event type (block is red,
   allow green, DNS blue, DHCP yellow, Wi-Fi purple, threats amber) in both
   themes and in the scrolling log, so you can tell what's happening at a glance.
-- **Generative soundtrack.** A band that listens to your network. Sci-fi has a
-  space-rock set list; Last Outpost has six horror styles in rotation, with its
-  gunfire, groans, radio chirps and creaking doors played on the beat and in
-  key. No audio files anywhere.
-- **The scene moves with the music.** In Last Outpost, zombies shamble in
-  time, guards sweep with the bars, and during a horde the lights follow the
-  heartbeat.
+- **Generative soundtracks.** Each theme has six styles in rotation (synthwave,
+  a pipe organ, chiptune and more in space; horror synth, dead west and more in
+  the compound), and the scene's own sounds play along on the beat and in key:
+  lasers and explosions, gunfire and groans. No audio files anywhere.
+- **The scene moves with the music.** The station's core breathes on the beat;
+  zombies shamble in time, guards sweep with the bars, and during a horde the
+  lights follow the heartbeat.
 - **Runs on anything.** Quality presets with an Auto mode size the scene to
   the device looking at it, from a gaming PC down to a Raspberry Pi 5 kiosk.
 - **Zero footprint.** Syslog is parsed in RAM and fanned out over WebSocket.
@@ -202,17 +202,40 @@ screen only downloads the theme it shows.
 All sound is synthesized in the browser with the WebAudio API. Browsers only
 allow audio after a click or keypress, so click once to start it.
 
-### Orbital Command's band
+### Orbital Command's soundtrack
 
-- **Set list:** a bank of four melodies (arpeggios, riffs, cascades,
-  wanderings) rotated every 75–165 seconds, each with its own bass groove, lead
-  sound and register, mutating as it goes.
-- **Song form:** intro, verse, chorus, bridge and outro, driven by traffic.
-  Blocked traffic builds tension and a lull after a storm resolves it.
-- **Device voices:** every IP gets its own notes from a hash, so your laptop
-  always plays "its" phrase; chatty devices get quieter.
-- **Under attack:** while a threat rocket is alive, a low detuned drone swells
-  in with a target-lock ping, and powers down once the last rocket is gone.
+Six styles take turns, every 6 minutes by default:
+
+| Style | Sound |
+|-------|-------|
+| Neon cruise | synthwave: four-on-the-floor, octave bass (Am–F–C–G), gated snare, a saw hook, arps when it's busy |
+| Blade cosmos | slow brassy swells over a sub (Dm–B♭–C–Am, dorian), cold bell arpeggios with long echoes, taiko at night |
+| Stellar organ | a pipe-organ ostinato climbing through the chord (Am–F–C–Em) over a ticking clock, a choir when it's busy |
+| Arcade | a chiptune shooter at 138 bpm: square bass, noise drums, arpeggios and a pentatonic riff |
+| Deep drift | a drone gliding between chords in E lydian, slow swells, pulsar pings in three-over-four |
+| Fleet battle | a string ostinato, brass stabs and taiko drums (Dm–B♭–C–A) |
+
+**Classic band** in the Music menu brings back the original generative band:
+a set list of four melodies with song form (intro, verse, chorus, bridge,
+outro), per-device voices, and a low drone while a threat rocket is alive.
+
+The station's sounds play along, on the beat and in key:
+
+| Event | Sound |
+|-------|-------|
+| asteroid intercepted | a defense laser diving onto a chord tone, then an explosion with a ring in key |
+| threat | a rocket launch; its interception is a bigger blast. While rockets are alive, a shield thump every two beats and a red-alert tone every four bars |
+| impact on the core | a big blast and a boom |
+| block | a low sonar ping as the asteroid appears |
+| allow | traffic plays the melody on the style's lead (saw, bell, organ, chip or glass) |
+| dns | a soft high ping |
+| dhcp | a warp-in whoosh onto a note as the planet arrives |
+| wifi | rising pings for a join, a falling zap for a leave or failure |
+| system | a shockwave: a low tone sweeping a filter open and shut |
+
+The station hums and space hisses underneath, with radio crackle in storms.
+**Move with the music** (Scene tab) makes the core breathe on the beat and the
+stars and dust drift faster when the music is loud.
 
 ### Last Outpost's soundtrack
 
@@ -259,8 +282,10 @@ The **Audio** tab is shared by both themes:
   from the feed. 0 is off, 1 is every event.
 - **Reverb**, **echo** and **Music bed** (music against event sounds).
 
-Last Outpost adds **Music** (Rotate, or pin one style), **Rotate every (min)**,
-**Gunfire** volume and **Wind & rain**.
+Each theme adds **Music** (Rotate, or pin one style; sci-fi also has Classic
+band), **Rotate every (min)**, and two volumes of its own: **Lasers &
+blasts** and **Station hum** for Orbital Command, **Gunfire** and **Wind &
+rain** for Last Outpost. Each theme keeps its own choices.
 
 ![last outpost audio settings](docs/panel-audio.png)
 
@@ -272,7 +297,7 @@ panel's *Apply & reload*.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the theme's toggles. Sci-fi: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music |
+| **Scene** | the theme's toggles. Sci-fi: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music |
 | **HUD** | each HUD panel on or off (names follow the theme), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | global hue shift and intensity for the HUD accent; sci-fi also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -411,7 +436,7 @@ UDM / UDR / APs ──syslog UDP :5514──► relay (Python) ──JSON over W
 | relay feed and demo generator (`ws.ts`) | its renderer and scene |
 | event classification (`events.ts`): allow, block, threat, dns, dhcp, wifi, system, plus direction and Wi-Fi outcome | what each event becomes on screen, and which repeats are worth drawing |
 | sim state and weather (`state.ts`), per-flow throttle (`throttle.ts`) | Scene tab toggles, colour options, HUD names and accent colour |
-| HUD, log, F1 panel, audio engine and the built-in band (`audio.ts`) | optionally its own `score`: music and sound design, with Audio tab controls |
+| HUD, log, F1 panel, audio engine and the classic band (`audio.ts`), shared score machinery (`sound/`: synth, conductor, groove) | optionally its own `score`: music and sound design, with Audio tab controls |
 | quality presets, auto tuner, frame loop (`perf.ts`, `loop.ts`) | scene budgets per quality tier |
 | boot and event pipeline (`app.ts`), theme registry | a `Theme` object as the default export (`theme.ts` is the contract) |
 
@@ -426,9 +451,11 @@ export of a `Theme` (defaults, per-tier budgets, panel controls, `create()`).
 The registry finds it, the build writes `dist/<id>/index.html` and the relay
 serves it at `/<id>/`. To give it its own music, set `score` to a function
 that receives the shared `AudioEngine` (context, output, reverb and echo sends,
-settings) and returns a `Score`. Last Outpost's `score.ts` and `synth.ts` are
-a worked example, and its `groove.ts` shows how visuals can follow
-`audio.pulse()`.
+settings) and returns a `Score`. The easy way is to extend `Conductor` from
+`sound/conductor.ts`: it handles the clock, style rotation, snapping sounds to
+the beat, chord lookup and the pulse, so a theme only writes its styles and
+what each event sounds like. Both themes' `score.ts` files are worked
+examples, and `sound/groove.ts` shows how visuals can follow `audio.pulse()`.
 
 ## Health and diagnostics
 
