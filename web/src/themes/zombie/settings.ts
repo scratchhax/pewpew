@@ -2,6 +2,7 @@ import type { CoreSettings } from '../../settings';
 import type { Budgets } from '../../perf';
 import type { Control } from '../../theme';
 import type { HudLabelOverrides } from '../../hud/hud';
+import { MUSIC_STYLES } from './score';
 
 /**
  * Last Outpost's own settings. Keys are z-prefixed: every theme shares one
@@ -19,6 +20,12 @@ export const ZOMBIE_DEFAULTS = {
   zRain: true,
   zBlood: true,
   zScreenShake: true,
+
+  // soundtrack
+  zMusicStyle: 'rotate' as string,   // rotate | carpenter | survivor | ambient
+  zMusicRotate: 6,                   // minutes per style while rotating
+  zGunfire: 0.8,                     // gunshot volume
+  zAmbience: 0.6,                    // wind + rain
 
   // scene budgets = the HIGH preset
   zMaxParticles: 3000,
@@ -60,6 +67,12 @@ export const ZOMBIE_CONTROLS = {
     toggle('zNightExtras', 'Fog + flashlights'),
   ],
   color: [] as Control[],
+  audio: [
+    { kind: 'select', key: 'zMusicStyle', label: 'Music', options: MUSIC_STYLES } as Control,
+    range('zMusicRotate', 'Rotate every (min)', 1, 30, 1),
+    range('zGunfire', 'Gunfire', 0, 1, 0.05),
+    range('zAmbience', 'Wind & rain', 0, 1, 0.05),
+  ],
   colorHint: `Hue shift & intensity recolour the HUD accent. Event colours
         (block/allow/dns/dhcp/wifi) and the radio log legend stay fixed so the
         colour law holds.`,

@@ -113,7 +113,7 @@ themes: Orbital Command (`web/src/themes/scifi/`) and Last Outpost
 | relay feed + demo generator (`ws.ts`) | its renderer (PixiJS for both current themes) and scene |
 | event classification (`events.ts`): allow / block / threat / dns / dhcp / wifi / system, direction, Wi-Fi outcome (joined / bad / other) | what each classified event becomes on screen |
 | sim state + weather (`state.ts`), per-flow visual throttle (`throttle.ts`) | which effects are worth showing, on-screen caps, camera |
-| HUD, comms log, F1 panel shell, audio engine | Scene tab toggles, colour scheme, HUD panel names + accent hue (and optional `body[data-theme]` CSS), audio cues for effects it shows |
+| HUD, comms log, F1 panel shell, audio engine (context, master, reverb, echo, analyser, noise gate) plus the built-in band | Scene tab toggles, colour scheme, HUD panel names + accent hue (and optional `body[data-theme]` CSS), audio cues for effects it shows, and optionally its own `score` (music + sound design) with Audio tab controls |
 | quality presets, auto tuner, frame loop + FPS cap (`perf.ts`, `loop.ts`) | scene budgets per quality tier |
 | boot + event pipeline (`app.ts`), theme selection (`themes/registry.ts`) | `Theme` object as the default export (`theme.ts` is the contract) |
 
@@ -216,7 +216,39 @@ CALM is a grey overcast day, STORM is dusk with rain, HURRICANE is horde night
 deepens toward the screen edges, low mist (with the fog budget on), floodlight
 cones on the towers, lamps at the gates and zombie eyes glowing in the dark. The HUD is
 relabelled to match (RADIO, COMPOUND, SURVIVAL LOG, HOT ZONES, RADIO LOG…).
-It uses the same generative soundtrack as sci-fi for now.
+
+**Its own soundtrack** (`score.ts`, `synth.ts`), still all synthesized. Three
+styles take turns, every 6 minutes by default:
+
+| Style | Sound |
+|-------|-------|
+| Horror synth | a pulsing minor ostinato (Am–F–Dm–E) over a saw drone, cold bell figures, a choir at night |
+| Lonely survivor | fingerpicked guitar and a slightly detuned piano phrase (Dm–B♭–F–C) over the wind, a cello at night |
+| Dark ambient | a breathing drone that glides between chords, distant swells, scraping metal, low booms at night |
+
+The compound's sounds play along. Each one is snapped to the beat and pitched
+to the chord that's playing:
+
+| Event | Sound |
+|-------|-------|
+| guards fire | a punchy rifle shot with a ring in key; a brute's burst lands as a roll on the 32nd-note grid |
+| block | a zombie groan pitched to the chord root |
+| threat | a horde roar (three groans on the chord) and a boom; while the horde attacks, a heartbeat on the beat and a swell into every fourth bar |
+| allow | traffic plays the melody on the style's lead (bell, piano or glass) |
+| dns | a radio chirp |
+| wifi | a door creaking open (join) or shut |
+| dhcp | a strummed music-box chord |
+| system | the generator sputtering |
+| breach | a boom and a metal clang |
+
+Night (traffic weather) thickens the arrangement: 16ths instead of 8ths, toms,
+a choir or cello. Wind is always there, and rain comes in with the weather. The
+**Audio** tab adds **Music** (Rotate, or pin one style), **Rotate every
+(min)**, **Gunfire** volume and **Wind & rain**. The core sliders still
+apply: Melody and Music bed control the music, the event gates and volumes
+control the compound's sounds, and Threat controls the horde. Effects run
+through their own limiter, so a busy night stays loud without clipping. On the
+CM5 kiosk the soundtrack costs about 1 fps more than sci-fi's band.
 
 **No flashing.** Every light and colour change in this theme eases over about a
 second: nothing strobes or blinks (including the HUD cursor and demo badge), and
@@ -244,8 +276,9 @@ drawn at zero alpha, which is what keeps night affordable on a Pi.
 ## The audio engine
 
 All sound is synthesized in the browser with the WebAudio API — there is no
-audio file anywhere in this repo. Think of it as a small band that listens to
-your network:
+audio file anywhere in this repo. The engine is shared, and a theme can bring
+its own score (Last Outpost does, see above). Without one, the built-in band
+plays. Think of it as a small band that listens to your network:
 
 - **Generative set list** — a 4-song bank of distinct melodies (arpeggios,
   riffs, cascades, wanderings) rotated every 75–165s, each with its own bass

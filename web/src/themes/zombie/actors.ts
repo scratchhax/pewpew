@@ -33,6 +33,8 @@ export class Zombies {
   private list: Zombie[] = [];
   private hordeSeq = 0;
   unit = 1;
+  /** Guards opened fire at screen x with this many rounds (for the soundtrack). */
+  onShot?: (x: number, rounds: number) => void;
 
   constructor(private layer: Container, private lights: Container, private tex: ZTextures,
               private compound: Compound, private fx: Fx) {}
@@ -161,6 +163,7 @@ export class Zombies {
   /** Guards open fire: rounds fly to the zombie and it drops when the first lands. */
   private kill(z: Zombie, p: Point, bursts: number): void {
     z.shot = true;
+    this.onShot?.(p.x, this.shooters(z, p).length * bursts);
     const L = this.compound.L;
     const last = { x: p.x, y: p.y };
     // follow the zombie while it's on screen; stragglers land where it fell

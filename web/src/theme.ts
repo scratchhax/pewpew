@@ -3,7 +3,7 @@ import type { State } from './state';
 import type { Throttle } from './throttle';
 import type { SceneEvent } from './events';
 import type { Tier } from './perf';
-import type { Cue } from './audio';
+import type { Cue, ScoreFactory, SfxOpts } from './audio';
 import type { HudLabelOverrides } from './hud/hud';
 
 /**
@@ -36,7 +36,11 @@ export interface Theme<T extends ThemeSettings = ThemeSettings> {
     color: Control[];
     colorGroup?: string;
     colorHint?: string;
+    /** Extra controls on the Audio tab for the theme's own score. */
+    audio?: Control[];
   };
+  /** The theme's own music and sound design; without one the built-in (sci-fi) band plays. */
+  score?: ScoreFactory;
   /** Create the renderer inside `host.mount`; resolves once ready to draw. */
   create(host: ThemeHost<T>, init: RendererInit): Promise<ThemeInstance>;
 }
@@ -74,6 +78,8 @@ export interface AudioCues {
   cueSong(kind: Cue, srcIp?: string): void;
   /** Hold the "under attack" bed while the theme shows an active threat. */
   setThreatActive(on: boolean): void;
+  /** A sound effect only the theme's own score defines (ignored by the built-in band). */
+  sfx(name: string, opts?: SfxOpts): void;
 }
 
 export interface RendererInit {
