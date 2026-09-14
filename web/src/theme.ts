@@ -3,7 +3,7 @@ import type { State } from './state';
 import type { Throttle } from './throttle';
 import type { SceneEvent } from './events';
 import type { Tier } from './perf';
-import type { Cue, ScoreFactory, SfxOpts } from './audio';
+import type { Cue, MusicPulse, ScoreFactory, SfxOpts } from './audio';
 import type { HudLabelOverrides } from './hud/hud';
 
 /**
@@ -80,6 +80,8 @@ export interface AudioCues {
   setThreatActive(on: boolean): void;
   /** A sound effect only the theme's own score defines (ignored by the built-in band). */
   sfx(name: string, opts?: SfxOpts): void;
+  /** The theme score's musical clock (null until audio starts, or without a score). */
+  pulse(): MusicPulse | null;
 }
 
 export interface RendererInit {

@@ -76,7 +76,8 @@ export class Sky {
     }
   }
 
-  update(dt: number, weather: Weather, dayNight: boolean, rainOn: boolean, alarm: number, fogOn = true): void {
+  /** `heart`: the soundtrack's heartbeat during a horde (softened), or null to breathe on its own. */
+  update(dt: number, weather: Weather, dayNight: boolean, rainOn: boolean, alarm: number, fogOn = true, heart: number | null = null): void {
     this.t += dt;
     const target = dayNight ? GLOOM[weather] : GLOOM.calm;
     this.darkness += (target - this.darkness) * Math.min(1, dt * 0.35);
@@ -88,7 +89,7 @@ export class Sky {
     this.alarmG.clear();
     if (alarm > 0.01) {
       // a steady red cast (alarm itself is eased); only a slow ±10% breath, no pulsing
-      const breath = 1 + 0.1 * Math.sin(this.t * 1.2);
+      const breath = heart === null ? 1 + 0.1 * Math.sin(this.t * 1.2) : 0.95 + 0.15 * heart;
       this.alarmG.rect(0, 0, this.w, this.h).fill({ color: 0xff2a1a, alpha: 0.07 * alarm * breath });
     }
 

@@ -10,6 +10,7 @@ import { Fx } from './fx';
 import { Zombies, Walkers } from './actors';
 import { Sky } from './weather';
 import { zombieScore } from './score';
+import { Groove } from './groove';
 import './hud.css';
 
 /** The event colour law, shared with the radio log legend. */
@@ -82,6 +83,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
   zombies.onShot = (x, rounds) => audio.sfx('shot', { pan: ((x / L.w) * 2 - 1) * 0.8, count: rounds });
   const walkers = new Walkers(layers.actors, layers.lights, tex);
   const sky = new Sky(dark, top, tex.rain, tex.glow);
+  const groove = new Groove();
 
   let L: Layout = makeLayout(app.screen.width, app.screen.height);
   compound.layout(L, app.renderer.resolution);
@@ -271,7 +273,8 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
   function frame(f: FrameInfo): void {
     const { dt, dtReal, t } = f;
 
-    const hits = zombies.update(dt, sky.darkness, walkers.positions());
+    groove.update(dtReal, settings.zMusicVisuals ? audio.pulse() : null);
+    const hits = zombies.update(dt, sky.darkness, walkers.positions(), groove.beat);
     walkers.update(dt, sky.darkness, settings.zNightExtras, zombies.positions());
     const attacked = zombies.underAttack();
     audio.setThreatActive(attacked);
@@ -288,8 +291,9 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
     }
 
     fx.update(dt);
-    compound.update(dt, sky.darkness, alarm);
-    sky.update(dt, state.weather, settings.zDayNight, settings.zRain, alarm, settings.zNightExtras);
+    compound.update(dt, sky.darkness, alarm, groove);
+    sky.update(dt, state.weather, settings.zDayNight, settings.zRain, alarm, settings.zNightExtras,
+      settings.zMusicVisuals && groove.style ? groove.heart : null);
 
     shake = Math.max(0, shake - dt * 18);
     punch = Math.max(0, punch - dt * 0.25);
@@ -322,7 +326,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
       }
     },
     stats: () => ({ nodes: countNodes(app.stage) }),
-    diag: () => ({ app, compound, zombies, walkers, sky }),
+    diag: () => ({ app, compound, zombies, walkers, sky, groove, audio }),
   };
 }
 

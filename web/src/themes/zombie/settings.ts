@@ -26,6 +26,7 @@ export const ZOMBIE_DEFAULTS = {
   zMusicRotate: 6,                   // minutes per style while rotating
   zGunfire: 0.8,                     // gunshot volume
   zAmbience: 0.6,                    // wind + rain
+  zMusicVisuals: true,               // zombies shamble in time, lights breathe with the music
 
   // scene budgets = the HIGH preset
   zMaxParticles: 3000,
@@ -57,6 +58,7 @@ export const ZOMBIE_CONTROLS = {
     toggle('zRadio', 'DNS radio'), toggle('zNewcomers', 'DHCP arrivals'),
     toggle('zBuildings', 'AP buildings'), toggle('zDayNight', 'Day / night'),
     toggle('zRain', 'Rain'), toggle('zBlood', 'Blood'), toggle('zScreenShake', 'Screen shake'),
+    toggle('zMusicVisuals', 'Move with the music'),
   ],
   budgets: [
     range('zMaxParticles', 'Particles', 200, 6000, 100),
