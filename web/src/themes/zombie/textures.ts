@@ -11,6 +11,8 @@ export interface ZTextures {
   dot: Texture;
   /** Top-down ridge tent drawn in greys, tinted per device. */
   tent: Texture;
+  /** A small brass round with a faint motion streak, pointing +x. */
+  bullet: Texture;
 }
 
 export async function loadTextures(): Promise<ZTextures> {
@@ -45,6 +47,22 @@ export async function loadTextures(): Promise<ZTextures> {
       ctx.fillRect(s / 2 - 1, 0, 2, s);
     }),
     tent: canvasTexture(64, drawTent),
+    bullet: canvasTexture(32, (ctx, s) => {
+      const cy = s / 2;
+      // motion streak behind the round (not a glow: a soft brass smear)
+      const g = ctx.createLinearGradient(0, cy, s * 0.72, cy);
+      g.addColorStop(0, 'rgba(210,170,90,0)');
+      g.addColorStop(1, 'rgba(210,170,90,0.55)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, cy - 1, s * 0.72, 2);
+      // the round: brass body, darker tip
+      ctx.fillStyle = '#c9a24a';
+      ctx.fillRect(s * 0.62, cy - 2, s * 0.26, 4);
+      ctx.fillStyle = '#7a5a22';
+      ctx.beginPath();
+      ctx.arc(s * 0.88, cy, 2, -Math.PI / 2, Math.PI / 2);
+      ctx.fill();
+    }),
     dot: canvasTexture(8, (ctx, s) => {
       ctx.fillStyle = '#fff';
       ctx.beginPath();

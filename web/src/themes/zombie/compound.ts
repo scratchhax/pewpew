@@ -361,12 +361,14 @@ export class Compound {
     const night = darkness * this.power;
 
     this.towers.forEach((tw, i) => {
-      // idle guards sweep their watch arc; firing turns them onto a target
       // engaged guards turn onto their target (shortest way round); idle ones
       // drift back into a slow sweep of their watch arc. Never an instant snap.
       tw.recoil = Math.max(0, tw.recoil - dt * 0.8);
       const want = tw.recoil > 0 ? tw.target : tw.idle + Math.sin(this.t * 0.35 + i * 1.7) * 0.9;
-      tw.aim += angleDelta(tw.aim, want) * Math.min(1, dt * (tw.recoil > 0 ? 7 : 1.2));
+      // capped turn rate: a guard swings at most ~3.5 rad/s, never whips round
+      const turn = angleDelta(tw.aim, want) * Math.min(1, dt * (tw.recoil > 0 ? 5 : 1.2));
+      const maxTurn = 3.5 * dt;
+      tw.aim += Math.max(-maxTurn, Math.min(maxTurn, turn));
       tw.guard.rotation = tw.aim;
       tw.cone.rotation = tw.aim;
       tw.cone.scale.set(5.2 * this.L.unit, 1.7 * this.L.unit);

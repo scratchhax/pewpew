@@ -1,13 +1,13 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 
 interface Particle { s: Sprite; vx: number; vy: number; age: number; life: number; drag: number; peak: number }
-interface Tracer { x1: number; y1: number; x2: number; y2: number; age: number; color: number }
+interface Bullet { s: Sprite; x: number; y: number; target: () => { x: number; y: number }; speed: number; delay: number; onHit?: (x: number, y: number) => void }
 interface Ring { x: number; y: number; r: number; maxR: number; age: number; life: number; color: number; width: number }
 interface Dash { x1: number; y1: number; x2: number; y2: number; age: number; life: number; color: number }
 interface Decal { s: Sprite; age: number }
 
-/** Gunfire streaks rise and fall over this long. */
-const TRACER_LIFE = 0.35;
+/** Rounds in flight at once (a busy horde night can't flood the scene). */
+const MAX_BULLETS = 80;
 
 /**
  * Soft in-and-out envelope for effects: 0 at birth, 1 at the middle, 0 at the
@@ -19,7 +19,7 @@ function envelope(age: number, life: number): number {
 }
 
 /**
- * Short-lived effects: soft (non-glowing) particles, gunfire streaks,
+ * Short-lived effects: soft (non-glowing) particles, bullets in flight,
  * expanding rings, dashed radio lines, and blood decals that stay a while.
  * No additive blending and no pops: every effect fades in and back out, so
  * small things never twinkle against the dark.
@@ -27,7 +27,7 @@ function envelope(age: number, life: number): number {
 export class Fx {
   private particles: Particle[] = [];
   private pool: Sprite[] = [];
-  private tracers: Tracer[] = [];
+  private bullets: Bullet[] = [];
   private rings: Ring[] = [];
   private dashes: Dash[] = [];
   private decals: Decal[] = [];
@@ -37,7 +37,7 @@ export class Fx {
   blood = true;
 
   constructor(private layer: Container, private decalLayer: Container,
-              private glow: Texture, private splats: Texture[]) {
+              private glow: Texture, private splats: Texture[], private bulletTex: Texture) {
     layer.addChild(this.g);
   }
 
@@ -58,8 +58,24 @@ export class Fx {
     }
   }
 
-  tracer(x1: number, y1: number, x2: number, y2: number, color = 0xd8b48a): void {
-    this.tracers.push({ x1, y1, x2, y2, age: 0, color });
+  /**
+   * A round fired from (x, y) that flies to a moving target and calls onHit on
+   * arrival. It's a small solid object in motion, not a flash, so shots read
+   * clearly without anything blinking. `delay` staggers a burst.
+   */
+  bullet(x: number, y: number, target: () => { x: number; y: number }, speed: number,
+         onHit?: (x: number, y: number) => void, delay = 0): void {
+    if (this.bullets.length >= MAX_BULLETS) {
+      if (onHit) { const t = target(); onHit(t.x, t.y); }
+      return;
+    }
+    const s = new Sprite(this.bulletTex);
+    s.anchor.set(0.85, 0.5);
+    s.scale.set(1.1);
+    s.position.set(x, y);
+    s.visible = false;
+    this.layer.addChild(s);
+    this.bullets.push({ s, x, y, target, speed, delay, onHit });
   }
 
   ring(x: number, y: number, color: number, maxR = 60, width = 2, life = 0.9): void {
@@ -122,12 +138,24 @@ export class Fx {
 
     const g = this.g;
     g.clear();
-    for (let i = this.tracers.length - 1; i >= 0; i--) {
-      const t = this.tracers[i];
-      t.age += dt;
-      if (t.age >= TRACER_LIFE) { this.tracers.splice(i, 1); continue; }
-      g.moveTo(t.x1, t.y1).lineTo(t.x2, t.y2)
-        .stroke({ width: 1.5, color: t.color, alpha: 0.3 * envelope(t.age, TRACER_LIFE) });
+    for (let i = this.bullets.length - 1; i >= 0; i--) {
+      const b = this.bullets[i];
+      if (b.delay > 0) { b.delay -= dt; continue; }
+      const t = b.target();
+      const dx = t.x - b.x, dy = t.y - b.y;
+      const dist = Math.hypot(dx, dy);
+      const step = b.speed * dt;
+      if (dist <= step) {
+        b.s.destroy();
+        this.bullets.splice(i, 1);
+        b.onHit?.(t.x, t.y);
+        continue;
+      }
+      b.x += (dx / dist) * step;
+      b.y += (dy / dist) * step;
+      b.s.visible = true;
+      b.s.position.set(b.x, b.y);
+      b.s.rotation = Math.atan2(dy, dx);
     }
     for (let i = this.rings.length - 1; i >= 0; i--) {
       const r = this.rings[i];

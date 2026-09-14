@@ -17,6 +17,7 @@ interface Zombie {
   dying: number;               // > 0 while falling
   seen: number;                // seconds on screen (for fade-in)
   watched: boolean;            // a guard has started turning toward it
+  shot: boolean;               // rounds fired, waiting for the hit
   baseScale: number; fallFrom: number; fallDir: number;
   color: number;
 }
@@ -63,6 +64,7 @@ export class Zombies {
     // sickly skin variety; brutes a paler, meaner green
     s.tint = brute ? 0xc8ff9a : [0xffffff, 0xd8f0c8, 0xe8e0c0, 0xc8e8d8][(Math.random() * 4) | 0];
     s.position.set(start.x, start.y);
+    s.rotation = Math.atan2(end.y - start.y, end.x - start.x);   // face the walk from the first frame
     const eye = new Sprite(this.tex.glow);
     eye.anchor.set(0.5); eye.blendMode = 'add'; eye.tint = brute ? 0xff9a45 : 0xff3a2a;
     eye.scale.set((brute ? 0.34 : 0.2) * L.unit); fade(eye, 0);
@@ -76,7 +78,7 @@ export class Zombies {
         : lone ? (Math.random() < 0.88 ? 0.55 + Math.random() * 0.38 : null)
         : 0.5 + Math.random() * 0.45,
       phase: Math.random() * 10, weave: horde ? 22 : 6,
-      brute, horde, dying: 0, seen: 0, watched: false,
+      brute, horde, dying: 0, seen: 0, watched: false, shot: false,
       baseScale: s.scale.x, fallFrom: 0, fallDir: 1, color,
     });
   }
@@ -117,6 +119,8 @@ export class Zombies {
       z.eye.position.set(x + Math.cos(z.s.rotation) * 6 * L.unit, y + Math.sin(z.s.rotation) * 6 * L.unit);
       fade(z.eye, darkness * 0.45 * Math.min(1, z.seen / 1.5));   // steady, eased in
 
+      if (z.shot) continue;                          // rounds are on their way
+
       // guards start turning toward a zombie a moment before they drop it
       if (z.killAt !== null && !z.watched && z.t >= z.killAt - 0.12) {
         z.watched = true;
@@ -138,23 +142,38 @@ export class Zombies {
   }
 
   /** The nearest tower; a brute also draws the next one, but only if it's
-   *  nearly as close (so no tracers across the whole courtyard). */
+   *  nearly as close (so no shots across the whole courtyard). */
   private shooters(z: Zombie, p: Point): number[] {
     const [a, b] = this.compound.towersNear(p);
     return z.brute && b && b.d < a.d * 1.35 ? [a.i, b.i] : [a.i];
   }
 
+  /** Guards open fire: rounds fly to the zombie and it drops when the first lands. */
   private kill(z: Zombie, p: Point, bursts: number): void {
+    z.shot = true;
+    const L = this.compound.L;
+    const last = { x: p.x, y: p.y };
+    // follow the zombie while it's on screen; stragglers land where it fell
+    const target = () => {
+      if (!z.s.destroyed) { last.x = z.s.x; last.y = z.s.y; }
+      return last;
+    };
+    let first = true;
     for (const i of this.shooters(z, p)) {
       for (let b = 0; b < bursts; b++) {
         const muzzle = this.compound.aim(i, p);
-        const jx = p.x + (Math.random() - 0.5) * 10, jy = p.y + (Math.random() - 0.5) * 10;
-        this.fx.tracer(muzzle.x, muzzle.y, jx, jy);
+        this.fx.bullet(muzzle.x, muzzle.y, target, 900 * L.unit,
+          first ? (x, y) => this.hit(z, x, y) : undefined, b * 0.12);
+        first = false;
       }
     }
-    this.fx.emit(p.x, p.y, BLOOD, z.brute ? 8 : 4, z.brute ? 70 : 45, 0.18, 0.6);
-    this.fx.splat(p.x, p.y, z.brute ? 1.8 : 1);
-    if (z.brute) this.fx.ring(p.x, p.y, z.color, 110 * this.compound.L.unit, 3.5, 0.9);
+  }
+
+  private hit(z: Zombie, x: number, y: number): void {
+    if (z.dying > 0) return;
+    this.fx.emit(x, y, BLOOD, z.brute ? 8 : 4, z.brute ? 70 : 45, 0.18, 0.6);
+    this.fx.splat(x, y, z.brute ? 1.8 : 1);
+    if (z.brute) this.fx.ring(x, y, z.color, 110 * this.compound.L.unit, 3.5, 0.9);
     z.dying = 0.9;
     z.fallFrom = z.s.rotation;
     z.fallDir = Math.random() < 0.5 ? -1 : 1;
@@ -229,17 +248,25 @@ export class Walkers {
         continue;
       }
       w.fade = Math.min(1, w.fade + dt * 3);
-      const a = w.path[w.seg], b = w.path[w.seg + 1];
-      const segLen = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      let a = w.path[w.seg], b = w.path[w.seg + 1];
+      let segLen = Math.hypot(b.x - a.x, b.y - a.y) || 1;
       w.along += w.speed * dt;
-      if (w.along >= segLen) {
+      // advance through finished segments and re-read the CURRENT segment:
+      // reusing the old one here drew walkers back at the previous waypoint
+      // for a frame at every corner (the flicker/teleport)
+      let arrived = false;
+      while (w.along >= segLen) {
         w.along -= segLen;
         w.seg++;
-        if (w.seg >= w.path.length - 1) {
-          w.s.position.set(b.x, b.y);
-          w.onDone?.(b);
-          continue;
-        }
+        if (w.seg >= w.path.length - 1) { arrived = true; break; }
+        a = w.path[w.seg];
+        b = w.path[w.seg + 1];
+        segLen = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      }
+      if (arrived) {
+        w.s.position.set(b.x, b.y);
+        w.onDone?.(b);
+        continue;
       }
       const f = w.along / segLen;
       const x = a.x + (b.x - a.x) * f, y = a.y + (b.y - a.y) * f;
