@@ -32,6 +32,16 @@ export class Dust {
 
   resize(w: number, h: number): void { this.w = w; this.h = h; }
 
+  /** Live mote budget: grow anywhere on screen, shrink by retiring the oldest. */
+  setCount(count: number): void {
+    while (this.motes.length < count) this.spawn(true);
+    while (this.motes.length > count) {
+      const m = this.motes.shift()!;
+      this.layer.removeChild(m.s);
+      m.s.destroy();
+    }
+  }
+
   update(dt: number, boost = 1): void {
     for (const m of this.motes) {
       m.tw += dt * 2;

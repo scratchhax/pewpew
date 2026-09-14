@@ -25,9 +25,18 @@ interface Crystal {
 export class Crystals {
   private active: Crystal[] = [];
   private puffs: Puff[] = [];
+  private maxPuffs = 70;
+  private trailPts = 36;     // flat x,y pairs kept per contrail
 
   constructor(private layer: Container, private texture: Texture,
               private glow: Texture, private fx: Fx) {}
+
+  /** Effect detail 0..1: fewer mist puffs and shorter contrails. 1 = full. */
+  setDetail(detail: number): void {
+    const f = Math.max(0, Math.min(1, detail));
+    this.maxPuffs = Math.round(70 * f);
+    this.trailPts = Math.max(8, Math.round(18 * f) * 2);
+  }
 
   /**
    * Spawn a crystal. If `inbound` it travels edge→station, else station→edge.
@@ -101,7 +110,7 @@ export class Crystals {
 
       // cloud / fog trail: soft expanding puffs left in the wake
       c.mistTick -= dt;
-      if (c.mistTick <= 0 && this.puffs.length < 70) {
+      if (c.mistTick <= 0 && this.puffs.length < this.maxPuffs) {
         c.mistTick = 0.07;
         const sp = new Sprite(this.glow);
         sp.anchor.set(0.5);
@@ -118,7 +127,7 @@ export class Crystals {
 
       // smooth tapered contrail (bright core inside the fog)
       c.trail.push(c.s.x, c.s.y);
-      if (c.trail.length > 36) c.trail.splice(0, 2);
+      if (c.trail.length > this.trailPts) c.trail.splice(0, c.trail.length - this.trailPts);
       c.trailG.clear();
       const n = c.trail.length / 2;
       for (let j = 1; j < n; j++) {

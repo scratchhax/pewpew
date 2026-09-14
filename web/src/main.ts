@@ -1,5 +1,6 @@
 import { Application, Container } from 'pixi.js';
-import { loadSettings } from './settings';
+import { loadSettings, saveSettings } from './settings';
+import { resolveBootPerf, applyTier, guessTier, AutoTuner } from './perf';
 import { State, ipAngle, hash01, isInternalIp } from './state';
 import { Feed } from './ws';
 import { buildTextures } from './textures';
@@ -56,14 +57,22 @@ function wifiStarColor(ev: NetEvent): number {
 async function main(): Promise<void> {
   const settings = loadSettings();
   const state = new State();
+  // quality tier is settled before the renderer exists: antialias and GPU
+  // power preference can only be chosen at init
+  const boot = resolveBootPerf(settings);
+  const initAntialias = settings.antialias;
+  const initPowerPref = settings.powerPref;
 
   const app = new Application();
   await app.init({
     resizeTo: window,
     background: '#02040a',
-    antialias: false,
-    powerPreference: 'low-power',
+    antialias: settings.antialias,
+    powerPreference: settings.powerPref === 'default' ? undefined : settings.powerPref,
+    resolution: settings.renderScale,
+    autoDensity: true,        // CSS size stays the window; scale only changes pixels
   });
+  app.ticker.maxFPS = settings.fpsCap;
   document.getElementById('app')!.appendChild(app.canvas);
 
   let w = app.screen.width, h = app.screen.height;
@@ -95,7 +104,7 @@ async function main(): Promise<void> {
   const fx = new Fx(fxLayer, textures.glow, settings.maxParticles, textures.asteroids);
   const starfield = new Starfield(bgLayer, textures.glow, textures.dot,
     textures.clouds, w, h, settings);
-  const dust = new Dust(dustLayer, textures.glow, w, h);
+  const dust = new Dust(dustLayer, textures.glow, w, h, settings.dustCount);
   const ambient = new AmbientShips(shipLayer, [...textures.icons, ...textures.ships], w, h);
   if (new URLSearchParams(location.search).has('diag'))
     (window as any).__diag = { app };
@@ -119,16 +128,63 @@ async function main(): Promise<void> {
   }
   applyColors();
 
-  const panel = new SettingsPanel(settings, () => {
+  /** Push every live perf value into the renderer and scenes (idempotent). */
+  function applyPerf(): void {
+    if (app.renderer.resolution !== settings.renderScale) {
+      app.renderer.resolution = settings.renderScale;
+    }
+    app.ticker.maxFPS = settings.fpsCap;
+    fx.setMax(settings.maxParticles);
+    dust.setCount(settings.dustCount);
+    station.setDetail(settings.fxDetail);
+    crystals.setDetail(settings.fxDetail);
+    constellation.setMax(settings.maxIpStars);
+    eventStars.setMax(settings.maxEventStars);
+  }
+  applyPerf();
+
+  const tuner = new AutoTuner(settings, boot, (tier) => {
+    console.info(`[pewpew] auto quality: frames low, stepping down to ${tier}`);
+    applyPerf();
+    starfield.rebuild();
+    panel.refresh();
+  });
+  if ((window as any).__diag) Object.assign((window as any).__diag, { settings, tuner });
+
+  // settings whose change means the starfield/nebula sprites must be rebuilt
+  const STARFIELD_KEYS = new Set(['starfield', 'nebula', 'hueShift', 'colorSat',
+    'starDensity', 'nebulaCount', 'quality']);
+
+  const panel = new SettingsPanel(settings, (key) => {
+    // key undefined = reset to defaults: re-resolve everything
+    if (key === 'quality' || key === undefined) {
+      if (settings.quality === 'auto') {
+        const g = guessTier(boot.gpu);
+        boot.why = g.why;
+        applyTier(settings, g.tier);
+        tuner.reset(g.tier);
+      } else if (settings.quality === 'custom') {
+        tuner.reset(null);
+      } else {
+        applyTier(settings, settings.quality);
+        tuner.reset(settings.quality);
+      }
+      saveSettings(settings);
+    }
     hud.applySettings(settings);
     audio.setVolume(settings.volume);
     audio.setReverb(settings.reverb);
     audio.setEcho(settings.echo);
     audio.setEnabled(settings.audio);
-    starfield.rebuild();
+    if (key === undefined || STARFIELD_KEYS.has(key)) starfield.rebuild();
     applyColors();
+    applyPerf();
     if (!settings.constellations) clearConstellation();
-  });
+  }, () => ({
+    tier: settings.quality === 'custom' ? null : tuner.tier,
+    why: boot.why,
+    reloadNeeded: settings.antialias !== initAntialias || settings.powerPref !== initPowerPref,
+  }));
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'F1') { e.preventDefault(); panel.toggle(); }
@@ -349,6 +405,7 @@ async function main(): Promise<void> {
   }
 
   let routed = 0;
+  let frames = 0, worstFrameMs = 0;
   const feed = new Feed(
     (ev, meta) => { routed++; if (meta?.demo) hud.showDemo(true); route(ev, false); },
     (events, meta) => {
@@ -364,6 +421,8 @@ async function main(): Promise<void> {
     d.style.cssText = `position:fixed;left:50%;transform:translateX(-50%);bottom:6px;
       z-index:50;font:11px monospace;color:#7fd4ff;background:rgba(0,0,0,0.65);
       padding:4px 12px;letter-spacing:1px;display:flex;align-items:center;gap:10px;`;
+    const perfTxt = document.createElement('span');
+    d.appendChild(perfTxt);
     const txt = document.createElement('span');
     const btn = document.createElement('button');
     btn.textContent = 'TEST';
@@ -380,6 +439,12 @@ async function main(): Promise<void> {
         + ` | q ${s.queue} sp ${sp}ms | alive ${s.alive} drop ${s.dropped}`
         + ` | rms ${s.rms.toFixed(3)} | ${__BUILD__}`;
       routed = 0;
+      const tier = settings.quality === 'custom' ? 'CUSTOM'
+        : `${settings.quality === 'auto' ? 'AUTO:' : ''}${(tuner.tier ?? '').toUpperCase()}`;
+      perfTxt.textContent = `${frames} fps | worst ${worstFrameMs.toFixed(0)}ms`
+        + ` | ${tier} x${app.renderer.resolution} cap ${settings.fpsCap || '-'}`
+        + ` | nodes ${countNodes(app.stage)} |`;
+      frames = 0; worstFrameMs = 0;
     }, 1000);
   }
 
@@ -387,6 +452,9 @@ async function main(): Promise<void> {
   let zoom = 1;
 
   app.ticker.add((ticker) => {
+    tuner.frame(performance.now());
+    frames++;
+    worstFrameMs = Math.max(worstFrameMs, ticker.deltaMS);
     const dtReal = Math.min(0.05, ticker.deltaMS / 1000);
     state.update(dtReal);
     const dt = dtReal * settings.speed * state.timeScale;
@@ -439,6 +507,13 @@ async function main(): Promise<void> {
 
     hud.update(dt, state, settings);
   });
+}
+
+/** Display objects in the scene graph (debug overlay). */
+function countNodes(c: Container): number {
+  let n = c.children.length;
+  for (const child of c.children) n += countNodes(child as Container);
+  return n;
 }
 
 main().catch((e) => {

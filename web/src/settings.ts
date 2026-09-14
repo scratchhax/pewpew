@@ -1,4 +1,8 @@
 export type MeshMode = 'law' | 'spectrum' | 'mono' | 'warm' | 'cool';
+/** Performance tier. `auto` picks one at boot and steps down if frames drop;
+ *  `custom` means the individual perf values below are the user's own. */
+export type Quality = 'auto' | 'low' | 'medium' | 'high' | 'ultra' | 'custom';
+export type PowerPref = 'low-power' | 'default' | 'high-performance';
 
 export interface Settings {
   starfield: boolean;
@@ -47,9 +51,22 @@ export interface Settings {
   meshMode: MeshMode;     // host-mesh colouring scheme
   hueShift: number;       // rotate mesh/nebula/accent hues 0..360
   colorSat: number;       // colour intensity 0..1
-  maxParticles: number;
   speed: number;          // global sim speed multiplier
   demo: boolean;
+
+  // ── performance (see perf.ts for the preset table) ──
+  quality: Quality;
+  renderScale: number;    // canvas pixels per CSS pixel (1 = today's look)
+  fpsCap: number;         // 0 = uncapped
+  antialias: boolean;     // renderer init only: needs a reload
+  powerPref: PowerPref;   // renderer init only: needs a reload
+  maxParticles: number;
+  starDensity: number;    // multiplier on the screen-area star count
+  nebulaCount: number;
+  dustCount: number;
+  fxDetail: number;       // 0..1: station aura/sparks, crystal trails & mist
+  maxIpStars: number;     // constellation node cap
+  maxEventStars: number;
 }
 
 export const DEFAULTS: Settings = {
@@ -99,23 +116,63 @@ export const DEFAULTS: Settings = {
   meshMode: 'spectrum',
   hueShift: 0,
   colorSat: 1,
-  maxParticles: 4000,
   speed: 1,
   demo: false,
+
+  // perf values = the HIGH preset, i.e. exactly how the scene ran before
+  // presets existed; `auto` overwrites them at boot
+  quality: 'auto',
+  renderScale: 1,
+  fpsCap: 0,
+  antialias: false,
+  powerPref: 'low-power',
+  maxParticles: 4000,
+  starDensity: 1,
+  nebulaCount: 7,
+  dustCount: 70,
+  fxDetail: 1,
+  maxIpStars: 140,
+  maxEventStars: 260,
 };
 
 const KEY = 'pewpew.settings.v1';
 
+/** Keys pinned by URL params for this page load: never written to storage. */
+const locked = new Set<keyof Settings>();
+export function lockSetting(key: keyof Settings): void { locked.add(key); }
+export function isLocked(key: keyof Settings): boolean { return locked.has(key); }
+
 export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+    if (raw) {
+      const saved = JSON.parse(raw) as Partial<Settings>;
+      // Saved before presets existed: a hand-tuned particle budget means the
+      // user already chose their own perf, so keep it instead of auto.
+      if (saved.quality === undefined && saved.maxParticles !== undefined &&
+          saved.maxParticles !== DEFAULTS.maxParticles) {
+        saved.quality = 'custom';
+      }
+      return { ...DEFAULTS, ...saved };
+    }
   } catch { /* ignore */ }
   return { ...DEFAULTS };
 }
 
 export function saveSettings(s: Settings): void {
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* ignore */ }
+  try {
+    let out: Partial<Settings> = s;
+    if (locked.size > 0) {
+      // URL overrides are per-load: keep whatever was stored before for those
+      const prev = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, unknown>;
+      const merged: Record<string, unknown> = { ...s };
+      for (const k of locked) {
+        if (k in prev) merged[k] = prev[k]; else delete merged[k];
+      }
+      out = merged as Partial<Settings>;
+    }
+    localStorage.setItem(KEY, JSON.stringify(out));
+  } catch { /* ignore */ }
 }
 
 /** Wipe saved prefs and restore DEFAULTS into the live object (in place). */

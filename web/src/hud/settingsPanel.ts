@@ -1,6 +1,23 @@
-import { Settings, MeshMode, saveSettings, resetSettings } from '../settings';
+import { Settings, MeshMode, Quality, PowerPref, saveSettings, resetSettings, isLocked } from '../settings';
+import { PERF_KEYS } from '../perf';
 
 type Key = keyof Settings;
+
+/** Live perf readout for the System tab, supplied by main. */
+export interface PerfStatus {
+  tier: string | null;      // tier in effect (null = custom)
+  why: string;              // what auto based its boot guess on
+  reloadNeeded: boolean;    // antialias / power preference changed since boot
+}
+
+const QUALITIES: Array<[Quality, string]> = [
+  ['auto', 'Auto'], ['low', 'Low (Pi / weak GPU)'],
+  ['medium', 'Medium'], ['high', 'High (classic)'], ['ultra', 'Ultra'], ['custom', 'Custom'],
+];
+const FPS_CAPS: Array<[string, string]> = [['0', 'Uncapped'], ['60', '60 fps'], ['30', '30 fps']];
+const POWER: Array<[PowerPref, string]> = [
+  ['low-power', 'Low power'], ['default', 'Browser default'], ['high-performance', 'High performance'],
+];
 
 const SCENE: Array<[Key, string]> = [
   ['starfield', 'Starfield'], ['nebula', 'Nebula clouds'], ['dust', 'Space dust'],
@@ -37,7 +54,8 @@ export class SettingsPanel {
   private root: HTMLElement;
   private visible = false;
 
-  constructor(private settings: Settings, private onChange: () => void) {
+  constructor(private settings: Settings, private onChange: (key?: Key) => void,
+              private perfStatus: () => PerfStatus) {
     this.root = document.createElement('div');
     this.root.id = 'settings';
     this.root.style.display = 'none';
@@ -53,6 +71,10 @@ export class SettingsPanel {
         this.onChange();
         this.render(this.activeTab || 'scene');
       }
+      if ((e.target as HTMLElement).closest('[data-action="reload"]')) {
+        saveSettings(this.settings);
+        location.reload();
+      }
     });
 
     this.root.addEventListener('change', (e) => {
@@ -63,15 +85,26 @@ export class SettingsPanel {
       if (el.type === 'checkbox') {
         bag[key] = el.checked;
       } else if (el.tagName === 'SELECT') {
-        bag[key] = el.value;
+        bag[key] = el.dataset.num ? parseFloat(el.value) : el.value;
       } else {
         bag[key] = parseFloat(el.value);
         const span = el.parentElement?.querySelector('.val');
         if (span) span.textContent = el.value;
       }
+      // hand-tuning any perf value leaves the preset behind
+      const perfTweak = (PERF_KEYS as Key[]).includes(key) && this.settings.quality !== 'custom';
+      if (perfTweak) this.settings.quality = 'custom';
       saveSettings(this.settings);
-      this.onChange();
+      this.onChange(key);
+      if (perfTweak || key === 'quality' || key === 'antialias' || key === 'powerPref') {
+        this.refresh();
+      }
     });
+  }
+
+  /** Re-render the open tab (e.g. auto just stepped down a tier). */
+  refresh(): void {
+    if (this.visible) this.render(this.activeTab);
   }
 
   private activeTab = 'scene';
@@ -81,9 +114,20 @@ export class SettingsPanel {
       ${this.settings[key] ? 'checked' : ''}/><span>${label}</span></label>`;
   }
   private rng(key: Key, label: string, min: number, max: number, step: number): string {
-    return `<label class="row sld"><span class="lbl">${label}</span>
+    return `<label class="row sld"><span class="lbl">${label}${this.pin(key)}</span>
       <input type="range" data-key="${key}" min="${min}" max="${max}" step="${step}"
       value="${this.settings[key] as number}"/><span class="val">${this.settings[key]}</span></label>`;
+  }
+  private sel(key: Key, label: string, options: Array<[string, string]>, numeric = false): string {
+    const cur = String(this.settings[key]);
+    return `<label class="row sld"><span class="lbl">${label}${this.pin(key)}</span>
+      <select data-key="${key}"${numeric ? ' data-num="1"' : ''}>${options.map(([v, l]) =>
+        `<option value="${v}"${cur === v ? ' selected' : ''}>${l}</option>`).join('')}
+      </select></label>`;
+  }
+  /** Marks a value pinned by a URL param (applies this load, not saved). */
+  private pin(key: Key): string {
+    return isLocked(key) ? ' <b class="pin" title="Set by URL parameter; not saved">URL</b>' : '';
   }
 
   private render(tab: string): void {
@@ -137,13 +181,44 @@ export class SettingsPanel {
         legend stay fixed so the colour law holds — pick the
         <b>Event-law</b> scheme to force the web green.</p></div></div>`;
     } else {
+      const st = this.perfStatus();
+      const running = this.settings.quality === 'auto'
+        ? `Auto is running <b>${(st.tier ?? 'custom').toUpperCase()}</b> (${st.why})`
+        : this.settings.quality === 'custom' ? 'Running your <b>custom</b> values'
+        : `Running the <b>${this.settings.quality.toUpperCase()}</b> preset`;
       html += `<div class="cols"><div class="col">
-        <p class="grp">Performance</p>
-        ${this.rng('maxParticles', 'Particles', 200, 4000, 100)}
+        <p class="grp">Quality</p>
+        ${this.sel('quality', 'Preset', QUALITIES)}
+        <p class="hint">${running}</p>
+        <p class="grp">Rendering</p>
+        ${this.rng('renderScale', 'Render scale', 0.5, 2, 0.05)}
+        ${this.sel('fpsCap', 'FPS cap', FPS_CAPS, true)}
+        <p class="grp">Budgets</p>
+        ${this.rng('maxParticles', 'Particles', 200, 8000, 100)}
+        ${this.rng('starDensity', 'Star density', 0.25, 1.5, 0.05)}
+        ${this.rng('nebulaCount', 'Nebulae', 0, 9, 1)}
+        ${this.rng('dustCount', 'Dust motes', 0, 140, 10)}
+        ${this.rng('fxDetail', 'FX detail', 0.25, 1, 0.05)}
+        ${this.rng('maxIpStars', 'IP stars', 40, 200, 10)}
+        ${this.rng('maxEventStars', 'Event stars', 50, 400, 10)}
+        </div><div class="col">
+        <p class="grp">Renderer (reload)</p>
+        ${this.chk('antialias', 'Antialias')}
+        ${this.sel('powerPref', 'GPU power', POWER)}
+        ${st.reloadNeeded
+          ? '<button class="set-reload" data-action="reload">Apply &amp; reload</button>'
+          : '<p class="hint">Read once at startup.</p>'}
+        <p class="grp">Simulation</p>
         ${this.rng('speed', 'Sim speed', 0.25, 2, 0.05)}
         <p class="grp">Danger zone</p>
         <button class="set-reset" data-action="reset">Reset to defaults</button>
-        </div><div class="col"><p class="grp">Demo</p>
+        <p class="grp">Notes</p>
+        <p class="hint"><b>Auto</b> guesses a tier from the GPU at load and drops
+        one tier at a time if frames stay low; it never steps back up. Moving
+        any value here switches to <b>Custom</b>. <b>?debug=1</b> shows the
+        FPS you actually get. Pin a kiosk with <b>?quality=low</b>
+        (also <b>?scale=0.6</b>, <b>?fps=30</b>).</p>
+        <p class="grp">Demo</p>
         <p class="hint">Add <b>?demo=1</b> to the URL (or <b>&showreel=1</b>)
         and reload for synthetic traffic. Debug overlay: <b>?debug=1</b>.</p></div></div>`;
     }
