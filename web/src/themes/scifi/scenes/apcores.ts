@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite, Text, TextStyle, Texture } from 'pixi.js';
-import { hash01 } from '../state';
+import { hash01 } from '../../../state';
 import type { Fx } from './fx';
 
 interface Ripple { r: number; color: number; }

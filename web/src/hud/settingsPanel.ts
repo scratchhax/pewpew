@@ -1,9 +1,9 @@
-import { Settings, MeshMode, Quality, PowerPref, saveSettings, resetSettings, isLocked } from '../settings';
-import { PERF_KEYS } from '../perf';
+import { CoreSettings, PowerPref, Quality, saveSettings, resetSettings, isLocked } from '../settings';
+import type { Control, Theme } from '../theme';
 
-type Key = keyof Settings;
+type Key = keyof CoreSettings;
 
-/** Live perf readout for the System tab, supplied by main. */
+/** Live perf readout for the System tab, supplied by the app. */
 export interface PerfStatus {
   tier: string | null;      // tier in effect (null = custom)
   why: string;              // what auto based its boot guess on
@@ -19,14 +19,6 @@ const POWER: Array<[PowerPref, string]> = [
   ['low-power', 'Low power'], ['default', 'Browser default'], ['high-performance', 'High performance'],
 ];
 
-const SCENE: Array<[Key, string]> = [
-  ['starfield', 'Starfield'], ['nebula', 'Nebula clouds'], ['dust', 'Space dust'],
-  ['ambientShips', 'Ambient ships'], ['planets', 'DHCP planets'], ['eventStars', 'Event stars'],
-  ['asteroids', 'Block asteroids'], ['threatMissiles', 'Threat missiles'],
-  ['crystals', 'Allow crystals'],
-  ['constellations', 'IP constellations'], ['ringObjects', 'Ring objects'],
-  ['apCores', 'AP cores'], ['screenShake', 'Screen shake'],
-];
 const HUD: Array<[Key, string]> = [
   ['uplink', 'Uplink'], ['threatBar', 'Ship status bars'], ['telemetry', 'Telemetry'],
   ['mostWanted', 'Most wanted'], ['terminal', 'Comms log'], ['oscilloscope', 'Sensor flux'],
@@ -40,21 +32,21 @@ const GATES: Array<[Key, string]> = [
   ['gateBlock', 'Block'], ['gateAllow', 'Allow'], ['gateDns', 'DNS'],
   ['gateWifi', 'WiFi'], ['gateDhcp', 'DHCP'], ['gateThreat', 'Threat'],
 ];
-const MESH_MODES: Array<[MeshMode, string]> = [
-  ['spectrum', 'Spectrum (rainbow web)'], ['law', 'Event-law (all allow-green)'],
-  ['mono', 'Mono (cyan)'], ['warm', 'Warm'], ['cool', 'Cool'],
-];
 
 /**
  * F1 settings overlay — tabbed (Scene / HUD / Audio / Colour / System).
- * Mutates the shared settings object in place, persists to localStorage,
- * and calls `onChange` so the app can re-apply.
+ * HUD, audio and system controls are core; the Scene tab, scene budgets and
+ * colour scheme come from the active theme's declared controls. Mutates the
+ * shared settings object in place, persists to localStorage, and calls
+ * `onChange` so the app can re-apply.
  */
 export class SettingsPanel {
   private root: HTMLElement;
   private visible = false;
 
-  constructor(private settings: Settings, private onChange: (key?: Key) => void,
+  constructor(private settings: CoreSettings, private theme: Pick<Theme, 'title' | 'controls'>,
+              private defaults: CoreSettings, private perfKeys: string[],
+              private onChange: (key?: string) => void,
               private perfStatus: () => PerfStatus) {
     this.root = document.createElement('div');
     this.root.id = 'settings';
@@ -66,7 +58,7 @@ export class SettingsPanel {
       const tab = (e.target as HTMLElement).closest('.set-tab');
       if (tab) this.render(tab.getAttribute('data-tab') || 'scene');
       if ((e.target as HTMLElement).closest('[data-action="reset"]')) {
-        resetSettings(this.settings);
+        resetSettings(this.settings, this.defaults);
         saveSettings(this.settings);
         this.onChange();
         this.render(this.activeTab || 'scene');
@@ -79,7 +71,7 @@ export class SettingsPanel {
 
     this.root.addEventListener('change', (e) => {
       const el = e.target as HTMLInputElement;
-      const key = el.dataset.key as Key | undefined;
+      const key = el.dataset.key;
       if (!key) return;
       const bag = this.settings as unknown as Record<string, boolean | number | string>;
       if (el.type === 'checkbox') {
@@ -92,7 +84,7 @@ export class SettingsPanel {
         if (span) span.textContent = el.value;
       }
       // hand-tuning any perf value leaves the preset behind
-      const perfTweak = (PERF_KEYS as Key[]).includes(key) && this.settings.quality !== 'custom';
+      const perfTweak = this.perfKeys.includes(key) && this.settings.quality !== 'custom';
       if (perfTweak) this.settings.quality = 'custom';
       saveSettings(this.settings);
       this.onChange(key);
@@ -109,40 +101,51 @@ export class SettingsPanel {
 
   private activeTab = 'scene';
 
-  private chk(key: Key, label: string): string {
-    return `<label class="row"><input type="checkbox" data-key="${key}"
-      ${this.settings[key] ? 'checked' : ''}/><span>${label}</span></label>`;
+  private get bag(): Record<string, boolean | number | string> {
+    return this.settings as unknown as Record<string, boolean | number | string>;
   }
-  private rng(key: Key, label: string, min: number, max: number, step: number): string {
+
+  private chk(key: string, label: string): string {
+    return `<label class="row"><input type="checkbox" data-key="${key}"
+      ${this.bag[key] ? 'checked' : ''}/><span>${label}</span></label>`;
+  }
+  private rng(key: string, label: string, min: number, max: number, step: number): string {
     return `<label class="row sld"><span class="lbl">${label}${this.pin(key)}</span>
       <input type="range" data-key="${key}" min="${min}" max="${max}" step="${step}"
-      value="${this.settings[key] as number}"/><span class="val">${this.settings[key]}</span></label>`;
+      value="${this.bag[key] as number}"/><span class="val">${this.bag[key]}</span></label>`;
   }
-  private sel(key: Key, label: string, options: Array<[string, string]>, numeric = false): string {
-    const cur = String(this.settings[key]);
+  private sel(key: string, label: string, options: Array<[string, string]>, numeric = false): string {
+    const cur = String(this.bag[key]);
     return `<label class="row sld"><span class="lbl">${label}${this.pin(key)}</span>
       <select data-key="${key}"${numeric ? ' data-num="1"' : ''}>${options.map(([v, l]) =>
         `<option value="${v}"${cur === v ? ' selected' : ''}>${l}</option>`).join('')}
       </select></label>`;
   }
+  private control(c: Control): string {
+    return c.kind === 'toggle' ? this.chk(c.key, c.label)
+      : c.kind === 'range' ? this.rng(c.key, c.label, c.min, c.max, c.step)
+      : this.sel(c.key, c.label, c.options, c.numeric);
+  }
   /** Marks a value pinned by a URL param (applies this load, not saved). */
-  private pin(key: Key): string {
+  private pin(key: string): string {
     return isLocked(key) ? ' <b class="pin" title="Set by URL parameter; not saved">URL</b>' : '';
   }
 
   private render(tab: string): void {
     this.activeTab = tab;
+    const c = this.theme.controls;
     const tabs = [['scene', 'SCENE'], ['hud', 'HUD'], ['audio', 'AUDIO'],
       ['color', 'COLOUR'], ['system', 'SYSTEM']] as const;
-    let html = `<div class="set-top"><h2>ORBITAL COMMAND</h2>
+    let html = `<div class="set-top"><h2>${this.theme.title}</h2>
       <div class="set-tabs">${tabs.map(([k, l]) =>
         `<button class="set-tab${k === tab ? ' active' : ''}" data-tab="${k}">${l}</button>`
       ).join('')}</div></div><div class="set-body">`;
 
     if (tab === 'scene') {
-      html += `<div class="cols">${this.twoCol(SCENE)}</div>`;
+      html += `<div class="cols">${this.twoCol(c.scene)}</div>`;
     } else if (tab === 'hud') {
-      html += `<div class="cols">${this.twoCol(HUD)}</div>`;
+      html += `<div class="cols">${this.twoCol(HUD.map(([key, label]) =>
+        ({ kind: 'toggle' as const, key, label })))}</div>`;
     } else if (tab === 'audio') {
       html += `<div class="cols"><div class="col">
         <p class="grp">Master</p>
@@ -167,19 +170,13 @@ export class SettingsPanel {
         </div></div>`;
     } else if (tab === 'color') {
       html += `<div class="cols"><div class="col">
-        <p class="grp">Host-mesh palette</p>
-        <label class="row sld"><span class="lbl">Scheme</span>
-        <select data-key="meshMode">${MESH_MODES.map(([v, l]) =>
-          `<option value="${v}"${this.settings.meshMode === v ? ' selected' : ''}>${l}</option>`
-        ).join('')}</select></label>
+        ${c.color.length ? `<p class="grp">${c.colorGroup ?? 'Scheme'}</p>
+        ${c.color.map((ctl) => this.control(ctl)).join('')}` : ''}
         <p class="grp">Global tint</p>
         ${this.rng('hueShift', 'Hue shift', 0, 360, 5)}
         ${this.rng('colorSat', 'Intensity', 0, 1, 0.05)}
         </div><div class="col"><p class="grp">Notes</p>
-        <p class="hint">Hue shift & intensity sweep the mesh, nebula and HUD
-        accent. Event colours (block/allow/dns/dhcp/wifi) and the terminal
-        legend stay fixed so the colour law holds — pick the
-        <b>Event-law</b> scheme to force the web green.</p></div></div>`;
+        <p class="hint">${c.colorHint ?? 'Hue shift & intensity sweep the theme and HUD accent.'}</p></div></div>`;
     } else {
       const st = this.perfStatus();
       const running = this.settings.quality === 'auto'
@@ -194,13 +191,7 @@ export class SettingsPanel {
         ${this.rng('renderScale', 'Render scale', 0.5, 2, 0.05)}
         ${this.sel('fpsCap', 'FPS cap', FPS_CAPS, true)}
         <p class="grp">Budgets</p>
-        ${this.rng('maxParticles', 'Particles', 200, 8000, 100)}
-        ${this.rng('starDensity', 'Star density', 0.25, 1.5, 0.05)}
-        ${this.rng('nebulaCount', 'Nebulae', 0, 9, 1)}
-        ${this.rng('dustCount', 'Dust motes', 0, 140, 10)}
-        ${this.rng('fxDetail', 'FX detail', 0.25, 1, 0.05)}
-        ${this.rng('maxIpStars', 'IP stars', 40, 200, 10)}
-        ${this.rng('maxEventStars', 'Event stars', 50, 400, 10)}
+        ${c.budgets.map((ctl) => this.control(ctl)).join('')}
         </div><div class="col">
         <p class="grp">Renderer (reload)</p>
         ${this.chk('antialias', 'Antialias')}
@@ -227,10 +218,10 @@ export class SettingsPanel {
     this.root.innerHTML = html;
   }
 
-  private twoCol(items: Array<[Key, string]>): string {
+  private twoCol(items: Control[]): string {
     const mid = Math.ceil(items.length / 2);
     return [items.slice(0, mid), items.slice(mid)].map((col) =>
-      `<div class="col">${col.map(([k, l]) => this.chk(k, l)).join('')}</div>`
+      `<div class="col">${col.map((ctl) => this.control(ctl)).join('')}</div>`
     ).join('');
   }
 

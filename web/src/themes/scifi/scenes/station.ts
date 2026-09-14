@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
-import type { State } from '../state';
+import type { State } from '../../../state';
 
 /** Central command station: pulsing core, rotating hex, orbiting guard dots. */
 export class Station {

@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
-import { hash01 } from '../state';
+import { hash01 } from '../../../state';
 
 interface StarNode { s: Sprite; halo: Sprite; lastSeen: number; vx: number; vy: number; }
 interface Link { x1: number; y1: number; x2: number; y2: number; life: number; color: number; }

@@ -1,6 +1,6 @@
 import { Container, Sprite, Texture } from 'pixi.js';
 import type { Fx } from './fx';
-import { edgePoint } from '../state';
+import { edgePoint } from '../../../state';
 
 interface Missile {
   root: Container;

@@ -95,6 +95,32 @@ UDM/UDR ──syslog UDP:5514──► relay (Python) ──JSON over WebSocket�
 - `deploy/` — systemd unit + kiosk autostart entry (built to run fullscreen
   on a Raspberry Pi, but any Chromium/Chrome/Firefox will do).
 
+### Viewer architecture: core + themes
+
+The relay knows nothing about how events look, and the viewer is split the
+same way: a shared **core** and a **theme** that only draws. Orbital Command
+(`web/src/themes/scifi/`) is the first theme.
+
+| Core (`web/src/*`) | Theme (`web/src/themes/<id>/`) |
+|--------------------|--------------------------------|
+| relay feed + demo generator (`ws.ts`) | its renderer (PixiJS for sci-fi) and scene |
+| event classification (`events.ts`): allow / block / threat / dns / dhcp / wifi / system, direction, Wi-Fi outcome | what each classified event becomes on screen |
+| sim state + weather (`state.ts`), per-flow visual throttle (`throttle.ts`) | which effects are worth showing, on-screen caps, camera |
+| HUD, comms log, F1 panel shell, audio engine | Scene tab toggles, colour scheme, audio cues for effects it shows |
+| quality presets, auto tuner, frame loop + FPS cap (`perf.ts`, `loop.ts`) | scene budgets per quality tier |
+| boot + event pipeline (`app.ts`) | `Theme` object (`theme.ts` is the contract) |
+
+Per event, the core logs it to the HUD, feeds the noise gate and sim state,
+then hands the theme a `SceneEvent`. The theme turns it into visuals, asking
+the shared throttle before drawing repeated flows. Each frame the core
+advances time (sim speed, bullet-time, FPS cap), computes the anti burn-in
+drift, and calls the theme's `frame()`. All settings live in one saved object,
+so HUD and audio preferences carry across themes.
+
+To add a theme: create `web/src/themes/<id>/index.ts` exporting a `Theme`
+(defaults, per-tier budgets, panel controls, `create()`), then boot it from
+`web/src/main.ts`.
+
 ## Run against your own network
 
 1. Start the relay:

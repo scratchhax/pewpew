@@ -1,4 +1,4 @@
-import type { Settings } from './settings';
+import type { CoreSettings as Settings } from './settings';
 import type { State } from './state';
 
 /**
@@ -37,7 +37,7 @@ function degreeToFreq(d: number): number {
   return BASE * Math.pow(2, oct + semi / 12);
 }
 
-type Cue = 'block' | 'allow' | 'dns' | 'dhcp' | 'wifi' | 'threat';
+export type Cue = 'block' | 'allow' | 'dns' | 'dhcp' | 'wifi' | 'threat';
 
 interface HostVoice {
   deg: number; cell: number[]; cellIdx: number;
