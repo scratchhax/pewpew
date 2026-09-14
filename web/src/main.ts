@@ -1,7 +1,7 @@
 import { boot } from './app';
-import { sciFi } from './themes/scifi';
+import { resolveTheme } from './themes/registry';
 
-boot(sciFi).catch((e) => {
+resolveTheme().then((theme) => boot(theme)).catch((e) => {
   console.error(e);
   document.body.innerHTML = `<pre style="color:#ff5a5a;padding:2em">${String(e)}</pre>`;
 });

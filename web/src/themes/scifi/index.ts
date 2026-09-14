@@ -64,6 +64,7 @@ export const sciFi: Theme<typeof SCIFI_DEFAULTS> = {
   controls: SCIFI_CONTROLS,
   create,
 };
+export default sciFi;
 
 async function create(host: ThemeHost<typeof SCIFI_DEFAULTS>,
                       init: RendererInit): Promise<ThemeInstance> {
