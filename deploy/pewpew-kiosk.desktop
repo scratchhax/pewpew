@@ -2,5 +2,5 @@
 Type=Application
 Name=pewpew Orbital Command
 Comment=Fullscreen kiosk for the network visualizer
-Exec=chromium-browser --kiosk --noerrdialogs --disable-infobars --autoplay-policy=no-user-gesture-required http://localhost:8080
+Exec=chromium-browser --kiosk --noerrdialogs --disable-infobars --autoplay-policy=no-user-gesture-required "http://localhost:8080/?quality=low"
 X-GNOME-Autostart-enabled=true

@@ -29,6 +29,9 @@ Full 42s showreel with sound — calm cruise → the F1 config tour → full sto
 - **Colour system** — a fixed event colour-law (block=red, allow=green…) so the
   picture stays readable, *plus* a 48-hue host-mesh you can reskin
   (spectrum / event-law / mono / warm / cool) with a global hue-shift & intensity.
+- **Runs on anything** — quality presets (Low / Medium / High / Ultra) with an
+  **Auto** mode that sizes the scene to the viewing device, from a gaming PC
+  down to a Raspberry Pi 5 kiosk. High is the full classic look.
 - **Zero footprint** — syslog parsed in RAM and fanned out over WebSocket;
   nothing written to disk, no cloud, no accounts, no telemetry.
 
@@ -150,7 +153,7 @@ System**. Everything is live (no reload) and persists to localStorage.
 | **HUD** | uplink · ship-status bars · telemetry · most-wanted · comms log · sensor flux · subspace spectrum · radar · scanlines |
 | **Audio** | additive Melody / Devices layers, per-event volume + per-event gate, the noise (chaos) gate, master / reverb / echo / music-bed, device mix |
 | **Colour** | host-mesh scheme (spectrum / event-law / mono / warm / cool) + a global hue-shift & intensity that sweeps the mesh, nebula and HUD accent |
-| **System** | particle budget · simulation speed · reset-to-defaults |
+| **System** | quality preset (auto / low / medium / high / ultra / custom) · render scale · FPS cap · particle, star, nebula, dust, effect-detail budgets · antialias + GPU power (reload) · simulation speed · reset-to-defaults |
 
 ### Audio: volume vs gate
 
@@ -168,6 +171,65 @@ noise. (The pitched impacts fire once per sequencer step, so they're a per-step
 summary; the noise gate fires 1:1 on raw events — that's why noise ≠ a wide-open
 gate.)
 
+### Performance & quality
+
+The relay never renders anything: every browser that opens the page draws the
+scene on its own GPU. So how smooth it runs depends on the *viewing* device,
+and a quality tier bundles every knob that trades looks for frame time.
+
+| Setting | Low | Medium | **High** | Ultra |
+|---------|-----|--------|----------|-------|
+| Render scale | 0.6 | 0.8 | 1.0 | device pixel ratio (≤2) |
+| FPS cap | 30 | 60 | none | none |
+| Antialias | off | off | off | on |
+| GPU power preference | low-power | browser default | low-power | high-performance |
+| Particles | 800 | 2000 | 4000 | 8000 |
+| Star density | 0.4 | 0.7 | 1.0 | 1.5 |
+| Nebula clouds | 3 | 5 | 7 | 9 |
+| Dust motes | 20 | 45 | 70 | 140 |
+| Effect detail (station aura, crystal trails) | 0.5 | 0.75 | 1.0 | 1.0 |
+| IP stars / event stars | 60 / 100 | 100 / 180 | 140 / 260 | 200 / 400 |
+
+- **High** is exactly how the scene looked before presets existed.
+- **Auto** (the default) guesses a tier when the page loads (Pi / phone GPUs
+  and software renderers start at Low, touch devices and ≤4-core machines at
+  Medium, everything else at High), then watches the real frame rate. If it
+  stays under ~75% of target for 5 seconds, it drops one tier. It only ever
+  steps **down**, so it can't flap; a reload starts from the guess again. The
+  System tab shows which tier Auto is running and why.
+- Moving any individual value switches the preset to **Custom** and keeps your
+  numbers.
+- **Render scale** trades sharpness for GPU fill: 0.6 draws about a third of
+  the pixels of 1.0. The HTML HUD and page compositing are *not* scaled, so on
+  a small board driving a big display the browser itself is often the ceiling
+  (see the measurements below).
+- **Antialias** and **GPU power** are read once when the renderer starts; the
+  panel offers *Apply & reload* when you change them.
+- Pin a device from the URL instead of the panel (handy for a kiosk with no
+  keyboard): `?quality=low`, `?scale=0.6`, `?fps=30`. URL values apply to that
+  page load only and are never saved. `?debug=1` shows FPS, worst frame time,
+  the active tier and render scale.
+- Settings saved before presets existed keep a hand-tuned particle budget as
+  **Custom**; untouched ones move to **Auto**.
+
+![quality settings](docs/perf.png)
+
+**Measured on a Raspberry Pi Compute Module 5** (Chromium kiosk, 2560×1440
+@ 75Hz, heavy demo traffic `?demo=1&rate=40&block=65`):
+
+| Tier | Canvas | FPS |
+|------|--------|-----|
+| High | 2560×1440 | 17.7 |
+| Medium | 2048×1152 | 20.9 |
+| Low | 1536×864 | 23.6 (25.4 in normal traffic) |
+
+Auto guessed Low on its own ("embedded GPU"). Forced to start at High, it
+stepped to Medium after 9s and Low after 18s. The scene logic costs ~4ms and
+the render calls ~8ms per frame; the rest is Chromium painting and compositing
+a 1440p page: hiding the HUD alone reached 33fps, and hiding the whole WebGL
+scene only 27fps. On a board like this, running the display at 1080p is likely
+to help more than any in-page setting.
+
 ![config tour](docs/config.gif)
 
 ![settings](docs/panel.png)
@@ -181,7 +243,10 @@ gate.)
 | `?demo=1&rate=40` | demo at ~40 events/sec |
 | `?demo=1&rate=40&block=65` | …with 65% of firewall hits blocked |
 | `?hosts=Router,Kitchen-AP` | demo hostnames |
-| `?debug=1` | perf/audio overlay (events/s, scheduler queue, voices alive, RMS) |
+| `?quality=low` | pin the quality tier (`auto` / `low` / `medium` / `high` / `ultra`) for this load |
+| `?scale=0.6` | pin the render scale (0.25–2) for this load |
+| `?fps=30` | pin the FPS cap (`0` = uncapped) for this load |
+| `?debug=1` | perf/audio overlay (FPS, worst frame, quality tier, render scale, scene nodes, events/s, scheduler queue, voices alive, RMS) |
 
 ![debug](docs/debug.png)
 
@@ -207,7 +272,12 @@ gate.)
 - **Everything looks soft/wrong after an update** — hard-refresh (Ctrl+Shift+R);
   the relay sends no-cache headers, but be paranoid.
 - **Wrong direction classification** — fix `wan_interfaces` in `relay.yaml`.
-- **Weak GPU** — lower the particle budget in F1, turn off nebula/dust.
+- **Weak GPU / choppy** — Auto should settle on its own within ~30s. If not,
+  pick **Low** in F1 → System or add `?quality=low`, then lower **Render
+  scale** further. `?debug=1` shows the FPS you're actually getting. On a Pi
+  driving a 1440p/4K screen, a 1080p display mode helps most.
+- **Looks soft** — you're on a lower tier or render scale; F1 → System shows
+  which. Pick **High** (or **Ultra** on a HiDPI screen) if the GPU can take it.
 - **Windows LAN IP changed and the viewer is blank** — it's pointing at the
   old relay IP; open the new one.
 
@@ -218,6 +288,10 @@ sudo cp deploy/pewpew-relay.service /etc/systemd/system/   # adjust paths/user
 sudo systemctl enable --now pewpew-relay
 cp deploy/pewpew-kiosk.desktop ~/.config/autostart/        # fullscreen chromium
 ```
+
+The kiosk entry opens `?quality=low`, the starting point for a Pi 5. Edit the URL
+in `pewpew-kiosk.desktop` to try `medium`, or to point a kiosk at a relay on
+another host (e.g. `http://192.168.1.5:8080/?quality=low`).
 
 ## Credits
 
