@@ -104,15 +104,16 @@ UDM/UDR ──syslog UDP:5514──► relay (Python) ──JSON over WebSocket�
 ### Viewer architecture: core + themes
 
 The relay knows nothing about how events look, and the viewer is split the
-same way: a shared **core** and a **theme** that only draws. Orbital Command
-(`web/src/themes/scifi/`) is the first theme.
+same way: a shared **core** and a **theme** that only draws. There are two
+themes: Orbital Command (`web/src/themes/scifi/`) and Last Outpost
+(`web/src/themes/zombie/`).
 
 | Core (`web/src/*`) | Theme (`web/src/themes/<id>/`) |
 |--------------------|--------------------------------|
-| relay feed + demo generator (`ws.ts`) | its renderer (PixiJS for sci-fi) and scene |
+| relay feed + demo generator (`ws.ts`) | its renderer (PixiJS for both current themes) and scene |
 | event classification (`events.ts`): allow / block / threat / dns / dhcp / wifi / system, direction, Wi-Fi outcome (joined / bad / other) | what each classified event becomes on screen |
 | sim state + weather (`state.ts`), per-flow visual throttle (`throttle.ts`) | which effects are worth showing, on-screen caps, camera |
-| HUD, comms log, F1 panel shell, audio engine | Scene tab toggles, colour scheme, audio cues for effects it shows |
+| HUD, comms log, F1 panel shell, audio engine | Scene tab toggles, colour scheme, HUD panel names + accent hue (and optional `body[data-theme]` CSS), audio cues for effects it shows |
 | quality presets, auto tuner, frame loop + FPS cap (`perf.ts`, `loop.ts`) | scene budgets per quality tier |
 | boot + event pipeline (`app.ts`), theme selection (`themes/registry.ts`) | `Theme` object as the default export (`theme.ts` is the contract) |
 
