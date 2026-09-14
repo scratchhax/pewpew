@@ -18,7 +18,7 @@ export interface Layers {
 
 interface Tower { base: Sprite; guard: Sprite; cone: Sprite; aim: number; target: number; idle: number; recoil: number }
 interface Building { host: string; slot: number; roof: Sprite; label: Text; lamp: Sprite; heat: number; glow: number; color: number; tint: number }
-interface Tent { name: string; slot: number; cot: Sprite; label: Text; age: number; seen: number }
+interface Tent { name: string; slot: number; sprite: Sprite; label: Text; age: number; seen: number }
 
 const LABEL = new TextStyle({ fill: 0xf3e6c8, fontFamily: 'monospace', fontSize: 10, stroke: { color: 0x1b140c, width: 3 } });
 const BUILDING_LABEL = new TextStyle({ fill: 0xffe2b0, fontFamily: 'monospace', fontSize: 12, fontWeight: 'bold', stroke: { color: 0x1b140c, width: 3 } });
@@ -26,6 +26,8 @@ const WALL_DARK = 0x3a3a3a, WALL_TRIM = 0xe86a17;
 const GRASS_TINT = 0xbfcfa8, CONCRETE_TINT = 0xe0d4c0, TREE_TINT = 0xd0dcbc;
 /** Tent names fade out once a device has been quiet this long (seconds). */
 const LABEL_RECENT = 30;
+/** Muted canvas colours for tents (khaki, olive, rust, slate, sand). */
+const TENT_TINTS = [0xc9b27a, 0x8f9a5e, 0xb8734a, 0x7f8f9e, 0xd8c49a];
 
 /** The walled compound: static terrain, walls and towers, and the buildings
  *  and tents that appear as hosts and devices show up in the logs. */
@@ -205,14 +207,26 @@ export class Compound {
     });
   }
 
-  /** Swing a guard onto a target; returns the muzzle position. */
-  aim(i: number, p: Point): Point {
+  /** Start turning a guard toward a target it's about to engage (no shot). */
+  watch(i: number, p: Point): void {
     const t = this.towers[i];
     t.target = Math.atan2(p.y - t.base.y, p.x - t.base.x);
-    t.aim = t.target;                        // snap: shots must line up
-    t.recoil = 1;
+    t.recoil = Math.max(t.recoil, 1);
+  }
+
+  /** Fire at a target; the guard turns onto it smoothly. Returns the muzzle. */
+  aim(i: number, p: Point): Point {
+    this.watch(i, p);
+    const t = this.towers[i];
     const reach = 26 * this.L.unit;
-    return { x: t.base.x + Math.cos(t.aim) * reach, y: t.base.y + Math.sin(t.aim) * reach };
+    return { x: t.base.x + Math.cos(t.target) * reach, y: t.base.y + Math.sin(t.target) * reach };
+  }
+
+  /** Towers ordered by distance to a point (nearest first). */
+  towersNear(p: Point): Array<{ i: number; d: number }> {
+    return this.towers
+      .map((t, i) => ({ i, d: Math.hypot(t.base.x - p.x, t.base.y - p.y) }))
+      .sort((a, b) => a.d - b.d);
   }
 
   // ── buildings (AP / gateway hosts) ───────────────────────────────────────
@@ -288,14 +302,15 @@ export class Compound {
     const used = new Set([...this.tents.values()].map((x) => x.slot));
     let slot = (hash01(name) * this.L.camp.length) | 0;
     while (used.has(slot)) slot = (slot + 1) % this.L.camp.length;
-    const cot = new Sprite(this.tex.frame(hash01(name + 'c') < 0.5 ? 'cot_green' : 'cot_orange'));
-    cot.anchor.set(0.5);
-    cot.alpha = 0;
+    const sprite = new Sprite(this.tex.tent);
+    sprite.tint = TENT_TINTS[(hash01(name + 'c') * TENT_TINTS.length) | 0];
+    sprite.anchor.set(0.5);
+    sprite.alpha = 0;
     const label = new Text({ text: name, style: LABEL });
     label.anchor.set(0.5, 0);
     label.alpha = 0;
-    t = { name, slot, cot, label, age: -delay, seen: now };
-    this.layers.props.addChild(cot);
+    t = { name, slot, sprite, label, age: -delay, seen: now };
+    this.layers.props.addChild(sprite);
     this.layers.labels.addChild(label);
     this.tents.set(name, t);
     this.placeTent(t);
@@ -311,20 +326,20 @@ export class Compound {
     let oldest: Tent | null = null;
     for (const t of this.tents.values()) if (!oldest || t.seen < oldest.seen) oldest = t;
     if (!oldest) return;
-    oldest.cot.destroy(); oldest.label.destroy();
+    oldest.sprite.destroy(); oldest.label.destroy();
     this.tents.delete(oldest.name);
   }
 
   private placeTent(t: Tent): void {
     const L = this.L;
     const p = L.camp[t.slot % L.camp.length];
-    t.cot.position.set(p.x, p.y);
-    t.cot.scale.set(0.24 * L.unit);
-    // alternate columns label below / above the cot so neighbours don't collide
+    t.sprite.position.set(p.x, p.y);
+    t.sprite.scale.set(0.62 * L.unit);
+    // alternate columns label below / above the tent so neighbours don't collide
     const col = Math.round((p.x - (L.cx - L.hw * 0.42)) / ((L.hw * 0.84) / 10));
     const below = col % 2 === 0;
     t.label.anchor.set(0.5, below ? 0 : 1);
-    t.label.position.set(p.x, p.y + (below ? 1 : -1) * 24 * L.unit);
+    t.label.position.set(p.x, p.y + (below ? 1 : -1) * 19 * L.unit);
   }
 
   /** A stable courtyard spot for any key (e.g. a LAN IP with no tent). */
@@ -347,11 +362,11 @@ export class Compound {
 
     this.towers.forEach((tw, i) => {
       // idle guards sweep their watch arc; firing turns them onto a target
-      tw.recoil = Math.max(0, tw.recoil - dt * 3);
-      if (tw.recoil <= 0) {
-        const sweep = tw.idle + Math.sin(this.t * 0.35 + i * 1.7) * 0.9;
-        tw.aim += (sweep - tw.aim) * Math.min(1, dt * 1.2);
-      }
+      // engaged guards turn onto their target (shortest way round); idle ones
+      // drift back into a slow sweep of their watch arc. Never an instant snap.
+      tw.recoil = Math.max(0, tw.recoil - dt * 0.8);
+      const want = tw.recoil > 0 ? tw.target : tw.idle + Math.sin(this.t * 0.35 + i * 1.7) * 0.9;
+      tw.aim += angleDelta(tw.aim, want) * Math.min(1, dt * (tw.recoil > 0 ? 7 : 1.2));
       tw.guard.rotation = tw.aim;
       tw.cone.rotation = tw.aim;
       tw.cone.scale.set(5.2 * this.L.unit, 1.7 * this.L.unit);
@@ -382,7 +397,7 @@ export class Compound {
     for (const t of this.tents.values()) {
       t.age += dt;
       const a = Math.max(0, Math.min(1, t.age * 1.5));
-      fade(t.cot, a);
+      fade(t.sprite, a);
       // names show while a device is active, then fade so the camp stays readable
       const quiet = (now - t.seen) / 1000;
       const want = quiet < LABEL_RECENT ? 0.9 : 0;
@@ -399,4 +414,9 @@ function mix(a: number, b: number, f: number): number {
 /** Frame-rate independent exponential approach: `rate` ≈ 1/seconds to settle. */
 function ease(current: number, target: number, dt: number, rate: number): number {
   return current + (target - current) * Math.min(1, dt * rate);
+}
+
+/** Signed shortest rotation from angle a to angle b, in (-PI, PI]. */
+export function angleDelta(a: number, b: number): number {
+  return Math.atan2(Math.sin(b - a), Math.cos(b - a));
 }
