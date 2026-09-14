@@ -1,5 +1,6 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import type { Weather } from '../../state';
+import { fade } from './fx';
 
 interface Drop { s: Sprite; speed: number }
 interface Fog { s: Sprite; vx: number; phase: number }
@@ -65,7 +66,7 @@ export class Sky {
     }
   }
 
-  update(dt: number, weather: Weather, dayNight: boolean, rainOn: boolean, alarm: number): void {
+  update(dt: number, weather: Weather, dayNight: boolean, rainOn: boolean, alarm: number, fogOn = true): void {
     this.t += dt;
     const target = !dayNight ? 0 : weather === 'hurricane' ? 0.64 : weather === 'storm' ? 0.36 : 0;
     this.darkness += (target - this.darkness) * Math.min(1, dt * 0.35);
@@ -92,13 +93,13 @@ export class Sky {
       }
     }
 
-    const foggy = weather === 'hurricane' && dayNight ? 1 : 0;
+    const foggy = weather === 'hurricane' && dayNight && fogOn ? 1 : 0;
     for (const f of this.fog) {
       f.phase += dt * 0.2;
       f.s.x += f.vx * dt;
       if (f.s.x < -300) f.s.x = this.w + 300;
       if (f.s.x > this.w + 300) f.s.x = -300;
-      f.s.alpha += (foggy * (0.06 + 0.03 * Math.sin(f.phase)) - f.s.alpha) * Math.min(1, dt * 0.5);
+      fade(f.s, f.s.alpha + (foggy * (0.06 + 0.03 * Math.sin(f.phase)) - f.s.alpha) * Math.min(1, dt * 0.5));
     }
   }
 }

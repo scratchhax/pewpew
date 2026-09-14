@@ -225,6 +225,12 @@ and the **System** tab's budgets per quality tier are:
 | Blood decals | 30 | 70 | 140 | 260 |
 | Rain density | 0.3 | 0.6 | 1.0 | 1.5 |
 | Tents | 16 | 22 | 28 | 36 |
+| Fog + survivor flashlights | off | on | on | on |
+
+On the CM5 kiosk (2560×1440, Auto → Low, demo traffic) Last Outpost runs at
+about 23 fps in daylight and 21 fps in horde night, against about 24 fps for
+sci-fi in the same session. Lights that are fully dark are skipped rather than
+drawn at zero alpha, which is what keeps night affordable on a Pi.
 
 ## The audio engine
 

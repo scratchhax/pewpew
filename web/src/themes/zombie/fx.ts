@@ -153,3 +153,13 @@ export class Fx {
     }
   }
 }
+
+/**
+ * Set a sprite's alpha and skip drawing it when it's effectively invisible.
+ * PixiJS still draws alpha-0 sprites, and the big additive light quads (tower
+ * cones, flashlights, fog) cost real fill time on a Pi even when unseen.
+ */
+export function fade(s: Container, alpha: number): void {
+  s.alpha = alpha;
+  s.visible = alpha > 0.004;
+}

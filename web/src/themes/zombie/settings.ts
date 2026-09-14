@@ -26,15 +26,16 @@ export const ZOMBIE_DEFAULTS = {
   zMaxDecals: 140,
   zRainDensity: 1,
   zMaxTents: 28,
+  zNightExtras: true,     // fog + survivor flashlights (fill-heavy on small GPUs)
 };
 
 export type ZombieSettings = CoreSettings & typeof ZOMBIE_DEFAULTS;
 
 export const ZOMBIE_BUDGETS: Budgets = {
-  low: { zMaxParticles: 600, zMaxZombies: 8, zMaxDecals: 30, zRainDensity: 0.3, zMaxTents: 16 },
-  medium: { zMaxParticles: 1500, zMaxZombies: 10, zMaxDecals: 70, zRainDensity: 0.6, zMaxTents: 22 },
-  high: { zMaxParticles: 3000, zMaxZombies: 12, zMaxDecals: 140, zRainDensity: 1, zMaxTents: 28 },
-  ultra: { zMaxParticles: 6000, zMaxZombies: 18, zMaxDecals: 260, zRainDensity: 1.5, zMaxTents: 36 },
+  low: { zMaxParticles: 600, zMaxZombies: 8, zMaxDecals: 30, zRainDensity: 0.3, zMaxTents: 16, zNightExtras: false },
+  medium: { zMaxParticles: 1500, zMaxZombies: 10, zMaxDecals: 70, zRainDensity: 0.6, zMaxTents: 22, zNightExtras: true },
+  high: { zMaxParticles: 3000, zMaxZombies: 12, zMaxDecals: 140, zRainDensity: 1, zMaxTents: 28, zNightExtras: true },
+  ultra: { zMaxParticles: 6000, zMaxZombies: 18, zMaxDecals: 260, zRainDensity: 1.5, zMaxTents: 36, zNightExtras: true },
 };
 
 type Key = keyof typeof ZOMBIE_DEFAULTS;
@@ -56,6 +57,7 @@ export const ZOMBIE_CONTROLS = {
     range('zMaxDecals', 'Blood decals', 0, 260, 10),
     range('zRainDensity', 'Rain', 0, 1.5, 0.05),
     range('zMaxTents', 'Tents', 8, 36, 1),
+    toggle('zNightExtras', 'Fog + flashlights'),
   ],
   color: [] as Control[],
   colorHint: `Hue shift & intensity recolour the HUD accent. Event colours

@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, RenderTexture, Sprite, Text, TextStyle } from 'pixi.js';
 import type { FrameName } from './assets/atlas';
 import type { ZTextures } from './textures';
+import { fade } from './fx';
 import { Layout, Point, seeded } from './layout';
 import { hash01 } from '../../state';
 
@@ -348,7 +349,7 @@ export class Compound {
       tw.guard.rotation = tw.aim;
       tw.cone.rotation = tw.aim;
       tw.cone.scale.set(5.2 * this.L.unit, 1.7 * this.L.unit);
-      tw.cone.alpha = night * 0.45;
+      fade(tw.cone, night * 0.45);
       tw.cone.tint = alarm > 0 && Math.sin(this.t * 10) > 0 ? 0xff5a4a : 0xfff0c8;
     });
 
@@ -370,17 +371,17 @@ export class Compound {
       b.roof.tint = b.pulse > 0.05 ? mix(0xffffff, b.color, Math.min(0.55, b.pulse * 0.4)) : 0xffffff;
       b.lamp.tint = b.color;
       b.lamp.scale.set(2.4 * this.L.unit * (1 + b.pulse * 0.3));
-      b.lamp.alpha = Math.min(0.9, b.pulse * 0.5 + night * 0.25) * flick;
+      fade(b.lamp, Math.min(0.9, b.pulse * 0.5 + night * 0.25) * flick);
     }
     const now = performance.now();
     for (const t of this.tents.values()) {
       t.age += dt;
       const a = Math.max(0, Math.min(1, t.age * 1.5));
-      t.cot.alpha = a;
+      fade(t.cot, a);
       // names show while a device is active, then fade so the camp stays readable
       const quiet = (now - t.seen) / 1000;
       const want = quiet < LABEL_RECENT ? 0.9 : 0;
-      t.label.alpha += (a * want - t.label.alpha) * Math.min(1, dt * 1.5);
+      fade(t.label, t.label.alpha + (a * want - t.label.alpha) * Math.min(1, dt * 1.5));
     }
   }
 }

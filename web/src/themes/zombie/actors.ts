@@ -1,6 +1,6 @@
 import { Container, Sprite, Texture } from 'pixi.js';
 import type { Compound } from './compound';
-import type { Fx } from './fx';
+import { fade, type Fx } from './fx';
 import type { ZTextures } from './textures';
 import { Point, wallPoint } from './layout';
 import { edgePoint } from '../../state';
@@ -62,7 +62,7 @@ export class Zombies {
     s.position.set(start.x, start.y);
     const eye = new Sprite(this.tex.glow);
     eye.anchor.set(0.5); eye.blendMode = 'add'; eye.tint = brute ? 0xff9a45 : 0xff3a2a;
-    eye.scale.set((brute ? 0.34 : 0.2) * L.unit); eye.alpha = 0;
+    eye.scale.set((brute ? 0.34 : 0.2) * L.unit); fade(eye, 0);
     this.layer.addChild(s);
     this.lights.addChild(eye);
     const lone = !brute && horde === 0;
@@ -89,7 +89,7 @@ export class Zombies {
         z.dying -= dt;
         z.s.alpha = Math.max(0, z.dying / 0.7);
         z.s.rotation += dt * 2.5;
-        z.eye.alpha = 0;
+        fade(z.eye, 0);
         if (z.dying <= 0) { z.s.destroy(); z.eye.destroy(); this.list.splice(i, 1); }
         continue;
       }
@@ -106,7 +106,7 @@ export class Zombies {
       z.s.position.set(x, y);
       z.s.rotation = Math.atan2(uy, ux) + Math.sin(z.phase) * 0.12;
       z.eye.position.set(x + Math.cos(z.s.rotation) * 6 * L.unit, y + Math.sin(z.s.rotation) * 6 * L.unit);
-      z.eye.alpha = darkness * (0.55 + 0.25 * Math.sin(z.phase * 1.7));
+      fade(z.eye, darkness * (0.55 + 0.25 * Math.sin(z.phase * 1.7)));
 
       if (z.killAt !== null && z.t >= z.killAt) {
         this.kill(z, { x, y }, z.brute ? 3 : 1);
@@ -182,7 +182,7 @@ export class Walkers {
       this.layer.addChild(prop);
     }
     const lamp = new Sprite(this.tex.glow);
-    lamp.anchor.set(0.05, 0.5); lamp.blendMode = 'add'; lamp.tint = 0xfff3d0; lamp.alpha = 0;
+    lamp.anchor.set(0.05, 0.5); lamp.blendMode = 'add'; lamp.tint = 0xfff3d0; fade(lamp, 0);
     this.layer.addChild(s);
     this.lights.addChild(lamp);
     this.list.push({
@@ -192,7 +192,8 @@ export class Walkers {
     });
   }
 
-  update(dt: number, darkness: number): void {
+  update(dt: number, darkness: number, flashlights = true): void {
+    const lampDark = flashlights ? darkness : 0;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const w = this.list[i];
       const done = w.seg >= w.path.length - 1;
@@ -200,7 +201,7 @@ export class Walkers {
         w.fade -= dt * 2.5;
         w.s.alpha = Math.max(0, w.fade);
         if (w.prop) w.prop.alpha = w.s.alpha;
-        w.lamp.alpha = w.s.alpha * darkness * 0.35;
+        fade(w.lamp, w.s.alpha * lampDark * 0.35);
         if (w.fade <= 0) {
           w.s.destroy(); w.prop?.destroy(); w.lamp.destroy();
           this.list.splice(i, 1);
@@ -236,7 +237,7 @@ export class Walkers {
       w.lamp.position.set(x, y);
       w.lamp.rotation = heading;
       w.lamp.scale.set(2.2 * w.s.scale.x, 0.9 * w.s.scale.x);
-      w.lamp.alpha = darkness * 0.35 * w.fade;
+      fade(w.lamp, lampDark * 0.35 * w.fade);
       if (w.trailGap && w.since >= w.trailGap) {
         w.since = 0;
         this.fx.emit(x, y, w.color, 1, 4, 0.1, 1.4);

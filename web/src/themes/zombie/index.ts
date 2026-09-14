@@ -267,7 +267,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
     const { dt, dtReal, t } = f;
 
     const hits = zombies.update(dt, sky.darkness);
-    walkers.update(dt, sky.darkness);
+    walkers.update(dt, sky.darkness, settings.zNightExtras);
     const attacked = zombies.underAttack();
     audio.setThreatActive(attacked);
     alarmKick = Math.max(0, alarmKick - dt * 0.8);
@@ -283,7 +283,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
 
     fx.update(dt);
     compound.update(dt, sky.darkness, alarm);
-    sky.update(dt, state.weather, settings.zDayNight, settings.zRain, alarm);
+    sky.update(dt, state.weather, settings.zDayNight, settings.zRain, alarm, settings.zNightExtras);
 
     shake = Math.max(0, shake - dt * 18);
     punch = Math.max(0, punch - dt * 0.25);
