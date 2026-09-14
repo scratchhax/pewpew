@@ -106,7 +106,7 @@ export class Zombies {
       z.s.position.set(x, y);
       z.s.rotation = Math.atan2(uy, ux) + Math.sin(z.phase) * 0.12;
       z.eye.position.set(x + Math.cos(z.s.rotation) * 6 * L.unit, y + Math.sin(z.s.rotation) * 6 * L.unit);
-      fade(z.eye, darkness * (0.55 + 0.25 * Math.sin(z.phase * 1.7)));
+      fade(z.eye, darkness * 0.55);                  // steady glow, no flicker
 
       if (z.killAt !== null && z.t >= z.killAt) {
         this.kill(z, { x, y }, z.brute ? 3 : 1);
@@ -136,8 +136,8 @@ export class Zombies {
         this.fx.flash(muzzle.x, muzzle.y);
       }
     }
-    this.fx.emit(p.x, p.y, BLOOD, z.brute ? 26 : 12, z.brute ? 120 : 80, 0.2, 0.55);
-    this.fx.emit(p.x, p.y, z.color, z.brute ? 10 : 4, 60, 0.16, 0.4);
+    this.fx.emit(p.x, p.y, BLOOD, z.brute ? 12 : 6, z.brute ? 90 : 60, 0.18, 0.5);
+    this.fx.emit(p.x, p.y, z.color, z.brute ? 5 : 2, 50, 0.14, 0.4);
     this.fx.splat(p.x, p.y, z.brute ? 1.8 : 1);
     if (z.brute) this.fx.ring(p.x, p.y, z.color, 110 * this.compound.L.unit, 3.5, 0.9);
     z.dying = 0.7;

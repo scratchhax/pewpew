@@ -136,9 +136,8 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
         if (settings.zHordes && zombies.hordes() < 2) {
           zombies.spawnHorde(angle, COLORS.threat);
         } else {
-          // hordes maxed (or off): sound the alarm briefly instead
+          // hordes maxed (or off): raise the alarm briefly instead
           alarmKick = 1;
-          if (settings.zScreenShake) shake = Math.min(12, shake + 3);
         }
         break;
       }
@@ -272,13 +271,13 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
     audio.setThreatActive(attacked);
     alarmKick = Math.max(0, alarmKick - dt * 0.8);
     const alarmTarget = Math.max(attacked ? 1 : 0, alarmKick);
-    alarm += (alarmTarget - alarm) * Math.min(1, dt * (alarmTarget > alarm ? 6 : 1.5));
+    // the alarm fades in over ~1s and out over ~2s: a mood, never a strobe
+    alarm += (alarmTarget - alarm) * Math.min(1, dt * (alarmTarget > alarm ? 1.2 : 0.6));
+    // only a real breach nudges the camera; routine kills don't jolt the screen
     if (hits.breaches.length > 0) {
       state.slowmo(0.35, 0.4);
-      punch += 0.03;
-      if (settings.zScreenShake) shake = Math.min(20, shake + 9);
-    } else if (hits.kills.length > 0 && settings.zScreenShake) {
-      shake = Math.min(6, shake + 1.2);
+      punch += 0.012;
+      if (settings.zScreenShake) shake = Math.min(6, shake + 3);
     }
 
     fx.update(dt);

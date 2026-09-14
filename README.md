@@ -200,19 +200,24 @@ colour law is the same as above, so the radio log still matches the scene.
 
 | Event | On screen |
 |-------|-----------|
-| block | a **zombie** shambles in from a bearing fixed by the remote IP; the nearest watchtower guard shoots it down (tracer, muzzle flash, blood). The odd one reaches the fence: a breach shakes the screen |
-| threat | a **horde**: a brute leading a weaving pack. The two nearest towers open fire, the alarm washes the screen red and the threat audio bed plays while the brute lives |
+| block | a **zombie** shambles in from a bearing fixed by the remote IP; the nearest watchtower guard shoots it down (a soft tracer and muzzle glow, blood). The odd one reaches the fence: a breach gives the camera a small nudge |
+| threat | a **horde**: a brute leading a weaving pack. The two nearest towers open fire, the scene takes on a steady red cast, the floodlights turn red and the threat audio bed plays while the brute lives |
 | allow (border) | **supply runs**: outbound, a scavenger runs from the camp through the nearest gate and off the map; inbound, a survivor carries a crate in. Internal (LAN↔LAN) permits are couriers strolling between tents |
-| dns | a dashed **radio call** from the client's spot in the camp to the radio mast, which pings blue |
+| dns | a dashed **radio call** from the client's spot in the camp to the radio mast, whose blue light warms up with traffic |
 | dhcp | a **new survivor** walks in through a gate and pitches a cot labelled with the device's hostname (renewals ring the existing tent; names fade when a device goes quiet) |
-| wifi | AP and gateway hosts are **buildings**: joins walk in the door, leaves and failures bolt out in a purple burst and rattle the roof |
-| system | the **generator flickers** and the logging building glows grey |
+| wifi | AP and gateway hosts are **buildings**: joins walk in the door, leaves and failures hurry out in a purple burst; the building lamp slowly warms toward the colour of its recent activity |
+| system | the **generator browns out**: the lights dim smoothly for a moment and recover |
 
 Traffic weather is **time of day**: CALM is daylight, STORM is dusk with rain,
 HURRICANE is horde night (dark, heavy rain, fog), with floodlight cones on the
 towers, lamps at the gates and zombie eyes glowing in the dark. The HUD is
 relabelled to match (RADIO, COMPOUND, SURVIVAL LOG, HOT ZONES, RADIO LOG…).
 It uses the same generative soundtrack as sci-fi for now.
+
+**No flashing.** Every light and colour change in this theme eases over about a
+second: nothing strobes or blinks (including the HUD cursor and demo badge), and
+routine kills don't shake the screen. Measured on demo traffic, the largest
+frame-to-frame brightness swing is a quarter of what the first version had.
 
 Its **Scene** tab has toggles for zombies, hordes, supply runs, couriers, DNS
 radio, DHCP arrivals, AP buildings, day/night, rain, blood and screen shake,

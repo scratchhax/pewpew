@@ -1,10 +1,13 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 
-interface Particle { s: Sprite; vx: number; vy: number; life: number; max: number; drag: number; grow: number }
+interface Particle { s: Sprite; vx: number; vy: number; life: number; max: number; drag: number; grow: number; peak: number }
 interface Tracer { x1: number; y1: number; x2: number; y2: number; life: number; color: number }
 interface Ring { x: number; y: number; r: number; maxR: number; life: number; max: number; color: number; width: number }
 interface Dash { x1: number; y1: number; x2: number; y2: number; life: number; max: number; color: number }
 interface Decal { s: Sprite; age: number }
+
+/** Gunfire lines fade over this long; a soft warm streak, no white core. */
+const TRACER_LIFE = 0.22;
 
 /**
  * Short-lived effects: additive particles, gunfire tracers, expanding rings,
@@ -39,23 +42,23 @@ export class Fx {
       s.scale.set(size * (0.6 + Math.random() * 0.8));
       const a = Math.random() * Math.PI * 2, v = speed * (0.3 + Math.random() * 0.7);
       const l = life * (0.6 + Math.random() * 0.7);
-      this.particles.push({ s, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: l, max: l, drag: 0.92, grow: 0 });
+      this.particles.push({ s, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: l, max: l, drag: 0.92, grow: 0, peak: 0.85 });
       this.layer.addChild(s);
     }
   }
 
-  /** Muzzle flash: a hot pop at the gun. */
-  flash(x: number, y: number, color = 0xfff1b0, size = 0.5): void {
+  /** Muzzle glow: a small warm bloom that fades, not a bright pop. */
+  flash(x: number, y: number, color = 0xffc98a, size = 0.5): void {
     if (this.particles.length >= this.maxParticles) return;
     const s = this.pool.pop() ?? Object.assign(new Sprite(this.glow), { blendMode: 'add' as const });
     s.anchor.set(0.5); s.visible = true;
-    s.x = x; s.y = y; s.tint = color; s.scale.set(size * 0.4);
-    this.particles.push({ s, vx: 0, vy: 0, life: 0.09, max: 0.09, drag: 1, grow: size * 6 });
+    s.x = x; s.y = y; s.tint = color; s.scale.set(size * 0.35);
+    this.particles.push({ s, vx: 0, vy: 0, life: 0.3, max: 0.3, drag: 1, grow: size * 0.8, peak: 0.4 });
     this.layer.addChild(s);
   }
 
-  tracer(x1: number, y1: number, x2: number, y2: number, color = 0xffd27a): void {
-    this.tracers.push({ x1, y1, x2, y2, life: 0.12, color });
+  tracer(x1: number, y1: number, x2: number, y2: number, color = 0xffc98a): void {
+    this.tracers.push({ x1, y1, x2, y2, life: TRACER_LIFE, color });
   }
 
   ring(x: number, y: number, color: number, maxR = 60, width = 2, life = 0.7): void {
@@ -105,7 +108,7 @@ export class Fx {
       p.vx *= p.drag; p.vy *= p.drag;
       p.s.x += p.vx * dt; p.s.y += p.vy * dt;
       if (p.grow) p.s.scale.set(p.s.scale.x + p.grow * dt);
-      p.s.alpha = Math.min(1, (p.life / p.max) * 1.6);
+      p.s.alpha = Math.min(p.peak, (p.life / p.max) * 1.4);
     }
 
     // decals slowly dry out over ~2 minutes
@@ -125,17 +128,16 @@ export class Fx {
       const t = this.tracers[i];
       t.life -= dt;
       if (t.life <= 0) { this.tracers.splice(i, 1); continue; }
-      const a = t.life / 0.12;
-      g.moveTo(t.x1, t.y1).lineTo(t.x2, t.y2).stroke({ width: 4, color: t.color, alpha: 0.25 * a });
-      g.moveTo(t.x1, t.y1).lineTo(t.x2, t.y2).stroke({ width: 1.4, color: 0xffffff, alpha: a });
+      const a = t.life / TRACER_LIFE;
+      g.moveTo(t.x1, t.y1).lineTo(t.x2, t.y2).stroke({ width: 2, color: t.color, alpha: 0.35 * a });
     }
     for (let i = this.rings.length - 1; i >= 0; i--) {
       const r = this.rings[i];
       r.life -= dt;
       if (r.life <= 0) { this.rings.splice(i, 1); continue; }
-      r.r += (r.maxR - r.r) * Math.min(1, dt * 6);
+      r.r += (r.maxR - r.r) * Math.min(1, dt * 4);
       const a = r.life / r.max;
-      g.circle(r.x, r.y, r.r).stroke({ width: r.width * a + 0.5, color: r.color, alpha: a * 0.85 });
+      g.circle(r.x, r.y, r.r).stroke({ width: r.width * a + 0.5, color: r.color, alpha: a * 0.5 });
     }
     for (let i = this.dashes.length - 1; i >= 0; i--) {
       const d = this.dashes[i];
@@ -149,7 +151,7 @@ export class Fx {
         const e = Math.min(len, s + 7);
         g.moveTo(d.x1 + ux * s, d.y1 + uy * s).lineTo(d.x1 + ux * e, d.y1 + uy * e);
       }
-      g.stroke({ width: 2, color: d.color, alpha: a * 0.9 });
+      g.stroke({ width: 2, color: d.color, alpha: a * 0.6 });
     }
   }
 }

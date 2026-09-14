@@ -30,3 +30,6 @@ body[data-theme="zombie"] #settings select {
   color: #f0dcb4;
   border-color: rgba(232, 161, 58, 0.3);
 }
+/* no blinking in this theme: steady cursor, steady demo badge */
+body[data-theme="zombie"] .cursor { animation: none; }
+body[data-theme="zombie"] #demo-badge { animation: none; opacity: 0.9; }

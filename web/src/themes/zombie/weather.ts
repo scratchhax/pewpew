@@ -78,8 +78,9 @@ export class Sky {
 
     this.alarmG.clear();
     if (alarm > 0.01) {
-      const pulse = 0.5 + 0.5 * Math.sin(this.t * 7);
-      this.alarmG.rect(0, 0, this.w, this.h).fill({ color: 0xff2a1a, alpha: 0.05 + 0.07 * pulse * alarm });
+      // a steady red cast (alarm itself is eased); only a slow ±10% breath, no pulsing
+      const breath = 1 + 0.1 * Math.sin(this.t * 1.2);
+      this.alarmG.rect(0, 0, this.w, this.h).fill({ color: 0xff2a1a, alpha: 0.07 * alarm * breath });
     }
 
     const wet = !rainOn ? 0 : weather === 'hurricane' ? 1 : weather === 'storm' ? 0.55 : 0;

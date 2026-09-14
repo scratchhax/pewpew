@@ -17,7 +17,7 @@ export interface Layers {
 }
 
 interface Tower { base: Sprite; guard: Sprite; cone: Sprite; aim: number; target: number; idle: number; recoil: number }
-interface Building { host: string; slot: number; roof: Sprite; label: Text; lamp: Sprite; pulse: number; color: number; shake: number }
+interface Building { host: string; slot: number; roof: Sprite; label: Text; lamp: Sprite; heat: number; glow: number; color: number; tint: number }
 interface Tent { name: string; slot: number; cot: Sprite; label: Text; age: number; seen: number }
 
 const LABEL = new TextStyle({ fill: 0xf3e6c8, fontFamily: 'monospace', fontSize: 10, stroke: { color: 0x1b140c, width: 3 } });
@@ -43,7 +43,10 @@ export class Compound {
   private buildings = new Map<string, Building>();
   private tents = new Map<string, Tent>();
   private t = 0;
-  private flicker = 0;
+  private brownout = 0;         // > 0 after a system event
+  private power = 1;            // eased light level (dips during a brownout)
+  private mastHeat = 0;
+  private mastGlow = 0;
   maxTents = 28;
 
   constructor(private app: Application, private layers: Layers, private tex: ZTextures) {
@@ -222,7 +225,7 @@ export class Compound {
     for (let i = 0; i < slots && used.has(slot); i++) slot = (slot + 1) % slots;
     if (used.has(slot)) {
       // all taken: the quietest building hands its slot over
-      const quiet = [...this.buildings.values()].sort((a, c) => a.pulse - c.pulse)[0];
+      const quiet = [...this.buildings.values()].sort((a, c) => a.heat - c.heat)[0];
       this.removeBuilding(quiet);
       slot = quiet.slot;
     }
@@ -232,7 +235,7 @@ export class Compound {
     label.anchor.set(0.5);
     const lamp = new Sprite(this.tex.glow);
     lamp.anchor.set(0.5); lamp.blendMode = 'add';
-    b = { host, slot, roof, label, lamp, pulse: 0, color: 0xffffff, shake: 0 };
+    b = { host, slot, roof, label, lamp, heat: 0, glow: 0, color: 0xffffff, tint: 0xffffff };
     this.layers.props.addChild(roof);
     this.layers.labels.addChild(label);
     this.layers.lights.addChild(lamp);
@@ -261,11 +264,12 @@ export class Compound {
     return { x: p.x, y: p.y + (p.y < this.L.cy ? half : -half) };
   }
 
+  /** Activity at a building: its lamp warms up slowly toward the event colour
+   *  and cools off over a few seconds. No flashes, no roof tint, no shaking. */
   buildingEvent(host: string, kind: 'good' | 'bad' | 'info', color: number): void {
     const b = this.building(host);
-    b.pulse = Math.min(1.5, b.pulse + (kind === 'bad' ? 0.9 : 0.5));
+    b.heat = Math.min(1, b.heat + (kind === 'bad' ? 0.35 : 0.2));
     b.color = color;
-    if (kind === 'bad') b.shake = 0.35;
   }
 
   setBuildingsVisible(on: boolean): void {
@@ -329,18 +333,20 @@ export class Compound {
     return { x: p.x + (hash01(key + 'x') - 0.5) * 14, y: p.y + (hash01(key + 'y') - 0.5) * 10 };
   }
 
-  /** Radio mast blink / generator flicker hooks. */
-  mastPing(): void { this.mastLight.alpha = 1; }
-  generatorFlicker(): void { this.flicker = 0.6; }
+  /** DNS traffic: the mast light warms up a little (eased, never a blink). */
+  mastPing(): void { this.mastHeat = Math.min(1, this.mastHeat + 0.25); }
+  /** System event: the generator browns out — lights dim smoothly and recover. */
+  generatorFlicker(): void { this.brownout = 1; }
 
   update(dt: number, darkness: number, alarm: number): void {
     this.t += dt;
-    this.flicker = Math.max(0, this.flicker - dt);
-    const flick = this.flicker > 0 ? (Math.sin(this.t * 60) > 0 ? 0.25 : 1) : 1;
-    const night = darkness * flick;
+    // everything below eases: no on/off toggles, no per-event pops
+    this.brownout = Math.max(0, this.brownout - dt * 0.6);
+    this.power = ease(this.power, this.brownout > 0 ? 0.6 : 1, dt, 1.2);
+    const night = darkness * this.power;
 
     this.towers.forEach((tw, i) => {
-      // idle guards sweep their watch arc; firing snaps them onto a target
+      // idle guards sweep their watch arc; firing turns them onto a target
       tw.recoil = Math.max(0, tw.recoil - dt * 3);
       if (tw.recoil <= 0) {
         const sweep = tw.idle + Math.sin(this.t * 0.35 + i * 1.7) * 0.9;
@@ -349,29 +355,28 @@ export class Compound {
       tw.guard.rotation = tw.aim;
       tw.cone.rotation = tw.aim;
       tw.cone.scale.set(5.2 * this.L.unit, 1.7 * this.L.unit);
-      fade(tw.cone, night * 0.45);
-      tw.cone.tint = alarm > 0 && Math.sin(this.t * 10) > 0 ? 0xff5a4a : 0xfff0c8;
+      fade(tw.cone, night * 0.4);
+      tw.cone.tint = mix(0xfff0c8, 0xff6a50, Math.min(1, alarm));   // alarm shifts to red, steadily
     });
 
-    for (const lamp of this.gateLamps) lamp.alpha = 0.08 + night * 0.6;
+    for (const lamp of this.gateLamps) lamp.alpha = 0.08 + night * 0.55;
 
-    this.mastLight.alpha = Math.max(0.1 + night * 0.3, this.mastLight.alpha - dt * 2);
+    this.mastHeat = Math.max(0, this.mastHeat - dt * 0.35);
+    this.mastGlow = ease(this.mastGlow, this.mastHeat, dt, 1);
+    this.mastLight.alpha = 0.1 + night * 0.25 + this.mastGlow * 0.25;
     this.mastLight.tint = 0x55b5ff;
-    this.mastLight.scale.set(0.9 * this.L.unit * (1 + this.mastLight.alpha * 0.6));
+    this.mastLight.scale.set(0.9 * this.L.unit * (1 + this.mastGlow * 0.3));
     this.genLight.tint = 0xffd27a;
-    this.genLight.alpha = (0.1 + night * 0.4) * flick;
+    this.genLight.alpha = (0.1 + night * 0.35) * this.power;
     this.genLight.scale.set(1.4 * this.L.unit);
 
     for (const b of this.buildings.values()) {
-      b.pulse = Math.max(0, b.pulse - dt * 0.9);
-      b.shake = Math.max(0, b.shake - dt);
-      const p = this.L.buildings[b.slot];
-      const jig = b.shake > 0 ? (Math.random() - 0.5) * 5 * b.shake : 0;
-      b.roof.position.set(p.x + jig, p.y);
-      b.roof.tint = b.pulse > 0.05 ? mix(0xffffff, b.color, Math.min(0.55, b.pulse * 0.4)) : 0xffffff;
-      b.lamp.tint = b.color;
-      b.lamp.scale.set(2.4 * this.L.unit * (1 + b.pulse * 0.3));
-      fade(b.lamp, Math.min(0.9, b.pulse * 0.5 + night * 0.25) * flick);
+      b.heat = Math.max(0, b.heat - dt * 0.2);
+      b.glow = ease(b.glow, b.heat, dt, 0.9);
+      b.tint = mix(b.tint, b.color, Math.min(1, dt * 0.8));
+      b.lamp.tint = b.tint;
+      b.lamp.scale.set(2.4 * this.L.unit);
+      fade(b.lamp, Math.min(0.45, b.glow * 0.3 + night * 0.2) * this.power);
     }
     const now = performance.now();
     for (const t of this.tents.values()) {
@@ -389,4 +394,9 @@ export class Compound {
 function mix(a: number, b: number, f: number): number {
   const ch = (s: number) => Math.round(((a >> s) & 255) * (1 - f) + ((b >> s) & 255) * f);
   return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
+/** Frame-rate independent exponential approach: `rate` ≈ 1/seconds to settle. */
+function ease(current: number, target: number, dt: number, rate: number): number {
+  return current + (target - current) * Math.min(1, dt * rate);
 }
