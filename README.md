@@ -200,7 +200,7 @@ colour law is the same as above, so the radio log still matches the scene.
 
 | Event | On screen |
 |-------|-----------|
-| block | a **zombie** shambles in from a bearing fixed by the remote IP; the nearest watchtower guard shoots it down (a soft tracer and muzzle glow, blood). The odd one reaches the fence: a breach gives the camera a small nudge |
+| block | a **zombie** shambles in from a bearing fixed by the remote IP; the nearest watchtower guard turns and fires; visible rounds fly to the zombie and it topples when they land (blood, no flash). The odd one reaches the fence: a breach gives the camera a small nudge |
 | threat | a **horde**: a brute leading a weaving pack. The two nearest towers open fire, the scene takes on a steady red cast, the floodlights turn red and the threat audio bed plays while the brute lives |
 | allow (border) | **supply runs**: outbound, a scavenger runs from the camp through the nearest gate and off the map; inbound, a survivor carries a crate in. Internal (LAN↔LAN) permits are couriers strolling between tents |
 | dns | a dashed **radio call** from the client's spot in the camp to the radio mast, whose blue light warms up with traffic |

@@ -74,7 +74,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
   const top = new Container();
   app.stage.addChild(below, dark, above, top);
 
-  const fx = new Fx(fxLayer, layers.decals, tex.glow, tex.splats);
+  const fx = new Fx(fxLayer, layers.decals, tex.glow, tex.splats, tex.bullet);
   const compound = new Compound(app, layers, tex);
   const zombies = new Zombies(layers.actors, layers.lights, tex, compound, fx);
   const walkers = new Walkers(layers.actors, layers.lights, tex);
