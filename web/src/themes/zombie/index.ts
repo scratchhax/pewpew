@@ -77,7 +77,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
   const fx = new Fx(fxLayer, layers.decals, tex.glow, tex.splats);
   const compound = new Compound(app, layers, tex);
   const zombies = new Zombies(layers.actors, layers.lights, tex, compound, fx);
-  const walkers = new Walkers(layers.actors, layers.lights, tex, fx);
+  const walkers = new Walkers(layers.actors, layers.lights, tex);
   const sky = new Sky(dark, top, tex.rain, tex.glow);
 
   let L: Layout = makeLayout(app.screen.width, app.screen.height);
@@ -158,7 +158,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
               throttle.allow(`con|${ev.src_ip}|${ev.dst_ip}`, 10)) {
             const a = compound.campSpot(ev.src_ip), b = compound.campSpot(ev.dst_ip);
             if (Math.hypot(a.x - b.x, a.y - b.y) > 20) {
-              walkers.walk('courier', [a, b], { speed: walkSpeed(), color: COLORS.allow, trail: true, unit: L.unit });
+              walkers.walk('courier', [a, b], { speed: walkSpeed(), color: COLORS.allow, unit: L.unit });
             }
           }
           break;
@@ -171,13 +171,13 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
           const dst = compound.campSpot(ev.dst_ip ?? 'lan');
           const path = outboundPath(dst, angle).reverse();
           walkers.walk('run', path, {
-            speed: walkSpeed(), color: COLORS.allow, carry: true, trail: true, unit: L.unit,
-            onDone: (p) => { fx.emit(p.x, p.y, COLORS.allow, 12, 70, 0.2, 0.6); fx.ring(p.x, p.y, COLORS.allow, 34 * L.unit); },
+            speed: walkSpeed(), color: COLORS.allow, carry: true, unit: L.unit,
+            onDone: (p) => fx.ring(p.x, p.y, COLORS.allow, 34 * L.unit),
           });
         } else {
           // a scavenger heads out on a supply run
           const src = compound.campSpot(ev.src_ip ?? 'lan');
-          walkers.walk('run', outboundPath(src, angle), { speed: runSpeed(), color: COLORS.allow, trail: true, unit: L.unit });
+          walkers.walk('run', outboundPath(src, angle), { speed: runSpeed(), color: COLORS.allow, unit: L.unit });
         }
         audio.cueSong('allow', ev.src_ip ?? ev.dst_ip ?? undefined);
         break;
@@ -190,9 +190,8 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
           // a radio call from the survivor's spot to the mast
           const from = compound.campSpot(ev.src_ip);
           fx.dash(from.x, from.y, L.mast.x, L.mast.y, COLORS.dns);
-          fx.emit(from.x, from.y, COLORS.dns, 3, 30, 0.14, 0.5);
         }
-        fx.ring(L.mast.x, L.mast.y, COLORS.dns, 42 * L.unit, 2, 0.8);
+        // the mast light warms with DNS traffic; no per-query ring (too busy)
         compound.mastPing();
         break;
       }
@@ -244,7 +243,7 @@ async function create(host: ThemeHost<typeof ZOMBIE_DEFAULTS>,
         } else if (bad) {
           walkers.walk('visit', [door, out], {
             speed: runSpeed(), color: COLORS.wifi, unit: L.unit,
-            onDone: (p) => { fx.emit(p.x, p.y, COLORS.wifi, 14, 90, 0.2, 0.6); fx.ring(p.x, p.y, COLORS.wifi, 36 * L.unit, 2.5, 0.8); },
+            onDone: (p) => { fx.emit(p.x, p.y, COLORS.wifi, 5, 40, 0.2, 0.8); fx.ring(p.x, p.y, COLORS.wifi, 36 * L.unit, 2.5, 1); },
           });
         } else {
           fx.ring(door.x, door.y, COLORS.wifi, 22 * L.unit, 1.5, 0.6);

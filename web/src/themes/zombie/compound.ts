@@ -386,7 +386,7 @@ export class Compound {
       // names show while a device is active, then fade so the camp stays readable
       const quiet = (now - t.seen) / 1000;
       const want = quiet < LABEL_RECENT ? 0.9 : 0;
-      fade(t.label, t.label.alpha + (a * want - t.label.alpha) * Math.min(1, dt * 1.5));
+      fade(t.label, t.label.alpha + (a * want - t.label.alpha) * Math.min(1, dt * 0.6));
     }
   }
 }

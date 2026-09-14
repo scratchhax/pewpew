@@ -15,6 +15,7 @@ interface Zombie {
   phase: number; weave: number;
   brute: boolean; horde: number; // horde id (0 = lone zombie)
   dying: number;               // > 0 while falling
+  seen: number;                // seconds on screen (for fade-in)
   color: number;
 }
 
@@ -73,7 +74,7 @@ export class Zombies {
         : lone ? (Math.random() < 0.88 ? 0.55 + Math.random() * 0.38 : null)
         : 0.5 + Math.random() * 0.45,
       phase: Math.random() * 10, weave: horde ? 22 : 6,
-      brute, horde, dying: 0, color,
+      brute, horde, dying: 0, seen: 0, color,
     });
   }
 
@@ -89,13 +90,15 @@ export class Zombies {
         z.dying -= dt;
         z.s.alpha = Math.max(0, z.dying / 0.7);
         z.s.rotation += dt * 2.5;
-        fade(z.eye, 0);
+        fade(z.eye, z.eye.alpha * Math.max(0, 1 - dt * 3));   // eyes dim out, not cut
         if (z.dying <= 0) { z.s.destroy(); z.eye.destroy(); this.list.splice(i, 1); }
         continue;
       }
       z.t += dt / z.dur;
       if (z.t < 0) { z.s.visible = false; continue; }
       z.s.visible = true;
+      z.seen += dt;
+      z.s.alpha = Math.min(1, z.seen / 0.8);         // shuffle into view instead of popping in
       z.phase += dt * (z.brute ? 3 : 5);
       const ux = z.tx - z.sx, uy = z.ty - z.sy;
       const len = Math.hypot(ux, uy) || 1;
@@ -106,7 +109,7 @@ export class Zombies {
       z.s.position.set(x, y);
       z.s.rotation = Math.atan2(uy, ux) + Math.sin(z.phase) * 0.12;
       z.eye.position.set(x + Math.cos(z.s.rotation) * 6 * L.unit, y + Math.sin(z.s.rotation) * 6 * L.unit);
-      fade(z.eye, darkness * 0.55);                  // steady glow, no flicker
+      fade(z.eye, darkness * 0.45 * Math.min(1, z.seen / 1.5));   // steady, eased in
 
       if (z.killAt !== null && z.t >= z.killAt) {
         this.kill(z, { x, y }, z.brute ? 3 : 1);
@@ -114,7 +117,7 @@ export class Zombies {
       } else if (z.t >= 1) {
         // reached the fence: a breach, then the wall guns finish it
         hits.breaches.push({ x, y });
-        this.fx.emit(x, y, 0xc9b48a, 10, 60, 0.22, 0.6);     // dust off the fence
+        this.fx.emit(x, y, 0xc9b48a, 6, 40, 0.22, 0.8);      // dust off the fence
         this.kill(z, { x, y }, z.brute ? 3 : 1);
         hits.kills.push({ x, y });
       }
@@ -133,11 +136,9 @@ export class Zombies {
         const muzzle = this.compound.aim(i, p);
         const jx = p.x + (Math.random() - 0.5) * 10, jy = p.y + (Math.random() - 0.5) * 10;
         this.fx.tracer(muzzle.x, muzzle.y, jx, jy);
-        this.fx.flash(muzzle.x, muzzle.y);
       }
     }
-    this.fx.emit(p.x, p.y, BLOOD, z.brute ? 12 : 6, z.brute ? 90 : 60, 0.18, 0.5);
-    this.fx.emit(p.x, p.y, z.color, z.brute ? 5 : 2, 50, 0.14, 0.4);
+    this.fx.emit(p.x, p.y, BLOOD, z.brute ? 8 : 4, z.brute ? 70 : 45, 0.18, 0.6);
     this.fx.splat(p.x, p.y, z.brute ? 1.8 : 1);
     if (z.brute) this.fx.ring(p.x, p.y, z.color, 110 * this.compound.L.unit, 3.5, 0.9);
     z.dying = 0.7;
@@ -147,7 +148,7 @@ export class Zombies {
 interface Walker {
   s: Sprite; prop: Sprite | null; lamp: Sprite;
   path: Point[]; seg: number; along: number;
-  speed: number; color: number; trailGap: number; since: number;
+  speed: number; color: number;
   fade: number;                  // fade-in, then fade-out at the end
   exitFade: boolean;
   onDone?: (p: Point) => void;
@@ -160,12 +161,12 @@ const SURVIVORS = ['survivor_a', 'survivor_b', 'survivor_c', 'survivor_d', 'surv
 export class Walkers {
   private list: Walker[] = [];
 
-  constructor(private layer: Container, private lights: Container, private tex: ZTextures, private fx: Fx) {}
+  constructor(private layer: Container, private lights: Container, private tex: ZTextures) {}
 
   count(kind?: string): number { return kind ? this.list.filter((w) => w.kind === kind).length : this.list.length; }
 
   walk(kind: string, path: Point[], opts: {
-    speed: number; color: number; carry?: boolean; trail?: boolean;
+    speed: number; color: number; carry?: boolean;
     exitFade?: boolean; onDone?: (p: Point) => void; unit: number; texture?: Texture;
   }): void {
     if (path.length < 2) return;
@@ -187,7 +188,7 @@ export class Walkers {
     this.lights.addChild(lamp);
     this.list.push({
       s, prop, lamp, path, seg: 0, along: 0, speed: opts.speed, color: opts.color,
-      trailGap: opts.trail ? 16 * opts.unit : 0, since: 0, fade: 0,
+      fade: 0,
       exitFade: opts.exitFade ?? true, onDone: opts.onDone, kind,
     });
   }
@@ -198,7 +199,7 @@ export class Walkers {
       const w = this.list[i];
       const done = w.seg >= w.path.length - 1;
       if (done) {
-        w.fade -= dt * 2.5;
+        w.fade -= dt * 1.2;
         w.s.alpha = Math.max(0, w.fade);
         if (w.prop) w.prop.alpha = w.s.alpha;
         fade(w.lamp, w.s.alpha * lampDark * 0.35);
@@ -208,12 +209,11 @@ export class Walkers {
         }
         continue;
       }
-      w.fade = Math.min(1, w.fade + dt * 3);
+      w.fade = Math.min(1, w.fade + dt * 1.5);
       w.s.alpha = w.fade;
       const a = w.path[w.seg], b = w.path[w.seg + 1];
       const segLen = Math.hypot(b.x - a.x, b.y - a.y) || 1;
       w.along += w.speed * dt;
-      w.since += w.speed * dt;
       if (w.along >= segLen) {
         w.along -= segLen;
         w.seg++;
@@ -238,10 +238,6 @@ export class Walkers {
       w.lamp.rotation = heading;
       w.lamp.scale.set(2.2 * w.s.scale.x, 0.9 * w.s.scale.x);
       fade(w.lamp, lampDark * 0.35 * w.fade);
-      if (w.trailGap && w.since >= w.trailGap) {
-        w.since = 0;
-        this.fx.emit(x, y, w.color, 1, 4, 0.1, 1.4);
-      }
     }
   }
 }
