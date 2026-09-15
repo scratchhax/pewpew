@@ -19,6 +19,7 @@ export const SCENES: Record<string, { title: string; blurb: string; accent: stri
   zombie: { title: 'Last Outpost', blurb: "A walled compound holding out against the internet's zombies.", accent: '#9fe36b' },
   racing: { title: 'Midnight Run', blurb: 'A neon street race: traffic, roadblocks, rivals and police chases.', accent: '#ff3fb4' },
   rush: { title: 'Packet Rush', blurb: 'A 16-bit runner: gems, stompable baddies, query blocks, rivals and a hunter drone.', accent: '#41a6f6' },
+  spy: { title: 'Panopticon', blurb: 'A made-up planet under watch: signal arcs, satellites, and an eye of god that zooms in on the people behind the traffic.', accent: '#e8c26a' },
 };
 /** Themes in picker order: the known scenes first (as the README lists them), then any others. */
 export const SCENE_ORDER = [...Object.keys(SCENES).filter((id) => THEME_IDS.includes(id)), ...THEME_IDS.filter((id) => !(id in SCENES))];

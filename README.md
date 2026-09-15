@@ -10,6 +10,8 @@ your own traffic. Pick a scene per screen:
 - **Last Outpost**: a walled compound holding out against the internet's zombies
 - **Midnight Run**: a 3D street race through a neon city at night
 - **Packet Rush**: a 16-bit side-scrolling runner, with boss fights
+- **Panopticon**: a made-up planet under surveillance, where the eye of god
+  zooms in on the people behind the traffic
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -19,6 +21,8 @@ and never touches the network itself.
 | ![orbital command](docs/hero.png) | ![last outpost](docs/zombie.png) |
 | **Midnight Run** | **Packet Rush** |
 | ![midnight run](docs/racing.png) | ![packet rush](docs/rush.png) |
+| **Panopticon** | **Panopticon: the eye of god** |
+| ![panopticon](docs/spy.png) | ![panopticon eye of god](docs/spy-eye.png) |
 
 | Midnight Run | Packet Rush | Last Outpost |
 |---|---|---|
@@ -28,6 +32,7 @@ and never touches the network itself.
 traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew/?theme=zombie) ·
 [Midnight Run](https://scratchhax.github.io/pewpew/?theme=racing) ·
 [Packet Rush](https://scratchhax.github.io/pewpew/?theme=rush) ·
+[Panopticon](https://scratchhax.github.io/pewpew/?theme=spy) ·
 Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 
 ## Contents
@@ -36,7 +41,7 @@ Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - [Highlights](#highlights)
 - [Setup](#setup): [Relay](#1-start-the-relay) · [Viewer](#2-build-the-viewer) · [UniFi logging](#3-send-unifi-logs-to-the-relay) · [Check it's working](#4-check-its-working) · [`relay.yaml`](#relayrelayyaml)
 - [Using pewpew](#using-pewpew): [Keys](#keys) · [Switching scenes](#switching-scenes) · [Log inspector](#log-inspector) · [Settings](#settings-f1)
-- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush)
+- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon)
 - [Sound](#sound)
 - [Performance and quality](#performance-and-quality)
 - [URL parameters](#url-parameters)
@@ -72,9 +77,9 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
 
 ## Highlights
 
-- **Four scenes, one relay.** Every screen picks its own scene, so the kiosk
+- **Five scenes, one relay.** Every screen picks its own scene, so the kiosk
   in the hall and the laptop on your desk can show different worlds at the same
-  time. Three are 2D (PixiJS) and one is full 3D (three.js); a screen only
+  time. Three are 2D (PixiJS) and two are full 3D (three.js); a screen only
   downloads the renderer its scene uses.
 - **A readable picture.** Each event type has one fixed colour in every scene
   and in the log: block is red, allow green, DNS blue, DHCP yellow, Wi-Fi
@@ -82,7 +87,7 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
 - **Generative soundtracks.** Every scene has its own band: synthwave, a pipe
   organ and chiptune in space; horror synth and dead west in the compound; drum
   and bass, eurobeat and a nu-metal riff on the street; an original chip band in
-  Packet Rush. The scene's sounds play along on the beat and in key: lasers,
+  Packet Rush; cold-war synth and swung spy jazz in Panopticon. The scene's sounds play along on the beat and in key: lasers,
   gunfire, an engine that shifts gears in time, gem chimes that climb the scale.
   There are no audio files anywhere, though you can upload your own
   [background track](#background-tracks).
@@ -213,7 +218,7 @@ minutes to start logging after a settings change or a relay restart.
 |-----|---------|--------------|
 | `syslog_bind`, `syslog_port` | `0.0.0.0`, `5514` | where syslog (UDP) is received |
 | `http_host`, `http_port` | `0.0.0.0`, `8080` | the viewer, WebSocket and health endpoints |
-| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing` or `rush` (every scene is also at `/<id>/`) |
+| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush` or `spy` (every scene is also at `/<id>/`) |
 | `buffer_size` | `500` | recent events replayed to each newly opened browser |
 | `wan_interfaces` | `[ppp0]` | which gateway interfaces count as WAN, for inbound and outbound. Look at the `IN=`/`OUT=` fields of your firewall log lines; `eth8`–`eth10` are common on UDM and UDR |
 | `wan_ips`, `vpn_networks` | empty | optional WAN addresses and VPN networks, for direction and VPN badges |
@@ -244,7 +249,7 @@ included). `python3 relay/test_cef.py` self-checks the CEF parser, and
 ![scene picker](docs/scene-picker.png)
 
 Press **F2** for the scene picker. Click a card, use the arrow keys and Enter,
-or press 1–4; Esc closes it. The **Scene** dropdown at the top of the F1 panel
+or press 1–5; Esc closes it. The **Scene** dropdown at the top of the F1 panel
 does the same. The screen fades out and loads the new scene.
 
 The pick is saved in that browser, so a kiosk pointed at the plain
@@ -257,7 +262,7 @@ different screens can show different scenes at once:
 | URL | Scene |
 |-----|-------|
 | `http://<relay-host>:8080/` | this screen's saved pick, or else the relay's `default_theme` |
-| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/` | that scene (unknown names are a 404) |
+| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/` | that scene (unknown names are a 404) |
 | any URL + `?theme=racing` | that scene (handy on the Pages demo) |
 
 The viewer checks the URL path, then `?theme=`, then the screen's saved pick,
@@ -312,7 +317,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -320,7 +325,7 @@ panel's **Apply & reload**.
 
 ## Scenes
 
-All four scenes draw the same events with the same colours. Each has its own
+All five scenes draw the same events with the same colours. Each has its own
 HUD, sound and settings.
 
 ### Orbital Command
@@ -545,6 +550,79 @@ Heat and boost are rows of flames and bolts, and speed is a segmented meter.
 Every three minutes a **STAGE CLEAR** card slides in with the stage's gems,
 stomps, blocks, bricks, checkpoints and most-visited site.
 
+### Panopticon
+
+![panopticon](docs/spy.png)
+
+Your network as a planet under watch. It isn't Earth. The continents,
+mountains, deserts, ice caps and weather are generated on the GPU from a seed,
+and the world has its own nations and cities with made-up names. Every outside
+IP has a home on it: its first two octets pick the nation, so an address range
+clusters in one place, and the whole address picks the city. Your network is
+the ground station. The planet turns slowly under a fixed sun, so the day/night
+line sweeps across the city lights, and clouds drift over it and cast shadows.
+Traffic weather is the **DEFCON** level: 5 on a calm network, 3 in a storm and
+1 in a hurricane, with heavier cloud and a warm cast creeping in at the edges.
+
+| Event | On the planet |
+|-------|---------------|
+| allow | a green signal arc along the great circle between your ground station and the other end's city |
+| block | a red arc that's cut off mid-flight, with a ring where it was stopped |
+| threat | an amber tracking marker on the attacker's city, labelled with its IP, and an arc home |
+| dns | a blue downlink from the nearest satellite to the ground station |
+| dhcp | a new device launches a satellite into orbit, labelled with its hostname; renewals send it a beam |
+| wifi | access points orbit as satellites with a dish: a join sends a purple beam down, a failure a crackling red one |
+| system | a ripple through the atmosphere from the ground station |
+
+**The eye of god.** Every so often the eye tasks a target. It happens when
+enough IDS/IPS threats land inside a minute (3 by default), when one address
+racks up 25 blocks in a minute, or on a random sweep about every 5 minutes.
+The first tasking waits 25 seconds after the page loads, and taskings are at
+least 90 seconds apart. A run lasts about 30 seconds:
+
+1. **Acquire.** The camera swings round until the target is under it, and a
+   reticle closes in over ticking coordinates and altitude.
+2. **Dive.** Down through the atmosphere and into the cloud deck.
+3. **Enhance.** Out of the cloud above a small scene, blocky at first and
+   sharpening in steps (ENHANCE ×2, ×4, ×8) as a scan line sweeps.
+4. **Identify.** Boxes lock onto the people, vehicles and objects, with
+   confidence scores that climb. A dossier types itself out: the target IP, the
+   signal, the IDS signature or firewall rule, the district, city and nation,
+   coordinates, contacts in the last minute, first seen, and what they're up
+   to. Then **TARGET IDENTIFIED** eases in.
+5. **Release.** Back into the cloud and up to orbit. The target stays marked
+   for a minute.
+
+![panopticon eye of god](docs/spy.gif)
+
+The eye catches people doing one of eight things. It never shows the same one
+twice in a row:
+
+- a briefcase swapped for an envelope between two cars in an empty car park
+- someone climbing out of a lit bedroom window, down the drainpipe, along the
+  hedge and over the fence to a car waiting with its lights off
+- someone hiding behind a dumpster while a patrol car's searchlight sweeps the alley
+- two people meeting on a rooftop, where an envelope changes hands before one of them goes down the fire escape
+- a bag thrown off the end of a pier
+- two people carrying a crate out of a warehouse into a van backed up to the loading dock
+- papers fed into a burning barrel behind a building
+- a lookout on a street corner signalling a car, which pulls over for a moment
+  before speeding off
+
+How it looks depends on the time of day at the target. In daylight you get
+satellite imagery; at night you get night vision or thermal. The scenes that
+only make sense in the dark switch to thermal when the target is in daylight.
+
+| Night vision | Thermal | Daylight |
+|---|---|---|
+| ![night vision](docs/spy-eye.png) | ![thermal](docs/spy-thermal.png) | ![daylight](docs/spy-day.png) |
+
+Everything is built in code: the planet and its city lights, the satellites,
+the eight scenes and every person in them. Nothing flashes: the enhance steps,
+scan lines, boxes and stamp all ease in. In F1 → Scene, **Eye of god** turns
+the taskings off, **Eye: threats in a minute** sets the threat trigger, and
+**Eye: random every (min)** sets how often a random sweep comes round.
+
 ## Sound
 
 All sound is synthesized in the browser with the WebAudio API. Browsers only
@@ -683,6 +761,34 @@ Sound effects fire the instant things happen and are pitched to the tune's key:
 | drone | a two-tone warning while it hunts you, a falling bomb whistle and the blast |
 | boss | its slam, rolling orbs, hits, and a victory fanfare |
 
+### Panopticon's soundtrack
+
+Five styles take turns, every 6 minutes by default:
+
+| Style | Sound |
+|-------|-------|
+| Cold war | a 92 bpm analog ostinato in D minor over sub octaves, rim clicks and a slow pad |
+| Signal intercept | 118 bpm glitchy electronica: syncopated kicks, gated hats, glassy chords and stray blips |
+| Deep cover | a 70 bpm drone gliding between chords, sonar pings, a sparse detuned piano, and a heartbeat when tension rises |
+| Zero day | 128 bpm industrial: four-on-the-floor, an off-beat reese bass, claps, and metal scraping on metal |
+| Dead drop | swung 138 bpm spy jazz: walking bass, brushes and ride, vibraphone comping, and muted brass stabs when it gets tense |
+
+The operation plays along:
+
+| Event | Sound |
+|-------|-------|
+| allow | traffic plays the melody on the style's lead |
+| block | a short interdiction tick |
+| threat | a two-tone lock-on |
+| dns | a burst of data chirps |
+| dhcp | a launch rumble |
+| wifi | rising pings (radio static under a background track) |
+| system | a shockwave |
+| eye of god | sonar pings while it acquires, a rising rush on the dive, digital blips at each enhance, teletype clicks while the dossier types, a tone as each box locks, a low stamp for TARGET IDENTIFIED, and a falling whoosh on the way out |
+
+The music drops to half volume while the eye works. An operations-room hum sits
+underneath, with radio static that rises with the DEFCON level.
+
 ### Background tracks
 
 Play your own music in any scene. In F1 → Audio → **Background track**, upload
@@ -741,6 +847,7 @@ two volumes of its own:
 | Last Outpost | **Gunfire**, **Wind & rain** |
 | Midnight Run | **Engine & nitro**, **Road & rain** |
 | Packet Rush | **Game sounds**, **Rain** |
+| Panopticon | **Surveillance sounds**, **Room & static** |
 
 Each scene keeps its own choices.
 
@@ -812,6 +919,15 @@ Each scene adds its own budgets:
 | Autoplay thinking (per second) | 10 | 15 | 20 | 30 |
 | Clouds & foreground | off | on | on | on |
 
+| Panopticon | Low | Medium | **High** | Ultra |
+|------------|-----|--------|----------|-------|
+| Planet detail (texture width, px) | 1024 | 2048 | 2048 | 4096 |
+| Signal arcs | 16 | 28 | 40 | 64 |
+| Satellites | 10 | 16 | 24 | 32 |
+| Stars | 0.4 | 0.7 | 1.0 | 1.5 |
+| Bloom | off | on | on | on |
+| Close-up shadows | off | off | on | on |
+
 **Measured on a Raspberry Pi Compute Module 5** (Chromium kiosk at
 2560×1440, Auto → Low, demo traffic):
 
@@ -831,13 +947,17 @@ any setting.
 scales up. Measured headless with the CPU throttled 6×, both High and Low hold
 about 60 fps at 720p. **Midnight Run** is a full 3D scene built to look good
 first, meant for a desktop or laptop GPU. Its Low tier is a starting point for
-smaller devices, not yet tuned for a Pi.
+smaller devices, not yet tuned for a Pi. **Panopticon** is 3D too. The planet
+is generated once when the scene loads (about a second on a desktop GPU), which
+keeps each frame cheap. Measured headless on a desktop GPU with the CPU
+throttled 4×, High and Low both hold about 60 fps at 720p, in orbit and in the
+close-up. It hasn't been measured on a Pi yet.
 
 ## URL parameters
 
 | Parameter | Effect |
 |-----------|--------|
-| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing` or `rush` |
+| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush` or `spy` |
 | `?demo=1` | synthetic traffic, no relay needed |
 | `?showreel=1` | with the demo: a looping 60-second calm → build → hurricane → cooldown arc |
 | `?rate=40` | with the demo: about 40 events per second |
@@ -895,8 +1015,8 @@ UDM / UDR / UCG / APs ──syslog UDP :5514──► relay (Python) ──JSON 
   ring buffer of recent events, broadcasts every event to every browser, and
   stores uploaded background tracks.
 - **`web/`**: Vite and TypeScript. Orbital Command, Last Outpost and Packet
-  Rush render with [PixiJS v8](https://pixijs.com/), Midnight Run with
-  [three.js](https://threejs.org/). The audio and nearly all graphics are
+  Rush render with [PixiJS v8](https://pixijs.com/), Midnight Run and
+  Panopticon with [three.js](https://threejs.org/). The audio and nearly all graphics are
   generated in code; Last Outpost adds one small sprite atlas.
 - **`deploy/`**: the systemd unit and the kiosk autostart entry.
 
@@ -929,8 +1049,8 @@ handles the clock, style rotation, snapping sounds to the beat, chord lookup
 and the pulse, so a scene only writes its styles and what each event sounds
 like. Every scene's `score.ts` is a worked example, and `sound/groove.ts` shows
 how visuals can follow `audio.pulse()`. Nothing in the core imports a renderer,
-so a scene can use whatever it likes: Midnight Run brings three.js, and only
-screens showing it download it.
+so a scene can use whatever it likes: Midnight Run and Panopticon bring
+three.js, and only screens showing one of them download it.
 
 ### Development
 
@@ -999,15 +1119,20 @@ Actions** first.
   screen, a 1080p display mode helps most.
 - **Soft or blurry:** you're on a lower tier or render scale; F1 → System
   shows which. Choose **High** (or **Ultra** on a high-DPI screen).
+- **The eye of god never comes:** check **Eye of god** is on in F1 → Scene.
+  It waits 25 seconds after loading and 90 seconds between taskings. On a quiet
+  network with no threats, only the random sweep triggers it, about every
+  **Eye: random every (min)** minutes.
 
 ## Credits
 
 - Syslog parsing vendored from
   [UniFi-Insights-Plus](https://github.com/jmasarweh/UniFi-Insights-Plus) (MIT).
 - [PixiJS v8](https://pixijs.com/) renders Orbital Command, Last Outpost and
-  Packet Rush; [three.js](https://threejs.org/) renders Midnight Run.
+  Packet Rush; [three.js](https://threejs.org/) renders Midnight Run and Panopticon.
 - Every sound and melody, every Orbital Command texture, Midnight Run's car,
-  city and signs, and all of Packet Rush's pixel art are generated in code.
+  city and signs, all of Packet Rush's pixel art, and Panopticon's planet,
+  satellites and surveillance scenes are generated in code.
 - Last Outpost sprites: [Top-down Shooter](https://kenney.nl/assets/top-down-shooter)
   by [Kenney](https://kenney.nl) (CC0), packed into
   `web/src/themes/zombie/assets/atlas.png` with its license beside it.
