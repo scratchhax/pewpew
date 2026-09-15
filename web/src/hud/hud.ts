@@ -160,7 +160,7 @@ export class Hud {
         <div class="log-wrap"><div id="terminal-body"></div></div>
       </div>
       <div id="demo-badge" style="display:none">${L.demo}</div>
-      <div id="hint">F1 settings</div>`;
+      <div id="hint">F1 settings · F2 scenes</div>`;
     document.body.appendChild(this.root);
 
     this.threatFill = q('threat-fill');

@@ -10,6 +10,7 @@ import { Hud, hudLabels } from './hud/hud';
 import { Audio } from './audio';
 import { SettingsPanel } from './hud/settingsPanel';
 import { mountTrackUi } from './hud/trackUi';
+import { ScenePicker } from './hud/scenePicker';
 import { analyseTrack, listTracks, saveMeta, trackUrl, type TrackListing } from './tracks';
 import type { Theme } from './theme';
 import type { NetEvent } from './types';
@@ -132,6 +133,8 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
   window.addEventListener('keydown', (e) => {
     if (e.key === 'F1') { e.preventDefault(); panel.toggle(); }
   });
+  // F2: pick a scene without touching the URL (kiosks)
+  new ScenePicker(theme.id);
 
   // ── event pipeline: HUD log + audio see every event; the theme decides
   // what's worth drawing (with the throttle) ──

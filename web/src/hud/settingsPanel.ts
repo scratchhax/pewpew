@@ -1,6 +1,8 @@
 import { CoreSettings, PowerPref, Quality, saveSettings, resetSettings, isLocked } from '../settings';
 import type { Control, Theme } from '../theme';
 import type { HudLabels } from './hud';
+import { SCENE_ORDER, sceneInfo, switchScene } from '../themes/registry';
+import { fadeThen } from './scenePicker';
 
 type Key = keyof CoreSettings;
 
@@ -45,7 +47,7 @@ export class SettingsPanel {
   private visible = false;
 
   constructor(private settings: CoreSettings,
-              private theme: Pick<Theme, 'title' | 'controls'> & { hudToggles: HudLabels['panel'] },
+              private theme: Pick<Theme, 'id' | 'title' | 'controls'> & { hudToggles: HudLabels['panel'] },
               private defaults: CoreSettings, private perfKeys: string[],
               private onChange: (key?: string) => void,
               private perfStatus: () => PerfStatus,
@@ -74,6 +76,8 @@ export class SettingsPanel {
 
     this.root.addEventListener('change', (e) => {
       const el = e.target as HTMLInputElement;
+      // the scene switcher in the header: fade out and load the other scene
+      if (el.dataset.action === 'scene') { const id = el.value; fadeThen(() => switchScene(id)); return; }
       const key = el.dataset.key;
       if (!key) return;
       const bag = this.settings as unknown as Record<string, boolean | number | string>;
@@ -139,7 +143,10 @@ export class SettingsPanel {
     const c = this.theme.controls;
     const tabs = [['scene', 'SCENE'], ['hud', 'HUD'], ['audio', 'AUDIO'],
       ['color', 'COLOUR'], ['system', 'SYSTEM']] as const;
-    let html = `<div class="set-top"><h2>${this.theme.title}</h2>
+    const scenes = SCENE_ORDER.map((id) => `<option value="${id}"${id === this.theme.id ? ' selected' : ''}>${sceneInfo(id).title}</option>`).join('');
+    let html = `<div class="set-top"><div class="set-title"><h2>${this.theme.title}</h2>
+      <label class="set-scene" title="Switch this screen to another scene (remembered on this screen). F2 opens the full picker.">SCENE
+      <select data-action="scene">${scenes}</select></label></div>
       <div class="set-tabs">${tabs.map(([k, l]) =>
         `<button class="set-tab${k === tab ? ' active' : ''}" data-tab="${k}">${l}</button>`
       ).join('')}</div></div><div class="set-body">`;
@@ -221,7 +228,7 @@ export class SettingsPanel {
         and reload for synthetic traffic. Debug overlay: <b>?debug=1</b>.</p></div></div>`;
     }
 
-    html += `</div><div class="set-foot">F1 to close</div>`;
+    html += `</div><div class="set-foot">F1 to close · F2 scene picker</div>`;
     this.root.innerHTML = html;
     const extras = this.root.querySelector<HTMLElement>('#track-ui');
     if (extras && this.mountAudioExtras) this.mountAudioExtras(extras);

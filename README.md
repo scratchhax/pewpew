@@ -288,9 +288,17 @@ at once:
 | `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/` | that theme (unknown names are a 404) |
 | any URL + `?theme=racing` | that theme (handy on the Pages demo) |
 
-The viewer checks the URL path, then `?theme=`, then the relay's
-`/config.json`, and falls back to `scifi`. Each theme is its own bundle, so a
-screen only downloads the theme it shows.
+The viewer checks the URL path, then `?theme=`, then this screen's own pick
+(below), then the relay's `/config.json`, and falls back to `scifi`. Each
+theme is its own bundle, so a screen only downloads the theme it shows.
+
+**Switching scenes without touching the URL** (kiosks): press **F2** for the
+scene picker (click a card, or use the arrow keys and Enter, or press 1–3;
+Esc closes), or use the **Scene** dropdown at the top of the **F1** panel. The
+screen fades out and loads the new scene. The pick is saved in that browser,
+so a kiosk that opens the plain `http://<relay-host>:8080/` comes back to it
+after a reload or a reboot. If the address names a theme (`/zombie/` or
+`?theme=`), picking another rewrites it to the new one.
 
 ## Sound
 

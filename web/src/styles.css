@@ -194,3 +194,31 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
 .hint b { color: var(--accent); opacity: 0.9; }
 .set-foot { font-size: 10px; letter-spacing: 1px; opacity: 0.4; text-align: right;
   border-top: 1px solid rgba(70,240,217,0.15); padding-top: 8px; margin-top: 6px; }
+
+/* ── Scene switching: the F1 header dropdown and the F2 picker ── */
+.set-title { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.set-scene { display: flex; align-items: center; gap: 6px; font-size: 10px; letter-spacing: 2px; opacity: 0.85; }
+#settings .set-scene select { flex: none; font-size: 12px; }
+#scene-picker {
+  position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.62); font-family: 'Courier New', monospace; color: #e9f4ff;
+  animation: spIn 0.25s ease-out;
+}
+@keyframes spIn { from { opacity: 0; } to { opacity: 1; } }
+.sp-panel { width: min(980px, 94vw); padding: 22px 26px 16px; background: rgba(6, 10, 20, 0.94);
+  clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px); }
+.sp-head { font-size: 15px; letter-spacing: 4px; color: var(--accent); margin-bottom: 16px; }
+.sp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.sp-card { position: relative; text-align: left; font-family: inherit; color: inherit; cursor: pointer;
+  display: flex; flex-direction: column; gap: 8px; padding: 18px 16px 20px; min-height: 150px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--scene) 18%, #0a0f1c), #070a14);
+  border: 1px solid color-mix(in srgb, var(--scene) 35%, transparent);
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s; }
+.sp-card:hover, .sp-card.focus { border-color: var(--scene); transform: translateY(-2px);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--scene) 40%, transparent); }
+.sp-num { position: absolute; top: 10px; right: 12px; font-size: 11px; opacity: 0.5; }
+.sp-title { font-size: 18px; font-weight: bold; letter-spacing: 2px; color: var(--scene); }
+.sp-blurb { font-size: 12px; line-height: 1.5; opacity: 0.8; }
+.sp-now { margin-top: auto; font-size: 10px; letter-spacing: 2px; color: var(--scene); }
+.sp-foot { margin-top: 14px; font-size: 10px; letter-spacing: 1px; opacity: 0.5; text-align: right; }
+#scene-veil { position: fixed; inset: 0; z-index: 40; background: #000; opacity: 0; transition: opacity 0.4s ease-in; pointer-events: none; }
