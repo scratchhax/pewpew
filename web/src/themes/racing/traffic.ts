@@ -42,6 +42,8 @@ const CURB = 8.55;
 const SIDEWALK_EDGE = 13.2;
 /** How far a civilian squeezes onto the curb to let us by. */
 const PULL = 1.9;
+/** Behind the camera (it sits at z ≈ 7.6): anything further back than this can't be seen. */
+const OUT_OF_VIEW = 10;
 
 /** Our car's acceleration at a speed (m/s²): a hard pull through the low gears, tapering near the top. */
 export const accelAt = (v: number) => Math.max(2.2, 11 - v * 0.12);
@@ -243,7 +245,7 @@ export class Traffic {
     }
     const car: Car = {
       rig, kind, lane, laneNow: lane, x: LANES[lane], z, vx: 0, speed, target: speed, yaw: 0, yawRate: 0,
-      mass: kind === 'police' ? 1.4 : 1, crashed: 0, age: 0, phase: 0, life: 0, yieldCool: 0, clearT: 0, pull: 0,
+      mass: kind === 'police' ? 2.6 : 1, crashed: 0, age: 0, phase: 0, life: 0, yieldCool: 0, clearT: 0, pull: 0,
       ratio: speed / Math.max(1, this.cruise),
     };
     this.cars.push(car);
@@ -286,7 +288,7 @@ export class Traffic {
 
   /** IDS threat: a black-and-white closes in and runs alongside while the heat lasts. */
   pursuit(playerSpeed: number): void {
-    this.wanted = Math.max(this.wanted, 8);
+    this.wanted = Math.max(this.wanted, 12);
     const cop = this.cars.find((c) => c.kind === 'police' && c.phase < 2 && !c.crashed);
     if (cop) { cop.life = Math.max(cop.life, 10); return; }
     this.spawnCop(playerSpeed);
@@ -299,13 +301,15 @@ export class Traffic {
   /** A black-and-white wherever there's room: behind us in the far lane first, then any lane behind, then pulling out ahead. */
   private spawnCop(playerSpeed: number): boolean {
     const far = this.playerLane < 2 ? 3 : 0;
-    const spots: Array<[number, number, number]> = [
+    const ahead: Array<[number, number, number]> = [[far, -65, -4], [3 - far, -65, -4], [far, -95, -2]];
+    const behind: Array<[number, number, number]> = [
       [far, NEAR + 10, 18], [3 - far, NEAR + 10, 18], [far, NEAR + 24, 20], [1, NEAR + 18, 19], [2, NEAR + 18, 19],
-      [far, -70, -6], [3 - far, -70, -6],
     ];
+    // flat out, a cop from behind would take a while: one pulls out of a side street ahead instead
+    const spots = this.pb.speed > this.cruise + 8 ? [...ahead, ...behind] : [...behind, ...ahead];
     for (const [lane, z, dv] of spots) {
       const car = this.addCar('police', lane, z, Math.max(10, playerSpeed + dv), 0xff2244, 0x0d0f16);
-      if (car) { car.life = 12; return true; }
+      if (car) { car.life = 14; return true; }
     }
     return false;
   }
@@ -629,8 +633,9 @@ export class Traffic {
       const beside = this.playerLane < 2 ? this.playerLane + 1 : this.playerLane - 1;
       const farLane = this.playerLane < 2 ? 3 : 0;
       const hold = -3 + Math.sin(c.age * 0.7) * 1.5;
-      if (c.phase === 0) { c.target = pace + Math.min(14, Math.max(3, (c.z - hold) * 0.8)); c.lane = c.z > 0 ? farLane : beside; if (c.z < hold + 1) c.phase = 1; }
-      else if (c.phase === 1) { c.target = pace + (c.z - hold) * 0.8; c.lane = beside; c.life -= dt; if (c.life <= 0) c.phase = 2; }
+      // pursuit driving: locked to our real speed (sprints included), closing hard from behind, easing off to fall in alongside from ahead
+      if (c.phase === 0) { c.target = playerSpeed + Math.max(-12, Math.min(35, (c.z - hold) * 1.1 + (c.z > hold ? 6 : 0))); c.lane = c.z > 0 ? farLane : beside; if (Math.abs(c.z - hold) < 1.5) c.phase = 1; }
+      else if (c.phase === 1) { c.target = playerSpeed + (c.z - hold) * 1.5; c.lane = beside; c.life -= dt; if (c.life <= 0) c.phase = 2; }
       else c.target = playerSpeed * 0.55;                  // shaken off: falls back
     } else {
       // traffic keeps its own pace (a share of our cruising speed, not of our current
@@ -661,7 +666,10 @@ export class Traffic {
           }
         }
       }
-      if (!moved && c.kind === 'police' && c.phase < 2) c.target = Math.min(c.target, ahead.speed + Math.max(0, ahead.gap - 4) * 2.5);   // riding bumpers
+      if (!moved && c.kind === 'police' && c.phase < 2) {
+        // out of sight behind the camera it threads through; in view it rides bumpers
+        if (c.z < OUT_OF_VIEW) c.target = Math.min(c.target, ahead.speed + Math.max(0, ahead.gap - 4) * 2.5);
+      }
       else if (!moved) c.target = Math.min(c.target, ahead.speed + Math.max(0, ahead.gap - 8) * 0.6);
     }
   }
@@ -681,7 +689,8 @@ export class Traffic {
       const car = b as Car;
       if (!isPlayer) {
         // gentle on the throttle, firm on the brakes, hard when the gap is closing fast
-        const accel = car.target > car.speed ? 6 : car.speed - car.target > 8 ? 22 : 14;
+        const pursuing = car.kind === 'police' && car.phase < 2;           // a pursuit car has a lot more under the hood
+        const accel = car.target > car.speed ? (pursuing ? 18 : 6) : car.speed - car.target > 8 ? 22 : 14;
         car.speed += Math.max(-accel * h, Math.min(accel * h, car.target - car.speed));
       }
       const laneX = isPlayer ? this.plan.x : LANES[car.laneNow] + car.pull;
@@ -714,6 +723,9 @@ export class Traffic {
    * cars' footprints): push apart along the shallowest axis, trade momentum,
    * turn off-centre hits into spin.
    */
+  /** A cop closing in from behind the camera: nobody can see it, so it slips through traffic instead of piling into it. */
+  private ghost(b: Body): boolean { return b !== this.pb && (b as Car).kind === 'police' && (b as Car).phase < 2 && b.z > OUT_OF_VIEW && !b.crashed; }
+
   private collide(hits: TrafficHits): void {
     const bodies = this.all();
     for (let i = 0; i < bodies.length; i++) {
@@ -721,6 +733,7 @@ export class Traffic {
       for (let j = i + 1; j < bodies.length; j++) {
         const b = bodies[j];
         if (Math.abs(a.x - b.x) > 2 * HALF_L || Math.abs(a.z - b.z) > 2 * HALF_L) continue;
+        if (this.ghost(a) || this.ghost(b)) continue;
         const c = overlap(a, b);
         if (c) this.resolve(a, b, c.nx, c.nz, c.depth, c.px, c.pz, hits);
       }
@@ -766,7 +779,9 @@ export class Traffic {
     for (const body of [a, b]) {
       // we lose it on the change in our own speed, so a heavy, wild driver shrugs off what spins a civilian
       const shock = body === this.pb ? j * wa * (pa ? 1 : 0) + j * wb * (pbb ? 1 : 0) : strength;
-      if (shock > (body === this.pb ? CRASH * 1.2 : CRASH) && !body.crashed) {
+      // a pursuit interceptor is built for contact: it takes a lot to spin one out
+      const tough = body === this.pb ? CRASH * 1.2 : (body as Car).kind === 'police' && (body as Car).phase < 2 ? CRASH * 2.6 : CRASH;
+      if (shock > tough && !body.crashed) {
         body.crashed = 0.001;
         body.yawRate += (Math.random() < 0.5 ? -1 : 1) * (body === this.pb ? 1.5 : 2 + Math.random() * 2.5);
       }

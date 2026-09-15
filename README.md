@@ -204,7 +204,7 @@ Everything is built in code: the car, the city, the signs and textures.
 |-------|-----------|
 | allow | cars on the road: outbound traffic ahead that you pass, inbound traffic coming up from behind to overtake |
 | block | a striped barricade across one or two lanes. Drivers swerve into a clear lane; anything that hits it smashes it (pieces fly), loses speed and gets knocked sideways |
-| threat | a police chase: a black-and-white with a flashing red-and-blue light bar closes in and runs alongside until the heat dies down. Every IDS/IPS event gets its cop: if there is no room behind you right away it keeps trying (other lanes, further back, or pulling out ahead) for several seconds, and a cop held up in traffic rides bumpers instead of giving up |
+| threat | a police chase: a black-and-white with a flashing red-and-blue light bar closes in and runs alongside until the heat dies down. Every IDS/IPS event gets its cop: if there is no room behind you right away it keeps trying (other lanes, further back, or pulling out ahead) for several seconds, and a cop drives like a pursuit car: locked to your real speed (sprints included), much quicker off the line, threading through traffic while it is still behind the camera, and pulling out of a side street ahead of you when you are flat out. It is built for contact, but your driver can still wreck it |
 | dhcp | a rival appears up ahead with the device's hostname on a plate. You reel it in, race side by side, then it boosts away |
 | dns | the next neon billboard over the horizon shows the domain, in DNS blue |
 | wifi | a neon gate over the road labelled with the AP: a full arch for a join, a broken dim one for a failure |
