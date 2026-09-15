@@ -73,7 +73,7 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
   // ── driving state ──
   let speed = 30, travelled = 0, wet = 0.45, rain = 0, nitro = 0;
   let rateFast = 0, rateSlow = 0, arrivals = 0;
-  let camX = 0, camShake = 0, fov = 62, bootT = -1, nitroOn = false, speedLimit = Infinity;
+  let camX = 0, camShake = 0, fov = 62, bootT = -1, nitroOn = false, speedLimit = Infinity, aggression = 0, lastWall = performance.now() / 1000;
   const groove = new Groove();
   const bendTarget = { x: 0, y: 0 };
 
@@ -132,16 +132,21 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
     if (bootT < 0) bootT = t;
 
     // traffic sets the pace; a sudden burst lights the nitro
-    rateFast += (arrivals / Math.max(dtReal, 1e-3) - rateFast) * Math.min(1, dtReal * 1.2);
-    rateSlow += (rateFast - rateSlow) * Math.min(1, dtReal * 0.08);
+    // measured on the wall clock: frame time is capped, and a slow frame must not look like a traffic spike
+    const wall = performance.now() / 1000, wallDt = Math.min(1, Math.max(1e-3, wall - lastWall));
+    lastWall = wall;
+    rateFast += (arrivals / wallDt - rateFast) * Math.min(1, wallDt * 1.2);
+    rateSlow += (rateFast - rateSlow) * Math.min(1, wallDt * 0.08);
     arrivals = 0;
     // only once there's a baseline: the first seconds after load aren't a burst
     const burst = rateSlow > 2 && t - bootT > 20 ? rateFast / rateSlow : 1;
     nitro += ((burst > 2 ? 1 : 0) - nitro) * Math.min(1, dtReal * (burst > 2 ? 2 : 0.7));
     const cruise = 26 + Math.min(34, rateSlow * 1.1);
+    // how hard our driver pushes through traffic: polite on a quiet network, a battering ram when it's slammed
+    aggression += (Math.min(1, Math.max(0, (rateSlow - 8) / 22) + nitro * 0.35) - aggression) * Math.min(1, dtReal * 0.5);
     // boxed in behind a car with no lane to move into: ease off to its pace
     const want = Math.min(cruise + nitro * 16, speedLimit);
-    speed += (want - speed) * Math.min(1, dt * (want < speed ? 6 : 0.6));
+    speed += (want - speed) * Math.min(1, dt * (want < speed ? 6 : 0.9 + aggression * 1.3));
     travelled += speed * dt;
 
     // the road winds: slow sums of sines steer the curved world
@@ -167,7 +172,8 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
 
     road.update(dt, speed, wet, beatGlow);
     city.update(dt, speed, wet);
-    const hits = traffic.update(dt, t, speed, camera);
+    const hits = traffic.update(dt, t, speed, cruise + nitro * 16, aggression, camera);
+    if (hits.honk) audio.sfx('honk', { pan: Math.max(-1, Math.min(1, traffic.playerX / 8)) });
     speedLimit = hits.speedLimit;
     traffic.player.underglowMat.opacity *= settings.rMusicVisuals && groove.style ? 0.75 + groove.downbeat * 0.35 : 1;
     // collisions: our speed takes the hit, sparks fly where metal met metal, the crash is heard in place
