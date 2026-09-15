@@ -333,6 +333,7 @@ class ZombieConductor extends Conductor {
   protected threatStep(i: number, t: number, g: number): void {
     const bars4 = this.cur.barSteps * 4;
     if (i % 8 === 0) { this.s.heart(this.sfxBus, t, 0.11 * g); this.markHeart(t); }
+    if (!this.notes) return;
     if (i % bars4 === bars4 / 2) this.s.riser(this.sfxBus, t, (bars4 / 2) * this.cur.stepDur, 0.03 * g);
     if (i % bars4 === 0 && i > 0) this.s.boom(this.sfxBus, t, 0.06 * g);
   }
@@ -366,7 +367,7 @@ class ZombieConductor extends Conductor {
         return;
       }
       case 'dns': {
-        if (Math.random() >= st.gateDns * 0.35) return;
+        if (!this.notes || Math.random() >= st.gateDns * 0.35) return;
         const t = this.slot('chirp', 2, 0.5);
         if (t < 0) return;
         const c = this.chordAt(t, 5);
@@ -382,7 +383,7 @@ class ZombieConductor extends Conductor {
         return;
       }
       case 'dhcp': {
-        if (Math.random() >= st.gateDhcp) return;
+        if (!this.notes || Math.random() >= st.gateDhcp) return;
         const t = this.slot('arrive', 4, 1.5);
         if (t < 0) return;
         // someone made it in: a gentle strummed chord of whatever's playing
@@ -434,10 +435,10 @@ class ZombieConductor extends Conductor {
         s.gunshot(this.sfxBus, when, 0.25 * this.setting<number>('zGunfire') * st.gBlock, pan, chord[0] * 2);
         break;
       case 'dns':
-        s.chirp(this.sfxBus, when, chord[0] * 4, chord[1] * 4, 0.02 * st.gDns, pan);
+        if (this.notes) s.chirp(this.sfxBus, when, chord[0] * 4, chord[1] * 4, 0.02 * st.gDns, pan);
         break;
       default:
-        s.pluck(this.sfxBus, when, pick(chord), 0.04 * (kind === 'allow' ? st.gAllow : kind === 'wifi' ? st.gWifi : st.gDhcp), pan);
+        if (this.notes) s.pluck(this.sfxBus, when, pick(chord), 0.04 * (kind === 'allow' ? st.gAllow : kind === 'wifi' ? st.gWifi : st.gDhcp), pan);
     }
   }
 }

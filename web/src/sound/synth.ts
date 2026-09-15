@@ -30,7 +30,8 @@ export class Bus {
   set(level: number, t: number, tc = 0.3): void {
     if (Math.abs(level - this.level) < 0.002) return;
     this.level = level;
-    for (const g of [this.dry, this.rev, this.echo]) g.gain.setTargetAtTime(level, t, tc);
+    // drop anything booked later (a fade-in still scheduled must not undo this)
+    for (const g of [this.dry, this.rev, this.echo]) { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(level, t, tc); }
   }
 }
 

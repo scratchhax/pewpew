@@ -227,17 +227,30 @@ for everyone behind it. Your car is never taken out; it gets knocked about,
 loses speed and fishtails, then recovers. Sparks fly where metal meets metal,
 and every crash is heard in place.
 
-**There's always a path.** Your driver scores all four lanes by the open road
-ahead every frame, checks the move over is physically clear (including any
-lane crossed on the way), and flicks across. Slower traffic in your planned
-lane moves over when it sees you coming, or floors it to get out ahead if it
-can't. New traffic never fills every lane at the same distance, and traffic
-keeps its own pace, so one slow car can't jam the whole road. How hard your car
-pushes rises with the event rate. On a quiet network it weaves politely and
-only brakes as a last resort. On a busy one it's a battering ram: it takes
-tighter gaps, doesn't brake for cars, shoves them aside or spins them out, and
-keeps its momentum. Boxed in for more than a moment, it leans on the horn and
-turns pushy whatever the traffic.
+**There's always a path.** Your driver plans in space and time. About twelve
+times a second it tries around a hundred moves: any point across the road
+(between lanes and along the curb included), each at cruising speed, with a
+boost, or braking. It plays each one forward for two seconds against where
+every car will be, using your car's real sideways grip and acceleration. Wrecks
+count as wide, fast-slowing obstacles sliding for the shoulder. The best clean
+move wins. Lane centres, short moves and keeping speed are preferred, and
+braking is the last resort.
+
+When nothing is clean, your driver gets wild. It accepts tighter gaps, flicks
+across harder with the tail hanging out, gets heavier to shove with, stops
+treating braking as an option, and leans on the horn. The cars in the way are
+asked to clear it: an outside-lane car squeezes onto the curb so you can go by
+on the inside, others change lanes, and if they can't they floor it. Rivals
+and police pace themselves off your cruising speed, not your current speed, so
+if you're held up they pull away instead of slowing into a moving wall. New
+traffic never fills every lane at the same distance, and traffic keeps its own
+pace. How wild your driver starts rises with the event rate: polite on a quiet
+network, a battering ram on a busy one.
+
+Measured headless over two minutes of demo traffic at 12 events a second, your
+car holds 99% of its cruising speed, is never held up for more than a moment,
+and takes about 6 knocks a minute. At 28 events a second it still holds 97%
+while shoving through.
 
 ### Choosing a theme
 
@@ -367,10 +380,12 @@ it within about 20 seconds, the kiosk included.
 - When a track loads, the viewer works out its **tempo, beat position and key**
   (in a background worker, once per track) and saves the result on the relay.
   The panel shows what it found; type a tempo to correct it, or **Re-detect**.
-- While a track plays, the theme's generated music steps aside. Its sound effects
-  and ambience stay on top, snapped to the track's beat and played in its key:
-  gunshots and groans, lasers and pings, the engine and horns. Music-driven
-  visuals follow the track's beat and loudness.
+- While a track plays, the track is the only music. The theme's generated
+  soundtrack steps aside, and so does every event sound that's really a note:
+  pings, chirps, arpeggios, music-box strums and drum pulses. Real sound effects
+  stay, locked to the track's beat: gunshots, groans, lasers, blasts, crashes,
+  horns and the engine, which stops following the chords and sits lower in the
+  mix. Music-driven visuals follow the track's beat and loudness.
 - **Track volume** sits under Space & balance. Choose **None** to go back to the
   theme's own soundtrack, or delete the track from the relay.
 

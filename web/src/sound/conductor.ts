@@ -312,6 +312,12 @@ export abstract class Conductor implements Score {
 
   // ── background track ──
   protected track: TrackClock | null = null;
+  /**
+   * False while a background track is the music: event sounds that are really
+   * notes (pings, chirps, arpeggios, drum pulses) sit out, so nothing composes
+   * under the track. Sound effects (shots, blasts, crashes, horns, engine) stay.
+   */
+  protected get notes(): boolean { return !this.track; }
   private trackStyle: TrackStyle | null = null;
 
   setTrack(clock: TrackClock | null): void {

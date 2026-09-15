@@ -407,13 +407,14 @@ class StreetConductor extends Conductor {
     }
     const lo = GEARS[this.gear - 1], hi = GEARS[this.gear];
     const rev = Math.max(0, Math.min(1, (this.speed - lo) / Math.max(1, hi - lo)));
-    const root = this.chordAt(now, 1)[0];
+    // with our own music the engine plays along in key; under a background track it's just an engine
+    const root = this.notes ? this.chordAt(now, 1)[0] : 46;
     const f = root * Math.pow(2, rev * 0.9 + this.nitro * 0.1);
     this.engine.oscs[0].frequency.setTargetAtTime(f, now, 0.08);
     this.engine.oscs[1].frequency.setTargetAtTime(f, now, 0.08);
     this.engine.oscs[2].frequency.setTargetAtTime(f / 2, now, 0.08);
     this.engine.lp.frequency.setTargetAtTime(300 + rev * 900 + this.nitro * 900, now, 0.1);
-    this.setBed(this.engineBed, eng * (0.08 + rev * 0.05 + this.nitro * 0.05), now);
+    this.setBed(this.engineBed, eng * (this.notes ? 1 : 0.45) * (0.08 + rev * 0.05 + this.nitro * 0.05), now);
     void dt;
   }
 
@@ -435,7 +436,7 @@ class StreetConductor extends Conductor {
     switch (kind) {
       case 'block': {
         this.bumpTension(0.05);
-        if (Math.random() >= st.gateBlock * 0.45) return;
+        if (Math.random() >= st.gateBlock * (this.notes ? 0.45 : 0.15)) return;
         const t = this.slot('horn', 4, 1);
         if (t < 0) return;
         s.horn(this.sfxBus, t, this.chordAt(t, 3)[0], 0.03 * st.gBlock, pan);
@@ -446,7 +447,7 @@ class StreetConductor extends Conductor {
         return;
       }
       case 'dns': {
-        if (Math.random() >= st.gateDns * 0.3) return;
+        if (!this.notes || Math.random() >= st.gateDns * 0.3) return;
         const t = this.slot('dns', 2, 0.5);
         if (t < 0) return;
         const c = this.chordAt(t, 5);
@@ -461,7 +462,7 @@ class StreetConductor extends Conductor {
         return;
       }
       case 'wifi': {
-        if (Math.random() >= st.gateWifi * 0.8) return;
+        if (!this.notes || Math.random() >= st.gateWifi * 0.8) return;
         const t = this.slot('gate', 4, 1);
         if (t < 0) return;
         this.chordAt(t, 4).forEach((f, k) => s.ping(this.sfxBus, t + k * this.cur.stepDur, f, 0.014 * st.gWifi, pan));
@@ -518,7 +519,7 @@ class StreetConductor extends Conductor {
     const pan = (Math.random() - 0.5) * 1.6;
     const c = this.chordAt(when, 4);
     if (kind === 'block' || kind === 'threat') s.horn(this.sfxBus, when, c[0] / 2, 0.012 * st.gBlock, pan);
-    else s.ping(this.sfxBus, when, pick(c), 0.008 * (kind === 'allow' ? st.gAllow : st.gDns), pan);
+    else if (this.notes) s.ping(this.sfxBus, when, pick(c), 0.008 * (kind === 'allow' ? st.gAllow : st.gDns), pan);
   }
 }
 

@@ -262,7 +262,8 @@ class OrbitalConductor extends Conductor {
   /** The station hums, space hisses, and storms crackle over the radio. */
   protected ambience(dt: number, state: State, now: number, on: boolean): void {
     const amb = on ? this.setting<number>('sAmbience') : 0;
-    this.setBed(this.hum, amb * (0.05 + this.mood.night * 0.03), now);
+    // the hum is a chord in A: under a background track in another key it would clash, so it all but leaves
+    this.setBed(this.hum, amb * (this.notes ? 1 : 0.2) * (0.05 + this.mood.night * 0.03), now);
     this.setBed(this.wind, amb * (0.06 + this.mood.night * 0.12), now);
     if (amb > 0 && state.weather !== 'calm' && Math.random() < dt * this.mood.night * 1.5) {
       this.s.crackle(this.amb, now + 0.05, 0.05 * amb, (Math.random() - 0.5) * 1.6);
@@ -272,7 +273,7 @@ class OrbitalConductor extends Conductor {
   /** Rockets alive: a shield thump every two beats, a red-alert tone every four bars. */
   protected threatStep(i: number, t: number, g: number): void {
     const bars4 = this.cur.barSteps * 4;
-    if (i % 8 === 0) { this.s.taiko(this.sfxBus, t, 0.09 * g); this.markHeart(t); }
+    if (i % 8 === 0) { if (this.notes) this.s.taiko(this.sfxBus, t, 0.09 * g); this.markHeart(t); }
     if (i % bars4 === 0) this.s.alert(this.sfxBus, t, this.chordAt(t, 4)[0], 0.025 * g, this.cur.stepDur * 4);
   }
 
@@ -287,7 +288,7 @@ class OrbitalConductor extends Conductor {
       case 'block': {
         // contact: a low sonar ping as the asteroid appears (the laser comes on intercept)
         this.bumpTension(0.05);
-        if (Math.random() >= st.gateBlock * 0.5) return;
+        if (!this.notes || Math.random() >= st.gateBlock * 0.5) return;
         const t = this.slot('contact', 4, 1);
         if (t < 0) return;
         s.ping(this.sfxBus, t, this.chordAt(t, 3)[0], 0.025 * st.gBlock, pan);
@@ -302,7 +303,7 @@ class OrbitalConductor extends Conductor {
         return;
       }
       case 'dns': {
-        if (Math.random() >= st.gateDns * 0.3) return;
+        if (!this.notes || Math.random() >= st.gateDns * 0.3) return;
         const t = this.slot('dns', 2, 0.5);
         if (t < 0) return;
         s.ping(this.sfxBus, t, this.chordAt(t, 5)[(Math.random() * 3) | 0], 0.012 * st.gDns, pan);
@@ -351,7 +352,7 @@ class OrbitalConductor extends Conductor {
         return;
       }
       case 'wifi': {
-        if (Math.random() >= st.gateWifi * 0.8) return;
+        if (Math.random() >= st.gateWifi * 0.8 || (!this.notes && opts.variant !== 'bad')) return;
         const t = this.slot('wifi', 4, 1);
         if (t < 0) return;
         const c = this.chordAt(t, 4);
@@ -378,10 +379,10 @@ class OrbitalConductor extends Conductor {
         s.zap(this.sfxBus, when, pick(c) / 2, 0.02 * this.weapons * st.gBlock, pan);
         break;
       case 'dns':
-        s.ping(this.sfxBus, when, pick(c) * 2, 0.008 * st.gDns, pan);
+        if (this.notes) s.ping(this.sfxBus, when, pick(c) * 2, 0.008 * st.gDns, pan);
         break;
       default:
-        s.chip(this.sfxBus, when, pick(c), 0.01 * (kind === 'allow' ? st.gAllow : kind === 'wifi' ? st.gWifi : st.gDhcp), 0.05, pan);
+        if (this.notes) s.chip(this.sfxBus, when, pick(c), 0.01 * (kind === 'allow' ? st.gAllow : kind === 'wifi' ? st.gWifi : st.gDhcp), 0.05, pan);
     }
   }
 }
