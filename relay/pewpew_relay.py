@@ -24,6 +24,7 @@ from aiohttp import WSMsgType, web
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import parsers
+from tracks import add_track_routes
 
 logger = logging.getLogger("pewpew-relay")
 
@@ -41,6 +42,8 @@ DEFAULTS = {
     "vpn_networks": {},
     "drop_log_types": [],          # e.g. ["system"] to quiet noise
     "default_theme": "scifi",      # viewer theme served at /
+    "tracks_dir": "tracks",        # uploaded background tracks (relative to relay/)
+    "max_track_mb": 60,
 }
 
 THEME_NAME = r"[a-z0-9][a-z0-9-]*"
@@ -294,6 +297,8 @@ async def main():
             logger.info("client disconnected (%d total)", len(hub.clients))
         return ws
     app.router.add_get("/ws", ws_handler)
+
+    add_track_routes(app, cfg)
 
     static = os.path.abspath(STATIC_DIR)
     index_file = os.path.join(static, "index.html")

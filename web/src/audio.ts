@@ -85,6 +85,20 @@ export interface Score {
   pulse?(): MusicPulse;
   /** True while the score hands everything back to the built-in band (e.g. a "classic" option). */
   passthrough?(): boolean;
+  /** A background track took over the music (null: it stopped). Effects should follow its clock. */
+  setTrack?(clock: TrackClock | null): void;
+}
+
+/** What an uploaded track's analysis says. `root` is a pitch class (0 = C). */
+export interface TrackMeta { bpm: number; offset: number; root: number; minor: boolean }
+
+/** A playing background track, as a score sees it. */
+export interface TrackClock extends TrackMeta {
+  /** The track's audio, for metering. */
+  node: AudioNode;
+  /** Beats since the track's first beat, from the media clock. */
+  beatAt(): number;
+  playing(): boolean;
 }
 
 /** The music as heard at the speakers, for visuals that move in time with it. */
@@ -303,6 +317,7 @@ export class Audio {
     }
 
     this.last = ctx.currentTime;
+    this.wireTrack();                          // a track chosen before audio could start
   }
 
 
@@ -381,8 +396,67 @@ export class Audio {
     this.score?.setThreatActive(on);
   }
 
-  /** The score is handing the soundtrack back to the built-in band. */
-  private classic(): boolean { return !!this.score?.passthrough?.(); }
+  /** The score is handing the soundtrack back to the built-in band (never while a track plays). */
+  private classic(): boolean { return !this.track && !!this.score?.passthrough?.(); }
+
+  // ── background track ──
+  private track: { name: string; el: HTMLAudioElement; node: MediaElementAudioSourceNode | null; gain: GainNode | null; meta: TrackMeta } | null = null;
+
+  /** Name of the background track playing, or null. */
+  trackName(): string | null { return this.track?.name ?? null; }
+
+  /**
+   * Play an uploaded track as the music (null = back to the theme's own
+   * soundtrack). The score keeps its effects and ambience and snaps them to
+   * the track's beat and key.
+   */
+  setTrack(name: string | null, url = '', meta?: TrackMeta): void {
+    if (this.track && (name !== this.track.name)) {
+      const old = this.track;
+      old.el.pause();
+      old.gain?.disconnect();
+      old.node?.disconnect();
+      old.el.removeAttribute('src');
+      old.el.load();
+      this.track = null;
+      this.score?.setTrack?.(null);
+    }
+    if (!name || !meta) return;
+    if (this.track) {                                      // same track, new tempo/key
+      this.track.meta = meta;
+      this.wireTrack();
+      return;
+    }
+    const el = new window.Audio(url);
+    el.loop = true;
+    el.preload = 'auto';
+    this.track = { name, el, node: null, gain: null, meta };
+    this.wireTrack();
+  }
+
+  /** Connect the track into the graph and hand its clock to the score (once audio is running). */
+  private wireTrack(): void {
+    const tr = this.track, ctx = this.ctx;
+    if (!tr || !ctx || !this.master) return;
+    if (!tr.node) {
+      tr.node = ctx.createMediaElementSource(tr.el);
+      tr.gain = ctx.createGain();
+      tr.gain.gain.value = this.settings.trackVolume * 1.2;
+      tr.node.connect(tr.gain).connect(this.master);
+    }
+    if (this.settings.audio && ctx.state === 'running') void tr.el.play().catch(() => {});
+    const beat = 60 / tr.meta.bpm;
+    this.score?.setTrack?.({
+      bpm: tr.meta.bpm, offset: tr.meta.offset, root: tr.meta.root, minor: tr.meta.minor, node: tr.gain!,
+      // the track's beat position right now (loops wrap naturally: it's just the media clock)
+      beatAt: () => (tr.el.currentTime - tr.meta.offset) / beat,
+      playing: () => !tr.el.paused,
+    });
+  }
+
+  setTrackVolume(v: number): void {
+    if (this.track?.gain && this.ctx) this.track.gain.gain.setTargetAtTime(v * 1.2, this.ctx.currentTime, 0.2);
+  }
 
   /** The theme score's musical clock, or null (no score, or audio not started yet). */
   pulse(): MusicPulse | null {
@@ -409,8 +483,8 @@ export class Audio {
       if (on) this.maybeStart();
       return;
     }
-    if (on) void this.ctx.resume();
-    else void this.ctx.suspend();
+    if (on) { void this.ctx.resume(); if (this.track) void this.track.el.play().catch(() => {}); }
+    else { void this.ctx.suspend(); this.track?.el.pause(); }
   }
 
   setVolume(v: number): void {
@@ -1024,7 +1098,7 @@ export class Audio {
     this.sectionT += GRID;
     if (this.weather === 'calm' && this.tension < 0.2) this.calmT += GRID;
     else this.calmT = 0;
-    const mel = this.settings.melody;              // melody layer (additive)
+    const mel = this.settings.melody && !this.track; // melody layer (additive); a track replaces it
     const dev = this.settings.deviceVoices;        // gated event sounds
     // per-type gate openness: 1 = every hit passes (default), 0 = choked off
     const gB = this.settings.gateBlock, gA = this.settings.gateAllow;

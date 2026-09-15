@@ -11,3 +11,6 @@ Thumbs.db
 desktop.ini
 
 *.log
+
+# uploaded background tracks (local media, never committed)
+relay/tracks/
