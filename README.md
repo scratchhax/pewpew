@@ -578,7 +578,7 @@ Traffic weather is the **DEFCON** level: 5 on a calm network, 3 in a storm and
 enough IDS/IPS threats land inside a minute (3 by default), when one address
 racks up 12 blocks in a minute, or on a random sweep about every 2 minutes, so
 even a quiet, well-behaved network gets regular visits. The first tasking comes
-15 seconds after the page loads, and there's a rest of up to 45 seconds after
+15 to 20 seconds after the page loads, and there's a rest of up to 45 seconds after
 each one. A run lasts about 30 seconds:
 
 1. **Acquire.** The camera swings round until the target is under it, and a

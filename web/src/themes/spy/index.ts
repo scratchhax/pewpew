@@ -196,7 +196,7 @@ async function create(host: ThemeHost<typeof SPY_DEFAULTS>, init: RendererInit):
   const bootAt = Date.now();
   const sweepMs = () => Math.max(0.5, settings.oEyeSweep) * 60000;
   let cooldownUntil = bootAt + 15000;
-  let nextSweep = bootAt + randomSweep();
+  let nextSweep = bootAt + 20000;          // the first look comes soon after the screen loads
   function randomSweep(): number { return sweepMs() * (0.6 + Math.random() * 0.8); }
 
   function targetFor(ip: string, reason: EyeTarget['reason']): EyeTarget {
