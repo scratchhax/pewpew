@@ -210,8 +210,14 @@ Everything is built in code: the car, the city, the signs and textures.
 | wifi | a neon gate over the road labelled with the AP: a full arch for a join, a broken dim one for a failure |
 | system | the street lights brown out in a wave rolling away down the road |
 
-Traffic sets the pace (about 100 km/h on a quiet network, over 200 when it's
-busy), and a sudden burst lights the nitro: the camera pulls back, the field of
+Traffic sets the cruising pace (about 100 km/h on a quiet network, over 200 when
+it's busy). When your driver sees several seconds of empty road on its line it
+sprints like a racer, up to about 85 km/h over cruise: a hard pull through the low gears that
+tapers near the top, with a beat of lost drive at every shift (watch the tach).
+When traffic closes in it lifts off and coasts back down; it never brakes. Motion
+blur streaks the edges of the screen out from the vanishing point as the speed
+climbs (your car and the road ahead stay sharp). **Motion blur** is a quality
+slider: off on Low, stronger on Ultra. A sudden burst lights the nitro: the camera pulls back, the field of
 view widens, and blue flames and speed lines kick in. Traffic weather is the
 rain: a dry (but always damp) night, then a wet storm, then a monsoon. Like
 Last Outpost, nothing else flashes: neon and brownouts ease; only the police light bars flash.
@@ -499,6 +505,7 @@ bundles every setting that trades looks for frame time.
 | Rain | 0.35 | 0.6 | 1.0 | 1.5 |
 | Bloom | off | on | on | on |
 | Lens (vignette, colour fringe) | off | off | on | on |
+| Motion blur | 0 | 0.45 | 0.6 | 0.8 |
 
 Midnight Run is a full 3D scene built to look good first; it's meant for a
 desktop or laptop GPU. Its Low tier is a starting point for smaller devices,

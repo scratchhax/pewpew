@@ -4,7 +4,8 @@ import { RACING_BUDGETS, RACING_CONTROLS, RACING_DEFAULTS, RACING_HUD } from './
 import { createWorld } from './world';
 import { Road } from './road';
 import { City } from './city';
-import { Traffic } from './traffic';
+import { Traffic, accelAt, COAST } from './traffic';
+import { GEARS } from './score';
 import { Fx } from './fx';
 import { bend, bendAt } from './bend';
 import { glow } from './textures';
@@ -12,7 +13,7 @@ import { racingScore } from './score';
 import { Groove } from '../../sound/groove';
 import { hudLabels } from '../../hud/hud';
 import { Dash } from './dash';
-import { Color } from 'three';
+import { Color, Vector3 } from 'three';
 import './hud.css';
 
 /** The event colour law, shared with the log legend. */
@@ -75,6 +76,7 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
     traffic.maxCars = settings.rMaxCars;
     fx.density = settings.rRain;
     world.lens.enabled = settings.rLens;
+    world.blur.enabled = settings.rMotionBlur > 0.01;
   }
   applyBudgets();
 
@@ -83,8 +85,9 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
   // ── driving state ──
   let speed = 30, travelled = 0, wet = 0.45, rain = 0, nitro = 0;
   let rateFast = 0, rateSlow = 0, arrivals = 0;
-  let camX = 0, camShake = 0, fov = 62, bootT = -1, nitroOn = false, boost = 0, aggression = 0, lastWall = performance.now() / 1000;
+  let camX = 0, camShake = 0, fov = 62, bootT = -1, nitroOn = false, boost = 0, open = 0, gear = 1, shiftT = 0, aggression = 0, lastWall = performance.now() / 1000;
   const groove = new Groove();
+  const vanish = new Vector3();
   const bendTarget = { x: 0, y: 0 };
 
   function event(se: SceneEvent, replay: boolean): void {
@@ -158,9 +161,17 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
     const cruise = 26 + Math.min(34, rateSlow * 1.1);
     // how hard our driver pushes through traffic: polite on a quiet network, a battering ram when it's slammed
     aggression += (Math.min(1, Math.max(0, (rateSlow - 8) / 22) + nitro * 0.35) - aggression) * Math.min(1, dtReal * 0.5);
-    // no brakes: when it gets wild the car goes faster, and puts its foot down to make a gap before it closes
-    const want = cruise + nitro * 16 + aggression * 8 + boost;
-    speed += (want - speed) * Math.min(1, dt * (want < speed ? 6 : 0.9 + aggression * 1.3));
+    // no brakes: a busy network drives faster, open road means a flat-out sprint, and the driver puts
+    // its foot down to make a gap before it closes. Lifting off only coasts.
+    const pace = cruise + nitro * 16 + aggression * 8 + open * 24;
+    traffic.pace = pace;
+    const want = pace + boost;
+    // a real car's pull: hard through the low gears, tapering near the top, a beat of lost drive at each shift
+    while (gear < GEARS.length - 1 && speed > GEARS[gear]) { gear++; shiftT = 0.22; }
+    while (gear > 1 && speed < GEARS[gear - 1] * 0.92) gear--;
+    shiftT = Math.max(0, shiftT - dt);
+    const accel = want > speed ? (accelAt(speed) + nitro * 4) * (shiftT > 0 ? 0.25 : 1) : COAST;
+    speed += Math.max(-accel * dt, Math.min(accel * dt, want - speed));
     travelled += speed * dt;
 
     // the road winds: slow sums of sines steer the curved world
@@ -189,6 +200,8 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
     const hits = traffic.update(dt, t, speed, cruise + nitro * 16 + aggression * 8, aggression, camera);
     if (hits.honk) audio.sfx('honk', { pan: Math.max(-1, Math.min(1, traffic.playerX / 8)) });
     boost = hits.boost;
+    // open road eases in (the driver sees it coming) and drops out quickly when traffic closes
+    open += (hits.open - open) * Math.min(1, dtReal * (hits.open > open ? 0.9 : 3));
     traffic.player.underglowMat.opacity *= settings.rMusicVisuals && groove.style ? 0.75 + groove.downbeat * 0.35 : 1;
     // collisions: our speed takes the hit, sparks fly where metal met metal, the crash is heard in place
     speed = Math.max(4, speed + hits.playerDv);
@@ -213,6 +226,15 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
     camera.fov = fov;
     camera.updateProjectionMatrix();
     world.skyline.rotation.y = -bend.value.x * 400;
+    // motion blur: streaks out from the vanishing point, growing with speed and nitro
+    if (world.blur.enabled) {
+      const vp = bendAt(-300);
+      vanish.set(vp.x, vp.y + 1, -300).project(camera);
+      world.blur.uniforms.uCenter.value.set(vanish.x * 0.5 + 0.5, vanish.y * 0.5 + 0.5);
+      world.blur.uniforms.uStrength.value = settings.rMotionBlur * (Math.max(0, Math.min(1, (speed - 32) / 40)) * 0.085 + nitro * 0.03);
+      vanish.set(traffic.playerX, 0.7, 0).project(camera);
+      world.blur.uniforms.uCar.value.set(vanish.x * 0.5 + 0.5, vanish.y * 0.5 + 0.5);
+    }
 
     world.render(settings.rBloom);
   }

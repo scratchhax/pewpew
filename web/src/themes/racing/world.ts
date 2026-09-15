@@ -31,6 +31,37 @@ const LensShader = {
     }`,
 };
 
+/**
+ * Motion blur for speed: every pixel is smeared back toward the vanishing point,
+ * more the further it is from it, so the road ahead stays sharp and the edges
+ * of the screen streak.
+ */
+const SpeedBlurShader = {
+  uniforms: {
+    tDiffuse: { value: null }, uStrength: { value: 0 }, uCenter: { value: new Vector2(0.5, 0.55) },
+    uCar: { value: new Vector2(0.5, 0.2) }, uCarSize: { value: new Vector2(0.12, 0.16) },
+  },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse; uniform float uStrength; uniform vec2 uCenter; uniform vec2 uCar; uniform vec2 uCarSize;
+    varying vec2 vUv;
+    void main() {
+      vec2 d = vUv - uCenter;
+      // our car rides with the camera, so it stays sharp
+      float car = smoothstep(0.75, 1.35, length((vUv - uCar) / uCarSize));
+      vec2 stepv = d * uStrength * smoothstep(0.04, 0.6, length(d)) * car / 10.0;
+      vec3 acc = vec3(0.0); float wsum = 0.0;
+      for (int i = 0; i < 10; i++) {
+        float w = 1.0 - float(i) * 0.07;
+        acc += texture2D(tDiffuse, vUv - stepv * float(i)).rgb * w;
+        wsum += w;
+      }
+      gl_FragColor = vec4(acc / wsum, 1.0);
+    }`,
+};
+
 export interface World {
   renderer: WebGLRenderer;
   scene: Scene;
@@ -38,6 +69,7 @@ export interface World {
   composer: EffectComposer;
   bloom: UnrealBloomPass;
   lens: ShaderPass;
+  blur: ShaderPass;
   skyline: Mesh;
   resize(w: number, h: number): void;
   setPixelRatio(r: number): void;
@@ -94,13 +126,15 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
   const renderPass = new RenderPass(scene, camera);
   const bloom = new UnrealBloomPass(new Vector2(window.innerWidth, window.innerHeight), 0.7, 0.5, 0.82);
   const lens = new ShaderPass(LensShader);
+  const blur = new ShaderPass(SpeedBlurShader);
   composer.addPass(renderPass);
   composer.addPass(bloom);
+  composer.addPass(blur);
   composer.addPass(lens);
   composer.addPass(new OutputPass());
 
   return {
-    renderer, scene, camera, composer, bloom, lens, skyline: sl,
+    renderer, scene, camera, composer, bloom, lens, blur, skyline: sl,
     resize(w, h) {
       renderer.setSize(w, h);
       composer.setSize(w, h);

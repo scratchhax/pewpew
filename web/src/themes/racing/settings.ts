@@ -30,13 +30,14 @@ export const RACING_DEFAULTS = {
   rRain: 1,
   rBloom: true,
   rLens: true,
+  rMotionBlur: 0.6,      // speed blur toward the vanishing point
 };
 
 export const RACING_BUDGETS: Budgets = {
-  low: { rMaxCars: 8, rDrawDistance: 380, rRain: 0.35, rBloom: false, rLens: false },
-  medium: { rMaxCars: 14, rDrawDistance: 520, rRain: 0.6, rBloom: true, rLens: false },
-  high: { rMaxCars: 20, rDrawDistance: 700, rRain: 1, rBloom: true, rLens: true },
-  ultra: { rMaxCars: 32, rDrawDistance: 900, rRain: 1.5, rBloom: true, rLens: true },
+  low: { rMaxCars: 8, rDrawDistance: 380, rRain: 0.35, rBloom: false, rLens: false, rMotionBlur: 0 },
+  medium: { rMaxCars: 14, rDrawDistance: 520, rRain: 0.6, rBloom: true, rLens: false, rMotionBlur: 0.45 },
+  high: { rMaxCars: 20, rDrawDistance: 700, rRain: 1, rBloom: true, rLens: true, rMotionBlur: 0.6 },
+  ultra: { rMaxCars: 32, rDrawDistance: 900, rRain: 1.5, rBloom: true, rLens: true, rMotionBlur: 0.8 },
 };
 
 type Key = keyof typeof RACING_DEFAULTS;
@@ -64,6 +65,7 @@ export const RACING_CONTROLS = {
     range('rRain', 'Rain', 0, 1.5, 0.05),
     toggle('rBloom', 'Bloom'),
     toggle('rLens', 'Lens (vignette, fringe)'),
+    range('rMotionBlur', 'Motion blur', 0, 1.5, 0.05),
   ],
   color: [] as Control[],
   colorHint: `Hue shift & intensity recolour the HUD accent. Event colours

@@ -8,6 +8,8 @@ import { NEAR } from './road';
 import { ROAD_WIDTH, drawNeon, facade, glow, streak } from './textures';
 
 const SLICE = 13;                 // metres between building slots
+/** Billboards: half their length, and how far they swing out from the wall toward the car (rad). */
+const SIGN_HALF = 4.7, SIGN_SWING = 0.5;
 // event windows: texture rows are building slots, columns are windows (floors x windows across)
 const WIN_ACROSS = 8, WIN_FLOORS = 64;
 const WIN_COLS = WIN_ACROSS * WIN_FLOORS, WIN_ROWS = 256;
@@ -310,9 +312,12 @@ export class City {
 
       if (slot.sign) {
         const sg = slot.sign;
-        sg.group.position.set(slot.x - slot.side * (slot.d / 2 + 0.2), 6 + (slot.h > 20 ? 4 : 0), slot.z);
-        // angled to face the oncoming car, not just the road
-        sg.group.rotation.y = slot.side > 0 ? Math.PI + 1.0 : -1.0;
+        // hinged off the wall and swung out toward the oncoming car: the far end touches the facade and the
+        // whole sign hangs over the sidewalk, clear of the building (it used to pivot on its middle, half inside)
+        // and below the street-light heads, clear of the poles
+        const wall = slot.x - slot.side * slot.d / 2;
+        sg.group.position.set(wall - slot.side * (0.3 + SIGN_HALF * Math.sin(SIGN_SWING)), slot.h > 20 ? 7.2 : 4.6, slot.z + SIGN_HALF * (1 - Math.cos(SIGN_SWING)));
+        sg.group.rotation.y = slot.side > 0 ? Math.PI + SIGN_SWING : -SIGN_SWING;
         sg.heat = Math.max(0, sg.heat - dt * 0.25);
         const b = 0.85 + sg.heat * 0.6;
         sg.mat.color.setScalar(b);

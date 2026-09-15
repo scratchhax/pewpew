@@ -43,6 +43,11 @@ const SIDEWALK_EDGE = 13.2;
 /** How far a civilian squeezes onto the curb to let us by. */
 const PULL = 1.9;
 
+/** Our car's acceleration at a speed (m/s²): a hard pull through the low gears, tapering near the top. */
+export const accelAt = (v: number) => Math.max(2.2, 11 - v * 0.12);
+/** Lifting off: no brakes, just engine braking and drag (m/s²). */
+export const COAST = 3.2;
+
 const nearestLane = (x: number) => LANES.reduce((best, lx, k) => (Math.abs(lx - x) < Math.abs(LANES[best] - x) ? k : best), 0);
 
 type Kind = 'traffic' | 'overtake' | 'rival' | 'police';
@@ -150,6 +155,8 @@ export interface TrafficHits {
   passed: number;
   /** Extra speed our driver wants over cruising, to get past before a gap closes (m/s). */
   boost: number;
+  /** 0..1: open road ahead on our line (the theme turns it into a sprint). */
+  open: number;
   /** Change to our forward speed from collisions this frame (m/s). */
   playerDv: number;
   impacts: Impact[];
@@ -363,7 +370,7 @@ export class Traffic {
   /** `cruise`: the pace we want (traffic speeds are shares of it). */
   update(dt: number, t: number, playerSpeed: number, cruise: number, aggression: number, camera: PerspectiveCamera): TrafficHits {
     this.aggression = Math.max(0, Math.min(1, aggression));
-    const hits: TrafficHits = { smashed: 0, passed: 0, boost: 0, playerDv: 0, impacts: [], honk: false };
+    const hits: TrafficHits = { smashed: 0, passed: 0, boost: 0, open: 0, playerDv: 0, impacts: [], honk: false };
     const pb = this.pb;
     pb.speed = playerSpeed;
     this.cruise = cruise;
@@ -459,12 +466,17 @@ export class Traffic {
     this.planT -= dt;
     if (this.planT <= 0) { this.planT = 0.08; this.replan(agg); }
     this.boxed = this.plan.safe ? Math.max(0, this.boxed - dt * 1.5) : this.boxed + dt;
-    if (this.plan.speed > this.cruise + 0.5) hits.boost = this.plan.speed - this.cruise;
+    if (this.plan.speed > this.pace + 0.5) hits.boost = this.plan.speed - this.pace;
+    hits.open = this.open;
     hits.honk = this.boxed > 0.6 && this.boxed - dt <= 0.6;
   }
 
   /** How hard our driver pushes: 0 on a quiet network, 1 when it's slammed. Set by the theme. */
   aggression = 0;
+  /** The speed our driver is going for before any boost (cruise, nitro and an open-road sprint). Set by the theme. */
+  pace = 30;
+  /** 0..1: how open the road ahead is on our driver's line (a long clear run means sprint). */
+  private open = 0;
   /** Street-light poles between two distances, as [x, z] (set by the theme; the sidewalk is otherwise open). */
   poles: (zMin: number, zMax: number) => Array<[number, number]> = () => [];
 
@@ -489,9 +501,8 @@ export class Traffic {
         }
       }
     });
-    // no brakes on this car: it holds its speed or puts its foot down
-    const kUp = 0.9 + agg * 1.3, kDown = 6;
-    const speeds = [this.cruise, this.cruise + 8 + agg * 12];
+    // no brakes on this car: it holds its pace or puts its foot down (lifting off only coasts)
+    const speeds = [this.pace, this.pace + 8 + agg * 12];
     const maxVx = 9.5 + agg * 6;
     // how close counts as a hit: some breathing room when calm, a coat of paint when it's wild
     const mx = 2 * HALF_W + 0.4 - agg * 0.36, mz = 2 * HALF_L + 2.5 - agg * 1.9;
@@ -500,12 +511,13 @@ export class Traffic {
     for (let x = -PLAYER_EDGE; x <= PLAYER_EDGE + 1e-3; x += 0.46) targets.push(x);
     for (const x of [-12.2, -11.2, 11.2, 12.2]) targets.push(x);
 
-    type Option = { score: number; x: number; speed: number; mode: number; safe: boolean; blocker: Car | null };
+    type Option = { score: number; x: number; speed: number; mode: number; safe: boolean; blocker: Car | null; ttc: number };
     let best: Option | null = null, bestWalk: Option | null = null;
     for (let s = 0; s < speeds.length; s++) {
-      const D = speeds[s] - pb.speed, k = D < 0 ? kDown : kUp;
-      const shiftAt = (t: number) => D * (t - (1 - Math.exp(-k * t)) / k);   // extra distance our speed change covers
-      const shiftH = shiftAt(H), vH = pb.speed + D * (1 - Math.exp(-k * H));
+      // our real acceleration (see ACCEL): the extra distance a speed change covers by time t
+      const D = speeds[s] - pb.speed, a = D > 0 ? accelAt(pb.speed) : COAST, t1 = Math.abs(D) / a;
+      const shiftAt = (t: number) => (t < t1 ? Math.sign(D) * a * t * t / 2 : D * (t - t1 / 2));
+      const shiftH = shiftAt(H), vH = pb.speed + Math.sign(D) * Math.min(Math.abs(D), a * H);
       for (const x of targets) {
         // fly the move
         let px = pb.x, vx = pb.vx, hitT = H, blocker: Car | null = null, pole = false;
@@ -549,7 +561,7 @@ export class Traffic {
           - Math.min(Math.abs(x), 8.5) * (2.2 - agg * 0.8)     // home is the middle of the road, where the action is
           - (s === 1 ? 3 - agg * 4 : 0)                        // a busy network would rather be flat out
           + (Math.abs(x - this.plan.x) < 0.5 ? 3 : 0) + (s === this.plan.mode ? 5 : 0);   // commit to a plan
-        const opt: Option = { score, x, speed: speeds[s], mode: s, safe, blocker: blocker ?? (ttc < 3 && !walk ? limiter : null) };
+        const opt: Option = { score, x, speed: speeds[s], mode: s, safe, blocker: blocker ?? (ttc < 3 && !walk ? limiter : null), ttc: walk ? 0 : ttc };
         if (walk) { if (!bestWalk || score > bestWalk.score) bestWalk = opt; }
         else if (!best || score > best.score) best = opt;
       }
@@ -557,6 +569,8 @@ export class Traffic {
     // the sidewalk is strictly the escape: only when the road has no clean line, and back down as soon as it does
     if (bestWalk && (!best || (!best.safe && (bestWalk.safe || bestWalk.score > best.score)))) best = bestWalk;
     this.plan = { x: best!.x, speed: best!.speed, mode: best!.mode, safe: best!.safe };
+    // a clean line with several seconds of empty road ahead: that's a sprint
+    this.open = best!.safe ? Math.max(0, Math.min(1, (best!.ttc - 2.5) / 3)) : 0;
     this.lastOptions = best;
     // clear the way: whoever stands in our line
     const inWay = best!.blocker;
