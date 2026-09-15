@@ -6,7 +6,7 @@ import type { Bed } from '../../sound/synth';
 /**
  * Midnight Run's soundtrack. Seven styles take turns (or one is pinned):
  *
- *   tokyo drift    : a written song: horn hook, swung beat, whistle, crowd shouts, koto
+ *   tokyo drift    : 130 bpm staccato brass walls on a 3-3-2 grid, claps, 808s, whistle, hey!
  *   street breaks  : big-beat breaks, an acid bass line, stabs
  *   liquid dnb     : 172 bpm rollers, a reese bass, airy pads
  *   chrome riff    : drop-D palm-muted power chords and a heavy backbeat
@@ -224,102 +224,117 @@ class Euro extends Style {
 
 // ── tokyo drift ────────────────────────────────────────────────────────────
 /** One note of a written part: step (16ths into the phrase), semitones above the tonic, length in steps. */
-type Note = [step: number, semi: number, len: number, fall?: boolean];
+type Note = [step: number, semi: number, len: number];
 
 /**
- * A mid-2000s Tokyo street-racing hip-hop anthem, written for this project
- * (the hook and every part are original; the sound is the era's): a horn
- * section hook with scoops and fall-offs, a hard swung beat with claps and
- * 808s, a whistle lead, crowd "hey!" shouts, koto and taiko, scratches and a
- * temple gong. Unlike the generative styles it's a *song*: fixed parts in a
- * 32-bar form (intro, verse, hook, break, hook) that loops.
+ * A Tokyo street-racing hip-hop banger at 130 bpm in B♭ minor, written for
+ * this project. What makes the era's sound: every hit is a one-16th staccato
+ * wall of stacked brass and saws across three octaves, locked to a
+ * syncopated 3-3-2 grid (1, 4, 7, 9, 13), and the arrangement builds by
+ * stacking layers. On top of that: its own chord stabs (B♭m B♭m G♭ F), an
+ * original whistle topline, claps and 808s, crowd "hey!" shouts, koto,
+ * taiko, scratches and a gong, in a 32-bar form that loops.
  */
 class Tokyo extends Style {
   readonly id = 'tokyo';
-  readonly bpm = 128;
-  readonly root = 34.65;                                       // C#
-  readonly scale = [0, 3, 5, 6, 7, 10];                        // minor blues
-  readonly chords = [[0, 3, 7], [0, 3, 7], [-4, 0, 3], [-2, 2, 5]];     // C#m C#m A B
+  readonly bpm = 130;
+  readonly root = 29.135;                                      // B♭
+  readonly scale = [0, 3, 5, 7, 10];                           // minor pentatonic
+  readonly chords = [[0, 3, 7], [0, 3, 7], [-4, -1, 3], [-5, -1, 2]];   // B♭m B♭m G♭ F
   readonly barsPerChord = 1;
   readonly leadOct = 4;
-  readonly level = 0.4;
+  readonly level = 0.42;
 
-  // the hook: two bars for the horn section, answered in the second bar (octave 3 above C#)
-  private static readonly HOOK: Note[] = [
-    [0, 7, 2], [3, 7, 1], [4, 10, 1], [6, 7, 2], [10, 3, 1], [11, 5, 1], [12, 6, 1], [14, 7, 2, true],
-    [16, 7, 2], [19, 10, 1], [20, 12, 2], [23, 10, 1], [24, 7, 1], [26, 5, 1], [28, 3, 1], [30, 0, 2, true],
+  /** The syncopated grid every stab lands on. */
+  private static readonly GRID = [0, 3, 6, 8, 12];
+  /** Original whistle topline over two bars (semitones above B♭4). */
+  private static readonly TOPLINE: Note[] = [
+    [0, 7, 2], [2, 10, 1], [3, 12, 3], [7, 10, 1], [10, 7, 2], [14, 5, 2],
+    [16, 3, 2], [19, 5, 1], [20, 7, 4], [26, 3, 1], [27, 0, 5],
   ];
-  // verse stabs: short and punchy on the offbeats
-  private static readonly STABS: Note[] = [[0, 7, 1], [6, 7, 1], [10, 10, 1, true], [16, 3, 1], [22, 5, 1], [27, 7, 2, true]];
-  // whistle answer in the verse and the break
-  private static readonly WHISTLE: Note[] = [[0, 15, 3], [4, 17, 2], [6, 19, 4], [12, 17, 3], [16, 15, 2], [19, 12, 2], [22, 10, 6]];
-  // koto figure for the intro and the break
-  private static readonly KOTO: Note[] = [[0, 12, 2], [2, 13, 2], [4, 17, 2], [6, 19, 2], [8, 20, 4], [12, 19, 2], [14, 17, 2]];
+  /** Koto figure for the intro and the break (semitones above B♭4). */
+  private static readonly KOTO: Note[] = [[0, 0, 2], [2, 3, 2], [4, 5, 2], [6, 7, 2], [8, 10, 3], [11, 7, 1], [12, 5, 2], [14, 3, 2]];
 
-  /** Where we are in the 32-bar song. */
-  private section(bar: number): 'intro' | 'verse' | 'hook' | 'break' {
+  /** Where we are in the 32-bar song, and how many stab layers are stacked. */
+  private section(bar: number): { name: 'intro' | 'build' | 'verse' | 'hook' | 'break' | 'rise'; layers: number } {
     const b = bar % 32;
-    return b < 4 ? 'intro' : b < 12 ? 'verse' : b < 20 ? 'hook' : b < 24 ? 'break' : 'hook';
+    if (b < 6) return { name: 'intro', layers: 1 };
+    if (b < 8) return { name: 'build', layers: 2 };
+    if (b < 16) return { name: 'verse', layers: 3 };
+    if (b < 24) return { name: 'hook', layers: 4 };
+    if (b < 28) return { name: 'break', layers: 1 };
+    return { name: 'rise', layers: 3 };
   }
 
-  private play(part: Note[], stepInPhrase: number, t: number, voice: (f: number, len: number, fall: boolean) => void): void {
-    for (const [st, semi, len, fall] of part) {
-      if (st === stepInPhrase) voice(this.root * Math.pow(2, 3 + semi / 12), len * this.stepDur, !!fall);
+  /** A one-16th wall: the chord stacked across octaves, more layers as the song builds. */
+  private stab(t: number, i: number, layers: number, accent: number): void {
+    const s = this.s, b = this.bus, len = this.stepDur * 0.62;
+    const c2 = this.tones(i, 2), c3 = this.tones(i, 3), c4 = this.tones(i, 4);
+    const g = 0.022 * accent;
+    // layer 1: the brass core
+    s.section(b, t, c2[0], g, len, -0.2);
+    s.section(b, t, c3[0], g, len, 0.2);
+    s.section(b, t, c3[2], g * 0.8, len, 0);
+    if (layers >= 2) {                                    // layer 2: a bright saw wall over it
+      s.supersaw(b, t, c3[1], g * 0.55, len, -0.35);
+      s.supersaw(b, t, c4[0], g * 0.55, len, 0.35);
+    }
+    if (layers >= 3) {                                    // layer 3: octaves up top and down low
+      s.section(b, t, c4[0], g * 0.7, len, 0.3);
+      s.section(b, t, c2[0] / 2, g * 0.8, len, 0);
+    }
+    if (layers >= 4) {                                    // layer 4: the full stack
+      s.section(b, t, c4[2], g * 0.55, len, -0.3);
+      s.supersaw(b, t, c4[1], g * 0.45, len, 0);
     }
   }
 
   step(i: number, t: number, m: Mood): void {
     const s = this.s, b = this.bus, pos = i % 16, bar = Math.floor(i / 16);
-    const sec = this.section(bar), p2 = ((bar % 2) * 16) + pos;       // step within a two-bar phrase
+    const sec = this.section(bar), p2 = ((bar % 2) * 16) + pos;
     const root = this.tones(i, 1)[0];
-    const swing = pos % 2 === 1 ? this.stepDur * 0.14 : 0;
-    const busy = m.night > 0.3 || m.tension > 0.3;
+    const swing = pos % 2 === 1 ? this.stepDur * 0.1 : 0;
+
+    // ── the stabs: every bar, on the grid ──
+    const onGrid = Tokyo.GRID.includes(pos);
+    if (onGrid && !(sec.name === 'break' && pos !== 0)) {
+      this.stab(t, i, sec.layers + (m.night > 0.6 && sec.layers < 4 ? 1 : 0), pos === 0 || pos === 8 ? 1 : 0.85);
+    }
 
     // ── drums ──
-    if (bar % 32 === 0 && pos === 0) s.gong(b, t, this.root * 4, 0.04);
-    if (sec === 'intro' || sec === 'break') {
-      if (pos === 0 || (sec === 'break' && pos === 10)) s.taiko(b, t, 0.16, -0.15);
-      if (sec === 'break' && pos === 8) s.taiko(b, t, 0.1, 0.25);
+    if (bar % 32 === 0 && pos === 0) s.gong(b, t, this.root * 8, 0.04);
+    if (sec.name === 'verse' || sec.name === 'hook' || sec.name === 'rise') {
+      if (pos === 0 || pos === 8 || (sec.name === 'hook' && pos === 6)) {
+        s.kick(b, t, 0.22);
+        s.eight08(b, t, root, 0.13, pos === 0 ? 0.42 : 0.28);
+      }
+      if (pos === 4 || pos === 12) { s.clap(b, t, 0.14, pos === 4 ? -0.1 : 0.1); s.snare(b, t, 0.05); }
+      s.hat(b, t + swing, pos % 2 ? 0.017 : 0.009, pos % 2 ? 0.3 : -0.25, pos === 14);
+      if (sec.name === 'hook' && pos === 0 && bar % 2 === 0) s.taiko(b, t, 0.1, 0.2);
+      // the rise: a snare roll that tightens into the top of the loop
+      if (sec.name === 'rise' && bar % 32 >= 30 && (bar % 32 === 31 ? true : pos % 2 === 0)) s.snare(b, t, 0.025 + (pos / 16) * 0.03, 0.1);
+    } else if (sec.name === 'build') {
+      if (pos % 4 === 0) s.kick(b, t, 0.12 + (bar % 32 === 7 ? 0.06 : 0));
+      if (bar % 32 === 7 && pos === 0) s.riser(b, t, 16 * this.stepDur, 0.05);
+    } else if (sec.name === 'break') {
+      if (pos === 0 || pos === 10) s.taiko(b, t, 0.16, -0.15);
       if (pos % 4 === 2) s.hat(b, t + swing, 0.01, 0.3);
-      if (sec === 'break' && bar % 4 === 3 && pos === 8) s.riser(b, t, 8 * this.stepDur, 0.04);
-    } else {
-      const kicks = busy ? [0, 3, 7, 10] : [0, 7, 10];
-      if (kicks.includes(pos)) {
-        s.kick(b, t, pos === 0 ? 0.22 : 0.16);
-        if (pos !== 3) s.eight08(b, t, pos === 7 ? root * 1.335 : root, 0.12, pos === 0 ? 0.4 : 0.22);
-      }
-      if (pos === 4 || pos === 12) { s.clap(b, t, 0.13, pos === 4 ? -0.1 : 0.1); s.snare(b, t, 0.04); }
-      if (sec === 'hook' && pos === 11) s.clap(b, t, 0.05, 0.3);             // pickup clap into the backbeat
-      s.hat(b, t + swing, pos % 2 ? 0.016 : 0.009, pos % 2 ? 0.3 : -0.25, pos === 14 && bar % 2 === 1);
-      if (sec === 'hook' && pos === 0 && bar % 2 === 0) s.taiko(b, t, 0.09, 0.2);
     }
 
-    // ── crowd ──
-    if ((sec === 'hook' && bar % 2 === 1 && pos === 12) || (sec === 'intro' && bar % 4 === 3 && pos === 12)) {
-      s.hey(b, t, 0.09);
-    }
-
-    // ── horns ──
-    const horn = (f: number, len: number, fall: boolean) => {
-      s.section(b, t, f, 0.03, len * 0.85, -0.3, fall);
-      s.section(b, t + 0.008, f * 2, 0.018, len * 0.85, 0.3, fall);     // the octave above, like a real section
-      s.section(b, t + 0.004, f / 2, 0.02, len * 0.8, 0, false);        // and the bari underneath
-    };
-    if (sec === 'hook') this.play(Tokyo.HOOK, p2, t, horn);
-    if (sec === 'verse') this.play(Tokyo.STABS, p2, t, (f, len, fall) => s.section(b, t, f, 0.028, len * 0.7, 0.2, fall));
-
-    // ── whistle, koto, scratches ──
-    if ((sec === 'verse' && bar % 4 >= 2) || sec === 'break') {
+    // ── crowd, topline, koto, scratches ──
+    if ((sec.name === 'hook' || sec.name === 'verse') && bar % 2 === 1 && pos === 14) s.hey(b, t, 0.1);
+    if (sec.name === 'hook') {
       let prev = 0;
-      for (const [st, semi, len] of Tokyo.WHISTLE) {
-        if (st === p2) s.whistle(b, t, this.root * Math.pow(2, 4 + semi / 12), 0.022, len * this.stepDur, prev, 0.15);
-        if (st < p2) prev = this.root * Math.pow(2, 4 + semi / 12);
+      for (const [st, semi, len] of Tokyo.TOPLINE) {
+        const f = this.root * Math.pow(2, 4 + semi / 12);
+        if (st === p2) s.whistle(b, t, f, 0.024, len * this.stepDur, prev, 0.12);
+        if (st < p2) prev = f;
       }
     }
-    if (sec === 'intro' || (sec === 'break' && bar % 2 === 0)) {
-      this.play(Tokyo.KOTO, pos, t, (f) => s.koto(b, t, f, 0.045, -0.1));
+    if (sec.name === 'intro' || sec.name === 'break') {
+      for (const [st, semi] of Tokyo.KOTO) if (st === pos && bar % 2 === 1) s.koto(b, t, this.root * Math.pow(2, 4 + semi / 12), 0.045, -0.1);
     }
-    if ((sec === 'verse' && bar % 4 === 3 && pos === 12) || (sec === 'hook' && bar % 8 === 3 && pos === 12)) {
+    if ((sec.name === 'verse' && bar % 8 === 7 && pos === 12) || (sec.name === 'hook' && bar % 4 === 3 && pos === 10)) {
       s.scratch(b, t, 0.06, this.stepDur * 2, 0.25);
       s.scratch(b, t + this.stepDur * 2, 0.05, this.stepDur * 2, -0.25);
     }
@@ -355,6 +370,7 @@ class StreetConductor extends Conductor {
 
   constructor(e: AudioEngine) {
     super(e, { styles: STYLES, styleKey: 'rMusicStyle', rotateKey: 'rMusicRotate' });
+    this.s.budget = 220;                 // stacked brass walls need headroom
     this.road = this.s.wind(this.amb);
     this.rain = this.s.rain(this.amb);
     // the engine: two detuned saws and a sub, through a filter that opens with revs

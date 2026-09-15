@@ -330,7 +330,7 @@ Seven styles take turns, every 6 minutes by default:
 
 | Style | Sound |
 |-------|-------|
-| Tokyo drift | a written song, not a generator: mid-2000s Tokyo street-racing hip-hop at 128 bpm with a horn-section hook (scoops, fall-offs, octaves and bari), a hard swung beat with claps and 808s, a whistle lead, crowd "hey!" shouts, koto, taiko, scratches and a temple gong, in a 32-bar intro / verse / hook / break / hook form. The hook and every part are original |
+| Tokyo drift | a written song, not a generator: Tokyo street-racing hip-hop at 130 bpm in B♭ minor. Every hit is a one-16th staccato wall of stacked brass and saws across three octaves on a syncopated 3-3-2 grid, and the arrangement stacks layers as it builds (drums at bar 8, the full stack at bar 16). Claps and 808s, a whistle topline, crowd "hey!" shouts, koto, taiko, scratches and a gong fill it out, in a 32-bar loop. Chords, topline and every part are original |
 | Street breaks | big-beat breakbeats at 132 bpm, a squelchy acid bass line, supersaw stabs when it's busy |
 | Night drive | slow synthwave (Em–C–A–D): octave bass, arpeggios, a saw lead melody |
 | Liquid DnB | 172 bpm rollers, a reese bass and airy seventh-chord pads |
