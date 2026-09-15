@@ -116,19 +116,19 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
 
   const scene = new Scene();
   scene.background = new Color(0x020406);
-  scene.fog = new FogExp2(0x020406, 0.0034);
+  scene.fog = new FogExp2(0x020406, 0.0017);
   const key = new DirectionalLight(0xcfe6ff, 2.2);
   key.position.set(-40, 90, 30);
   scene.add(key, key.target, new HemisphereLight(0x5a88b0, 0x0a0f0c, 0.55));
 
   const inner = new Scene();
   inner.background = new Color(0x05020c);
-  inner.fog = new FogExp2(0x05020c, 0.007);
+  inner.fog = new FogExp2(0x05020c, 0.0035);
   const innerKey = new DirectionalLight(0xd8c8ff, 1.8);
   innerKey.position.set(30, 80, 20);
   inner.add(innerKey, innerKey.target, new HemisphereLight(0x8a6ad0, 0x0a0614, 0.7));
 
-  const camera = new PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 600);
+  const camera = new PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 900);
   const composer = new EffectComposer(renderer);
   composer.setPixelRatio(ratio);
   composer.setSize(window.innerWidth, window.innerHeight);

@@ -29,7 +29,7 @@ export const MAINFRAME_DEFAULTS = {
   mAmbience: 0.5,        // fan hum and electrical buzz
 
   // scene budgets = the HIGH preset
-  mMaxPackets: 700,
+  mMaxPackets: 900,
   mChunks: 4,            // board sections drawn ahead
   mDetail: 1536,         // board texture width per section (px)
   mBloom: true,
@@ -37,10 +37,10 @@ export const MAINFRAME_DEFAULTS = {
 };
 
 export const MAINFRAME_BUDGETS: Budgets = {
-  low: { mMaxPackets: 300, mChunks: 3, mDetail: 768, mBloom: false, mHaze: false },
-  medium: { mMaxPackets: 500, mChunks: 3, mDetail: 1024, mBloom: true, mHaze: false },
-  high: { mMaxPackets: 700, mChunks: 4, mDetail: 1536, mBloom: true, mHaze: true },
-  ultra: { mMaxPackets: 1000, mChunks: 5, mDetail: 2048, mBloom: true, mHaze: true },
+  low: { mMaxPackets: 400, mChunks: 3, mDetail: 768, mBloom: false, mHaze: false },
+  medium: { mMaxPackets: 650, mChunks: 3, mDetail: 1024, mBloom: true, mHaze: false },
+  high: { mMaxPackets: 900, mChunks: 4, mDetail: 1536, mBloom: true, mHaze: true },
+  ultra: { mMaxPackets: 1300, mChunks: 5, mDetail: 2048, mBloom: true, mHaze: true },
 };
 
 type Key = keyof typeof MAINFRAME_DEFAULTS;

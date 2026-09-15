@@ -214,13 +214,14 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     dim += (dimTarget - dim) * Math.min(1, dtReal * (dimTarget < dim ? 5 : 1.2));
     const pulse = settings.mMusicVisuals && groove.style ? 0.85 + groove.downbeat * 0.3 + groove.energy * 0.15 : 1;
 
-    ambientT -= dtReal * (4 + heat * 6);
+    ambientT -= dtReal * (9 + heat * 10);
     while (ambientT < 0) { ambientT += 1 / 3; if (settings.mPackets) traffic.ambient(flight.z); }
     checkDive();
     const view = dive.update(dtReal, world.camera, f.wanderX, f.wanderY);
     if (dive.exitZ !== lastExit) { lastExit = dive.exitZ; flight.z = dive.exitZ; flight.alt = 18; }
     const rate = state.rate30s / 30;
-    const speed = (24 + Math.min(20, rate * 0.6) + heat * 10) * settings.mFlightSpeed * dive.speedFactor;
+    // slow and high: plenty of time to take in the board
+    const speed = (17 + Math.min(10, rate * 0.35) + heat * 7) * settings.mFlightSpeed * dive.speedFactor;
     if (!view?.controlsCamera) {
       flight.update(dt, board, world.camera, { speed, steerX: dive.steerX, low: 9 - heat * 2, wanderX: f.wanderX, wanderY: f.wanderY });
     }
@@ -237,7 +238,7 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     world.key.intensity = 2.2 * (0.35 + 0.65 * dim);
     world.key.position.set(flight.x - 40, 90, flight.z + 30);
     world.key.target.position.set(flight.x, 0, flight.z - 40);
-    (world.scene.fog as { density: number }).density = 0.0034 + heat * 0.0015;
+    (world.scene.fog as { density: number }).density = 0.0017 + heat * 0.0008;
     const lens = world.lens.uniforms;
     lens.uTime.value += dtReal;
     lens.uHaze.value = settings.mHaze ? heat : 0;

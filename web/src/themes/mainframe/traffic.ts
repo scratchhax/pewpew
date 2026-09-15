@@ -125,7 +125,7 @@ export class Traffic {
   camX = 0;
 
   private streetX(r: () => number = Math.random): number {
-    const near = STREETS.filter((s) => Math.abs(s - this.camX) < 75);
+    const near = STREETS.filter((s) => Math.abs(s - this.camX) < 190);
     const pool = near.length ? near : STREETS;
     return pool[Math.floor(r() * pool.length)] + TRACE_OFFS[Math.floor(r() * TRACE_OFFS.length)];
   }
@@ -134,16 +134,16 @@ export class Traffic {
   flow(color: Color, outbound: boolean, camZ: number, branch = false): void {
     const x = this.streetX();
     if (branch) {
-      const routes = this.board.routes(camZ - 30, camZ - 170).filter((rt) => Math.abs(rt.pts[0].x - this.camX) < 80);
+      const routes = this.board.routes(camZ - 40, camZ - 220).filter((rt) => Math.abs(rt.pts[0].x - this.camX) < 190);
       const rt = routes[Math.floor(Math.random() * routes.length)];
       if (rt) {
         const start = new Vector3(rt.pts[0].x, 0.12, outbound ? camZ + 30 : camZ - 260);
-        this.launch(makeRoute([start, ...rt.pts], rt.chip), color, 60 + Math.random() * 30, 9 + Math.random() * 5, undefined, 1.6);
+        this.launch(makeRoute([start, ...rt.pts], rt.chip), color, 80 + Math.random() * 40, 15 + Math.random() * 8, undefined, 2.6);
         return;
       }
     }
     const z0 = outbound ? camZ + 30 : camZ - 300, z1 = outbound ? camZ - 300 : camZ + 40;
-    this.launch(makeRoute([new Vector3(x, 0.12, z0), new Vector3(x, 0.12, z1)]), color, 50 + Math.random() * 45, 9 + Math.random() * 8, undefined, 1.7);
+    this.launch(makeRoute([new Vector3(x, 0.12, z0), new Vector3(x, 0.12, z1)]), color, 70 + Math.random() * 60, 15 + Math.random() * 12, undefined, 2.8);
   }
 
   /** The board's own chatter between events: dim clock and bus pulses, so it's never still. */
@@ -154,13 +154,13 @@ export class Traffic {
 
   /** A blocked packet: runs at a firewall chip ahead and shatters on its pins. */
   strike(camZ: number): void {
-    const fws = this.board.chips(camZ - 40, camZ - 170, 'fw').filter((c) => c.routes.length && Math.abs(c.x - this.camX) < 85);
+    const fws = this.board.chips(camZ - 50, camZ - 220, 'fw').filter((c) => c.routes.length && Math.abs(c.x - this.camX) < 190);
     const chip = fws[Math.floor(Math.random() * fws.length)];
     if (!chip) { this.flow(COL.block, true, camZ); return; }
     const rt = chip.routes[Math.floor(Math.random() * chip.routes.length)];
     const start = new Vector3(rt.pts[0].x, 0.12, camZ + 20);
     const end = rt.pts[rt.pts.length - 1];
-    this.launch(makeRoute([start, ...rt.pts], chip), COL.block, 75 + Math.random() * 20, 9, () => {
+    this.launch(makeRoute([start, ...rt.pts], chip), COL.block, 95 + Math.random() * 25, 14, () => {
       this.burst(end, COL.block, 16);
       this.glow(chip, COL.block, 1, 1.4);
       this.onEvent('shatter', end.x);
@@ -170,13 +170,13 @@ export class Traffic {
   // ── worms and ICE ────────────────────────────────────────────────────────
   worm(camZ: number): Chip | null {
     if (this.worms.length >= 4) return null;
-    const chips = this.board.chips(camZ - 70, camZ - 160).filter((c) => (c.kind === 'cpu' || c.kind === 'ram' || c.kind === 'ic') && c.routes.length && Math.abs(c.x - this.camX) < 80);
+    const chips = this.board.chips(camZ - 80, camZ - 210).filter((c) => (c.kind === 'cpu' || c.kind === 'ram' || c.kind === 'ic') && c.routes.length && Math.abs(c.x - this.camX) < 190);
     const chip = chips[Math.floor(Math.random() * chips.length)];
     if (!chip) return null;
     const rt = chip.routes[Math.floor(Math.random() * chip.routes.length)];
     const start = new Vector3(rt.pts[0].x, 0.12, rt.pts[0].z + 45);
     const route = makeRoute([start, ...rt.pts], chip);
-    this.worms.push({ route, head: 0, speed: 9, age: 0, chip, dying: -1, ice: [], iced: false });
+    this.worms.push({ route, head: 0, speed: 14, age: 0, chip, dying: -1, ice: [], iced: false });
     this.glow(chip, COL.threat, 0.9, 12);
     this.onEvent('worm', start.x);
     return chip;
@@ -196,7 +196,7 @@ export class Traffic {
           w.iced = true;
           const rev = makeRoute([...w.route.pts].reverse().map((p) => p.clone()), null);
           for (let i = 0; i < 3; i++) {
-            const p = this.launch(rev, COL.ice, 30 + i * 6, 5, undefined, 1.3);
+            const p = this.launch(rev, COL.ice, 45 + i * 8, 9, undefined, 2.2);
             if (p) { p.d = -i * 3; w.ice.push(p); }
           }
           this.onEvent('ice', w.route.pts[w.route.pts.length - 1].x);
@@ -213,7 +213,7 @@ export class Traffic {
       }
       const alive = w.dying < 0 ? SEG : Math.max(0, SEG - Math.floor(w.dying / 0.09));
       for (let s = 0; s < SEG; s++) {
-        const d = w.head - s * 1.8;
+        const d = w.head - s * 3;
         if (d < 0) break;
         this.pointAt(w.route, d, tmpV);
         if (s >= alive) {
@@ -223,7 +223,7 @@ export class Traffic {
         const sc = 1 - s / (SEG * 1.4);
         tmpV.x += this.jitter[s % this.jitter.length] * (w.dying >= 0 ? 3 : 1);
         tmpV.y = 0.45 + Math.sin(w.age * 9 - s * 0.8) * 0.18;
-        tmpM.compose(tmpV, tmpQ.identity(), tmpS.set(1.5 * sc, 1.0 * sc, 1.6 * sc));
+        tmpM.compose(tmpV, tmpQ.identity(), tmpS.set(2.6 * sc, 1.6 * sc, 2.8 * sc));
         this.wormMesh.setMatrixAt(n++, tmpM);
         if (n >= 120) break;
       }
@@ -241,7 +241,7 @@ export class Traffic {
   // ── shards ───────────────────────────────────────────────────────────────
   burst(at: Vector3, color: Color, n: number): void {
     for (let i = 0; i < n && this.shards.length < 480; i++) {
-      const a = Math.random() * Math.PI * 2, v = 4 + Math.random() * 10;
+      const a = Math.random() * Math.PI * 2, v = 7 + Math.random() * 16;
       this.shards.push({ pos: at.clone().setY(0.3), vel: new Vector3(Math.cos(a) * v, 2 + Math.random() * 6, Math.sin(a) * v), life: 0.5 + Math.random() * 0.5, age: 0, color: color.clone() });
     }
   }
@@ -256,7 +256,7 @@ export class Traffic {
       s.pos.addScaledVector(s.vel, dt);
       if (s.pos.y < 0.15) { s.pos.y = 0.15; s.vel.y *= -0.3; s.vel.x *= 0.7; s.vel.z *= 0.7; }
       const k = 1 - s.age / s.life;
-      tmpM.compose(s.pos, tmpQ.identity(), tmpS.set(1.5 * k + 0.3, 1, 1.5 * k + 0.3));
+      tmpM.compose(s.pos, tmpQ.identity(), tmpS.set(2.6 * k + 0.5, 1, 2.6 * k + 0.5));
       this.shardMesh.setMatrixAt(n, tmpM);
       this.shardMesh.setColorAt(n, this.col.copy(s.color).multiplyScalar(k * 2));
       n++;
@@ -300,11 +300,11 @@ export class Traffic {
 
   // ── lookup towers ────────────────────────────────────────────────────────
   lookup(domain: string, camZ: number): boolean {
-    const roms = this.board.chips(camZ - 45, camZ - 160, 'rom').filter((c) => c.canvas && Math.abs(c.x - this.camX) < 85 && !this.displays.some((d) => d.chip === c));
+    const roms = this.board.chips(camZ - 60, camZ - 210, 'rom').filter((c) => c.canvas && Math.abs(c.x - this.camX) < 190 && !this.displays.some((d) => d.chip === c));
     const chip = roms[0];
     if (!chip || !chip.routes.length) return false;
     const rt = chip.routes[Math.floor(Math.random() * chip.routes.length)];
-    this.launch(makeRoute([new Vector3(rt.pts[0].x, 0.12, camZ + 20), ...rt.pts], chip), COL.dns, 75, 5, () => {
+    this.launch(makeRoute([new Vector3(rt.pts[0].x, 0.12, camZ + 20), ...rt.pts], chip), COL.dns, 95, 12, () => {
       this.displays.push({ chip, text: domain.toUpperCase(), age: 0, life: 6 });
       this.glow(chip, COL.dns, 0.55, 5);
       this.onEvent('lookup', chip.x);
@@ -346,7 +346,7 @@ export class Traffic {
   // ── pick and place ───────────────────────────────────────────────────────
   place(name: string, camZ: number): boolean {
     if (this.arms.length >= 3) return false;
-    const sockets = this.board.chips(camZ - 55, camZ - 150, 'socket').filter((c) => !c.used && Math.abs(c.x - this.camX) < 85);
+    const sockets = this.board.chips(camZ - 70, camZ - 200, 'socket').filter((c) => !c.used && Math.abs(c.x - this.camX) < 190);
     const chip = sockets[0];
     if (!chip) return false;
     chip.used = true;
@@ -418,7 +418,7 @@ export class Traffic {
 
   // ── antennas ─────────────────────────────────────────────────────────────
   antenna(good: boolean, camZ: number): boolean {
-    const ants = this.board.antennas(camZ - 30, camZ - 150).filter((a) => Math.abs(a.x - this.camX) < 85);
+    const ants = this.board.antennas(camZ - 40, camZ - 200).filter((a) => Math.abs(a.x - this.camX) < 190);
     const a = ants[Math.floor(Math.random() * ants.length)];
     if (!a) return false;
     for (let i = 0; i < (good ? 3 : 2); i++) {
@@ -473,8 +473,8 @@ export class Traffic {
     g.textBaseline = 'middle';
     g.fillText(text.slice(0, 22), 6, 34);
     f.tex.needsUpdate = true;
-    f.sprite.scale.set(15, 1.9, 1);
-    f.sprite.position.set(this.camX + (Math.random() - 0.5) * 70, 4 + Math.random() * 8, camZ - 55 - Math.random() * 90);
+    f.sprite.scale.set(26, 3.25, 1);
+    f.sprite.position.set(this.camX + (Math.random() - 0.5) * 200, 8 + Math.random() * 16, camZ - 70 - Math.random() * 130);
     f.age = 0; f.life = 5 + Math.random() * 3; f.vy = 0.6 + Math.random() * 0.8; f.busy = true; f.sprite.visible = true;
   }
 

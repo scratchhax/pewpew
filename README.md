@@ -12,7 +12,7 @@ your own traffic. Pick a scene per screen:
 - **Packet Rush**: a 16-bit side-scrolling runner, with boss fights
 - **Panopticon**: a made-up planet under surveillance, where the eye of god
   zooms in on the people behind the traffic
-- **Mainframe**: a low flight over a circuit board while your traffic races
+- **Mainframe**: a slow, high flight over a circuit board while your traffic races
   along the traces, diving into chips to trace intruders
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
@@ -635,13 +635,13 @@ the taskings off, **Eye: threats in a minute** sets the threat trigger, and
 
 ![mainframe](docs/mainframe.png)
 
-A low, fast flight over a real-looking circuit board while your network races
+A slow, high flight over a big, busy, real-looking circuit board while your network races
 along its traces. The board is generated in sections ahead of the camera: green
 solder mask, copper traces, gold pads and vias, silkscreen outlines, part
 numbers, and text taken from your own traffic (addresses, hostnames, domains,
 rule names). The parts on it are 3D: chips with pins and laser-etched lids,
 capacitor towers, heat sinks, spinning fans, headers, crystals and LEDs, all lit
-by neon reflections. The camera flies high enough that the board fills the screen, and weaves between six "streets" of parallel
+by neon reflections. The camera flies high and unhurried, so you can take in a wide stretch of board at once, and drifts across ten "streets" of parallel
 traces, banks into its turns, climbs over the tall parts and drops back down
 into the gaps. Between events the board keeps up a dim chatter of clock and bus
 pulses, so it's never still, and addresses drift up through the air.
@@ -657,7 +657,7 @@ pulses, so it's never still, and addresses drift up through the air.
 | system | a brownout: the LEDs, the light and the packets dim and recover |
 
 Traffic weather is the board's load: **NOMINAL** on a calm network, **HEAVY
-LOAD** in a storm (faster traffic, faster flight), and **OVERCLOCK** in a
+LOAD** in a storm (faster traffic, a little faster flight), and **OVERCLOCK** in a
 hurricane, where the light turns orange, the fans spin up, the packets run hot
 and heat haze shimmers over the board.
 

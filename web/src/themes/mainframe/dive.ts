@@ -87,7 +87,7 @@ export class Dive {
   private chip: Chip | null = null;
   private innerBoard: Board | null = null;
   private innerTraffic: Traffic | null = null;
-  private innerFlight = Object.assign(new Flight(), { lift: 17 });
+  private innerFlight = Object.assign(new Flight(), { lift: 30 });
   private from = new Vector3();
   private lookOffset = new Vector3();
   private fromUp = new Vector3(0, 1, 0);
@@ -131,7 +131,7 @@ export class Dive {
     if (this.active) return false;
     // a chip about as far ahead as the camera will naturally travel while it locks on and swoops down
     const reach = speed * 0.85 * (DUR.lock + DUR.descend * 0.8);
-    const cands = this.board.chips(camZ - reach + 45, camZ - reach - 45).filter((c) => c.w >= 10 && !c.covered && c.kind !== 'socket' && c.kind !== 'macro');
+    const cands = this.board.chips(camZ - reach + 45, camZ - reach - 45).filter((c) => c.w >= 10 && !c.covered && c.kind !== 'socket' && c.kind !== 'macro' && Math.abs(c.x - this.world.camera.position.x) < 90);
     if (!cands.length) return false;
     const prefer = cands.filter((c) => c.kind === 'cpu' || c.kind === 'fw');
     const pool = prefer.length ? prefer : cands;
@@ -306,7 +306,7 @@ export class Dive {
   /** The flight inside the die, with the target's traffic streaming along the buses. */
   private innerStep(dt: number, camera: PerspectiveCamera, wanderX: number, wanderY: number, busy: number): void {
     const board = this.innerBoard!, traffic = this.innerTraffic!;
-    this.innerFlight.update(dt, board, camera, { speed: 40, low: 5, wanderX, wanderY });
+    this.innerFlight.update(dt, board, camera, { speed: 30, low: 5, wanderX, wanderY });
     board.update(this.innerFlight.z, 5);
     const z = this.innerFlight.z;
     this.spawnT -= dt * busy;

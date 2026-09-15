@@ -13,7 +13,7 @@ export class Flight {
   vx = 0;
   speed = 26;
   /** Height above the low point: high over the board, lower inside a chip. */
-  lift = 28;
+  lift = 62;
   private targetX = 0;
   private nextTurn = 2;
   private roll = 0;
@@ -27,17 +27,17 @@ export class Flight {
     this.nextTurn -= dt;
     if (o.steerX !== undefined && o.steerX !== null) this.targetX = o.steerX;
     else if (this.nextTurn <= 0) {
-      this.nextTurn = 3.5 + Math.random() * 5;
+      this.nextTurn = 6 + Math.random() * 7;
       const s = STREETS[Math.floor(Math.random() * STREETS.length)];
-      this.targetX = Math.max(-80, Math.min(80, Math.random() < 0.7 ? s + (Math.random() - 0.5) * 8 : (Math.random() - 0.5) * 140));
+      this.targetX = Math.max(-130, Math.min(130, Math.random() < 0.7 ? s + (Math.random() - 0.5) * 8 : (Math.random() - 0.5) * 240));
     }
-    const want = Math.max(-26, Math.min(26, (this.targetX - this.x) * 0.7));
+    const want = Math.max(-18, Math.min(18, (this.targetX - this.x) * 0.45));
     this.vx += (want - this.vx) * Math.min(1, dt * 1.6);
     this.x += this.vx * dt;
     // clearance over the parts coming up
     let h = 0;
     for (let dz = 6; dz <= 46; dz += 4) for (let dx = -10; dx <= 10; dx += 5) h = Math.max(h, board.heightAt(this.x + dx, this.z - dz));
-    const base = (o.low ?? 9) + this.lift + Math.sin(this.t * 0.11) * 3.5 + Math.sin(this.t * 0.037 + 1) * 2;
+    const base = (o.low ?? 9) + this.lift + Math.sin(this.t * 0.11) * 6 + Math.sin(this.t * 0.037 + 1) * 4;
     const altTarget = Math.max(base, h + 7);
     this.alt += (altTarget - this.alt) * Math.min(1, dt * (altTarget > this.alt ? 2.6 : 0.7));
     this.roll += (-this.vx * 0.014 - this.roll) * Math.min(1, dt * 3);

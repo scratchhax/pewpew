@@ -20,12 +20,13 @@ import {
  * a silicon floor of standard-cell rows, memory macros and copper buses.
  */
 
-export const W = 320;                          // board width (x from -160 to 160)
+export const W = 480;                          // board width (x from -240 to 240)
 export const HALF = W / 2;
 export const CH = 128;                         // section length
-export const STREETS = [-120, -64, -22, 22, 64, 120];
+export const STREETS = [-190, -148, -106, -64, -22, 22, 64, 106, 148, 190];
 export const TRACE_OFFS = [-4, -2, 0, 2, 4];
-const X_BLOCKS: Array<[number, number]> = [[-157, -127], [-113, -71], [-57, -29], [-15, 15], [29, 57], [71, 113], [127, 157]];
+/** The blocks of parts between the streets (and out past the last ones). */
+const X_BLOCKS: Array<[number, number]> = [[-236, -198], ...STREETS.slice(0, -1).map((s, i): [number, number] => [s + 8, STREETS[i + 1] - 8]), [198, 236]];
 export type Style = 'pcb' | 'die';
 export type ChipKind = 'cpu' | 'ram' | 'rom' | 'fw' | 'rf' | 'ic' | 'socket' | 'macro';
 
@@ -424,18 +425,18 @@ export class Chunk {
         for (let u = r() * 10; u < CH; u += 12 + r() * 20) this.via(sx + off, u, 0.5);
       }
     }
-    for (const o of [-3, -1, 1, 3]) this.line([[-HALF, 64 + o], [HALF, 64 + o]], 0.5, pal.trace);
-    const us: Array<[number, number]> = [[3, 58], [70, 125]];
+    for (const cu of [43, 85]) for (const o of [-3, -1, 1, 3]) this.line([[-HALF, cu + o], [HALF, cu + o]], 0.5, pal.trace);
+    const us: Array<[number, number]> = [[3, 38], [48, 80], [90, 125]];
     const blocks: Array<{ x0: number; x1: number; u0: number; u1: number }> = [];
     for (const [x0, x1] of X_BLOCKS) for (const [u0, u1] of us) blocks.push({ x0, x1, u0, u1 });
     blocks.sort(() => r() - 0.5);
-    const kinds = ['rom', 'fw', 'socket', 'antenna', ...Array.from({ length: blocks.length - 4 }, () => ['cpu', 'ram', 'power', 'passives', 'connector', 'quiet', 'quiet', 'ram', 'cpu', 'power'][Math.floor(r() * 10)])];
+    const kinds = ['rom', 'rom', 'fw', 'fw', 'socket', 'socket', 'antenna', 'antenna', ...Array.from({ length: blocks.length - 8 }, () => ['cpu', 'ram', 'power', 'passives', 'connector', 'quiet', 'ram', 'cpu', 'power', 'passives'][Math.floor(r() * 10)])];
     blocks.forEach((b, i) => this.district(kinds[i], b));
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 7; i++) {
       const s = this.board.words();
-      if (s) this.text(-150 + r() * 250, 4 + r() * 120, s, 2.2, pal.silk, 0.55);
+      if (s) this.text(-230 + r() * 400, 6 + r() * 116, s, 4.2, pal.silk, 0.55);
     }
-    this.text(STREETS[1] - 7, 62, `REV ${String.fromCharCode(65 + (this.index % 6))}`, 2, pal.silk, 0.6, 'right');
+    this.text(STREETS[3] - 7, 64, `REV ${String.fromCharCode(65 + (this.index % 6))}`, 2, pal.silk, 0.6, 'right');
   }
 
   private district(kind: string, b: { x0: number; x1: number; u0: number; u1: number }): void {
@@ -454,19 +455,19 @@ export class Chunk {
         break;
       }
       case 'ram': {
-        const n = 3 + Math.floor(r() * 3);
-        for (let i = 0; i < n; i++) this.chip(cx, b.u0 + 4 + i * ((bd - 8) / Math.max(1, n - 1)), bw - 8, 6, 1.4, 'ram');
+        const n = 2 + Math.floor(r() * 3);
+        for (let i = 0; i < n; i++) this.chip(cx, b.u0 + 4 + i * ((bd - 8) / Math.max(1, n - 1)), bw - 6, 5.5, 1.4, 'ram');
         break;
       }
       case 'power': {
-        for (let i = 0; i < 5; i++) this.cap(b.x0 + 4 + r() * (bw - 8), b.u0 + 4 + r() * (bd - 8), 1.8 + r() * 1.6, 7 + r() * 8);
+        for (let i = 0; i < 4; i++) this.cap(b.x0 + 4 + r() * (bw - 8), b.u0 + 4 + r() * (bd - 8), 1.8 + r() * 1.6, 7 + r() * 8);
         this.part('plastic', this.board.tpl.box, cx, 1.6, cu, 6, 2.8, 6, 0x2b2c30);
         this.raise(cx, cu, 6, 6, 3);
         this.chip(cx, b.u0 + 3, 7, 5, 1.2, 'ic');
         break;
       }
       case 'passives': {
-        for (let i = 0; i < 30; i++) this.smd(b.x0 + 2 + r() * (bw - 4), b.u0 + 2 + r() * (bd - 4), 1.8 + r(), 1 + r() * 0.4, r() < 0.5);
+        for (let i = 0; i < 18; i++) this.smd(b.x0 + 2 + r() * (bw - 4), b.u0 + 2 + r() * (bd - 4), 1.8 + r(), 1 + r() * 0.4, r() < 0.5);
         this.chip(cx, cu, 8, 8, 1.3, 'ic');
         for (let i = 0; i < 5; i++) this.led(b.x0 + 3 + i * 2.2, b.u1 - 3, [0x39ff88, 0xff4040, 0x40a0ff, 0xffb030][i % 4]);
         break;
@@ -476,11 +477,11 @@ export class Chunk {
         for (let i = 0; i < 8; i++) this.smd(b.x0 + 3 + r() * (bw - 6), b.u0 + 3 + r() * (bd - 6), 2, 1.2, r() < 0.5);
         for (let i = 0; i < 6; i++) this.via(b.x0 + 3 + r() * (bw - 6), b.u0 + 3 + r() * (bd - 6), 1.1);
         const s = this.board.words();
-        if (s) this.text(cx, cu, s.slice(0, 12), 2.6, this.pal.silk, 0.6, 'center');
+        if (s) this.text(cx, cu, s.slice(0, 12), 4.2, this.pal.silk, 0.6, 'center');
         break;
       }
       case 'connector': {
-        const len = bd - 8;
+        const len = bd - 6;
         this.part('plastic', this.board.tpl.box, cx, 1.8, cu, 5, 3.2, len, 0x141414);
         for (let i = 0; i < Math.floor(len / 2.54); i++) for (const o of [-1.2, 1.2]) {
           this.part('metal', this.board.tpl.box, cx + o, 4, b.u0 + 4 + 1.27 + i * 2.54, 0.6, 1.6, 0.6, 0xd4a64a);
@@ -533,7 +534,7 @@ export class Chunk {
     for (let u = 8; u < CH; u += 16) this.line([[-HALF, u], [HALF, u]], 0.35, pal.trace, true);
     const cell = new Color();
     for (const [x0, x1] of X_BLOCKS) {
-      for (let u0 = 3; u0 < CH - 10; u0 += 30) {
+      for (let u0 = 3; u0 < CH - 10; u0 += 31) {
         if (r() < 0.35) {
           this.chip((x0 + x1) / 2, u0 + 12, x1 - x0 - 4, 22, 1.2 + r() * 1.4, 'macro', false);
         } else {
