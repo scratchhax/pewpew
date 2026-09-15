@@ -194,9 +194,10 @@ async function create(host: ThemeHost<typeof SPY_DEFAULTS>, init: RendererInit):
 
   // ── the eye's taskings ──
   const bootAt = Date.now();
-  let cooldownUntil = bootAt + 25000;
+  const sweepMs = () => Math.max(0.5, settings.oEyeSweep) * 60000;
+  let cooldownUntil = bootAt + 15000;
   let nextSweep = bootAt + randomSweep();
-  function randomSweep(): number { return Math.max(1, settings.oEyeEvery) * 60000 * (0.6 + Math.random() * 0.8); }
+  function randomSweep(): number { return sweepMs() * (0.6 + Math.random() * 0.8); }
 
   function targetFor(ip: string, reason: EyeTarget['reason']): EyeTarget {
     const now = Date.now();
@@ -236,7 +237,7 @@ async function create(host: ThemeHost<typeof SPY_DEFAULTS>, init: RendererInit):
       threatTimes.length = 0;
     } else {
       for (const it of intel.values()) {
-        if (it.blocks.length >= 25 && it.blocks.filter((h) => now - h < 60000).length >= 25) { target = targetFor(it.ip, 'block'); it.blocks.length = 0; break; }
+        if (it.blocks.length >= 12 && it.blocks.filter((h) => now - h < 60000).length >= 12) { target = targetFor(it.ip, 'block'); it.blocks.length = 0; break; }
       }
     }
     if (!target && now >= nextSweep) target = sweepTarget();
@@ -247,7 +248,8 @@ async function create(host: ThemeHost<typeof SPY_DEFAULTS>, init: RendererInit):
     orbit.track(target.ip, target.city, `TASKED ${target.ip} · ${target.city.name.toUpperCase()}`, 60);
     eye.start(target, vignette, mode);
     nextSweep = Date.now() + randomSweep();
-    cooldownUntil = Date.now() + 90000;
+    // the run itself takes about 30 seconds; then at least this long back in orbit (less when sweeps are set close together)
+    cooldownUntil = Date.now() + 30000 + Math.min(45000, sweepMs());
   }
 
   // ── frame ──

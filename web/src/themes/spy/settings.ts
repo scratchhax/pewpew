@@ -17,7 +17,7 @@ export const SPY_DEFAULTS = {
   oGrid: true,           // lat/long graticule over the planet
   oEye: true,            // the eye of god: zoom, enhance, identify
   oEyeThreats: 3,        // IDS/IPS threats inside a minute that task the eye
-  oEyeEvery: 5,          // otherwise, a random tasking about this often (minutes)
+  oEyeSweep: 2,          // otherwise, a random sweep about this often (minutes); was oEyeEvery (renamed so saved screens get the new default)
   oMusicVisuals: true,   // city lights and the grid breathe with the music
 
   // soundtrack
@@ -55,7 +55,7 @@ export const SPY_CONTROLS = {
     toggle('oGrid', 'Grid'), toggle('oMusicVisuals', 'Move with the music'),
     toggle('oEye', 'Eye of god'),
     range('oEyeThreats', 'Eye: threats in a minute', 1, 12, 1),
-    range('oEyeEvery', 'Eye: random every (min)', 1, 30, 1),
+    range('oEyeSweep', 'Eye: random sweep every (min)', 0.5, 30, 0.5),
   ],
   audio: [
     { kind: 'select', key: 'oMusicStyle', label: 'Music', options: SPY_MUSIC } as Control,

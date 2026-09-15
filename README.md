@@ -576,9 +576,10 @@ Traffic weather is the **DEFCON** level: 5 on a calm network, 3 in a storm and
 
 **The eye of god.** Every so often the eye tasks a target. It happens when
 enough IDS/IPS threats land inside a minute (3 by default), when one address
-racks up 25 blocks in a minute, or on a random sweep about every 5 minutes.
-The first tasking waits 25 seconds after the page loads, and taskings are at
-least 90 seconds apart. A run lasts about 30 seconds:
+racks up 12 blocks in a minute, or on a random sweep about every 2 minutes, so
+even a quiet, well-behaved network gets regular visits. The first tasking comes
+15 seconds after the page loads, and there's a rest of up to 45 seconds after
+each one. A run lasts about 30 seconds:
 
 1. **Acquire.** The camera swings round until the target is under it, and a
    reticle closes in over ticking coordinates and altitude.
@@ -621,7 +622,8 @@ Everything is built in code: the planet and its city lights, the satellites,
 the eight scenes and every person in them. Nothing flashes: the enhance steps,
 scan lines, boxes and stamp all ease in. In F1 → Scene, **Eye of god** turns
 the taskings off, **Eye: threats in a minute** sets the threat trigger, and
-**Eye: random every (min)** sets how often a random sweep comes round.
+**Eye: random sweep every (min)** sets how often a random sweep comes round
+(as often as every 30 seconds).
 
 ## Sound
 
@@ -1120,9 +1122,9 @@ Actions** first.
 - **Soft or blurry:** you're on a lower tier or render scale; F1 → System
   shows which. Choose **High** (or **Ultra** on a high-DPI screen).
 - **The eye of god never comes:** check **Eye of god** is on in F1 → Scene.
-  It waits 25 seconds after loading and 90 seconds between taskings. On a quiet
-  network with no threats, only the random sweep triggers it, about every
-  **Eye: random every (min)** minutes.
+  It waits 15 seconds after loading and rests up to 45 seconds between taskings.
+  On a quiet network with no threats, the random sweep triggers it, about every
+  **Eye: random sweep every (min)** minutes (2 by default).
 
 ## Credits
 
