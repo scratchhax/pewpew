@@ -16,6 +16,8 @@ export const RUSH_DEFAULTS = {
   pDrone: true,          // threat → the hunter drone
   pWeather: true,        // rain in the factory, embers in the castle
   pTurbo: true,          // bursts of traffic light the turbo
+  pBosses: true,         // sustained threats → a boss fight
+  pHero: 'bot' as string, // bot | cat | ghost
 
   // soundtrack
   pMusicStyle: 'world' as string,   // world | rotate | a tune
@@ -28,13 +30,15 @@ export const RUSH_DEFAULTS = {
   pMaxGems: 140,
   pParticles: 400,
   pWeatherDensity: 1,
+  pPlanRate: 20,         // how often the runner re-plans (per second)
+  pParallax: true,       // clouds and the foreground strip (fill-heavy on small GPUs)
 };
 
 export const RUSH_BUDGETS: Budgets = {
-  low: { pMaxBaddies: 6, pMaxGems: 60, pParticles: 120, pWeatherDensity: 0.3 },
-  medium: { pMaxBaddies: 8, pMaxGems: 100, pParticles: 250, pWeatherDensity: 0.6 },
-  high: { pMaxBaddies: 10, pMaxGems: 140, pParticles: 400, pWeatherDensity: 1 },
-  ultra: { pMaxBaddies: 14, pMaxGems: 200, pParticles: 700, pWeatherDensity: 1.5 },
+  low: { pMaxBaddies: 6, pMaxGems: 60, pParticles: 120, pWeatherDensity: 0.3, pPlanRate: 10, pParallax: false },
+  medium: { pMaxBaddies: 8, pMaxGems: 100, pParticles: 250, pWeatherDensity: 0.6, pPlanRate: 15, pParallax: true },
+  high: { pMaxBaddies: 10, pMaxGems: 140, pParticles: 400, pWeatherDensity: 1, pPlanRate: 20, pParallax: true },
+  ultra: { pMaxBaddies: 14, pMaxGems: 200, pParticles: 700, pWeatherDensity: 1.5, pPlanRate: 30, pParallax: true },
 };
 
 type Key = keyof typeof RUSH_DEFAULTS;
@@ -48,12 +52,16 @@ export const RUSH_CONTROLS = {
     toggle('pQueries', 'Query blocks (DNS)'), toggle('pRivals', 'Rivals (DHCP)'),
     toggle('pFlags', 'Checkpoints (Wi-Fi)'), toggle('pDrone', 'Hunter drone (threat)'),
     toggle('pWeather', 'Rain & embers'), toggle('pTurbo', 'Turbo on bursts'),
+    toggle('pBosses', 'Boss fights (threat bursts)'),
+    { kind: 'select', key: 'pHero', label: 'Hero', options: [['bot', 'Courier bot'], ['cat', 'Hacker cat'], ['ghost', 'Ghost']] } as Control,
   ],
   budgets: [
     range('pMaxBaddies', 'Baddies', 3, 20, 1),
     range('pMaxGems', 'Gems', 30, 250, 10),
     range('pParticles', 'Particles', 60, 900, 20),
     range('pWeatherDensity', 'Weather', 0, 1.5, 0.05),
+    range('pPlanRate', 'Autoplay thinking (per s)', 5, 30, 1),
+    toggle('pParallax', 'Clouds & foreground'),
   ],
   color: [] as Control[],
   audio: [

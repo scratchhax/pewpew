@@ -207,6 +207,8 @@ export class Backdrop {
   }
 
   flicker(): void { this.dip = 1; this.dipX = 0; }
+  /** Clouds and the foreground strip (off on small devices). */
+  detail = true;
 
   update(dt: number, camX: number, vw: number, vh: number, t: number): void {
     this.dip = Math.max(0, this.dip - dt * 0.4);
@@ -221,6 +223,8 @@ export class Backdrop {
       if (!on) return;
       s.root.alpha = a;
       s.front.alpha = a;
+      s.clouds.visible = this.detail;
+      s.front.visible = this.detail;
       s.sky.width = vw; s.sky.height = vh; s.sky.tileScale.set(1, vh / 256);
       for (const [layer, factor, y, drift] of [
         [s.far, 0.12, vh - 150, 0], [s.clouds, 0.22, 6, 4], [s.mid, 0.42, vh - 120, 0],

@@ -94,6 +94,9 @@ async function create(host: ThemeHost<typeof RUSH_DEFAULTS>, init: RendererInit)
     actors.maxEnemies = settings.pMaxBaddies;
     actors.maxGems = settings.pMaxGems;
     actors.maxBits = settings.pParticles;
+    actors.planRate = settings.pPlanRate;
+    backdrop.detail = settings.pParallax;
+    actors.setHero(art.heroes[settings.pHero as 'bot' | 'cat' | 'ghost'] ?? art.heroes.bot);
   }
   applyBudgets();
 
@@ -127,6 +130,7 @@ async function create(host: ThemeHost<typeof RUSH_DEFAULTS>, init: RendererInit)
   // ── pace ──
   let speed = 120, nitro = 0, rateFast = 0, rateSlow = 0, arrivals = 0, bootT = -1, lastWall = performance.now() / 1000;
   let blockBurst = 0, wallCool = 0;
+  const threatTimes: number[] = [];
 
   function event(se: SceneEvent, replay: boolean): void {
     if (replay) return;
@@ -143,10 +147,19 @@ async function create(host: ThemeHost<typeof RUSH_DEFAULTS>, init: RendererInit)
           if (actors.baddie(Math.random() < 0.3)) audio.cueSong('block', ev.src_ip ?? undefined);
         }
         break;
-      case 'threat':
+      case 'threat': {
         audio.cueSong('threat', ev.src_ip ?? undefined);
         if (settings.pDrone) actors.hunt();
+        // a sustained attack (three threats inside half a minute) brings a boss named for it
+        const now = performance.now() / 1000;
+        threatTimes.push(now);
+        while (threatTimes.length && now - threatTimes[0] > 30) threatTimes.shift();
+        if (settings.pBosses && threatTimes.length >= 3) {
+          const sig = (ev.rule_desc || ev.rule_name || 'BOTNET MECH').replace(/^ET\s+/i, '').replace(/[^A-Za-z0-9 .:/_-]/g, '').trim();
+          if (actors.bossFight(sig.slice(0, 20).trim() || 'BOTNET MECH')) threatTimes.length = 0;
+        }
         break;
+      }
       case 'dns':
         audio.cueSong('dns', ev.src_ip ?? undefined);
         if (ev.dns_query) dash.domain(ev.dns_query.replace(/^www\./, ''));
@@ -215,7 +228,7 @@ async function create(host: ThemeHost<typeof RUSH_DEFAULTS>, init: RendererInit)
     dash.update(dtReal, {
       state, stats: actors.stats, speed, eps: state.rate30s / 30, world: worldIdx,
       worldName: [worldNames.calm, worldNames.storm, worldNames.hurricane][worldIdx],
-      power: actors.activePower(), hunted: actors.hunted, map: actors.mapInfo(), course,
+      power: actors.activePower(), hunted: actors.hunted, map: actors.mapInfo(), course, boss: actors.bossInfo(),
     });
 
     screen.position.set(Math.round(f.wanderX * 0.2), Math.round(f.wanderY * 0.2));

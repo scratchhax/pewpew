@@ -53,6 +53,72 @@ function botPalette(body: string, shade: string, scarf: string, scarfHi: string)
 
 export interface BotFrames { run: Texture[]; jump: Texture; fall: Texture }
 
+export type HeroKind = 'bot' | 'cat' | 'ghost';
+
+// ── the hacker cat: a hoodie, a tail that streams behind ───────────────────
+const CAT_HEAD = [
+  '...k......k.....',
+  '..kbk....kbk....',
+  '..kpbkkkkbpk....',
+  '.kbbbbbbbbbbk...',
+  '.kbbbbbbbbbbbk..',
+  '.kbbbbbwkbbwkk..',
+  '.kbbbbbwkbbwkbk.',
+  '.kbbbbbbbbnbbbk.',
+  '..kbbbbbbbbbbk..',
+  '...kkkkkkkkkk...',
+];
+const CAT_BODY = [
+  'T..kddddddddk...',
+  'TT.kdhddddddk...',
+  '.TTkddddddddek..',
+  '...kddddddddek..',
+  '....kddddddek...',
+];
+const CAT_BODY_FLUTTER = [
+  '.TTkddddddddk...',
+  'T..kdhddddddk...',
+  '...kddddddddek..',
+  '...kddddddddek..',
+  '....kddddddek...',
+];
+
+function catFrames(): BotFrames {
+  const pal: Palette = { k: P.ink, b: P.orange, p: P.red, w: P.white, n: P.plum, d: P.navy, h: P.blue, e: P.ink, T: P.orange, g: P.steel };
+  const frame = (legs: string, flutter: boolean) => sprite([...CAT_HEAD, ...(flutter ? CAT_BODY_FLUTTER : CAT_BODY), ...LEGS[legs]], pal);
+  return { run: [frame('run1', false), frame('run2', true), frame('run3', false), frame('run2', true)], jump: frame('jump', true), fall: frame('fall', false) };
+}
+
+// ── the ghost: no legs, a hem that ripples ─────────────────────────────────
+const GHOST_TOP = [
+  '................',
+  '.....kkkkkk.....',
+  '...kkwwwwwwkk...',
+  '..kwwwwwwwwwwk..',
+  '.kwwwwwwwwwwwsk.',
+  '.kwwwwwkwwwkwsk.',
+  '.kwwwwwkwwwkwsk.',
+  '.kwwwwwwwwwwwsk.',
+  '.kwwwwwwwkkwwsk.',
+  '.kwwwwwwwwwwwsk.',
+  '.kwwwwwwwwwwwsk.',
+  '.kwwwwwwwwwwwsk.',
+  '.kwwwwwwwwwwssk.',
+  '.kwwwwwwwwwwssk.',
+  '.kwwwwwwwwwsssk.',
+];
+const GHOST_HEM = [
+  ['.kwwkwwwkwwwksk.', '.kk..kkk..kkk.k.', '................'],
+  ['.kwwwkwwwkwwwsk.', '..kkk..kkk..kkk.', '................'],
+  ['.kkwwwkwwwkwwsk.', '.k..kkk..kkk..k.', '................'],
+];
+
+function ghostFrames(): BotFrames {
+  const pal: Palette = { k: P.slate, w: P.white, s: P.silver };
+  const frame = (hem: number) => sprite([...GHOST_TOP, ...GHOST_HEM[hem]], pal);
+  return { run: [frame(0), frame(1), frame(2), frame(1)], jump: frame(1), fall: frame(0) };
+}
+
 function botFrames(pal: Palette): BotFrames {
   const frame = (legs: string, flutter: boolean) =>
     sprite([...BOT_HEAD, ...(flutter ? BOT_BODY_FLUTTER : BOT_BODY), ...LEGS[legs]], pal);
@@ -111,7 +177,11 @@ const DRONE = [
 
 export interface Art {
   hero: BotFrames;
+  heroes: Record<HeroKind, BotFrames>;
   rival: BotFrames;
+  boss: Texture;
+  bossHurt: Texture;
+  orb: Texture[];
   crawler: Texture[];
   hopper: Texture[];
   squashed: Texture;
@@ -165,6 +235,17 @@ export function makeArt(): Art {
 
   return {
     hero: botFrames(botPalette(P.sky, P.blue, P.red, P.orange)),
+    heroes: { bot: botFrames(botPalette(P.sky, P.blue, P.red, P.orange)), cat: catFrames(), ghost: ghostFrames() },
+    boss: bossTex(false),
+    bossHurt: bossTex(true),
+    orb: [0, 1].map((k) => tex(canvas(10, 10, (c) => {
+      for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) {
+        const d = Math.hypot(x - 4.5, y - 4.5);
+        if (d > 4.8) continue;
+        c.fillStyle = d > 3.8 ? P.ink : (x + y + k) % 4 === 0 ? P.white : d < 2 ? '#e0b0ff' : '#9b5de5';
+        c.fillRect(x, y, 1, 1);
+      }
+    }))),
     rival: botFrames(botPalette(P.sand, P.orange, P.teal, P.cyan)),
     crawler: creature(crawlerPal),
     hopper: creature(hopperPal),
@@ -446,4 +527,38 @@ function castle(): WorldArt {
       }
     })),
   };
+}
+
+
+/**
+ * The boss: a hovering botnet mech, drawn procedurally at 32x30. A dome with a
+ * visor and one big eye, horns, arms, and jets underneath. The hurt version is
+ * the same mech washed pale (the theme eases between them; nothing flashes).
+ */
+function bossTex(hurt: boolean): Texture {
+  return tex(canvas(32, 30, (c) => {
+    const put = (x: number, y: number, col: string) => { c.fillStyle = col; c.fillRect(x, y, 1, 1); };
+    const body = hurt ? '#e8a0b0' : P.red, shade = hurt ? '#c07888' : P.plum, hi = hurt ? P.white : P.orange;
+    for (let y = 0; y < 30; y++) for (let x = 0; x < 32; x++) {
+      const dx = x - 15.5, dy = y - 13;
+      const dome = (dx * dx) / (13 * 13) + (dy * dy) / (11 * 11);
+      if (dome <= 1) put(x, y, dome > 0.86 ? P.ink : dx > 6 ? shade : dx < -8 && dy < -2 ? hi : body);
+    }
+    // horns
+    for (let k = 0; k < 5; k++) { put(5 - k, 5 - k, P.ink); put(4 - k, 5 - k, P.sand); put(26 + k, 5 - k, P.ink); put(27 + k, 5 - k, P.sand); }
+    // visor and eye
+    c.fillStyle = P.ink; c.fillRect(7, 10, 18, 7);
+    c.fillStyle = hurt ? P.silver : P.steel; c.fillRect(8, 11, 16, 5);
+    c.fillStyle = P.sand; c.fillRect(13, 11, 6, 5);
+    c.fillStyle = hurt ? P.white : P.red; c.fillRect(15, 12, 2, 3);
+    c.fillStyle = P.white; c.fillRect(14, 12, 1, 1);
+    // arms
+    c.fillStyle = P.ink; c.fillRect(0, 15, 4, 6); c.fillRect(28, 15, 4, 6);
+    c.fillStyle = P.slate; c.fillRect(1, 16, 2, 4); c.fillRect(29, 16, 2, 4);
+    // jets
+    c.fillStyle = P.ink; c.fillRect(9, 23, 5, 3); c.fillRect(18, 23, 5, 3);
+    c.fillStyle = P.cyan; c.fillRect(10, 26, 3, 2); c.fillRect(19, 26, 3, 2);
+    c.fillStyle = P.white; c.fillRect(11, 26, 1, 1); c.fillRect(20, 26, 1, 1);
+    c.fillStyle = P.sky; c.fillRect(11, 28, 1, 2); c.fillRect(20, 28, 1, 2);
+  }));
 }

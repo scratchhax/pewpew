@@ -38,7 +38,7 @@ const pad = (n: number, len: number) => String(Math.max(0, Math.floor(n))).padSt
 
 export interface DashInfo {
   state: State;
-  stats: { gems: number; stomps: number; queries: number; bricks: number; flags: number; hurts: number };
+  stats: { gems: number; stomps: number; queries: number; bricks: number; flags: number; hurts: number; bosses: number };
   speed: number;
   eps: number;
   world: number;
@@ -47,6 +47,7 @@ export interface DashInfo {
   hunted: boolean;
   map: { heroX: number; enemies: number[]; flags: number[]; queries: number[]; rivals: number[] };
   course: Course;
+  boss: { name: string; hp: number; max: number } | null;
 }
 
 /** How long a stage lasts (seconds of running). */
@@ -54,6 +55,10 @@ const STAGE_SECONDS = 180;
 
 export class Dash {
   private top: CanvasRenderingContext2D;
+  private bossCtx: CanvasRenderingContext2D;
+  private bossWrap: HTMLElement;
+  private bossShow = 0;
+  private bossLast: { name: string; hp: number; max: number } | null = null;
   private mapCtx: CanvasRenderingContext2D;
   private itemCtx: CanvasRenderingContext2D;
   private meterCtx: CanvasRenderingContext2D;
@@ -66,7 +71,7 @@ export class Dash {
   private runT = 0;
   private stage = 1;
   private stageT = 0;
-  private stageStart = { gems: 0, stomps: 0, queries: 0, bricks: 0, flags: 0 };
+  private stageStart = { gems: 0, stomps: 0, queries: 0, bricks: 0, flags: 0, bosses: 0 };
   private cardT = -1;
   private cardLines: Array<[string, string]> = [];
   private cardTitle = '';
@@ -79,6 +84,10 @@ export class Dash {
     this.topWrap.id = 'rush-top';
     hud.appendChild(this.topWrap);
     this.top = pixelCanvas(this.topWrap, 232, 13, 4, 'rush-topbar');
+    this.bossWrap = document.createElement('div');
+    this.bossWrap.id = 'rush-boss';
+    this.topWrap.appendChild(this.bossWrap);
+    this.bossCtx = pixelCanvas(this.bossWrap, 140, 11, 4, 'rush-bossbar');
 
     this.panels = {
       map: document.getElementById('hud-topleft')!,
@@ -95,14 +104,14 @@ export class Dash {
     this.card.id = 'rush-card';
     this.card.hidden = true;
     document.body.appendChild(this.card);
-    this.cardCtx = pixelCanvas(this.card, 150, 74, 4, 'rush-card-canvas');
+    this.cardCtx = pixelCanvas(this.card, 150, 83, 4, 'rush-card-canvas');
   }
 
   /** Remember looked-up domains, for the stage card's "most visited". */
   domain(name: string): void { this.domains.set(name, (this.domains.get(name) ?? 0) + 1); }
 
   private score(s: DashInfo['stats']): number {
-    return s.gems * 10 + s.stomps * 100 + s.queries * 50 + s.bricks * 20 + s.flags * 500;
+    return s.gems * 10 + s.stomps * 100 + s.queries * 50 + s.bricks * 20 + s.flags * 500 + s.bosses * 5000;
   }
 
   update(dt: number, d: DashInfo): void {
@@ -115,6 +124,7 @@ export class Dash {
     if (this.stageT >= STAGE_SECONDS) this.clearStage(d);
 
     this.drawTop(d);
+    this.drawBoss(dt, d);
     const shown = (el: HTMLElement) => el.style.display !== 'none';
     if (shown(this.panels.map)) this.drawMap(d);
     if (shown(this.panels.item)) this.drawItem(d);
@@ -144,6 +154,25 @@ export class Dash {
     x += drawText(c, 'STAGE', x, 4, P.sand);
     x += 3;
     drawText(c, `${d.world + 1}-${this.stage}`, x, 4, P.white);
+  }
+
+  /** The boss's name and hearts under the top bar, sliding in and out with the fight. */
+  private drawBoss(dt: number, d: DashInfo): void {
+    if (d.boss) this.bossLast = d.boss;
+    this.bossShow += ((d.boss ? 1 : 0) - this.bossShow) * Math.min(1, dt * 4);
+    this.bossWrap.style.opacity = this.bossShow.toFixed(3);
+    this.bossWrap.style.transform = `translateY(${((1 - this.bossShow) * -12).toFixed(1)}px)`;
+    const b = this.bossLast, c = this.bossCtx, W = 140, H = 11;
+    c.clearRect(0, 0, W, H);
+    if (!b || this.bossShow < 0.01) return;
+    c.fillStyle = P.plum; c.fillRect(0, 0, W, H);
+    c.fillStyle = P.orange; c.fillRect(0, 0, W, 1); c.fillRect(0, H - 1, W, 1); c.fillRect(0, 0, 1, H); c.fillRect(W - 1, 0, 1, H);
+    drawText(c, 'BOSS', 3, 3, P.sand);
+    drawText(c, b.name.slice(0, 16).trim(), 22, 3, P.white);
+    for (let k = 0; k < b.max; k++) {
+      const x = W - 8 - (b.max - 1 - k) * 8, on = k < b.hp;
+      stamp(c, ['.k.k.', 'krkrk', 'krrrk', '.krk.', '..k..'], { k: P.ink, r: on ? P.red : P.steel }, x - 2, 3);
+    }
   }
 
   private drawMap(d: DashInfo): void {
@@ -254,9 +283,10 @@ export class Dash {
       ['BLOCKS', pad(s.queries - b.queries, 3)],
       ['BRICKS', pad(s.bricks - b.bricks, 3)],
       ['FLAGS', pad(s.flags - b.flags, 3)],
+      ['BOSSES', pad(s.bosses - b.bosses, 3)],
       ['TOP SITE', topDomain.slice(0, 16)],
     ];
-    this.stageStart = { gems: s.gems, stomps: s.stomps, queries: s.queries, bricks: s.bricks, flags: s.flags };
+    this.stageStart = { gems: s.gems, stomps: s.stomps, queries: s.queries, bricks: s.bricks, flags: s.flags, bosses: s.bosses };
     this.domains.clear();
     this.stage++;
     this.stageT = 0;
@@ -274,7 +304,7 @@ export class Dash {
     const ease = (k: number) => k * k * (3 - 2 * k);
     this.card.style.transform = `translate(-50%, ${(-40 + 40 * ease(inK) - 40 * ease(outK)).toFixed(1)}px)`;
     this.card.style.opacity = String(ease(inK) * (1 - ease(outK)));
-    const c = this.cardCtx, W = 150, H = 74;
+    const c = this.cardCtx, W = 150, H = 83;
     c.clearRect(0, 0, W, H);
     c.fillStyle = P.ink; c.fillRect(0, 0, W, H);
     c.fillStyle = P.white; c.fillRect(0, 0, W, 1); c.fillRect(0, H - 1, W, 1); c.fillRect(0, 0, 1, H); c.fillRect(W - 1, 0, 1, H);

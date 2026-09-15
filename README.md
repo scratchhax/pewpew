@@ -311,6 +311,19 @@ speed, and ledges forgive landing a few pixels low. A hit scatters some gems
 pit, the bot bounces back out. Measured headless over 90 seconds of demo traffic,
 it misses a jump about once a run or less and stomps around 50 baddies.
 
+**Boss fights.** A sustained attack (three IDS/IPS threats inside half a
+minute) brings in a boss: a hovering botnet mech named after the threat's
+signature, with its name and hearts in a boss bar under the top bar. It keeps
+ahead of you, then slams down and rolls packet orbs along the ground. That's
+your chance: land on its dome while it's down. Three stomps and it bursts into
+gems with a victory fanfare. A boss battle tune takes over the music for the
+fight (unless you've pinned a tune). One boss at a time, and never more often
+than about once a minute. Turn it off with **Boss fights** in F1.
+
+**Heroes.** Pick who runs in F1 → Scene → **Hero**: the courier bot with its red
+scarf, a hacker cat in a hoodie with its tail streaming behind, or a ghost with
+a rippling hem. It switches live.
+
 **The dash** is a 16-bit game's HUD, drawn in the pixel font. A top bar shows
 gems, score (it counts up), time and stage. The course panel is a mini-map of
 the ground around you with baddies, rivals, query blocks and flags on it, plus a
@@ -573,6 +586,18 @@ bundles every setting that trades looks for frame time.
 | Bloom | off | on | on | on |
 | Lens (vignette, colour fringe) | off | off | on | on |
 | Motion blur | 0 | 0.45 | 0.6 | 0.8 |
+
+| Packet Rush budgets | Low | Medium | **High** | Ultra |
+|---------------------|-----|--------|----------|-------|
+| Baddies | 6 | 8 | 10 | 14 |
+| Gems | 60 | 100 | 140 | 200 |
+| Particles | 120 | 250 | 400 | 700 |
+| Weather | 0.3 | 0.6 | 1.0 | 1.5 |
+| Autoplay thinking (per second) | 10 | 15 | 20 | 30 |
+| Clouds & foreground | off | on | on | on |
+
+Packet Rush is light: it draws at about 250 pixels tall and scales up. Measured
+headless with the CPU throttled 6x, both High and Low hold about 60 fps at 720p.
 
 Midnight Run is a full 3D scene built to look good first; it's meant for a
 desktop or laptop GPU. Its Low tier is a starting point for smaller devices,

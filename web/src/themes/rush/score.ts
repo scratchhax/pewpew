@@ -330,12 +330,43 @@ class Castle extends ChipStyle {
   }
 }
 
+// ── boss: the battle ───────────────────────────────────────────────────────
+class BossBattle extends ChipStyle {
+  readonly id = 'boss';
+  readonly bpm = 176;
+  readonly root = 30.87;                                                        // B
+  readonly scale = [0, 2, 3, 5, 7, 8, 11];                                      // harmonic minor
+  readonly chords = [[0, 3, 7], [-4, -1, 3], [-2, 1, 4], [-5, -1, 2]];          // Bm G A#dim F#
+  readonly barsPerChord = 1;
+  readonly leadOct = 4;
+  readonly level = 0.75;
+  protected readonly rhythms = [RHYTHMS[1], RHYTHMS[5], [[0, 2], [2, 2], [4, 2], [6, 2], [8, 3], [11, 3], [14, 2]] as Array<[number, number]>];
+
+  step(i: number, t: number): void {
+    const c = this.chip, b = this.bus, pos = i % 16, bar = Math.floor(i / 16);
+    const r = this.tones(i, 1)[0];
+    // a galloping bass: root, root, octave
+    if (pos % 4 !== 3) c.tri(b, t, pos % 4 === 2 ? r * 2 : r, 0.2, this.stepDur * 0.9);
+    if (pos % 4 === 0 || pos === 7 || pos === 14) c.kick(b, t, 0.2);
+    if (pos === 4 || pos === 12) c.snare(b, t, 0.12);
+    c.hat(b, t, pos % 2 ? 0.014 : 0.026);
+    if (pos % 2 === 0) {
+      const ch = this.chordAt(i);
+      c.pulse(b, t, semis(this.root, ch[0], 4), 0.022, this.stepDur * 1.8, 0.125, { arp: [0, ch[1] - ch[0], ch[2] - ch[0], 12], arpRate: 1 / 60, pan: 0.3 });
+    }
+    this.sing(i, t, 0.075, 0.5, this.leadOct, { vib: 0.015, harmony: 0.45 });
+    if (bar % 4 === 0 && pos === 0) c.crash(b, t, 0.04);
+    if (bar % 4 === 3 && pos >= 8 && pos % 2 === 0) c.snare(b, t, 0.05 + (pos - 8) * 0.012, -0.2);
+  }
+}
+
 const STYLES: StyleDef[] = [
   { id: 'hills', name: 'Green hills', make: (s, b) => new Hills(s, b) },
   { id: 'sky', name: 'Airship march', make: (s, b) => new Sky(s, b) },
   { id: 'caves', name: 'Underground', make: (s, b) => new Caves(s, b) },
   { id: 'factory', name: 'Factory rush', make: (s, b) => new Factory(s, b) },
   { id: 'castle', name: 'Castle siege', make: (s, b) => new Castle(s, b) },
+  { id: 'boss', name: 'Boss battle', make: (s, b) => new BossBattle(s, b) },
 ];
 
 export const RUSH_MUSIC: Array<[string, string]> = [
@@ -351,6 +382,7 @@ class RushConductor extends Conductor {
   private gemAt = -9;
   private calmPick = 0;
   private calmAt = 0;
+  private bossOn = false;
 
   constructor(e: AudioEngine) {
     super(e, { styles: STYLES, styleKey: 'pMusicStyle', rotateKey: 'pMusicRotate', musicGain: 0.55 });
@@ -361,6 +393,8 @@ class RushConductor extends Conductor {
   /** 'world': the tune follows the scene; otherwise the usual pin or rotation. */
   protected wanted(): string | null {
     const v = this.setting<string>('pMusicStyle');
+    // a boss fight takes over the music whatever's pinned (unless a tune is pinned by hand)
+    if (this.bossOn && (v === 'world' || v === 'rotate')) return 'boss';
     if (v !== 'world') return super.wanted();
     const night = this.mood?.night ?? 0;
     if (night > 0.72) return 'castle';
@@ -457,6 +491,32 @@ class RushConductor extends Conductor {
         k.pulse(bus, t, key(7, 4), 0.06 * v, 0.28, 0.5, { slide: 0.3, pan });
         for (let j = 0; j < 4; j++) k.pulse(bus, t + 0.05 + j * 0.04, key(12 + j * 2, 5), 0.015 * v, 0.03, 0.125, { pan: pan + (j - 1.5) * 0.3 });
         break;
+      case 'bossStart': {
+        this.bossOn = true;
+        // a warning siren, three rises
+        for (let j = 0; j < 3; j++) k.pulse(bus, t + j * 0.28, key(0, 4), 0.045 * v, 0.24, 0.5, { slide: 1.5 });
+        break;
+      }
+      case 'bossEnd': this.bossOn = false; break;
+      case 'bossSlam':
+        k.tri(bus, t + 0.25, 80, 0.3 * v, 0.3, 30);
+        this.s.noiseHit(bus, t + 0.25, { type: 'lowpass', f: 700, g: 0.12 * v, r: 0.35, rate: 0.4 });
+        break;
+      case 'bossHit':
+        k.pulse(bus, t, key(12, 4), 0.07 * v, 0.2, 0.5, { slide: 0.4 });
+        this.s.noiseHit(bus, t, { type: 'bandpass', f: 1500, g: 0.08 * v, r: 0.2 });
+        break;
+      case 'bossDown': {
+        this.s.noiseHit(bus, t, { type: 'lowpass', f: 2500, fTo: 150, g: 0.16 * v, a: 0.002, r: 0.9, rate: 0.5 });
+        // the victory fanfare on the next beat
+        const at = Math.max(t + 0.5, this.quant(4, 0.3));
+        [[0, 0.12], [0, 0.12], [0, 0.12], [4, 0.36], [2, 0.36], [4, 0.2], [7, 0.7]].reduce((when, [sm, len]) => {
+          k.pulse(bus, when, key(sm + 12, 4), 0.05 * v, len * 0.9, 0.25, { vib: 0.015, echo: 0.2 });
+          k.pulse(bus, when, key(sm + 7, 4), 0.025 * v, len * 0.9, 0.5);
+          return when + len;
+        }, at);
+        break;
+      }
       case 'rescue': k.pulse(bus, t, key(0, 3), 0.05 * v, 0.3, 0.25, { slide: 4 }); break;
       case 'rivalDash': this.s.noiseHit(bus, t, { type: 'bandpass', f: 800, fTo: 4000, g: 0.03 * v, r: 0.25, pan }); break;
       case 'bombDrop': k.pulse(bus, t, 1400, 0.02 * v * st.gThreat, 0.5, 0.125, { slide: 0.35, pan }); break;

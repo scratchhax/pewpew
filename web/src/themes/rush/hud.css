@@ -59,3 +59,6 @@ body[data-theme="rush"] #rate { color: #73eff7; }
 #rush-card { position: fixed; top: 22%; left: 50%; z-index: 15; pointer-events: none; transform: translateX(-50%);
   filter: drop-shadow(6px 6px 0 rgba(0, 0, 0, 0.5)); }
 #rush-card[hidden] { display: none; }
+#rush-boss { display: flex; justify-content: center; margin-top: 8px; }
+@media (max-width: 1500px) { #rush-bossbar { width: 420px !important; height: 33px !important; } }
+@media (max-width: 1100px) { #rush-bossbar { width: 280px !important; height: 22px !important; } }

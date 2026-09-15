@@ -23,7 +23,7 @@ const PLAN_HALF = 1.5;
 
 type Power = 'shoe' | 'magnet' | 'shield';
 
-export interface RunStats { gems: number; stomps: number; queries: number; bricks: number; flags: number; hurts: number; rescues: number }
+export interface RunStats { gems: number; stomps: number; queries: number; bricks: number; flags: number; hurts: number; rescues: number; bosses: number }
 
 interface Runner {
   art: BotFrames;
@@ -43,7 +43,7 @@ interface Runner {
   side?: number;
 }
 
-interface Enemy { kind: 'crawler' | 'hopper'; sprite: Sprite; x: number; y: number; vx: number; vy: number; grounded: boolean; squash: number; hopT: number; anim: number }
+interface Enemy { kind: 'crawler' | 'hopper' | 'orb'; sprite: Sprite; x: number; y: number; vx: number; vy: number; grounded: boolean; squash: number; hopT: number; anim: number }
 interface Gem { sprite: Sprite; x: number; y: number; vx: number; vy: number; free: boolean; delay: number; t: number }
 interface Query { sprite: Sprite; x: number; y: number; used: boolean; bump: number; domain: string }
 interface Brick { sprite: Sprite; x: number; y: number }
@@ -51,12 +51,21 @@ interface Flag { pole: Sprite; flag: Sprite; label: Sprite | null; x: number; ba
 interface Item { sprite: Sprite; kind: Power; x: number; y: number; vy: number; grounded: boolean }
 interface Bomb { sprite: Sprite; x: number; y: number; vx: number; vy: number; fuse: number }
 interface Blast { x: number; y: number; t: number }
+/** The boss mech: hovers ahead, slams down (that's when it can be stomped), rolls packet orbs at us. */
+interface Boss {
+  sprite: Sprite; label: Sprite; name: string;
+  x: number; hover: number; hoverTarget: number; ground: number;
+  hp: number; max: number; inv: number; t: number; slamT: number; low: number;
+  phase: 'enter' | 'fight' | 'leave';
+}
 interface Bit { sprite: Sprite; x: number; y: number; vx: number; vy: number; life: number; max: number; g: number; fade: boolean }
 interface Pop { sprite: Sprite; x: number; y: number; t: number; max: number; rise: number }
 
 export class Actors {
   hero: Runner;
-  stats: RunStats = { gems: 0, stomps: 0, queries: 0, bricks: 0, flags: 0, hurts: 0, rescues: 0 };
+  stats: RunStats = { gems: 0, stomps: 0, queries: 0, bricks: 0, flags: 0, hurts: 0, rescues: 0, bosses: 0 };
+  /** How often runners re-plan (per second); lower on small devices. */
+  planRate = 20;
   /** Things the theme hears about (sounds): set by the theme. */
   onSfx: (name: string, x: number) => void = () => {};
 
@@ -109,6 +118,8 @@ export class Actors {
   }
 
   get turbo(): boolean { return this.powers.shoe > 0; }
+  /** Pick who runs (the courier bot, the hacker cat or the ghost). */
+  setHero(frames: BotFrames): void { this.hero.art = frames; }
   /** A burst of traffic: a moment of turbo (trails and all). */
   boost(seconds: number): void { this.powers.shoe = Math.max(this.powers.shoe, seconds); }
   get heroSpeedBonus(): number { return this.powers.shoe > 0 ? 55 : 0; }
@@ -306,6 +317,16 @@ export class Actors {
         const bt = land.t + b.fuse;
         if (Math.abs(bt - t) < 0.25 && Math.abs(land.x - x) < 20 && y > land.y - 22) { score -= 300; break; }
       }
+      const boss = this.boss;
+      if (boss && boss.phase === 'fight' && boss.inv <= 0 && !taken.has(boss)) {
+        // the boss holds still while it's low; aim to land on its dome
+        const bx = boss.low > 0 ? boss.x : boss.x + r.speed * t;
+        const top = boss.ground - boss.hover - 26;
+        if (Math.abs(bx - x) < 15 && y > top - 4 && y - HEIGHT < boss.ground - boss.hover) {
+          if (vy > 0 && y < top + 8) { score += 320; taken.add(boss); vy = -300; grounded = false; }
+          else if (this.hurt <= 0 && this.powers.shield <= 0) { score -= 360; taken.add(boss); }
+        }
+      }
       for (const bl of this.blasts) {
         if (t < 0.3 && Math.abs(bl.x - x) < 20 && y > bl.y - 22) score -= 200;
       }
@@ -374,6 +395,7 @@ export class Actors {
     this.updateFlags(dt);
     this.updateItems(dt);
     this.updateDrone(dt, t);
+    this.updateBoss(dt);
     this.updateBits(dt);
     this.updateTrails(dt);
 
@@ -408,7 +430,7 @@ export class Actors {
   private stepRunner(r: Runner, dt: number, isHero: boolean): void {
     const course = this.course;
     r.planT -= dt;
-    if (r.planT <= 0) { r.planT = r.grounded ? 0.05 : 0.1; this.plan(r, isHero); }
+    if (r.planT <= 0) { r.planT = (r.grounded ? 1 : 2) / this.planRate; this.plan(r, isHero); }
     if (r.doubleAt >= 0) {
       r.doubleAt -= dt;
       // the planned second jump: only if it still beats coming down where we are
@@ -470,7 +492,8 @@ export class Actors {
       // walk; turn around at walls and (crawlers) at pit edges
       const nx = e.x + e.vx * dt;
       const ahead = nx + Math.sign(e.vx) * 7;
-      if (course.wall(ahead, e.y) || (e.kind === 'crawler' && e.grounded && course.groundTop(Math.floor(ahead / TILE)) === Infinity) || this.brickAt(ahead, e.y - 4)) e.vx = -e.vx;
+      if (e.kind === 'orb') e.x = nx;                          // orbs roll on regardless
+      else if (course.wall(ahead, e.y) || (e.kind === 'crawler' && e.grounded && course.groundTop(Math.floor(ahead / TILE)) === Infinity) || this.brickAt(ahead, e.y - 4)) e.vx = -e.vx;
       else e.x = nx;
       if (e.kind === 'hopper' && e.grounded) {
         e.hopT -= dt;
@@ -483,9 +506,9 @@ export class Actors {
         const land = e.vy >= 0 ? course.landing(e.x - 5, e.x + 5, e.y, ny) : null;
         if (land !== null) { e.y = land; e.vy = 0; e.grounded = true; } else e.y = ny;
       }
-      const frames = e.kind === 'hopper' ? this.art.hopper : this.art.crawler;
+      const frames = e.kind === 'orb' ? this.art.orb : e.kind === 'hopper' ? this.art.hopper : this.art.crawler;
       e.sprite.texture = frames[Math.floor(e.anim) % 2];
-      e.sprite.scale.x = e.vx < 0 ? 1 : -1;
+      e.sprite.scale.x = e.kind === 'orb' ? 1 : e.vx < 0 ? 1 : -1;
       e.sprite.position.set(Math.round(e.x), Math.round(e.y) + 1);
       if (e.y > course.vh + 20 || e.x < this.camX - 40) { e.sprite.destroy(); this.enemies.splice(i, 1); continue; }
 
@@ -496,7 +519,7 @@ export class Actors {
         if (r.y < e.y - 7 && r.vy <= -60) continue;
         if (r.y < e.y - 7) {
           e.squash = 0.35;
-          e.sprite.texture = e.kind === 'hopper' ? this.art.hopSquashed : this.art.squashed;
+          e.sprite.texture = e.kind === 'orb' ? this.art.orb[0] : e.kind === 'hopper' ? this.art.hopSquashed : this.art.squashed;
           r.vy = -270; r.grounded = false; r.usedDouble = false;
           if (r === hero) { this.stats.stomps++; this.onSfx('stomp', e.x); }
           this.burst(e.x, e.y - 4, P.white, 6, 60);
@@ -504,7 +527,7 @@ export class Actors {
         } else if (r === hero && this.hurt <= 0) {
           if (this.powers.shield > 0) {
             this.powers.shield = 0;
-            e.squash = 0.35; e.sprite.texture = e.kind === 'hopper' ? this.art.hopSquashed : this.art.squashed;
+            e.squash = 0.35; e.sprite.texture = e.kind === 'orb' ? this.art.orb[0] : e.kind === 'hopper' ? this.art.hopSquashed : this.art.squashed;
             this.burst(e.x, e.y - 6, P.cyan, 10, 80); this.onSfx('shieldPop', e.x);
           } else {
             this.hurtHero();
@@ -737,6 +760,128 @@ export class Actors {
       }
       b.sprite.position.set(Math.round(b.x), Math.round(b.y) + 1);
     }
+  }
+
+  // ── the boss ──
+  private boss: Boss | null = null;
+  private bossCool = 0;
+
+  /** A sustained attack: a boss mech named for the threat comes in (one at a time, not too often). */
+  bossFight(name: string): boolean {
+    if (this.boss || this.bossCool > 0) return false;
+    const sprite = new Sprite(this.art.boss);
+    sprite.anchor.set(0.5, 1);
+    this.layers.mid.addChild(sprite);
+    const label = new Sprite(pixelText(name.slice(0, 20), P.orange));
+    label.anchor.set(0.5, 1);
+    this.layers.ui.addChild(label);
+    this.boss = {
+      sprite, label, name, x: this.camX + this.vw + 40, hover: 70, hoverTarget: 55, ground: this.hero.y,
+      hp: 3, max: 3, inv: 0, t: 0, slamT: 3.2, low: 0, phase: 'enter',
+    };
+    this.onSfx('bossStart', this.boss.x);
+    return true;
+  }
+
+  /** The fight's state for the dash (null when there's no boss). */
+  bossInfo(): { name: string; hp: number; max: number } | null {
+    return this.boss && this.boss.phase !== 'leave' ? { name: this.boss.name, hp: this.boss.hp, max: this.boss.max } : null;
+  }
+
+  private updateBoss(dt: number): void {
+    this.bossCool = Math.max(0, this.bossCool - dt);
+    const b = this.boss, hero = this.hero, course = this.course;
+    if (!b) return;
+    b.t += dt;
+    b.inv = Math.max(0, b.inv - dt);
+    const top = course.groundTop(Math.floor(b.x / TILE));
+    if (top !== Infinity) b.ground += (top - b.ground) * Math.min(1, dt * 6);
+    if (b.phase === 'enter') {
+      const target = hero.x + 120;
+      b.x += (target - b.x) * Math.min(1, dt * 1.5) + hero.speed * dt * 0.5;
+      if (Math.abs(b.x - target) < 12) b.phase = 'fight';
+      if (b.t > 45) b.phase = 'leave';
+    } else if (b.phase === 'fight') {
+      if (b.t > 50) b.phase = 'leave';
+      if (b.low > 0) {
+        // down on the ground: it holds still (we catch up), then lifts off again
+        b.low -= dt;
+        b.hoverTarget = 0;
+        if (b.low <= 0) { b.hoverTarget = 55; b.slamT = 2.6 + Math.random(); }
+      } else {
+        // keep ahead of us, bobbing, until it's time to slam
+        const target = hero.x + 110 + Math.sin(b.t * 0.8) * 22;
+        b.x += (target - b.x) * Math.min(1, dt * 2.4);
+        b.hoverTarget = 50 + Math.sin(b.t * 1.7) * 8;
+        b.slamT -= dt;
+        if (b.slamT <= 0 && b.hover > 30) { b.low = 1.5; this.onSfx('bossSlam', b.x); }
+      }
+    } else {
+      b.x += (hero.speed + 60) * dt;
+      b.hoverTarget = 140;
+    }
+    const rate = b.hoverTarget < b.hover ? 7 : 1.8;
+    const wasHigh = b.hover > 6;
+    b.hover += (b.hoverTarget - b.hover) * Math.min(1, dt * rate);
+    if (wasHigh && b.hover <= 6 && b.low > 0) {
+      // impact: dust, and two packet orbs rolling at us
+      this.burst(b.x - 14, b.ground - 2, P.silver, 8, 70);
+      this.burst(b.x + 14, b.ground - 2, P.silver, 8, 70);
+      for (const off of [-18, -40]) {
+        const e: Enemy = { kind: 'orb', sprite: new Sprite(this.art.orb[0]), x: b.x + off, y: b.ground, vx: -80, vy: -60, grounded: false, squash: 0, hopT: 9, anim: 0 };
+        e.sprite.anchor.set(0.5, 1);
+        this.layers.mid.addChild(e.sprite);
+        this.enemies.push(e);
+      }
+    }
+    const y = b.ground - b.hover;
+    // hit: pale for a moment (an ease between the two looks, never a flash)
+    b.sprite.texture = b.inv > 0.6 ? this.art.bossHurt : this.art.boss;
+    b.sprite.alpha = b.inv > 0 ? 0.75 + 0.25 * Math.cos(b.inv * 6) : 1;
+    b.sprite.position.set(Math.round(b.x), Math.round(y) + 1);
+    b.sprite.rotation = b.phase === 'fight' && b.low <= 0 ? Math.sin(b.t * 2) * 0.05 : 0;
+    b.label.position.set(Math.round(b.x), Math.round(y - 34));
+
+    // contact with the hero: land on the dome to hit it, touch it anywhere else and it hurts
+    if (b.phase === 'fight' && Math.abs(b.x - hero.x) < 15 && hero.y > y - 30 && hero.y - HEIGHT < y) {
+      if (hero.vy > 0 && hero.y < y - 18) {
+        if (b.inv <= 0) {
+          b.hp--; b.inv = 1.4; b.low = 0; b.hoverTarget = 70; b.slamT = 2.2;
+          this.stats.stomps++;
+          this.burst(b.x, y - 26, P.sand, 14, 110);
+          if (b.hp <= 0) { this.defeatBoss(); return; }
+          this.onSfx('bossHit', b.x);
+        }
+        hero.vy = -300; hero.grounded = false; hero.usedDouble = false;
+      } else if (this.hurt <= 0 && b.inv <= 0) {
+        if (this.powers.shield > 0) { this.powers.shield = 0; this.onSfx('shieldPop', hero.x); } else this.hurtHero();
+      }
+    }
+    if (b.phase === 'leave' && y < -40) this.dropBoss();
+  }
+
+  private defeatBoss(): void {
+    const b = this.boss!;
+    const y = b.ground - b.hover;
+    this.stats.bosses++;
+    this.onSfx('bossDown', b.x);
+    this.popText('BOSS DOWN!', P.sand, b.x, y - 40);
+    this.burst(b.x, y - 14, P.orange, 24, 150);
+    this.burst(b.x, y - 14, P.white, 14, 120);
+    for (let k = 0; k < 18; k++) {
+      const a = -Math.PI * (0.1 + 0.8 * Math.random());
+      this.addGem(b.x, y - 14, Math.cos(a) * 140 + this.hero.speed * 0.5, Math.sin(a) * 260, true, 0.3);
+    }
+    this.dropBoss();
+  }
+
+  private dropBoss(): void {
+    if (!this.boss) return;
+    this.boss.sprite.destroy();
+    this.boss.label.destroy({ texture: true, textureSource: true });
+    this.boss = null;
+    this.bossCool = 40;
+    this.onSfx('bossEnd', 0);
   }
 
   // ── little effects ──
