@@ -128,18 +128,23 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
   innerKey.position.set(30, 80, 20);
   inner.add(innerKey, innerKey.target, new HemisphereLight(0x8a6ad0, 0x0a0614, 0.7));
 
-  const camera = new PerspectiveCamera(64, window.innerWidth / window.innerHeight, 0.1, 900);
+  const camera = new PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 600);
   const composer = new EffectComposer(renderer);
   composer.setPixelRatio(ratio);
   composer.setSize(window.innerWidth, window.innerHeight);
   const pass = new RenderPass(scene, camera);
-  const bloom = new UnrealBloomPass(new Vector2(window.innerWidth, window.innerHeight), 0.75, 0.55, 0.8);
+  const bloom = new UnrealBloomPass(new Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.75, 0.55, 0.8);
   const lens = new ShaderPass(LensShader);
   composer.addPass(pass);
   composer.addPass(bloom);
   composer.addPass(lens);
   composer.addPass(new OutputPass());
-  const setRes = () => lens.uniforms.uRes.value.set(window.innerWidth * renderer.getPixelRatio(), window.innerHeight * renderer.getPixelRatio());
+  const setRes = () => {
+    const pr = renderer.getPixelRatio();
+    lens.uniforms.uRes.value.set(window.innerWidth * pr, window.innerHeight * pr);
+    // bloom is soft anyway: half resolution costs a quarter of the fill
+    bloom.setSize(Math.round(window.innerWidth * pr / 2), Math.round(window.innerHeight * pr / 2));
+  };
   setRes();
 
   return {

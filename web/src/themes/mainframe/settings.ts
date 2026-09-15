@@ -30,17 +30,17 @@ export const MAINFRAME_DEFAULTS = {
 
   // scene budgets = the HIGH preset
   mMaxPackets: 700,
-  mChunks: 6,            // board sections drawn ahead
-  mDetail: 1024,         // board texture width per section (px)
+  mChunks: 4,            // board sections drawn ahead
+  mDetail: 1536,         // board texture width per section (px)
   mBloom: true,
   mHaze: true,           // heat haze when the board overclocks
 };
 
 export const MAINFRAME_BUDGETS: Budgets = {
-  low: { mMaxPackets: 300, mChunks: 4, mDetail: 512, mBloom: false, mHaze: false },
-  medium: { mMaxPackets: 500, mChunks: 5, mDetail: 1024, mBloom: true, mHaze: false },
-  high: { mMaxPackets: 700, mChunks: 6, mDetail: 1024, mBloom: true, mHaze: true },
-  ultra: { mMaxPackets: 1000, mChunks: 8, mDetail: 2048, mBloom: true, mHaze: true },
+  low: { mMaxPackets: 300, mChunks: 3, mDetail: 768, mBloom: false, mHaze: false },
+  medium: { mMaxPackets: 500, mChunks: 3, mDetail: 1024, mBloom: true, mHaze: false },
+  high: { mMaxPackets: 700, mChunks: 4, mDetail: 1536, mBloom: true, mHaze: true },
+  ultra: { mMaxPackets: 1000, mChunks: 5, mDetail: 2048, mBloom: true, mHaze: true },
 };
 
 type Key = keyof typeof MAINFRAME_DEFAULTS;
@@ -70,7 +70,7 @@ export const MAINFRAME_CONTROLS = {
     range('mMaxPackets', 'Packets', 100, 1500, 50),
     range('mChunks', 'Board ahead (sections)', 3, 10, 1),
     { kind: 'select', key: 'mDetail', label: 'Board detail', numeric: true,
-      options: [['512', '512'], ['1024', '1024'], ['2048', '2048']] } as Control,
+      options: [['768', '768'], ['1024', '1024'], ['1536', '1536'], ['2048', '2048']] } as Control,
     toggle('mBloom', 'Bloom'),
     toggle('mHaze', 'Heat haze'),
   ],

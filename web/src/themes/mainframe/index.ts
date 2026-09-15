@@ -182,7 +182,7 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     return targetFor(best?.ip ?? `${45 + Math.floor(Math.random() * 150)}.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.${1 + Math.floor(Math.random() * 250)}`, 'sweep');
   }
   function startDive(target: DiveTarget): boolean {
-    if (!dive.start(target, flight.z)) return false;
+    if (!dive.start(target, flight.z, flight.speed)) return false;
     nextSweep = Date.now() + randomSweep();
     cooldownUntil = Date.now() + 25000 + Math.min(45000, sweepMs());
     return true;
@@ -226,6 +226,7 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     }
     audio.sfx('fly', { count: flight.speed });
     board.update(flight.z, settings.mChunks);
+    traffic.camX = flight.x;
     traffic.speedScale = 1 + heat * 0.35;
     traffic.dim = dim * pulse;
     traffic.update(dt);

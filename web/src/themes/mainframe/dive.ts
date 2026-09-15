@@ -89,7 +89,12 @@ export class Dive {
   private innerTraffic: Traffic | null = null;
   private innerFlight = new Flight();
   private from = new Vector3();
-  private fromLook = new Vector3();
+  private lookOffset = new Vector3();
+  private fromUp = new Vector3(0, 1, 0);
+  private fromFov = 60;
+  private vel = new Vector3();
+  private lastPos = new Vector3();
+  private velInit = false;
   private look = new Vector3();
   private el: HTMLElement;
   private parts: Record<string, HTMLElement> = {};
@@ -122,12 +127,15 @@ export class Dive {
   get inside(): boolean { return this.phase === 'inside' || (this.phase === 'through' && this.t > 0.8) || (this.phase === 'surface' && this.t < 0.9); }
 
   /** Task a chip ahead of the camera. Returns false if there's nothing suitable in view. */
-  start(target: DiveTarget, camZ: number): boolean {
+  start(target: DiveTarget, camZ: number, speed = 26): boolean {
     if (this.active) return false;
-    const cands = this.board.chips(camZ - 140, camZ - 240).filter((c) => c.top && c.w >= 10 && !c.covered);
+    // a chip about as far ahead as the camera will naturally travel while it locks on and swoops down
+    const reach = speed * 0.85 * (DUR.lock + DUR.descend * 0.8);
+    const cands = this.board.chips(camZ - reach + 45, camZ - reach - 45).filter((c) => c.w >= 10 && !c.covered && c.kind !== 'socket' && c.kind !== 'macro');
     if (!cands.length) return false;
     const prefer = cands.filter((c) => c.kind === 'cpu' || c.kind === 'fw');
-    const chip = (prefer.length ? prefer : cands)[Math.floor(Math.random() * (prefer.length || cands.length))];
+    const pool = prefer.length ? prefer : cands;
+    const chip = pool.reduce((a, b) => (Math.abs(b.z - (camZ - reach)) < Math.abs(a.z - (camZ - reach)) ? b : a));
     this.chip = chip;
     this.target = target;
     this.phase = 'lock';
@@ -138,7 +146,8 @@ export class Dive {
     this.board.etch(chip, target.ip, true);
     this.traffic.glow(chip, COL.target, 1, 30);
     this.steerX = chip.x;
-    this.speedFactor = 0.6;
+    this.speedFactor = 0.85;
+    this.velInit = false;
     // the lid glows with the die as the camera comes down onto it
     const lid = chip.top!.material as MeshStandardMaterial;
     lid.emissive.setRGB(1, 0.78, 0.45);
@@ -176,29 +185,45 @@ export class Dive {
     switch (this.phase) {
       case 'lock': {
         this.reticle(top, camera, 1 - this.t / DUR.lock * 0.5);
+        // track the flight's real velocity, so the swoop leaves at the same speed and heading
+        if (this.velInit && dt > 0) this.vel.lerp(this.tmp.copy(camera.position).sub(this.lastPos).divideScalar(dt), Math.min(1, dt * 4));
+        else if (dt > 0) { this.vel.set(0, 0, -20); this.velInit = true; }
+        this.lastPos.copy(camera.position);
         if (this.t >= DUR.lock) {
           this.phase = 'descend'; this.t = 0;
           this.from.copy(camera.position);
-          camera.getWorldDirection(this.fromLook).multiplyScalar(30).add(camera.position);
+          this.vel.y = 0;
+          const dir = camera.getWorldDirection(this.tmp);
+          this.lookOffset.copy(dir).multiplyScalar(camera.position.y / Math.max(0.2, -dir.y));
+          this.fromUp.copy(camera.up);
+          this.fromFov = camera.fov;
           this.audio.sfx('descend');
         }
         break;
       }
       case 'descend': {
-        const u = ease(this.t / DUR.descend);
-        const end = this.tmp.set(chip.x, chip.h + 4.5, chip.z + 3.5);
-        camera.position.copy(this.from).lerp(end, u);
-        camera.position.y += Math.sin(u * Math.PI) * 10;
+        const s = clamp01(this.t / DUR.descend);
+        const u = ease(s);
+        // a Hermite curve: it leaves with the flight's own velocity and settles gently above the chip
+        const s2 = s * s, s3 = s2 * s;
+        const h00 = 2 * s3 - 3 * s2 + 1, h10 = s3 - 2 * s2 + s, h01 = -2 * s3 + 3 * s2, h11 = s3 - s2;
+        const ex = chip.x, ey = chip.h + 4.5, ez = chip.z + 3.5;
+        camera.position.set(
+          this.from.x * h00 + this.vel.x * DUR.descend * h10 + ex * h01,
+          this.from.y * h00 + ey * h01 - 5 * h11,
+          this.from.z * h00 + this.vel.z * DUR.descend * h10 + ez * h01 - 3 * h11,
+        );
         // never through a capacitor tower or heat sink on the way down
         if (u < 0.9) {
           let h = 0;
           for (let dx = -4; dx <= 4; dx += 4) for (let dz = -4; dz <= 4; dz += 4) h = Math.max(h, this.board.heightAt(camera.position.x + dx, camera.position.z + dz));
           camera.position.y = Math.max(camera.position.y, h + 4);
         }
-        this.look.copy(this.fromLook).lerp(top, Math.min(1, u * 1.6));
-        camera.up.set(0, 1, 0);
+        const b = Math.min(1, s / 0.75), blend = b * b * (3 - 2 * b);
+        this.look.copy(camera.position).add(this.lookOffset).lerp(top, blend);
+        camera.up.copy(this.fromUp).lerp(this.tmp.set(0, 1, 0), Math.min(1, s * 2.5)).normalize();
         camera.lookAt(this.look);
-        camera.fov = 62 - u * 18;
+        camera.fov = this.fromFov + (44 - this.fromFov) * u;
         camera.updateProjectionMatrix();
         lens.uZoom.value = clamp01((u - 0.4) / 0.6) * 0.9;
         const lid = chip.top!.material as MeshStandardMaterial;

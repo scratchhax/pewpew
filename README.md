@@ -641,7 +641,7 @@ solder mask, copper traces, gold pads and vias, silkscreen outlines, part
 numbers, and text taken from your own traffic (addresses, hostnames, domains,
 rule names). The parts on it are 3D: chips with pins and laser-etched lids,
 capacitor towers, heat sinks, spinning fans, headers, crystals and LEDs, all lit
-by neon reflections. The camera weaves between four "streets" of parallel
+by neon reflections. The camera flies high enough that the board fills the screen, and weaves between six "streets" of parallel
 traces, banks into its turns, climbs over the tall parts and drops back down
 into the gaps. Between events the board keeps up a dim chatter of clock and bus
 pulses, so it's never still, and addresses drift up through the air.
@@ -1030,8 +1030,8 @@ Each scene adds its own budgets:
 | Mainframe | Low | Medium | **High** | Ultra |
 |-----------|-----|--------|----------|-------|
 | Packets | 300 | 500 | 700 | 1000 |
-| Board ahead (sections) | 4 | 5 | 6 | 8 |
-| Board detail (texture width, px) | 512 | 1024 | 1024 | 2048 |
+| Board ahead (sections) | 3 | 3 | 4 | 5 |
+| Board detail (texture width, px) | 768 | 1024 | 1536 | 2048 |
 | Bloom | off | on | on | on |
 | Heat haze | off | off | on | on |
 
@@ -1059,8 +1059,8 @@ is generated once when the scene loads (about a second on a desktop GPU), which
 keeps each frame cheap. Measured headless on a desktop GPU with the CPU
 throttled 4×, High and Low both hold about 60 fps at 720p, in orbit and in the
 close-up. It hasn't been measured on a Pi yet. **Mainframe** is 3D as well.
-Measured the same way with the CPU throttled 4×, High holds about 48–54 fps and
-Low about 55–58 fps, on the board and inside a chip. It hasn't been measured on
+Measured the same way with the CPU throttled 4×, High and Low both hold about
+60 fps at 720p, on the board and inside a chip. It hasn't been measured on
 a Pi yet either.
 
 ## URL parameters
