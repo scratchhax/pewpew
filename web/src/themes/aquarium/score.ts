@@ -6,8 +6,6 @@ import type { Bed } from '../../sound/synth';
 /**
  * The aquarium's soundtrack: slow, warm and a little wet.
  *
- *   sea shanty : a 6/8 shanty: squeezebox, fiddle, banjo, boot stomps and a crew that shouts back
- *   capstan    : a slow 3/4 capstan song: concertina oom-pah-pah, cello and a tin whistle
  *   lagoon     : 80 bpm lounge, soft electric piano chords, a round bass, a rim click
  *   tidepool   : 96 bpm bossa, plucked marimba-ish patterns and a shaker
  *   kelp dub   : 70 bpm dub, echoing chord stabs, a deep sub and a lazy snare
@@ -19,111 +17,6 @@ import type { Bed } from '../../sound/synth';
  * creaks open (or bangs shut), and the light dims with a sinking tone. The
  * pump hums and the water moves underneath.
  */
-
-/**
- * A shanty in 6/8: a bar is twelve sixteenths, so the two stomps land on the
- * dotted-quarter pulse. The squeezebox pushes and pulls on those two beats, the
- * banjo fills the eighths between, and the fiddle sings a phrase that changes
- * every few bars. Every fourth bar the crew shouts back.
- */
-class Shanty extends Style {
-  readonly id = 'shanty';
-  readonly bpm = 144;                                       // 12 sixteenths a bar = a 96 bpm 6/8 pulse
-  readonly barSteps = 12;
-  readonly root = 36.71;                                    // D
-  readonly scale = [0, 2, 3, 5, 7, 9, 10];                  // dorian: the sailors' mode
-  readonly chords = [[0, 3, 7], [-2, 2, 5], [-4, 0, 3], [-2, 2, 5]];
-  readonly barsPerChord = 2;
-  readonly leadOct = 4;
-  readonly level = 0.85;
-  private tune: number[] = [];
-
-  enter(): void { this.newTune(); }
-  /** Six eighths of melody, mostly stepwise, resting on the pulse. */
-  private newTune(): void {
-    let deg = 4;
-    this.tune = Array.from({ length: 6 }, (_, k) => {
-      if (k !== 0 && Math.random() < 0.3) return -1;
-      deg += pick([-2, -1, -1, 0, 1, 1, 2]);
-      if (deg < 0) deg += 3;
-      if (deg > 9) deg -= 3;
-      return deg;
-    });
-  }
-
-  step(i: number, t: number, m: Mood): void {
-    const s = this.s, b = this.bus, pos = i % 12, bar = Math.floor(i / 12);
-    if (pos === 0 && bar % 4 === 0) this.newTune();
-    // boots on the deck, and hands on the offbeat
-    if (pos === 0) s.stomp(b, t, 0.12);
-    if (pos === 6) { s.stomp(b, t, 0.09); s.clap(b, t, 0.035, 0.15); }
-    if (pos === 3 || pos === 9) s.hat(b, t, 0.006, -0.25);
-    // the squeezebox: a push on one, a pull on four
-    if (pos === 0 || pos === 6) {
-      const hold = 5 * this.stepDur;
-      for (const fq of this.tones(i, 3)) s.organ(b, t, fq, 0.012, hold, pos === 0 ? -0.2 : 0.2);
-      s.tone(b, t, this.tones(i, 1)[pos === 0 ? 0 : 2], { type: 'triangle', g: 0.09, a: 0.01, h: 0.12, r: 0.3, lp: 700 });
-    }
-    // banjo between the beats
-    if (pos === 2 || pos === 4 || pos === 8 || pos === 10) {
-      const c = this.tones(i, 4);
-      s.banjo(b, t, c[(pos / 2) % c.length] * (pos > 6 ? 2 : 1), 0.02, pos > 6 ? 0.3 : -0.3);
-    }
-    // the fiddle sings the verse
-    if (pos % 2 === 0) {
-      const deg = this.tune[pos / 2];
-      if (deg >= 0) s.fiddle(b, t, this.scaleTone(deg, this.leadOct), 0.03, this.stepDur * 1.6, 0.15);
-    }
-    // the crew answers every fourth bar, and joins in when the water is up
-    if (pos === 6 && bar % 4 === 3) s.hey(b, t, 0.05 + m.night * 0.03);
-    if (pos === 0 && bar % 8 === 4) s.choir(b, t, this.tones(i, 3), 0.005 + m.night * 0.003, 6 * this.stepDur);
-  }
-
-  lead(t: number, f: number, g: number, pan: number): void { this.s.fiddle(this.bus, t, f, g * 0.5, 0.25, pan); }
-}
-
-/** The slow song at the capstan: oom-pah-pah, a cello underneath and a tin whistle over the top. */
-class Capstan extends Style {
-  readonly id = 'capstan';
-  readonly bpm = 96;                                        // 12 sixteenths a bar = a slow 3/4
-  readonly barSteps = 12;
-  readonly root = 41.2;                                     // E
-  readonly scale = [0, 2, 3, 5, 7, 8, 10];
-  readonly chords = [[0, 3, 7], [-4, 0, 3], [-2, 2, 5], [0, 3, 7]];
-  readonly barsPerChord = 2;
-  readonly leadOct = 4;
-  readonly level = 0.9;
-  private tune: number[] = [];
-
-  enter(): void { this.newTune(); }
-  private newTune(): void {
-    let deg = 2;
-    this.tune = Array.from({ length: 3 }, (_, k) => {
-      if (k === 1 && Math.random() < 0.4) return -1;
-      deg += pick([-2, -1, 0, 1, 2]);
-      if (deg < 0) deg += 4;
-      if (deg > 8) deg -= 4;
-      return deg;
-    });
-  }
-
-  step(i: number, t: number, m: Mood): void {
-    const s = this.s, b = this.bus, pos = i % 12, bar = Math.floor(i / 12);
-    if (pos === 0 && bar % 4 === 0) this.newTune();
-    if (pos === 0) s.tone(b, t, this.tones(i, 1)[0], { type: 'triangle', g: 0.1, a: 0.01, h: 0.2, r: 0.4, lp: 600 });
-    if (pos === 4 || pos === 8) for (const fq of this.tones(i, 3)) s.organ(b, t, fq, 0.009, 3 * this.stepDur, pos === 4 ? -0.25 : 0.25);
-    if (this.isChordStart(i)) s.cello(b, t, this.tones(i, 2)[0], 0.03, this.barsPerChord * 12 * this.stepDur * 0.7, -0.1);
-    // the capstan comes round: one soft heave a bar
-    if (pos === 0 && bar % 2 === 1) s.tom(b, t, 80, 0.035, 0.2);
-    if (pos % 4 === 0) {
-      const deg = this.tune[pos / 4];
-      if (deg >= 0) s.whistle(b, t, this.scaleTone(deg, this.leadOct), 0.014, this.stepDur * 3, pos === 0 ? this.scaleTone(deg - 1, this.leadOct) : 0, 0.2);
-    }
-    if (pos === 6 && bar % 8 === 7) s.choir(b, t, this.tones(i, 3), 0.005 + m.night * 0.004, 8 * this.stepDur);
-  }
-
-  lead(t: number, f: number, g: number, pan: number): void { this.s.whistle(this.bus, t, f, g * 0.35, 0.3, 0, pan); }
-}
 
 class Lagoon extends Style {
   readonly id = 'lagoon';
@@ -226,8 +119,6 @@ class Abyss extends Style {
 }
 
 const STYLES: StyleDef[] = [
-  { id: 'shanty', name: 'Sea shanty', make: (s, b) => new Shanty(s, b) },
-  { id: 'capstan', name: 'Capstan song', make: (s, b) => new Capstan(s, b) },
   { id: 'lagoon', name: 'Lagoon', make: (s, b) => new Lagoon(s, b) },
   { id: 'tidepool', name: 'Tidepool', make: (s, b) => new Tidepool(s, b) },
   { id: 'dub', name: 'Kelp dub', make: (s, b) => new KelpDub(s, b) },
