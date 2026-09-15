@@ -24,13 +24,18 @@ const PROJECT = /* glsl */`
   gl_Position = projectionMatrix * mvPosition;
 `;
 
-export function curved<T extends Material>(m: T, key = '', extra?: (vertex: string) => string): T {
+export function curved<T extends Material>(
+  m: T, key = '', extra?: (vertex: string) => string,
+  fragment?: (fragment: string) => string, uniforms?: Record<string, { value: unknown }>,
+): T {
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uBend = bend;
+    if (uniforms) Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nuniform vec2 uBend;')
       .replace('#include <project_vertex>', PROJECT);
     if (extra) shader.vertexShader = extra(shader.vertexShader);
+    if (fragment) shader.fragmentShader = fragment(shader.fragmentShader);
   };
   m.customProgramCacheKey = () => 'curved' + key;
   return m;

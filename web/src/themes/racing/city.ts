@@ -1,13 +1,17 @@
 import {
   AdditiveBlending, BoxGeometry, CanvasTexture, Color, CylinderGeometry, DynamicDrawUsage, Group, InstancedMesh,
   Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry, Quaternion, Scene, Vector3,
-  RepeatWrapping, SRGBColorSpace, type Texture,
+  RepeatWrapping, SRGBColorSpace, DataTexture, RGBAFormat, FloatType, NearestFilter, InstancedBufferAttribute, type Texture,
 } from 'three';
 import { curved } from './bend';
 import { NEAR } from './road';
 import { ROAD_WIDTH, drawNeon, facade, glow, streak } from './textures';
 
 const SLICE = 13;                 // metres between building slots
+// event windows: texture rows are building slots, columns are windows (floors x windows across)
+const WIN_ACROSS = 8, WIN_FLOORS = 64;
+const WIN_COLS = WIN_ACROSS * WIN_FLOORS, WIN_ROWS = 256;
+const WINDOW_W = 18 / 10, WINDOW_H = 50 / 26;
 const NEON = ['#ff3fb4', '#3ff0ff', '#ffb040', '#b56bff', '#5cff9c', '#ff5a5a'];
 const NEON_COLORS = NEON.map((c) => new Color(c).multiplyScalar(2.2));
 const SIGN_WORDS = ['NITRO', 'GARAGE 24', 'RAMEN', 'TURBO', 'MOTEL', 'ARCADE', 'BODY SHOP', 'KARAOKE', 'DRIFT',
@@ -20,6 +24,7 @@ interface Slot {
   w: number; d: number; h: number; x: number;
   roofNeon: number;       // colour index, -1 = none
   lamp: boolean;
+  idx: number;            // stable index (its row of event windows)
   sign: Sign | null;
 }
 
@@ -60,25 +65,62 @@ export class City {
   private wave = 0;             // travelling brownout front (m)
   private glowTex: Texture;
   private pendingText: Array<{ text: string; color: string }> = [];
+  // event windows
+  private winData: Float32Array;
+  private winTex: DataTexture;
+  private winTime = { value: 0 };
+  private winDirty = 0;
+  private slotAttrs: InstancedBufferAttribute[] = [];
 
   constructor(private scene: Scene, far: number) {
     this.far = far;
     this.glowTex = glow();
     const box = new BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
     const maxSlots = Math.ceil((1200 + NEAR) / SLICE) * 2;
+    // event windows: one texel per window of every building slot (row = slot, column = window)
+    this.winData = new Float32Array(WIN_COLS * WIN_ROWS * 4);
+    for (let i = 3; i < this.winData.length; i += 4) this.winData[i] = -1e6;
+    this.winTex = new DataTexture(this.winData, WIN_COLS, WIN_ROWS, RGBAFormat, FloatType);
+    this.winTex.minFilter = NearestFilter; this.winTex.magFilter = NearestFilter;
+    this.winTex.needsUpdate = true;
+    const winUniforms = { uWin: { value: this.winTex }, uWinTime: this.winTime };
     for (let k = 0; k < 4; k++) {
       const tex = facade(k + 1);
       tex.wrapS = RepeatWrapping; tex.wrapT = RepeatWrapping;
       const mat = curved(new MeshStandardMaterial({
-        map: tex, emissiveMap: tex, emissive: new Color(0.95, 0.9, 0.85), color: 0x2e3242, roughness: 0.7, metalness: 0.1, envMapIntensity: 0.12,
-      }), 'facade', (vs) => vs.replace('#include <uv_vertex>', `#include <uv_vertex>
+        map: tex, emissiveMap: tex, emissive: new Color(0.95, 0.9, 0.85).multiplyScalar(0.72), color: 0x2e3242, roughness: 0.7, metalness: 0.1, envMapIntensity: 0.12,
+      }), 'facade', (vs) => vs
+        .replace('#include <common>', '#include <common>\nattribute float aSlot;\nvarying float vSlot;\nvarying float vRoadFace;')
+        .replace('#include <uv_vertex>', `#include <uv_vertex>
+        vSlot = aSlot;
+        vRoadFace = step(0.5, abs(normal.x));        // only the faces along the road
         #ifdef USE_INSTANCING
           // windows keep their real size whatever the building's size: one tile = 18 m x 50 m
           vec2 facadeScale = vec2(length(instanceMatrix[2].xyz), length(instanceMatrix[1].xyz)) / vec2(18.0, 50.0);
           vMapUv *= facadeScale;
           vEmissiveMapUv *= facadeScale;
-        #endif`));
-      const mesh = new InstancedMesh(box, mat, maxSlots);
+        #endif`),
+      (fs) => fs
+        .replace('#include <common>', '#include <common>\nuniform sampler2D uWin;\nuniform float uWinTime;\nvarying float vSlot;\nvarying float vRoadFace;')
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        {
+          // which window this pixel belongs to (the facade tile is 10 x 26 windows), and whether it's inside the glass
+          vec2 cell = vMapUv * vec2(10.0, 26.0);
+          vec2 id = floor(cell), f = fract(cell);
+          float glass = step(0.18, f.x) * step(f.x, 0.82) * step(0.22, f.y) * step(f.y, 0.78);
+          float col = mod(id.y, ${WIN_FLOORS}.0) * ${WIN_ACROSS}.0 + mod(id.x, ${WIN_ACROSS}.0);
+          vec4 w = texture2D(uWin, vec2((col + 0.5) / ${WIN_COLS}.0, (vSlot + 0.5) / ${WIN_ROWS}.0));
+          // the light eases on, holds a moment, and fades slowly: never a blink
+          float age = uWinTime - w.a;
+          float k = step(0.0, age) * smoothstep(0.0, 0.9, age) * exp(-max(0.0, age - 1.5) / 11.0);
+          totalEmissiveRadiance = mix(totalEmissiveRadiance, w.rgb * 2.6, k * glass * vRoadFace);
+        }`), winUniforms);
+      const geo = box.clone();
+      const slotAttr = new InstancedBufferAttribute(new Float32Array(maxSlots), 1);
+      slotAttr.setUsage(DynamicDrawUsage);
+      geo.setAttribute('aSlot', slotAttr);
+      this.slotAttrs.push(slotAttr);
+      const mesh = new InstancedMesh(geo, mat, maxSlots);
       mesh.instanceMatrix.setUsage(DynamicDrawUsage);
       mesh.frustumCulled = false;
       this.blocks.push(mesh);
@@ -148,7 +190,7 @@ export class City {
     this.slots = [];
     for (let z = NEAR; z > -this.far; z -= SLICE) {
       for (const side of [-1, 1] as const) {
-        const slot = { z, side } as Slot;
+        const slot = { z, side, idx: this.slots.length % WIN_ROWS } as Slot;
         this.reroll(slot);
         this.slots.push(slot);
       }
@@ -156,6 +198,10 @@ export class City {
   }
 
   private reroll(slot: Slot): void {
+    // a new building: its windows start dark
+    const row = slot.idx * WIN_COLS * 4;
+    for (let i = 3; i < WIN_COLS * 4; i += 4) this.winData[row + i] = -1e6;
+    this.winDirty = Math.max(this.winDirty, 1);
     slot.kind = (Math.random() * 4) | 0;
     slot.w = SLICE * (0.72 + Math.random() * 0.24);
     slot.d = 10 + Math.random() * 18;
@@ -185,6 +231,23 @@ export class City {
     return out;
   }
 
+  /**
+   * One event, one window: a window on a building up ahead lights in the event's
+   * colour, eases on, and fades over about fifteen seconds.
+   */
+  lightWindow(color: Color): void {
+    const ahead = this.slots.filter((sl) => sl.z < -40 && sl.z > -this.far * 0.9);
+    if (!ahead.length) return;
+    const sl = ahead[(Math.random() * ahead.length) | 0];
+    const across = Math.max(1, Math.min(WIN_ACROSS, Math.floor(sl.w / WINDOW_W)));
+    const floors = Math.max(2, Math.min(WIN_FLOORS, Math.floor(sl.h / WINDOW_H)));
+    const col = (1 + ((Math.random() * (floors - 1)) | 0)) * WIN_ACROSS + ((Math.random() * across) | 0);
+    const i = (sl.idx * WIN_COLS + col) * 4;
+    this.winData[i] = color.r; this.winData[i + 1] = color.g; this.winData[i + 2] = color.b;
+    this.winData[i + 3] = this.winTime.value;
+    this.winDirty = Math.max(this.winDirty, 1);
+  }
+
   /** A DNS lookup: the next sign to come over the horizon shows the domain, in DNS blue. */
   takeover(domain: string): void {
     if (this.pendingText.length > 4) this.pendingText.shift();
@@ -196,6 +259,12 @@ export class City {
 
   update(dt: number, speed: number, wet: number): void {
     const dz = speed * dt;
+    this.winTime.value += dt;
+    // new window lights go up to the GPU a few times a second (the shader does the easing)
+    if (this.winDirty > 0) {
+      this.winDirty += dt;
+      if (this.winDirty > 1.1) { this.winTex.needsUpdate = true; this.winDirty = 0; }
+    }
     this.brownout = Math.max(0, this.brownout - dt * 0.35);
     this.wave += dt * 180;
     const counts = [0, 0, 0, 0];
@@ -210,6 +279,7 @@ export class City {
       dummy.rotation.set(0, 0, 0);
       dummy.scale.set(slot.d, slot.h, slot.w);
       dummy.updateMatrix();
+      this.slotAttrs[slot.kind].setX(counts[slot.kind], slot.idx);
       mesh.setMatrixAt(counts[slot.kind]++, dummy.matrix);
 
       if (slot.roofNeon >= 0) {
@@ -248,7 +318,7 @@ export class City {
         sg.mat.color.setScalar(b);
       }
     }
-    counts.forEach((n, k) => { this.blocks[k].count = n; this.blocks[k].instanceMatrix.needsUpdate = true; });
+    counts.forEach((n, k) => { this.blocks[k].count = n; this.blocks[k].instanceMatrix.needsUpdate = true; this.slotAttrs[k].needsUpdate = true; });
     this.roofs.count = roofs;
     this.roofs.instanceMatrix.needsUpdate = true;
     if (this.roofs.instanceColor) this.roofs.instanceColor.needsUpdate = true;

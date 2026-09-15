@@ -12,6 +12,7 @@ import { racingScore } from './score';
 import { Groove } from '../../sound/groove';
 import { hudLabels } from '../../hud/hud';
 import { Dash } from './dash';
+import { Color } from 'three';
 import './hud.css';
 
 /** The event colour law, shared with the log legend. */
@@ -23,6 +24,10 @@ const COLORS = {
   wifi: 0xc08cff,
   threat: 0xff9a45,
 };
+/** City windows light in the same law (system events in the log's grey). */
+const WINDOW_COLORS: Record<string, Color> = Object.fromEntries(
+  Object.entries({ ...COLORS, system: 0x7d99b3 }).map(([k, v]) => [k, new Color(v)]),
+);
 
 /**
  * Midnight Run: the network as a street race through a neon city at night.
@@ -86,6 +91,9 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
     if (replay) return;
     arrivals++;
     dash.event(se);
+    // one event, one window
+    const wc = WINDOW_COLORS[se.kind];
+    if (wc) city.lightWindow(wc);
     const ev = se.ev;
     switch (se.kind) {
       case 'allow': {

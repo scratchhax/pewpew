@@ -204,7 +204,7 @@ Everything is built in code: the car, the city, the signs and textures.
 |-------|-----------|
 | allow | cars on the road: outbound traffic ahead that you pass, inbound traffic coming up from behind to overtake |
 | block | a striped barricade across one or two lanes. Drivers swerve into a clear lane; anything that hits it smashes it (pieces fly), loses speed and gets knocked sideways |
-| threat | a police chase: a black-and-white closes in and runs alongside, its light bar swaying softly between red and blue, until the heat dies down |
+| threat | a police chase: a black-and-white with a flashing red-and-blue light bar closes in and runs alongside until the heat dies down. Every IDS/IPS event gets its cop: if there is no room behind you right away it keeps trying (other lanes, further back, or pulling out ahead) for several seconds, and a cop held up in traffic rides bumpers instead of giving up |
 | dhcp | a rival appears up ahead with the device's hostname on a plate. You reel it in, race side by side, then it boosts away |
 | dns | the next neon billboard over the horizon shows the domain, in DNS blue |
 | wifi | a neon gate over the road labelled with the AP: a full arch for a join, a broken dim one for a failure |
@@ -214,7 +214,9 @@ Traffic sets the pace (about 100 km/h on a quiet network, over 200 when it's
 busy), and a sudden burst lights the nitro: the camera pulls back, the field of
 view widens, and blue flames and speed lines kick in. Traffic weather is the
 rain: a dry (but always damp) night, then a wet storm, then a monsoon. Like
-Last Outpost, it never flashes: police lights, neon and brownouts all ease.
+Last Outpost, nothing else flashes: neon and brownouts ease; only the police light bars flash.
+
+**Every event is a window.** Each live event lights one real window on a building coming up ahead, in its event colour (the same colour law as the log: green allow, red block, blue DNS, yellow DHCP, purple Wi-Fi, amber threat, grey system). The window eases on over about a second, then fades over about fifteen, so a busy network paints the city in its traffic while the ordinary warm and cool office lights stay underneath.
 
 **The dash.** The HUD is the car's instrument cluster, and every needle swings
 on a spring. Nothing blinks.

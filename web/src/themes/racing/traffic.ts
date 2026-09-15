@@ -279,10 +279,28 @@ export class Traffic {
 
   /** IDS threat: a black-and-white closes in and runs alongside while the heat lasts. */
   pursuit(playerSpeed: number): void {
+    this.wanted = Math.max(this.wanted, 8);
     const cop = this.cars.find((c) => c.kind === 'police' && c.phase < 2 && !c.crashed);
     if (cop) { cop.life = Math.max(cop.life, 10); return; }
-    const car = this.addCar('police', this.playerLane < 2 ? 3 : 0, NEAR + 10, playerSpeed + 18, 0xff2244, 0x0d0f16);
-    if (car) car.life = 12;
+    this.spawnCop(playerSpeed);
+  }
+
+  /** Seconds we're still wanted: a cop that can't get in right away (or gets shaken off early) keeps trying. */
+  private wanted = 0;
+  private copTry = 0;
+
+  /** A black-and-white wherever there's room: behind us in the far lane first, then any lane behind, then pulling out ahead. */
+  private spawnCop(playerSpeed: number): boolean {
+    const far = this.playerLane < 2 ? 3 : 0;
+    const spots: Array<[number, number, number]> = [
+      [far, NEAR + 10, 18], [3 - far, NEAR + 10, 18], [far, NEAR + 24, 20], [1, NEAR + 18, 19], [2, NEAR + 18, 19],
+      [far, -70, -6], [3 - far, -70, -6],
+    ];
+    for (const [lane, z, dv] of spots) {
+      const car = this.addCar('police', lane, z, Math.max(10, playerSpeed + dv), 0xff2244, 0x0d0f16);
+      if (car) { car.life = 12; return true; }
+    }
+    return false;
   }
 
   /** Blocked traffic: a barricade across one or two lanes ahead. */
@@ -353,6 +371,9 @@ export class Traffic {
     const steps = Math.min(4, Math.max(1, Math.ceil(dt / 0.02)));
     const h = dt / steps;
 
+    this.wanted = Math.max(0, this.wanted - dt);
+    this.copTry -= dt;
+    if (this.wanted > 0 && this.copTry <= 0 && !this.police()) { this.copTry = 0.3; this.spawnCop(playerSpeed); }
     this.drivePlayer(hits, dt);
     for (const c of this.cars) this.driveCar(c, playerSpeed, dt, cruise);
 
@@ -390,13 +411,17 @@ export class Traffic {
       if (c.plate) c.plate.mesh.quaternion.copy(camera.quaternion);
       if (c.rig.bar) {
         // a slow, soft sway between red and blue: a glow, never a strobe
-        const k = 0.5 + 0.5 * Math.sin(c.age * 3.2), live = c.crashed ? 0.3 : 1;
-        c.rig.bar.red.color.setRGB((3 * k + 0.2) * live, 0.08, 0.12);
-        c.rig.bar.blue.color.setRGB(0.1, 0.35, (3.2 * (1 - k) + 0.2) * live);
-        c.rig.bar.glowMat.color.setRGB((0.9 * k + 0.1) * live, 0.15 * live, (1.0 * (1 - k) + 0.15) * live);
+        // a proper light bar: red and blue take turns, each with a quick double pulse
+        const cyc = (c.age * 1.9) % 1, live = c.crashed ? 0.25 : 1;
+        const pulse = Math.pow(Math.abs(Math.sin(cyc * Math.PI * 4)), 0.5);
+        const r = cyc < 0.5 ? pulse : 0, bl = cyc < 0.5 ? 0 : pulse;
+        c.rig.bar.red.color.setRGB((5 * r + 0.15) * live, 0.08, 0.12);
+        c.rig.bar.blue.color.setRGB(0.1, 0.35, (5.5 * bl + 0.15) * live);
+        c.rig.bar.glowMat.color.setRGB((1.4 * r + 0.05) * live, 0.12 * live, (1.6 * bl + 0.08) * live);
       }
       c.rig.group.visible = this.far + c.z > 2;
-      if (c.z > NEAR + 15 || c.z < -this.far - 40) {
+      const chasing = c.kind === 'police' && c.phase < 2 && !c.crashed;
+      if (c.z > NEAR + (chasing ? 70 : 15) || c.z < -this.far - 40) {
         if (c.kind === 'traffic' && c.z > NEAR) hits.passed++;
         if (c.plate) { c.plate.mat.dispose(); c.plate.tex.dispose(); }
         disposeCar(c.rig);
@@ -622,7 +647,8 @@ export class Traffic {
           }
         }
       }
-      if (!moved) c.target = Math.min(c.target, ahead.speed + Math.max(0, ahead.gap - 8) * 0.6);
+      if (!moved && c.kind === 'police' && c.phase < 2) c.target = Math.min(c.target, ahead.speed + Math.max(0, ahead.gap - 4) * 2.5);   // riding bumpers
+      else if (!moved) c.target = Math.min(c.target, ahead.speed + Math.max(0, ahead.gap - 8) * 0.6);
     }
   }
 
