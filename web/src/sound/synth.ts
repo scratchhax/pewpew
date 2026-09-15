@@ -551,6 +551,71 @@ export class Synth {
     this.tone(bus, t, f * 1.2, { type: 'sawtooth', g, a: 0.25, h: 0.1, r: 0.7, glide: 0.7, lp: 1400, lpTo: 500, pan, rev: 0.3 });
   }
 
+  // ── tokyo ──
+  /** Fat synth-brass stab: detuned saws and a square, a fast filter snap and a pitch scoop up into the note. */
+  brass(bus: Bus, t: number, f: number, g: number, len: number, pan = 0): void {
+    if (this.busy(5)) return;
+    const a = 0.008, r = 0.12, end = t + a + len + r;
+    const env = this.env(t, g, a, len, r);
+    if (!env) return;
+    const lp = this.filter('lowpass', 900, 3);
+    lp.frequency.setValueAtTime(700, t);
+    lp.frequency.exponentialRampToValueAtTime(4200, t + 0.03);
+    lp.frequency.exponentialRampToValueAtTime(1500, t + len + r);
+    const scoop = Math.pow(2, -1.2 / 12);
+    for (const [type, det, k] of [['sawtooth', -14, 0.4], ['sawtooth', 14, 0.4], ['square', 0, 0.25]] as const) {
+      const o = this.osc(type, f * scoop, t, end, det);
+      o.frequency.exponentialRampToValueAtTime(f, t + 0.05);
+      o.connect(this.gain(k)).connect(lp);
+    }
+    const drive = this.ctx.createWaveShaper();
+    drive.curve = this.drive() as Float32Array<ArrayBuffer>;
+    lp.connect(this.gain(0.35)).connect(drive).connect(env);
+    this.out(env, bus, pan, 0.3, 0.15);
+  }
+
+  /** Koto / shamisen pluck: a hard attack that bends down onto the note and buzzes out. */
+  koto(bus: Bus, t: number, f: number, g: number, pan = 0): void {
+    const bend = Math.pow(2, 0.6 / 12);
+    this.tone(bus, t, f * bend, { type: 'sawtooth', g, a: 0.001, r: 0.9, glide: 1 / bend, lp: 3800, lpTo: 700, q: 3, pan, rev: 0.45, echo: 0.3 });
+    this.tone(bus, t, f * 2 * bend, { type: 'triangle', g: g * 0.3, a: 0.001, r: 0.4, glide: 1 / bend, pan });
+    this.noiseHit(bus, t, { type: 'bandpass', f: 3000, q: 2, g: g * 0.4, r: 0.02, pan });
+  }
+
+  /** Hand clap: three quick noise bursts and a short room tail. */
+  clap(bus: Bus, t: number, g: number, pan = 0): void {
+    for (const [dt, k] of [[0, 0.7], [0.011, 0.8], [0.023, 1]] as const) {
+      this.noiseHit(bus, t + dt, { type: 'bandpass', f: 1400, q: 1.1, g: g * k, a: 0.001, r: dt === 0.023 ? 0.18 : 0.012, pan, rev: 0.5 });
+    }
+  }
+
+  /** Temple gong: slow inharmonic partials with a shimmer. */
+  gong(bus: Bus, t: number, f: number, g: number): void {
+    if (this.busy(5)) return;
+    for (const [m, k, r] of [[1, 1, 4], [1.47, 0.6, 3], [2.09, 0.45, 2.4], [2.76, 0.3, 1.8], [3.9, 0.18, 1.2]] as const) {
+      this.tone(bus, t, f * m, { g: g * k, a: 0.01, r, glide: 0.99, pan: (m - 2) * 0.2, rev: 0.8, echo: 0.2 });
+    }
+  }
+
+  /** Vinyl scratch: a filtered noise swish pitched back and forth. */
+  scratch(bus: Bus, t: number, g: number, len = 0.25, pan = 0): void {
+    const env = this.env(t, g, 0.005, len * 0.6, len * 0.4);
+    if (!env) return;
+    const end = t + len + 0.02;
+    const src = this.noise(t, end, 1);
+    src.playbackRate.setValueAtTime(0.4, t);
+    src.playbackRate.linearRampToValueAtTime(2.2, t + len * 0.35);
+    src.playbackRate.linearRampToValueAtTime(0.6, t + len * 0.7);
+    src.playbackRate.linearRampToValueAtTime(1.8, t + len);
+    const bp = this.filter('bandpass', 1800, 2.5);
+    bp.frequency.setValueAtTime(900, t);
+    bp.frequency.linearRampToValueAtTime(3200, t + len * 0.35);
+    bp.frequency.linearRampToValueAtTime(1100, t + len * 0.7);
+    bp.frequency.linearRampToValueAtTime(2600, t + len);
+    src.connect(bp).connect(env);
+    this.out(env, bus, pan, 0.15);
+  }
+
   /** Metal dragged on metal, far away. */
   scrape(bus: Bus, t: number, f: number, g: number, pan = 0): void {
     if (this.busy(4)) return;

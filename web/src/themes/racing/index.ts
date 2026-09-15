@@ -73,7 +73,7 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
   // ── driving state ──
   let speed = 30, travelled = 0, wet = 0.45, rain = 0, nitro = 0;
   let rateFast = 0, rateSlow = 0, arrivals = 0;
-  let camX = 0, camShake = 0, fov = 62, bootT = -1, nitroOn = false;
+  let camX = 0, camShake = 0, fov = 62, bootT = -1, nitroOn = false, speedLimit = Infinity;
   const groove = new Groove();
   const bendTarget = { x: 0, y: 0 };
 
@@ -139,7 +139,9 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
     const burst = rateSlow > 2 && t - bootT > 20 ? rateFast / rateSlow : 1;
     nitro += ((burst > 2 ? 1 : 0) - nitro) * Math.min(1, dtReal * (burst > 2 ? 2 : 0.7));
     const cruise = 26 + Math.min(34, rateSlow * 1.1);
-    speed += (cruise + nitro * 16 - speed) * Math.min(1, dt * 0.6);
+    // boxed in behind a car with no lane to move into: ease off to its pace
+    const want = Math.min(cruise + nitro * 16, speedLimit);
+    speed += (want - speed) * Math.min(1, dt * (want < speed ? 6 : 0.6));
     travelled += speed * dt;
 
     // the road winds: slow sums of sines steer the curved world
@@ -166,11 +168,15 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
     road.update(dt, speed, wet, beatGlow);
     city.update(dt, speed, wet);
     const hits = traffic.update(dt, t, speed, camera);
+    speedLimit = hits.speedLimit;
     traffic.player.underglowMat.opacity *= settings.rMusicVisuals && groove.style ? 0.75 + groove.downbeat * 0.35 : 1;
-    if (hits.smashed > 0) {
-      fx.burst(traffic.playerX, 0.8, -2.6, 40, 14);
-      if (settings.rShake) camShake = Math.min(1, camShake + 0.6);
-      audio.sfx('smash', { pan: Math.max(-1, Math.min(1, traffic.playerX / 8)) });
+    // collisions: our speed takes the hit, sparks fly where metal met metal, the crash is heard in place
+    speed = Math.max(4, speed + hits.playerDv);
+    for (const im of hits.impacts) {
+      fx.burst(im.x, 0.6, im.z, Math.min(40, 6 + im.strength * 5), 5 + im.strength * 1.5);
+      const pan = Math.max(-1, Math.min(1, im.x / 9));
+      audio.sfx(im.strength > 3 ? 'smash' : 'bump', { pan, count: im.strength });
+      if (im.player && settings.rShake) camShake = Math.min(1, camShake + Math.min(0.7, im.strength * 0.12));
     }
     fx.update(dt, rain, nitro, speed, camera.position.z);
     audio.setThreatActive(traffic.police());

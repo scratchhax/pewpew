@@ -4,8 +4,9 @@ import { Conductor, Style, pick, type Mood, type StyleDef } from '../../sound/co
 import type { Bed } from '../../sound/synth';
 
 /**
- * Midnight Run's soundtrack. Six styles take turns (or one is pinned):
+ * Midnight Run's soundtrack. Seven styles take turns (or one is pinned):
  *
+ *   tokyo drift    : synth-brass stabs, claps, 808s, koto, scratches, a gong
  *   street breaks  : big-beat breaks, an acid bass line, stabs
  *   liquid dnb     : 172 bpm rollers, a reese bass, airy pads
  *   chrome riff    : drop-D palm-muted power chords and a heavy backbeat
@@ -221,8 +222,83 @@ class Euro extends Style {
   lead(t: number, f: number, g: number, pan: number): void { this.s.supersaw(this.bus, t, f, g * 0.25, 0.1, pan); }
 }
 
+// ── tokyo drift ────────────────────────────────────────────────────────────
+/**
+ * Hard-hitting hip-hop in the spirit of a Tokyo street-racing anthem (all
+ * original): fat distorted synth-brass stabs in call-and-response bars, claps
+ * on the backbeat, 808s under the kicks, a koto line in a Japanese scale,
+ * scratch fills and a temple gong every eight bars.
+ */
+class Tokyo extends Style {
+  readonly id = 'tokyo';
+  readonly bpm = 128;
+  readonly root = 34.65;                                       // C#
+  readonly scale = [0, 1, 5, 7, 8];                            // miyako-bushi
+  readonly chords = [[0, 3, 7], [0, 3, 7], [-4, 0, 3], [-2, 2, 5]];     // C#m C#m A B
+  readonly barsPerChord = 1;
+  readonly leadOct = 4;
+  readonly level = 0.4;
+  private call: Array<[number, number]> = [];      // [step, chord-tone index for the top voice]
+  private answer: Array<[number, number]> = [];
+  private kotoLine: number[] = [];
+
+  enter(): void { this.compose(); }
+
+  private compose(): void {
+    // a punchy call on the first bar of each pair, a busier answer on the second
+    const calls = [[0, 3, 6, 8], [0, 3, 6, 10], [0, 2, 6, 8, 11], [0, 3, 8, 11]];
+    const answers = [[0, 2, 3, 6, 10, 12], [0, 3, 4, 7, 10, 13], [1, 3, 6, 8, 11, 14]];
+    this.call = pick(calls).map((s, k) => [s, k === 0 ? 0 : pick([0, 1, 2])]);
+    this.answer = pick(answers).map((s, k, arr) => [s, Math.max(0, 2 - Math.floor((k * 3) / arr.length))]);
+    let d = 5;
+    this.kotoLine = Array.from({ length: 8 }, (_, k) => {
+      d = Math.max(2, Math.min(9, d + pick([-2, -1, 1, 1, 2])));
+      return k === 3 || k === 7 ? -1 : d;
+    });
+  }
+
+  step(i: number, t: number, m: Mood): void {
+    const s = this.s, b = this.bus, pos = i % 16, bar = Math.floor(i / 16);
+    const root = this.tones(i, 1)[0];
+    if (pos === 0 && bar % 8 === 0) {
+      if (bar > 0) s.gong(b, t, this.tones(i, 2)[0], 0.035);
+      this.compose();
+    }
+
+    // drums: syncopated kicks with 808s underneath, claps on 2 and 4
+    const kicks = m.night > 0.5 ? [0, 7, 10, 13] : [0, 7, 10];
+    if (kicks.includes(pos)) {
+      s.kick(b, t, pos === 0 ? 0.2 : 0.15);
+      if (pos !== 13) s.eight08(b, t, pos === 7 ? root * 1.498 : root, 0.12, pos === 7 ? 0.2 : 0.35);
+    }
+    if (pos === 4 || pos === 12) { s.clap(b, t, 0.12, pos === 4 ? -0.1 : 0.1); s.snare(b, t, 0.03); }
+    if (pos % 2 === 1) s.hat(b, t, 0.014, 0.3, pos === 15 && bar % 2 === 1);
+    else s.hat(b, t, 0.008, -0.25);
+    if (m.night > 0.4 && bar % 2 === 0 && pos === 0) s.taiko(b, t, 0.1, -0.2);
+
+    // the brass: call on even bars, answer on odd bars (calls only when it's quiet)
+    const phrase = bar % 2 === 0 ? this.call : m.night > 0.15 || m.tension > 0.2 ? this.answer : [];
+    for (const [st, top] of phrase) {
+      if (st !== pos) continue;
+      const c = this.tones(i, 3);
+      s.brass(b, t, c[0] / 2, 0.022, this.stepDur * 0.7, -0.25);
+      s.brass(b, t, c[top], 0.026, this.stepDur * 0.7, 0.25);
+    }
+
+    // koto on the third bar of every four, a scratch fill closing the fourth
+    if (bar % 4 === 2 && pos % 2 === 0) {
+      const d = this.kotoLine[pos / 2];
+      if (d >= 0) s.koto(b, t, this.scaleTone(d, 4), 0.04, 0.15);
+    }
+    if (bar % 4 === 3 && pos === 12 && m.night > 0.2) s.scratch(b, t, 0.06, this.stepDur * 3, 0.2);
+  }
+
+  lead(t: number, f: number, g: number, pan: number): void { this.s.koto(this.bus, t, f, g * 0.7, pan); }
+}
+
 // ── the conductor ──────────────────────────────────────────────────────────
 const STYLES: StyleDef[] = [
+  { id: 'tokyo', name: 'Tokyo drift', make: (s, b) => new Tokyo(s, b) },
   { id: 'breaks', name: 'Street breaks', make: (s, b) => new Breaks(s, b) },
   { id: 'drive', name: 'Night drive', make: (s, b) => new Drive(s, b) },
   { id: 'dnb', name: 'Liquid DnB', make: (s, b) => new Dnb(s, b) },
@@ -363,10 +439,16 @@ class StreetConductor extends Conductor {
     if (!st.deviceVoices) return;
     const eng = this.setting<number>('rEngine');
     const pan = opts.pan ?? 0;
+    const hard = Math.min(1.5, (opts.count ?? 5) / 6);
     if (name === 'smash') {
       const t = this.slot('smash', 1, 0.3);
       if (t < 0) return;
-      s.crash(this.sfxBus, t, 0.2 * st.gBlock, pan, this.chordAt(t, 3)[0]);
+      s.crash(this.sfxBus, t, 0.2 * st.gBlock * hard, pan, this.chordAt(t, 3)[0]);
+    } else if (name === 'bump') {
+      // a light panel knock: no waiting for the grid, it's contact
+      const t = s.ctx.currentTime + 0.01;
+      s.tom(this.sfxBus, t, 110, 0.12 * hard, pan);
+      s.noiseHit(this.sfxBus, t, { type: 'bandpass', f: 1600, q: 1, g: 0.05 * hard, a: 0.002, r: 0.08, pan });
     } else if (name === 'nitro' && eng > 0) {
       const t = this.slot('nitro', 2, 0.4);
       if (t < 0) return;

@@ -201,7 +201,7 @@ Everything is built in code: the car, the city, the signs and textures.
 | Event | On screen |
 |-------|-----------|
 | allow | cars on the road: outbound traffic ahead that you pass, inbound traffic coming up from behind to overtake |
-| block | a striped barricade across one or two lanes. Your car swerves into the lane with the most room, or smashes through in a spray of sparks |
+| block | a striped barricade across one or two lanes. Drivers swerve into a clear lane; anything that hits it smashes it (pieces fly), loses speed and gets knocked sideways |
 | threat | a police chase: a black-and-white closes in and runs alongside, its light bar swaying softly between red and blue, until the heat dies down |
 | dhcp | a rival appears up ahead with the device's hostname on a plate. You reel it in, race side by side, then it boosts away |
 | dns | the next neon billboard over the horizon shows the domain, in DNS blue |
@@ -213,6 +213,17 @@ busy), and a sudden burst lights the nitro: the camera pulls back, the field of
 view widens, and blue flames and speed lines kick in. Traffic weather is the
 rain: a dry (but always damp) night, then a wet storm, then a monsoon. Like
 Last Outpost, it never flashes: police lights, neon and brownouts all ease.
+
+**Physics.** Nothing drives through anything. Every car has a footprint,
+momentum, sideways velocity, a heading and spin. Drivers follow the car
+ahead, brake when a gap closes and only change lanes when the next lane is
+clear. When cars do touch (checked as oriented rectangles, sub-stepped so
+fast cars can't pass through each other) they push apart and trade momentum,
+and an off-centre hit spins them. A hard hit makes a car lose control: it
+spins out, slides to the shoulder, scrubs to a stop and becomes an obstacle
+for everyone behind it. Your car is never taken out; it gets knocked about,
+loses speed and fishtails, then recovers. Sparks fly where metal meets metal,
+and every crash is heard in place.
 
 ### Choosing a theme
 
@@ -303,10 +314,11 @@ through their own limiter, so a busy night stays punchy without clipping.
 
 ### Midnight Run's soundtrack
 
-Six styles take turns, every 6 minutes by default:
+Seven styles take turns, every 6 minutes by default:
 
 | Style | Sound |
 |-------|-------|
+| Tokyo drift | hard-hitting hip-hop at 128 bpm: fat distorted synth-brass stabs in call-and-response, claps on the backbeat, 808s, a koto line in a Japanese scale, scratch fills and a temple gong (all original) |
 | Street breaks | big-beat breakbeats at 132 bpm, a squelchy acid bass line, supersaw stabs when it's busy |
 | Night drive | slow synthwave (Em–C–A–D): octave bass, arpeggios, a saw lead melody |
 | Liquid DnB | 172 bpm rollers, a reese bass and airy seventh-chord pads |
@@ -320,7 +332,7 @@ The car is part of the band:
 |-------|-------|
 | driving | an engine note pitched to the chord that climbs through each gear with speed; shifts wait for the beat and land with a turbo blow-off |
 | nitro | a whoosh and a roar as it lights |
-| barricade smashed | a metal crash ringing in key |
+| collisions | a metal crash ringing in key for hard hits, a panel knock for light bumps, heard where they happen |
 | block | a horn honking a fifth |
 | threat | a soft siren wail across two chord tones while the police are on you |
 | dhcp | a rival's engine revving past |

@@ -2,7 +2,7 @@ import {
   AdditiveBlending, BoxGeometry, CanvasTexture, Color, DoubleSide, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial,
   PlaneGeometry, SRGBColorSpace, TorusGeometry, type PerspectiveCamera, type Scene, type Texture,
 } from 'three';
-import { curved, bendAt } from './bend';
+import { curved } from './bend';
 import { buildCar, disposeCar, type CarRig } from './car';
 import { LANES, NEAR } from './road';
 import { drawNeon, streak, stripes } from './textures';
@@ -21,21 +21,84 @@ const GEO = {
 
 const PAINTS = [0xd7263d, 0xf2f2f2, 0x1b1b24, 0x2a6cf0, 0xf5b700, 0x2bd9a8, 0x8a2be2, 0xff6a00, 0x9aa3b5, 0x0f5132];
 
+// ── physics constants ──
+/** Car footprint half-width and half-length (m). */
+const HALF_W = 0.98;
+const HALF_L = 2.28;
+/** Reach used for barricade checks (m). */
+const R = 0.98;
+const AXLE = 1.25;
+/** Bounciness of car-on-car contact. */
+const RESTITUTION = 0.25;
+/** An impulse (m/s) above this makes a car lose control. */
+const CRASH = 5.5;
+/** How far out crashed cars come to rest (on the shoulder, clear of the lanes). */
+const SHOULDER = 8.0;
+const ROAD_EDGE = 8.2;
+
 type Kind = 'traffic' | 'overtake' | 'rival' | 'police';
 
-interface Car {
+/** The four corners of a car's footprint and its two axes. Forward is (-sin yaw, -cos yaw). */
+function frame(b: { x: number; z: number; yaw: number }) {
+  const s = Math.sin(b.yaw), c = Math.cos(b.yaw);
+  const fx = -s, fz = -c, rx = c, rz = -s;
+  const corners: Array<[number, number]> = [];
+  for (const [u, v] of [[1, 1], [1, -1], [-1, -1], [-1, 1]]) {
+    corners.push([b.x + rx * HALF_W * u + fx * HALF_L * v, b.z + rz * HALF_W * u + fz * HALF_L * v]);
+  }
+  return { fx, fz, rx, rz, corners };
+}
+
+function inside(px: number, pz: number, b: { x: number; z: number }, f: ReturnType<typeof frame>): boolean {
+  const dx = px - b.x, dz = pz - b.z;
+  return Math.abs(dx * f.rx + dz * f.rz) <= HALF_W && Math.abs(dx * f.fx + dz * f.fz) <= HALF_L;
+}
+
+/**
+ * Separating axis test for two car footprints. Returns the push direction
+ * (from b toward a), how deep they overlap, and a contact point, or null.
+ */
+function overlap(a: { x: number; z: number; yaw: number }, b: { x: number; z: number; yaw: number }) {
+  const fa = frame(a), fb = frame(b);
+  let depth = Infinity, nx = 0, nz = 0;
+  for (const [ux, uz] of [[fa.rx, fa.rz], [fa.fx, fa.fz], [fb.rx, fb.rz], [fb.fx, fb.fz]]) {
+    const ra = HALF_W * Math.abs(fa.rx * ux + fa.rz * uz) + HALF_L * Math.abs(fa.fx * ux + fa.fz * uz);
+    const rb = HALF_W * Math.abs(fb.rx * ux + fb.rz * uz) + HALF_L * Math.abs(fb.fx * ux + fb.fz * uz);
+    const d = (a.x - b.x) * ux + (a.z - b.z) * uz;
+    const o = ra + rb - Math.abs(d);
+    if (o <= 0) return null;
+    if (o < depth) { depth = o; nx = d < 0 ? -ux : ux; nz = d < 0 ? -uz : uz; }
+  }
+  // contact: the corners that ended up inside the other car (or the midpoint)
+  let px = 0, pz = 0, n = 0;
+  for (const [cx, cz] of fa.corners) if (inside(cx, cz, b, fb)) { px += cx; pz += cz; n++; }
+  for (const [cx, cz] of fb.corners) if (inside(cx, cz, a, fa)) { px += cx; pz += cz; n++; }
+  if (n) { px /= n; pz /= n; } else { px = (a.x + b.x) / 2; pz = (a.z + b.z) / 2; }
+  return { nx, nz, depth, px, pz };
+}
+
+/** Rigid-ish body in the road plane. Velocity is (vx, -speed): forward is -z. */
+interface Body {
+  x: number; z: number;
+  vx: number;               // sideways velocity (m/s)
+  speed: number;            // forward speed over the ground (m/s)
+  yaw: number;              // heading (rad, three.js rotation.y)
+  yawRate: number;          // spin (rad/s)
+  mass: number;
+  crashed: number;          // > 0: seconds since losing control (0 = driving)
+}
+
+interface Car extends Body {
   rig: CarRig;
   kind: Kind;
   lane: number;
-  x: number;
-  z: number;
-  speed: number;
+  laneNow: number;          // the lane it's actually steering for
+  target: number;           // speed the driver wants
+  ratio: number;            // traffic cruise speed as a share of ours
   age: number;
-  phase: number;          // rival/police script phase
+  phase: number;            // rival/police script phase
   life: number;
-  glow: number;           // underglow colour
   plate?: { mesh: Mesh; mat: MeshBasicMaterial; tex: CanvasTexture };
-  trail: Mesh[];          // wet-road taillight reflections
 }
 
 interface Block {
@@ -45,7 +108,6 @@ interface Block {
   z: number;
   smashed: boolean;
   vel: Array<{ x: number; y: number; z: number; r: number }>;
-  age: number;
   glowMat: MeshBasicMaterial;
 }
 
@@ -58,62 +120,77 @@ interface Gate {
   label?: { mat: MeshBasicMaterial; tex: CanvasTexture };
 }
 
-export interface TrafficHits { smashed: number; passed: number }
+export interface Impact { x: number; z: number; strength: number; player: boolean }
+
+/** What happened this frame. */
+export interface TrafficHits {
+  smashed: number;
+  passed: number;
+  /** When our driver is boxed in: the speed to ease down to. */
+  speedLimit: number;
+  /** Change to our forward speed from collisions this frame (m/s). */
+  playerDv: number;
+  impacts: Impact[];
+}
 
 /**
- * Everything on the road: the player's car and its lane-picking driver,
- * traffic, rivals that pull alongside with a hostname plate, a police chase,
- * roadblocks and Wi-Fi gates. The road scrolls under the player; every other
- * car moves at its own speed relative to that.
+ * Everything on the road, driven by a small physics model: every car is two
+ * discs with momentum, sideways velocity, heading and spin. Drivers avoid
+ * trouble (follow, change lanes when there's room), but when anything touches
+ * they trade momentum; an off-centre hit spins them, and a hard one makes a
+ * car lose control, slide out and scrub to a stop on the shoulder. Our car is
+ * knocked about, loses speed and fishtails, then recovers. Barricades are
+ * solid until something smashes them.
  */
 export class Traffic {
   player: CarRig;
-  playerX = LANES[1];
+  private pb: Body = { x: LANES[1], z: 0, vx: 0, speed: 30, yaw: 0, yawRate: 0, mass: 1.25, crashed: 0 };
   private playerLane = 1;
-  private playerYaw = 0;
   private cars: Car[] = [];
   private blocks: Block[] = [];
   private gates: Gate[] = [];
   private stripeTex: Texture;
-  private streakTex: Texture;
   private trailMat: MeshBasicMaterial;
   private postMat = curved(new MeshStandardMaterial({ color: 0x15151c }));
   private barrierMat: MeshStandardMaterial | null = null;
   maxCars = 20;
   far = 700;
-  nitro = 0;
 
   constructor(private scene: Scene, private glowTex: Texture) {
     this.player = buildCar({ paint: 0x1e2cff, glow: 0x3ff0ff, glowTex });
     scene.add(this.player.group);
     this.stripeTex = stripes();
-    this.streakTex = streak();
     this.trailMat = curved(new MeshBasicMaterial({
-      map: this.streakTex, color: new Color(2.4, 0.1, 0.15), transparent: true, blending: AdditiveBlending,
+      map: streak(), color: new Color(2.4, 0.1, 0.15), transparent: true, blending: AdditiveBlending,
       depthWrite: false, toneMapped: false,
     }));
   }
 
-  police(): boolean { return this.cars.some((c) => c.kind === 'police' && c.phase < 2); }
+  get playerX(): number { return this.pb.x; }
+  police(): boolean { return this.cars.some((c) => c.kind === 'police' && c.phase < 2 && !c.crashed); }
   rivals(): number { return this.cars.filter((c) => c.kind === 'rival').length; }
 
   // ── spawns ──
-  private addCar(kind: Kind, lane: number, z: number, speed: number, glow: number, paint?: number): Car {
+  private addCar(kind: Kind, lane: number, z: number, speed: number, glow: number, paint?: number): Car | null {
+    // never spawn into another car
+    if (!this.laneFree(LANES[lane], z - 12, z + 12, null)) return null;
     const rig = buildCar({
       paint: paint ?? PAINTS[(Math.random() * PAINTS.length) | 0], glow, glowTex: this.glowTex,
       police: kind === 'police', spoiler: kind !== 'traffic' || Math.random() < 0.3,
     });
     if (kind === 'traffic' || kind === 'overtake') rig.underglowMat.opacity = 0.55;
     this.scene.add(rig.group);
-    const trail: Mesh[] = [];
     for (const side of [-0.55, 0.55]) {
       const t = new Mesh(GEO.trail, this.trailMat);
       t.position.set(side, 0.05, 2.25 + 3.3);
       t.renderOrder = 1;
       rig.group.add(t);
-      trail.push(t);
     }
-    const car: Car = { rig, kind, lane, x: LANES[lane], z, speed, age: 0, phase: 0, life: 0, glow, trail };
+    const car: Car = {
+      rig, kind, lane, laneNow: lane, x: LANES[lane], z, vx: 0, speed, target: speed, yaw: 0, yawRate: 0,
+      mass: kind === 'police' ? 1.4 : 1, crashed: 0, age: 0, phase: 0, life: 0,
+      ratio: speed / Math.max(1, this.pb.speed),
+    };
     this.cars.push(car);
     return car;
   }
@@ -128,14 +205,14 @@ export class Traffic {
     else this.addCar('traffic', lane, -this.far * (0.7 + Math.random() * 0.25), playerSpeed * (0.45 + Math.random() * 0.25), color);
   }
 
-  /** DHCP: a rival pulls up alongside with the device's name on a plate, then boosts away. */
+  /** DHCP: a rival appears up ahead with the device's name on a plate; we reel it in, race, it boosts away. */
   rival(name: string, color: number, playerSpeed: number): void {
-    const existing = this.cars.find((c) => c.kind === 'rival' && c.plate && (c.plate.mesh.userData.name === name));
+    const existing = this.cars.find((c) => c.kind === 'rival' && c.plate?.mesh.userData.name === name);
     if (existing) { existing.life = Math.max(existing.life, 4); return; }
     if (this.rivals() >= 3) return;
     const lane = this.playerLane < 2 ? this.playerLane + 1 : this.playerLane - 1;
-    // appears up ahead; we reel it in until we're side by side
     const car = this.addCar('rival', lane, -90, playerSpeed - 10, color);
+    if (!car) return;
     car.life = 7 + Math.random() * 4;
     const c = document.createElement('canvas');
     c.width = 512; c.height = 128;
@@ -150,12 +227,12 @@ export class Traffic {
     car.plate = { mesh, mat, tex };
   }
 
-  /** IDS threat: a black-and-white comes up behind and sits on our bumper while the heat lasts. */
+  /** IDS threat: a black-and-white closes in and runs alongside while the heat lasts. */
   pursuit(playerSpeed: number): void {
-    const cop = this.cars.find((c) => c.kind === 'police' && c.phase < 2);
+    const cop = this.cars.find((c) => c.kind === 'police' && c.phase < 2 && !c.crashed);
     if (cop) { cop.life = Math.max(cop.life, 10); return; }
     const car = this.addCar('police', this.playerLane < 2 ? 3 : 0, NEAR + 10, playerSpeed + 18, 0xff2244, 0x0d0f16);
-    car.life = 12;
+    if (car) car.life = 12;
   }
 
   /** Blocked traffic: a barricade across one or two lanes ahead. */
@@ -183,7 +260,7 @@ export class Traffic {
     const z = -this.far * 0.65;
     group.position.z = z;
     this.scene.add(group);
-    this.blocks.push({ group, pieces, lanes, z, smashed: false, vel: [], age: 0, glowMat });
+    this.blocks.push({ group, pieces, lanes, z, smashed: false, vel: [], glowMat });
   }
 
   /** Wi-Fi: a neon gate over the road. Joins light it up; failures leave it dim and broken. */
@@ -192,7 +269,6 @@ export class Traffic {
     const group = new Group();
     const mat = curved(new MeshBasicMaterial({ color: new Color(0xc08cff).multiplyScalar(good ? 2.4 : 0.9), toneMapped: false, side: DoubleSide }));
     const arch = new Mesh(good ? GEO.arch : GEO.broken, mat);
-    arch.position.y = 0;
     if (!good) arch.rotation.z = 0.45;
     group.add(arch);
     for (const side of [-1, 1]) {
@@ -217,76 +293,46 @@ export class Traffic {
 
   // ── update ──
   update(dt: number, t: number, playerSpeed: number, camera: PerspectiveCamera): TrafficHits {
-    const hits: TrafficHits = { smashed: 0, passed: 0 };
+    const hits: TrafficHits = { smashed: 0, passed: 0, speedLimit: Infinity, playerDv: 0, impacts: [] };
+    const pb = this.pb;
+    pb.speed = playerSpeed;
+    // sub-step so fast closing speeds can't tunnel through each other on a slow frame
+    const steps = Math.min(4, Math.max(1, Math.ceil(dt / 0.02)));
+    const h = dt / steps;
 
-    // the driver: pick the lane with the most room ahead, glide over to it
-    const room = (lane: number) => {
-      let clear = 200;
-      for (const c of this.cars) if (c.lane === lane && c.z < 2 && c.z > -120 && c.kind === 'traffic') clear = Math.min(clear, -c.z);
-      for (const b of this.blocks) if (!b.smashed && b.lanes.includes(lane) && b.z < 2 && b.z > -140) clear = Math.min(clear, -b.z * 0.8);
-      return clear;
-    };
-    const here = room(this.playerLane);
-    if (here < 70) {
-      let best = this.playerLane, bestRoom = here;
-      for (const l of [this.playerLane - 1, this.playerLane + 1]) {
-        if (l < 0 || l > 3) continue;
-        const r = room(l);
-        if (r > bestRoom + 10) { best = l; bestRoom = r; }
-      }
-      this.playerLane = best;
+    this.drivePlayer(hits);
+    for (const c of this.cars) this.driveCar(c, playerSpeed, dt);
+
+    for (let k = 0; k < steps; k++) {
+      this.integrate(pb, h, 0);
+      for (const c of this.cars) this.integrate(c, h, playerSpeed);
+      this.collide(hits);
+      this.hitBarricades(hits, h);
     }
-    const want = LANES[this.playerLane];
-    const lateral = Math.max(-7, Math.min(7, (want - this.playerX) * 2.2));
-    this.playerX += lateral * dt;
-    this.playerYaw += ((-lateral * 0.03) - this.playerYaw) * Math.min(1, dt * 6);
+    hits.playerDv = pb.speed - playerSpeed;
+
+    // render our car: heading plus a little roll into the slide
     const pg = this.player.group;
-    pg.position.set(this.playerX, 0, 0);
-    pg.rotation.set(0, this.playerYaw, lateral * 0.01);
+    pg.position.set(pb.x, 0, 0);
+    pg.rotation.set(0, pb.yaw, Math.max(-0.08, Math.min(0.08, pb.vx * 0.012)));
     this.spin(this.player, playerSpeed, dt);
     this.player.underglowMat.opacity = 0.85 + 0.15 * Math.sin(t * 1.3);
 
-    // cars
     for (let i = this.cars.length - 1; i >= 0; i--) {
       const c = this.cars[i];
       c.age += dt;
-      if (c.kind === 'rival') {
-        // catch up, hold alongside, then boost away
-        // reel it in to our front quarter (a car's length ahead, in full view), duel, then it boosts away
-        const hold = -6;
-        if (c.phase === 0) { c.speed = playerSpeed - Math.min(12, Math.max(1, (hold - c.z) * 0.25)); if (c.z > hold - 1) c.phase = 1; }
-        else if (c.phase === 1) { c.speed = playerSpeed + (c.z - hold) * 0.6 + Math.sin(c.age * 0.9) * 1.2; c.life -= dt; if (c.life <= 0) c.phase = 2; }
-        else c.speed += dt * 14;
-      } else if (c.kind === 'police') {
-        // closes in along the far lane (clear of the camera), then cuts in beside us, just ahead
-        const beside = this.playerLane < 2 ? this.playerLane + 1 : this.playerLane - 1;
-        const farLane = this.playerLane < 2 ? 3 : 0;
-        const hold = -3 + Math.sin(c.age * 0.7) * 1.5;
-        if (c.phase === 0) { c.speed = playerSpeed + Math.max(3, (c.z - hold) * 1.2); c.lane = c.z > 0 ? farLane : beside; if (c.z < hold + 1) c.phase = 1; }
-        else if (c.phase === 1) {
-          c.speed = playerSpeed + (c.z - hold) * 0.8;
-          c.lane = beside;
-          c.life -= dt;
-          if (c.life <= 0) c.phase = 2;
-        } else c.speed = Math.max(0, c.speed - dt * 22);   // shaken off: falls back
-        if (c.rig.bar) {
-          // a slow, soft sway between red and blue: a glow, never a strobe
-          const k = 0.5 + 0.5 * Math.sin(c.age * 3.2);
-          c.rig.bar.red.color.setRGB(3 * k + 0.2, 0.08, 0.12);
-          c.rig.bar.blue.color.setRGB(0.1, 0.35, 3.2 * (1 - k) + 0.2);
-          c.rig.bar.glowMat.color.setRGB(0.9 * k + 0.1, 0.15, 1.0 * (1 - k) + 0.15);
-        }
-      }
-      const targetX = LANES[c.lane];
-      c.x += (targetX - c.x) * Math.min(1, dt * 2);
-      c.z += (playerSpeed - c.speed) * dt;
       c.rig.group.position.set(c.x, 0, c.z);
+      c.rig.group.rotation.set(0, c.yaw, 0);
       this.spin(c.rig, c.speed, dt);
       if (c.plate) c.plate.mesh.quaternion.copy(camera.quaternion);
-
-      // fade in over the horizon, out as they pass
-      const fadeFar = Math.min(1, (this.far + c.z) / 80);
-      c.rig.group.visible = fadeFar > 0.02;
+      if (c.rig.bar) {
+        // a slow, soft sway between red and blue: a glow, never a strobe
+        const k = 0.5 + 0.5 * Math.sin(c.age * 3.2), live = c.crashed ? 0.3 : 1;
+        c.rig.bar.red.color.setRGB((3 * k + 0.2) * live, 0.08, 0.12);
+        c.rig.bar.blue.color.setRGB(0.1, 0.35, (3.2 * (1 - k) + 0.2) * live);
+        c.rig.bar.glowMat.color.setRGB((0.9 * k + 0.1) * live, 0.15 * live, (1.0 * (1 - k) + 0.15) * live);
+      }
+      c.rig.group.visible = this.far + c.z > 2;
       if (c.z > NEAR + 15 || c.z < -this.far - 40) {
         if (c.kind === 'traffic' && c.z > NEAR) hits.passed++;
         if (c.plate) { c.plate.mat.dispose(); c.plate.tex.dispose(); }
@@ -295,27 +341,262 @@ export class Traffic {
       }
     }
 
-    // roadblocks
+    this.updateBlocks(dt, playerSpeed);
+    this.updateGates(dt, playerSpeed);
+    return hits;
+  }
+
+  // ── drivers ──
+  /** Our driver: keep the lane while there's room, move over when the next lane is clear, brake when boxed in. */
+  private drivePlayer(hits: TrafficHits): void {
+    const pb = this.pb;
+    if (!pb.crashed) {
+      const here = this.roomAhead(LANES[this.playerLane], 0, null, false);
+      const blocked = this.roomAhead(LANES[this.playerLane], 0, null, true);
+      if (Math.min(here.gap, blocked.gap + 25) < 65) {
+        let best = this.playerLane, bestGap = Math.min(here.gap, blocked.gap + 25);
+        // squeeze past a wreck or a crawler with a smaller gap than a normal lane change needs
+        const stuck = here.car && (here.car.crashed > 0 || here.car.speed < this.pb.speed * 0.3) && here.gap < 30;
+        for (const l of [this.playerLane - 1, this.playerLane + 1]) {
+          if (l < 0 || l > 3 || !this.laneFree(LANES[l], stuck ? -7 : -11, stuck ? 6 : 10, null)) continue;
+          const r = this.roomAhead(LANES[l], 0, null, false);
+          if (r.gap > bestGap + 12) { best = l; bestGap = r.gap; }
+        }
+        this.playerLane = best;
+      }
+    }
+    const lead = this.roomAhead(pb.x, 0, null, false);
+    if (lead.car && lead.gap < 30) hits.speedLimit = Math.max(4, lead.speed + (lead.gap - 10) * 0.9);
+  }
+
+  /** Every other driver: its script picks a speed and lane; then it follows and overtakes like anyone. */
+  private driveCar(c: Car, playerSpeed: number, dt: number): void {
+    if (c.crashed) return;
+    if (c.kind === 'rival') {
+      const hold = -6;
+      if (c.phase === 0) { c.target = playerSpeed - Math.min(12, Math.max(1, (hold - c.z) * 0.25)); if (c.z > hold - 1) c.phase = 1; }
+      else if (c.phase === 1) { c.target = playerSpeed + (c.z - hold) * 0.6 + Math.sin(c.age * 0.9) * 1.2; c.life -= dt; if (c.life <= 0) c.phase = 2; }
+      else c.target = playerSpeed + 16;
+    } else if (c.kind === 'police') {
+      const beside = this.playerLane < 2 ? this.playerLane + 1 : this.playerLane - 1;
+      const farLane = this.playerLane < 2 ? 3 : 0;
+      const hold = -3 + Math.sin(c.age * 0.7) * 1.5;
+      if (c.phase === 0) { c.target = playerSpeed + Math.min(14, Math.max(3, (c.z - hold) * 0.8)); c.lane = c.z > 0 ? farLane : beside; if (c.z < hold + 1) c.phase = 1; }
+      else if (c.phase === 1) { c.target = playerSpeed + (c.z - hold) * 0.8; c.lane = beside; c.life -= dt; if (c.life <= 0) c.phase = 2; }
+      else c.target = playerSpeed * 0.55;                  // shaken off: falls back
+    } else {
+      c.target = playerSpeed * c.ratio;
+    }
+
+    // scripted cars only cut in when the lane is clear alongside
+    if (c.kind === 'rival' || c.kind === 'police') {
+      if (c.lane !== c.laneNow && this.laneFree(LANES[c.lane], c.z - 8, c.z + 8, c)) c.laneNow = c.lane;
+    } else {
+      c.laneNow = c.lane;
+    }
+
+    // follow the car (or barricade, or wreck) ahead: overtake if there's room, otherwise brake to its pace
+    const ahead = this.roomAhead(c.x, c.z, c);
+    if (ahead.gap < 40 && c.target > ahead.speed) {
+      let moved = false;
+      // anyone not holding a scripted position may overtake (rivals on their way out, police falling back)
+      const free = c.kind === 'traffic' || c.kind === 'overtake' || c.phase !== 1;
+      if (free && Math.abs(c.x - LANES[c.laneNow]) < 0.5) {
+        for (const l of [c.lane - 1, c.lane + 1]) {
+          if (l < 0 || l > 3) continue;
+          if (this.laneFree(LANES[l], c.z - 14, c.z + 9, c) && this.roomAhead(LANES[l], c.z, c).gap > ahead.gap + 8) {
+            c.lane = l; c.laneNow = l; moved = true;
+            break;
+          }
+        }
+      }
+      if (!moved) c.target = Math.min(c.target, ahead.speed + Math.max(0, ahead.gap - 8) * 0.6);
+    }
+  }
+
+  // ── physics ──
+  private integrate(b: Body, h: number, playerSpeed: number): void {
+    const isPlayer = b === this.pb;
+    if (b.crashed) {
+      // out of control: tyres scrub the speed off, the spin slowly dies, it slides for the shoulder
+      b.crashed += h;
+      b.speed = Math.max(0, b.speed - (isPlayer ? 5 : 9) * h);
+      b.vx *= Math.exp(-h * 1.2);
+      b.yawRate *= Math.exp(-h * (isPlayer ? 2.2 : 0.8));
+      if (!isPlayer && b.crashed > 0.5) b.vx += (Math.sign(b.x || 1) * SHOULDER - b.x) * 1.6 * h;
+      if (isPlayer && b.crashed > 1.4) b.crashed = 0;        // we always catch it
+    } else {
+      const car = b as Car;
+      if (!isPlayer) {
+        // gentle on the throttle, firm on the brakes, hard when the gap is closing fast
+        const accel = car.target > car.speed ? 6 : car.speed - car.target > 8 ? 22 : 14;
+        car.speed += Math.max(-accel * h, Math.min(accel * h, car.target - car.speed));
+      }
+      const laneX = isPlayer ? LANES[this.playerLane] : LANES[car.laneNow];
+      const wantVx = Math.max(-6, Math.min(6, (laneX - b.x) * 1.8));
+      b.vx += (wantVx - b.vx) * Math.min(1, h * 4);
+      b.yawRate *= Math.exp(-h * 5);
+    }
+    // grip turns the car to face where it's going; a spin fights it
+    const heading = -Math.atan2(b.vx, Math.max(6, b.speed));
+    if (!b.crashed) b.yaw += (heading - b.yaw) * Math.min(1, h * 6);
+    b.yaw += b.yawRate * h;
+
+    b.x += b.vx * h;
+    if (!isPlayer) b.z += (playerSpeed - b.speed) * h;
+    // the curb
+    if (Math.abs(b.x) > ROAD_EDGE) {
+      b.x = Math.sign(b.x) * ROAD_EDGE;
+      b.vx = -b.vx * 0.3;
+      b.yawRate *= 0.6;
+    }
+  }
+
+  private all(): Body[] { return [this.pb, ...this.cars]; }
+
+  /**
+   * Box-vs-box contact between every pair (separating axis test on the two
+   * cars' footprints): push apart along the shallowest axis, trade momentum,
+   * turn off-centre hits into spin.
+   */
+  private collide(hits: TrafficHits): void {
+    const bodies = this.all();
+    for (let i = 0; i < bodies.length; i++) {
+      const a = bodies[i];
+      for (let j = i + 1; j < bodies.length; j++) {
+        const b = bodies[j];
+        if (Math.abs(a.x - b.x) > 2 * HALF_L || Math.abs(a.z - b.z) > 2 * HALF_L) continue;
+        const c = overlap(a, b);
+        if (c) this.resolve(a, b, c.nx, c.nz, c.depth, c.px, c.pz, hits);
+      }
+    }
+  }
+
+  private resolve(a: Body, b: Body, nx: number, nz: number, pen: number, px: number, pz: number, hits: TrafficHits): void {
+    const pa = a === this.pb, pbb = b === this.pb;
+    const wa = 1 / a.mass, wb = 1 / b.mass;
+    // a sideways touch means someone was merging into someone: both drivers abort
+    // and hold the lane they're actually in, instead of leaning on each other
+    if (Math.abs(nx) > Math.abs(nz)) {
+      for (const body of [a, b]) {
+        if (body.crashed) continue;
+        const nearest = LANES.reduce((best, x, k) => (Math.abs(x - body.x) < Math.abs(LANES[best] - body.x) ? k : best), 0);
+        if (body === this.pb) this.playerLane = nearest;
+        else { (body as Car).lane = nearest; (body as Car).laneNow = nearest; }
+      }
+    }
+    // push apart (our car never moves along the road: the other takes all of that)
+    const sx = pen / (wa + wb);
+    a.x += nx * sx * wa; b.x -= nx * sx * wb;
+    if (pa) b.z -= nz * pen; else if (pbb) a.z += nz * pen;
+    else { a.z += nz * sx * wa; b.z -= nz * sx * wb; }
+
+    // velocities in the road plane: (vx, -speed)
+    const rvx = a.vx - b.vx, rvz = (-a.speed) - (-b.speed);
+    const vn = rvx * nx + rvz * nz;
+    if (vn >= 0) return;
+    const j = (-(1 + RESTITUTION) * vn) / (wa + wb);
+    a.vx += j * nx * wa; a.speed -= j * nz * wa;
+    b.vx -= j * nx * wb; b.speed += j * nz * wb;
+
+    // off-centre impulses spin each car: tau = r.z*F.x - r.x*F.z
+    const spinA = ((pz - a.z) * (j * nx) - (px - a.x) * (j * nz)) * wa * 0.45;
+    const spinB = ((pz - b.z) * (-j * nx) - (px - b.x) * (-j * nz)) * wb * 0.45;
+    a.yawRate += spinA; b.yawRate += spinB;
+
+    const strength = j;
+    if (strength > 0.8) hits.impacts.push({ x: px, z: pz, strength, player: pa || pbb });
+    for (const body of [a, b]) {
+      if (strength > CRASH && !body.crashed) {
+        body.crashed = 0.001;
+        body.yawRate += (Math.random() < 0.5 ? -1 : 1) * (body === this.pb ? 1.5 : 2 + Math.random() * 2.5);
+      }
+    }
+    if (this.pb.yawRate > 3) this.pb.yawRate = 3;
+    if (this.pb.yawRate < -3) this.pb.yawRate = -3;
+    this.pb.speed = Math.max(4, this.pb.speed);
+  }
+
+  /** Barricades are solid: whatever hits one smashes it, pays for it in speed, and gets knocked sideways. */
+  private hitBarricades(hits: TrafficHits, h: number): void {
+    void h;
+    for (const bl of this.blocks) {
+      if (bl.smashed || bl.z < -40 || bl.z > 40) continue;
+      for (const body of this.all()) {
+        if (Math.abs(body.z - bl.z) > AXLE + R + 0.6) continue;
+        const piece = bl.pieces.find((p) => Math.abs(p.position.x - body.x) < 0.5 + R);
+        if (!piece) continue;
+        bl.smashed = true;
+        hits.smashed++;
+        const hitSpeed = Math.max(4, body === this.pb ? body.speed : Math.abs(body.speed - this.pb.speed) + body.speed * 0.3);
+        bl.vel = bl.pieces.map((p) => ({
+          x: (p.position.x - body.x) * 1.5 + (Math.random() - 0.5) * 5, y: 3 + Math.random() * 5,
+          z: -hitSpeed * (0.25 + Math.random() * 0.2), r: (Math.random() - 0.5) * 12,
+        }));
+        body.speed *= body === this.pb ? 0.75 : 0.5;
+        body.vx += (body.x - piece.position.x || (Math.random() - 0.5)) * 2;
+        body.yawRate += (Math.random() - 0.5) * (body === this.pb ? 1.6 : 4);
+        if (body !== this.pb) body.crashed = body.crashed || 0.001;
+        hits.impacts.push({ x: piece.position.x, z: bl.z, strength: CRASH, player: body === this.pb });
+        break;
+      }
+    }
+  }
+
+  // ── keeping track of the road ──
+  /** Cars count as in the same lane when they're closer than this sideways (m). */
+  private static readonly WIDE = 2.3;
+  /** Bumper-to-bumper length used for gaps (m). */
+  private static readonly LENGTH = 5.2;
+
+  /** The nearest thing ahead of a point in a lane: cars (ours included), wrecks and, unless `blocks` is false, barricades. */
+  private roomAhead(x: number, z: number, self: Car | null, blocks = true): { gap: number; speed: number; car: Car | null } {
+    let gap = 250, speed = Infinity, car: Car | null = null;
+    for (const c of this.cars) {
+      if (c === self || Math.abs(c.x - x) > Traffic.WIDE || c.z >= z) continue;
+      const g = z - c.z - Traffic.LENGTH;
+      if (g < gap) { gap = g; speed = c.speed; car = c; }
+    }
+    if (self && Math.abs(this.pb.x - x) < Traffic.WIDE && z > 0) {
+      const g = z - Traffic.LENGTH;
+      if (g < gap) { gap = g; speed = this.pb.speed; car = null; }
+    }
+    if (blocks) {
+      for (const b of this.blocks) {
+        if (b.smashed || b.z >= z || !b.lanes.some((l) => Math.abs(LANES[l] - x) < Traffic.WIDE)) continue;
+        const g = z - b.z - 3;
+        if (g < gap) { gap = g; speed = 0; car = null; }
+      }
+    }
+    return { gap: Math.max(0, gap), speed, car };
+  }
+
+  /** True when nothing (ours included) occupies a lane between z0 and z1. */
+  private laneFree(x: number, z0: number, z1: number, self: Car | null): boolean {
+    for (const c of this.cars) {
+      if (c === self) continue;
+      const inLane = Math.abs(c.x - x) < Traffic.WIDE || (!c.crashed && Math.abs(LANES[c.laneNow] - x) < Traffic.WIDE);
+      if (inLane && c.z > z0 && c.z < z1) return false;
+    }
+    if (Math.abs(this.pb.x - x) < Traffic.WIDE && 0 > z0 && 0 < z1 && self !== null) return false;
+    return true;
+  }
+
+  // ── scenery on the road ──
+  private updateBlocks(dt: number, playerSpeed: number): void {
     for (let i = this.blocks.length - 1; i >= 0; i--) {
       const b = this.blocks[i];
-      b.age += dt;
       b.z += playerSpeed * dt;
       b.group.position.z = b.z;
-      if (!b.smashed && b.z > -2.5 && b.z < 2.5 && b.lanes.some((l) => Math.abs(LANES[l] - this.playerX) < 2.2)) {
-        b.smashed = true;
-        hits.smashed++;
-        b.vel = b.pieces.map((p) => ({
-          x: (p.position.x - this.playerX) * 2 + (Math.random() - 0.5) * 6, y: 4 + Math.random() * 5,
-          z: -playerSpeed * 0.3 - Math.random() * 10, r: (Math.random() - 0.5) * 12,
-        }));
-      }
       if (b.smashed) {
         b.pieces.forEach((p, k) => {
           const vel = b.vel[k];
+          if (!vel) return;
           vel.y -= 18 * dt;
           p.position.x += vel.x * dt;
           p.position.y = Math.max(0, p.position.y + vel.y * dt);
           p.position.z += vel.z * dt;
+          if (p.position.y <= 0) { vel.x *= 0.9; vel.z *= 0.9; vel.r *= 0.9; }
           p.rotation.x += vel.r * dt;
           p.rotation.y += vel.r * 0.7 * dt;
         });
@@ -327,8 +608,10 @@ export class Traffic {
         this.blocks.splice(i, 1);
       }
     }
+  }
 
-    // gates ease up as they come into view and glow brighter as we drive under
+  /** Gates ease up as they come into view and glow brighter as we drive under. */
+  private updateGates(dt: number, playerSpeed: number): void {
     for (let i = this.gates.length - 1; i >= 0; i--) {
       const g = this.gates[i];
       g.z += playerSpeed * dt;
@@ -345,8 +628,6 @@ export class Traffic {
         this.gates.splice(i, 1);
       }
     }
-    void bendAt;
-    return hits;
   }
 
   private spin(rig: CarRig, speed: number, dt: number): void {
