@@ -1,14 +1,37 @@
 // Run against `npm run dev -- --host 127.0.0.1`. No browser test dependency.
-// CHROME_BIN can override the installed Chromium/Chrome executable.
+// The first Chrome/Chromium/Edge found for this platform is used; CHROME_BIN
+// overrides it, and is what you want on anything the list below misses.
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { access, mkdtemp, rm } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 
+const CANDIDATES = {
+  linux: ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium',
+    '/usr/bin/chromium-browser', '/snap/bin/chromium'],
+  darwin: ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'],
+  win32: ['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'],
+};
+
+async function findBrowser() {
+  if (process.env.CHROME_BIN) return process.env.CHROME_BIN;
+  for (const path of CANDIDATES[process.platform] ?? []) {
+    try { await access(path, constants.X_OK); return path; } catch { /* keep looking */ }
+  }
+  throw new Error(`No Chrome/Chromium found on ${process.platform}. Tried:\n  `
+    + (CANDIDATES[process.platform] ?? ['(no known locations for this platform)']).join('\n  ')
+    + '\nSet CHROME_BIN to the browser executable, e.g. CHROME_BIN=/path/to/chrome npm run test:browser');
+}
+
 const profile = await mkdtemp(join(tmpdir(), 'pewpew-browser-'));
-const chrome = spawn(process.env.CHROME_BIN || '/usr/bin/google-chrome', [
+const chrome = spawn(await findBrowser(), [
   '--headless', '--no-sandbox', '--disable-gpu', '--remote-debugging-pipe',
   '--no-first-run', '--no-default-browser-check', `--user-data-dir=${profile}`, 'about:blank',
 ], { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });
@@ -75,7 +98,10 @@ try {
   await evaluate(`inspector.store.add(makeEvent(1, {raw_log:undefined})); document.querySelector('[data-command="live"]').click();`); await tick();
   await evaluate(`document.querySelectorAll('.log-row')[1].click()`); await tick();
   await check('document.querySelector(".log-detail").textContent.includes("not available")', 'missing raw data is explicit');
-  await evaluate(`const search=document.querySelector('[data-filter="search"]'); search.value='no-match'; search.dispatchEvent(new Event('input',{bubbles:true}));`); await tick();
+  await check(`(() => {const s=document.querySelector('[data-filter="search"]'); s.value='no-match';
+    s.dispatchEvent(new Event('input',{bubbles:true}));
+    return !!document.querySelector('.log-row');})()`, 'search is debounced, not applied on the keystroke');
+  await delay(500);
   await check('!document.querySelector(".log-row") && document.querySelector(".log-rows").textContent.includes("No matching")', 'empty search results');
   await click('[data-command="reset"]'); await tick();
   await evaluate(`document.querySelector('.log-list').focus(); document.querySelector('.log-list').dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}));`); await tick();

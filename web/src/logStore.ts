@@ -14,6 +14,12 @@ export interface LogRecord {
   event: NetEvent;
   bytes: number;
   truncated: boolean;
+  /**
+   * Lowercased text of every retained field, built on the first search that
+   * reaches this record and kept until it is evicted. Re-lowercasing 5,000
+   * records ten times a second is what makes filtering hurt on a Pi.
+   */
+  haystack?: string;
 }
 export interface Pivot { field: 'ip' | 'mac' | 'host'; value: string }
 export interface LogFilter { search: string; type: string; action: string; host: string; pivot?: Pivot }
@@ -31,7 +37,10 @@ export function matches(record: LogRecord, filter: LogFilter): boolean {
       ? v.toLowerCase() === p.value.toLowerCase() : v === p.value))) return false;
   }
   const query = filter.search.trim().toLowerCase();
-  return !query || Object.values(e).some(v => String(v ?? '').toLowerCase().includes(query));
+  if (!query) return true;
+  // NUL between fields so a query cannot match across a field boundary.
+  record.haystack ??= Object.values(e).map(v => v == null ? '' : String(v)).join('\0').toLowerCase();
+  return record.haystack.includes(query);
 }
 
 export function eventClass(e: NetEvent): string {

@@ -1,6 +1,7 @@
 import { LogStore, eventClass, matches, summary, type LogFilter, type Pivot } from '../logStore';
 
 const ROW = 36;
+const SEARCH_DEBOUNCE = 150;
 const emptyFilter = (): LogFilter => ({ search: '', type: '', action: '', host: '' });
 const element = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '', cls = '') => {
   const node = document.createElement(tag);
@@ -30,6 +31,7 @@ export class LogInspector {
   private version = -1;
   private dirty = true;
   private timer: number | undefined;
+  private searchTimer: number | undefined;
   private previousFocus: HTMLElement | null = null;
   private renderedDetail: number | undefined;
   private expiredDetail = false;
@@ -67,9 +69,15 @@ export class LogInspector {
       const input = e.target as HTMLInputElement;
       const key = input.dataset.filter as 'search' | 'type' | 'action' | 'host' | undefined;
       if (!key) return;
-      this.filter[key] = input.value;
-      this.dirty = true;
-      this.list.scrollTop = 0;
+      if (key === 'search') {
+        // A keystroke would otherwise re-scan the whole retained history at
+        // the next 100ms refresh; on a Pi that is felt while typing.
+        const value = input.value;
+        window.clearTimeout(this.searchTimer);
+        this.searchTimer = window.setTimeout(() => this.applyFilter('search', value), SEARCH_DEBOUNCE);
+        return;
+      }
+      this.applyFilter(key, input.value);
     });
     this.root.addEventListener('click', e => {
       const button = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
@@ -130,6 +138,7 @@ export class LogInspector {
   close(): void {
     if (!this.isOpen) return;
     window.clearInterval(this.timer); this.timer = undefined;
+    window.clearTimeout(this.searchTimer); this.searchTimer = undefined;
     this.root.close(); this.rows.replaceChildren(); this.detail.replaceChildren();
     this.ids = []; this.renderedDetail = undefined;
     this.previousFocus?.focus(); this.previousFocus = null;
@@ -147,7 +156,14 @@ export class LogInspector {
     this.filter = { ...emptyFilter(), pivot };
     this.syncFilters();
   }
+  private applyFilter(key: 'search' | 'type' | 'action' | 'host', value: string): void {
+    this.filter[key] = value;
+    this.dirty = true;
+    this.list.scrollTop = 0;
+  }
   private syncFilters(): void {
+    // A pending keystroke must not resurrect the old query after a pivot/reset.
+    window.clearTimeout(this.searchTimer); this.searchTimer = undefined;
     this.root.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-filter]').forEach(input => {
       input.value = this.filter[input.dataset.filter as 'search' | 'type' | 'action' | 'host'];
     });

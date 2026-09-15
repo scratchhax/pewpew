@@ -584,9 +584,16 @@ inspector. The scene and soundtrack keep running underneath. Press **Esc**
 to close; **F1** switches to settings. The L shortcut also works when the
 compact log is hidden in settings, and does not activate while typing.
 
+The compact COMMS LOG on the HUD is unchanged: same one-line format, same
+`[inbound]`/`[outbound]`/`[internal]` tags, DHCP-learned hostnames and `×N`
+collapsing of repeats. It now renders from the same retained history the
+inspector reads, so the two views can never disagree.
+
 - Search retained fields and raw text, or filter by type, action, and exact
   syslog host. Select a row for structured details, endpoint information, raw
-  syslog (when available), and copy controls.
+  syslog (when available), and copy controls. Search applies 150ms after you
+  stop typing, and each searched event keeps a lowercased copy of its text
+  until it is evicted, so a Pi is not re-scanning the history at every refresh.
 - Click an IP, MAC, or host in the details to follow matching events across
   event types. **Back**, the removable identity chip, and **Reset filters**
   let you return to the previous view. Matches use explicit event fields;
@@ -620,9 +627,11 @@ npm run test:browser
 npm run test:browser -- --stress
 ```
 
-Browser checks use installed Chrome (`CHROME_BIN` overrides its path). The
-optional stress check runs the inspector in isolation at 200 events/second
-for five minutes, checks bounded rows and retention, and samples post-GC heap.
+Browser checks look for Chrome, Chromium, or Edge in the usual places on
+Linux, macOS, and Windows; set `CHROME_BIN` to the executable if yours is
+somewhere else (the failure message lists what was tried). The optional stress
+check runs the inspector in isolation at 200 events/second for five minutes,
+checks bounded rows and retention, and samples post-GC heap.
 
 ## How it works
 
