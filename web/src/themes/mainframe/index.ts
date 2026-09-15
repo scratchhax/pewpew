@@ -41,7 +41,7 @@ interface Intel { ip: string; first: number; hits: number[]; blocks: number[]; t
 
 async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: RendererInit): Promise<ThemeInstance> {
   const { settings, state, throttle, audio } = host;
-  const world = createWorld(host.mount, init.antialias, init.powerPref === 'default' ? undefined : init.powerPref, init.resolution);
+  const world = createWorld(host.mount, init.antialias, init.powerPref === 'default' ? undefined : init.powerPref, init.resolution, settings.mSmooth);
   const overlay = document.createElement('div');
   overlay.id = 'mf-overlay';
   document.body.appendChild(overlay);
@@ -241,7 +241,6 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     (world.scene.fog as { density: number }).density = 0.0017 + heat * 0.0008;
     const lens = world.lens.uniforms;
     lens.uTime.value += dtReal;
-    lens.uHaze.value = settings.mHaze ? heat : 0;
     lens.uHeat.value = heat * 0.7;
     audio.setThreatActive(traffic.wormsAlive > 0);
     world.render(view?.scene ?? world.scene, world.camera, settings.mBloom);

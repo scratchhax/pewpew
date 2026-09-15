@@ -33,14 +33,14 @@ export const MAINFRAME_DEFAULTS = {
   mChunks: 4,            // board sections drawn ahead
   mDetail: 1536,         // board texture width per section (px)
   mBloom: true,
-  mHaze: true,           // heat haze when the board overclocks
+  mSmooth: true,         // multisampled edges (applies on reload)
 };
 
 export const MAINFRAME_BUDGETS: Budgets = {
-  low: { mMaxPackets: 400, mChunks: 3, mDetail: 768, mBloom: false, mHaze: false },
-  medium: { mMaxPackets: 650, mChunks: 3, mDetail: 1024, mBloom: true, mHaze: false },
-  high: { mMaxPackets: 900, mChunks: 4, mDetail: 1536, mBloom: true, mHaze: true },
-  ultra: { mMaxPackets: 1300, mChunks: 5, mDetail: 2048, mBloom: true, mHaze: true },
+  low: { mMaxPackets: 400, mChunks: 3, mDetail: 768, mBloom: false, mSmooth: false },
+  medium: { mMaxPackets: 650, mChunks: 3, mDetail: 1024, mBloom: true, mSmooth: true },
+  high: { mMaxPackets: 900, mChunks: 4, mDetail: 1536, mBloom: true, mSmooth: true },
+  ultra: { mMaxPackets: 1300, mChunks: 5, mDetail: 2048, mBloom: true, mSmooth: true },
 };
 
 type Key = keyof typeof MAINFRAME_DEFAULTS;
@@ -72,7 +72,7 @@ export const MAINFRAME_CONTROLS = {
     { kind: 'select', key: 'mDetail', label: 'Board detail', numeric: true,
       options: [['768', '768'], ['1024', '1024'], ['1536', '1536'], ['2048', '2048']] } as Control,
     toggle('mBloom', 'Bloom'),
-    toggle('mHaze', 'Heat haze'),
+    toggle('mSmooth', 'Smooth edges (on reload)'),
   ],
   color: [] as Control[],
   colorHint: `Hue shift & intensity recolour the HUD accent. Event colours

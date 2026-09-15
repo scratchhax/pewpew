@@ -1,6 +1,6 @@
 import {
   ACESFilmicToneMapping, BoxGeometry, Color, DirectionalLight, FogExp2, HemisphereLight, Mesh, MeshBasicMaterial,
-  PerspectiveCamera, PMREMGenerator, Scene, SRGBColorSpace, Vector2, WebGLRenderer, type Camera, type Texture,
+  HalfFloatType, PerspectiveCamera, PMREMGenerator, Scene, SRGBColorSpace, Vector2, WebGLRenderTarget, WebGLRenderer, type Camera, type Texture,
 } from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -10,30 +10,25 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 /**
  * Renderer, two scenes (the board and the inside of a chip) sharing one
- * neon-lit reflection map, and a lens pass: heat haze when the board
+ * neon-lit reflection map, and a lens pass: a warm edge when the board
  * overclocks, a radial zoom blur and a gold whiteout for diving into a chip,
  * slight colour fringing, grain and a vignette. All eased; nothing strobes.
  */
 const LensShader = {
   uniforms: {
     tDiffuse: { value: null }, uTime: { value: 0 }, uRes: { value: new Vector2(1920, 1080) },
-    uHaze: { value: 0 }, uDive: { value: 0 }, uZoom: { value: 0 }, uHeat: { value: 0 }, uVignette: { value: 0.6 },
+    uDive: { value: 0 }, uZoom: { value: 0 }, uHeat: { value: 0 }, uVignette: { value: 0.6 },
   },
   vertexShader: /* glsl */`varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */`
     precision highp float;
     uniform sampler2D tDiffuse;
-    uniform float uTime, uHaze, uDive, uZoom, uHeat, uVignette;
+    uniform float uTime, uDive, uZoom, uHeat, uVignette;
     uniform vec2 uRes;
     varying vec2 vUv;
     float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
     void main() {
       vec2 uv = vUv;
-      if (uHaze > 0.001) {
-        float rise = uTime * 1.6;
-        vec2 wob = vec2(sin(uv.y * 70.0 - rise * 4.0 + sin(uv.x * 13.0)), cos(uv.x * 55.0 + rise * 3.0 + uv.y * 20.0));
-        uv += wob * 0.0016 * uHaze * (0.4 + 0.6 * smoothstep(0.0, 0.7, 1.0 - uv.y));
-      }
       vec2 c = uv - 0.5;
       vec3 col;
       if (uZoom > 0.001) {
@@ -46,7 +41,7 @@ const LensShader = {
         }
         col = acc / wsum;
       } else {
-        float ab = 0.0012 + dot(c, c) * 0.004;
+        float ab = dot(c, c) * 0.0016;
         col = vec3(texture2D(tDiffuse, uv + c * ab).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - c * ab).b);
       }
       // diving through the die: a gold whiteout crossed by a lattice rushing past
@@ -63,7 +58,7 @@ const LensShader = {
       float vig = smoothstep(0.2, 0.9, dot(c, c) * 2.2);
       col *= 1.0 - vig * uVignette;
       col = mix(col, col * vec3(1.25, 0.75, 0.45) + vec3(0.04, 0.01, 0.0), vig * uHeat * 0.8);
-      col += (h21(vUv * uRes + fract(uTime * 7.0) * 91.0) - 0.5) * 0.025;
+      col += (h21(vUv * uRes + fract(uTime * 7.0) * 91.0) - 0.5) * 0.01;
       gl_FragColor = vec4(max(col, 0.0), 1.0);
     }`,
 };
@@ -102,7 +97,7 @@ function neonEnv(renderer: WebGLRenderer): Texture {
   return rt.texture;
 }
 
-export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: WebGLPowerPreference | undefined, ratio: number): World {
+export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: WebGLPowerPreference | undefined, ratio: number, msaa: boolean): World {
   const renderer = new WebGLRenderer({ antialias, powerPreference: powerPref, stencil: false });
   renderer.setPixelRatio(ratio);
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -129,7 +124,9 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
   inner.add(innerKey, innerKey.target, new HemisphereLight(0x8a6ad0, 0x0a0614, 0.7));
 
   const camera = new PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 900);
-  const composer = new EffectComposer(renderer);
+  // multisampled scene target: the board is all thin traces and pins, which crawl without it
+  const target = new WebGLRenderTarget(window.innerWidth * ratio, window.innerHeight * ratio, { type: HalfFloatType, samples: msaa ? 4 : 0 });
+  const composer = new EffectComposer(renderer, target);
   composer.setPixelRatio(ratio);
   composer.setSize(window.innerWidth, window.innerHeight);
   const pass = new RenderPass(scene, camera);

@@ -658,8 +658,8 @@ pulses, so it's never still, and addresses drift up through the air.
 
 Traffic weather is the board's load: **NOMINAL** on a calm network, **HEAVY
 LOAD** in a storm (faster traffic, a little faster flight), and **OVERCLOCK** in a
-hurricane, where the light turns orange, the fans spin up, the packets run hot
-and heat haze shimmers over the board.
+hurricane, where the light turns orange, the fans spin up and the packets run
+hot.
 
 **Diving into a chip.** It runs on the same schedule as Panopticon's eye of god:
 enough threats inside a minute, one address hitting 12 blocks in a minute, or a
@@ -1033,7 +1033,7 @@ Each scene adds its own budgets:
 | Board ahead (sections) | 3 | 3 | 4 | 5 |
 | Board detail (texture width, px) | 768 | 1024 | 1536 | 2048 |
 | Bloom | off | on | on | on |
-| Heat haze | off | off | on | on |
+| Smooth edges (multisampling) | off | on | on | on |
 
 **Measured on a Raspberry Pi Compute Module 5** (Chromium kiosk at
 2560×1440, Auto → Low, demo traffic):

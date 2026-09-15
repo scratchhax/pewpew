@@ -117,7 +117,8 @@ export class BoardMaterials {
   readonly grille: MeshStandardMaterial;
   constructor(env: Texture) {
     this.plastic = new MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.05, envMap: env, envMapIntensity: 0.5 });
-    this.metal = new MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.9, envMap: env, envMapIntensity: 1.0 });
+    // not too glossy: tiny pins with sharp highlights sparkle and crawl as the camera moves
+    this.metal = new MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.85, envMap: env, envMapIntensity: 0.8 });
     this.led = new MeshBasicMaterial({ vertexColors: true, toneMapped: false });
     this.blades = new MeshStandardMaterial({ map: fanBlades(), alphaTest: 0.5, side: DoubleSide, roughness: 0.45, metalness: 0.1, envMap: env, envMapIntensity: 0.6 });
     this.grille = new MeshStandardMaterial({ map: fanGrille(), alphaTest: 0.5, roughness: 0.55, metalness: 0.05, envMap: env, envMapIntensity: 0.4 });
@@ -586,6 +587,19 @@ export class Chunk {
       tex.anisotropy = 4;
       this.textures.push(tex);
       this.group.add(new Mesh(lids, new MeshStandardMaterial({ map: tex, roughness: 0.7, envMap: B.env, envMapIntensity: 0.3 })));
+    }
+    // the board carries on to either side: the same section repeated, sharing its geometry and textures,
+    // so banking never shows an edge (off-screen copies are frustum-culled)
+    const originals = [...this.group.children];
+    for (const dx of [-W, W]) {
+      for (const o of originals) {
+        if (!(o instanceof Mesh)) continue;
+        const copy = new Mesh(o.geometry, o.material);
+        copy.position.copy(o.position); copy.position.x += dx;
+        copy.rotation.copy(o.rotation); copy.scale.copy(o.scale);
+        this.group.add(copy);
+        if (this.fans.includes(o)) this.fans.push(copy);
+      }
     }
     B.scene.add(this.group);
   }
