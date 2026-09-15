@@ -87,7 +87,7 @@ export class Dive {
   private chip: Chip | null = null;
   private innerBoard: Board | null = null;
   private innerTraffic: Traffic | null = null;
-  private innerFlight = new Flight();
+  private innerFlight = Object.assign(new Flight(), { lift: 17 });
   private from = new Vector3();
   private lookOffset = new Vector3();
   private fromUp = new Vector3(0, 1, 0);

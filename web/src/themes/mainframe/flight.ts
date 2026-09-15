@@ -12,6 +12,8 @@ export class Flight {
   alt = 12;
   vx = 0;
   speed = 26;
+  /** Height above the low point: high over the board, lower inside a chip. */
+  lift = 28;
   private targetX = 0;
   private nextTurn = 2;
   private roll = 0;
@@ -35,14 +37,14 @@ export class Flight {
     // clearance over the parts coming up
     let h = 0;
     for (let dz = 6; dz <= 46; dz += 4) for (let dx = -10; dx <= 10; dx += 5) h = Math.max(h, board.heightAt(this.x + dx, this.z - dz));
-    const base = (o.low ?? 9) + 11 + Math.sin(this.t * 0.11) * 3.5 + Math.sin(this.t * 0.037 + 1) * 2;
+    const base = (o.low ?? 9) + this.lift + Math.sin(this.t * 0.11) * 3.5 + Math.sin(this.t * 0.037 + 1) * 2;
     const altTarget = Math.max(base, h + 7);
     this.alt += (altTarget - this.alt) * Math.min(1, dt * (altTarget > this.alt ? 2.6 : 0.7));
     this.roll += (-this.vx * 0.014 - this.roll) * Math.min(1, dt * 3);
     camera.position.set(this.x + (o.wanderX ?? 0) * 0.01, this.alt + (o.wanderY ?? 0) * 0.005, this.z);
     // steep enough to read as flying over the board, with the traces rushing up from below
     // looking well down at the board: it fills the frame, and the horizon stays out of sight
-    this.look.set(this.x + this.vx * 0.35, 0, this.z - (this.alt * 0.62 + 8));
+    this.look.set(this.x + this.vx * 0.35, 0, this.z - (this.alt * 0.7 + 10));
     camera.up.set(Math.sin(this.roll), Math.cos(this.roll), 0);
     camera.lookAt(this.look);
     camera.fov = 58 + Math.min(12, (this.speed - 26) * 0.22);

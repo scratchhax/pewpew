@@ -138,12 +138,12 @@ export class Traffic {
       const rt = routes[Math.floor(Math.random() * routes.length)];
       if (rt) {
         const start = new Vector3(rt.pts[0].x, 0.12, outbound ? camZ + 30 : camZ - 260);
-        this.launch(makeRoute([start, ...rt.pts], rt.chip), color, 55 + Math.random() * 25, 6 + Math.random() * 4, undefined, 1.05);
+        this.launch(makeRoute([start, ...rt.pts], rt.chip), color, 60 + Math.random() * 30, 9 + Math.random() * 5, undefined, 1.6);
         return;
       }
     }
     const z0 = outbound ? camZ + 30 : camZ - 300, z1 = outbound ? camZ - 300 : camZ + 40;
-    this.launch(makeRoute([new Vector3(x, 0.12, z0), new Vector3(x, 0.12, z1)]), color, 45 + Math.random() * 40, 6 + Math.random() * 6, undefined, 1.1);
+    this.launch(makeRoute([new Vector3(x, 0.12, z0), new Vector3(x, 0.12, z1)]), color, 50 + Math.random() * 45, 9 + Math.random() * 8, undefined, 1.7);
   }
 
   /** The board's own chatter between events: dim clock and bus pulses, so it's never still. */
@@ -160,7 +160,7 @@ export class Traffic {
     const rt = chip.routes[Math.floor(Math.random() * chip.routes.length)];
     const start = new Vector3(rt.pts[0].x, 0.12, camZ + 20);
     const end = rt.pts[rt.pts.length - 1];
-    this.launch(makeRoute([start, ...rt.pts], chip), COL.block, 70 + Math.random() * 20, 6, () => {
+    this.launch(makeRoute([start, ...rt.pts], chip), COL.block, 75 + Math.random() * 20, 9, () => {
       this.burst(end, COL.block, 16);
       this.glow(chip, COL.block, 1, 1.4);
       this.onEvent('shatter', end.x);
@@ -196,7 +196,7 @@ export class Traffic {
           w.iced = true;
           const rev = makeRoute([...w.route.pts].reverse().map((p) => p.clone()), null);
           for (let i = 0; i < 3; i++) {
-            const p = this.launch(rev, COL.ice, 30 + i * 6, 3.5, undefined, 0.8);
+            const p = this.launch(rev, COL.ice, 30 + i * 6, 5, undefined, 1.3);
             if (p) { p.d = -i * 3; w.ice.push(p); }
           }
           this.onEvent('ice', w.route.pts[w.route.pts.length - 1].x);
@@ -213,7 +213,7 @@ export class Traffic {
       }
       const alive = w.dying < 0 ? SEG : Math.max(0, SEG - Math.floor(w.dying / 0.09));
       for (let s = 0; s < SEG; s++) {
-        const d = w.head - s * 1.25;
+        const d = w.head - s * 1.8;
         if (d < 0) break;
         this.pointAt(w.route, d, tmpV);
         if (s >= alive) {
@@ -223,7 +223,7 @@ export class Traffic {
         const sc = 1 - s / (SEG * 1.4);
         tmpV.x += this.jitter[s % this.jitter.length] * (w.dying >= 0 ? 3 : 1);
         tmpV.y = 0.45 + Math.sin(w.age * 9 - s * 0.8) * 0.18;
-        tmpM.compose(tmpV, tmpQ.identity(), tmpS.set(0.95 * sc, 0.7 * sc, 1.05 * sc));
+        tmpM.compose(tmpV, tmpQ.identity(), tmpS.set(1.5 * sc, 1.0 * sc, 1.6 * sc));
         this.wormMesh.setMatrixAt(n++, tmpM);
         if (n >= 120) break;
       }
@@ -256,7 +256,7 @@ export class Traffic {
       s.pos.addScaledVector(s.vel, dt);
       if (s.pos.y < 0.15) { s.pos.y = 0.15; s.vel.y *= -0.3; s.vel.x *= 0.7; s.vel.z *= 0.7; }
       const k = 1 - s.age / s.life;
-      tmpM.compose(s.pos, tmpQ.identity(), tmpS.set(0.9 * k + 0.2, 1, 0.9 * k + 0.2));
+      tmpM.compose(s.pos, tmpQ.identity(), tmpS.set(1.5 * k + 0.3, 1, 1.5 * k + 0.3));
       this.shardMesh.setMatrixAt(n, tmpM);
       this.shardMesh.setColorAt(n, this.col.copy(s.color).multiplyScalar(k * 2));
       n++;
@@ -473,8 +473,8 @@ export class Traffic {
     g.textBaseline = 'middle';
     g.fillText(text.slice(0, 22), 6, 34);
     f.tex.needsUpdate = true;
-    f.sprite.scale.set(10, 1.25, 1);
-    f.sprite.position.set(this.camX + (Math.random() - 0.5) * 70, 2.5 + Math.random() * 5, camZ - 45 - Math.random() * 80);
+    f.sprite.scale.set(15, 1.9, 1);
+    f.sprite.position.set(this.camX + (Math.random() - 0.5) * 70, 4 + Math.random() * 8, camZ - 55 - Math.random() * 90);
     f.age = 0; f.life = 5 + Math.random() * 3; f.vy = 0.6 + Math.random() * 0.8; f.busy = true; f.sprite.visible = true;
   }
 

@@ -237,7 +237,7 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     world.key.intensity = 2.2 * (0.35 + 0.65 * dim);
     world.key.position.set(flight.x - 40, 90, flight.z + 30);
     world.key.target.position.set(flight.x, 0, flight.z - 40);
-    (world.scene.fog as { density: number }).density = 0.0052 + heat * 0.002;
+    (world.scene.fog as { density: number }).density = 0.0034 + heat * 0.0015;
     const lens = world.lens.uniforms;
     lens.uTime.value += dtReal;
     lens.uHaze.value = settings.mHaze ? heat : 0;

@@ -116,7 +116,7 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
 
   const scene = new Scene();
   scene.background = new Color(0x020406);
-  scene.fog = new FogExp2(0x020406, 0.0052);
+  scene.fog = new FogExp2(0x020406, 0.0034);
   const key = new DirectionalLight(0xcfe6ff, 2.2);
   key.position.set(-40, 90, 30);
   scene.add(key, key.target, new HemisphereLight(0x5a88b0, 0x0a0f0c, 0.55));
