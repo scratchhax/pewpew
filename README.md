@@ -248,7 +248,7 @@ twelve times a second it tries around a hundred moves: any point across the road
 plays each one forward for two seconds against where every car will be, using
 your car's real sideways grip and acceleration. Wrecks count as wide,
 fast-slowing obstacles sliding for the shoulder. The best clean move wins. Lane
-centres and short moves are preferred, and the sidewalk is the escape route
+centres, the middle of the road and short moves are preferred (home is the two inner lanes, where the action is), the curb is only an escape, and the sidewalk is the last resort
 when the road is shut. The car hops the curb with a thump and sparks, and gets
 back on the road when there's room. Hits barely cost it any speed: the other
 car takes the shove.

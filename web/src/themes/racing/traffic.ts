@@ -519,8 +519,9 @@ export class Traffic {
           + Math.min(walk ? 8 : ttc, 4) * 6                    // open road ahead (past a few seconds it's all the same)
           - Math.abs(x - pb.x) * (1.6 - agg * 1.1)             // effort: the wilder it gets, the less a long move costs
           - (walk ? 13 - agg * 5                                // the sidewalk: when the road is shut, or it's wild anyway
-            : Math.abs(x) > 6.6 ? 5 - agg * 3.5                // riding the curb
+            : Math.abs(x) > 6.6 ? 16 - agg * 6                 // riding the curb: an escape, not a lane
             : offLane * (2.2 - agg * 1.3))                     // lane centres look like driving
+          - Math.min(Math.abs(x), 8.5) * (2.2 - agg * 0.8)     // home is the middle of the road, where the action is
           - (s === 1 ? 3 - agg * 4 : 0)                        // a busy network would rather be flat out
           + (Math.abs(x - this.plan.x) < 0.5 ? 3 : 0) + (s === this.plan.mode ? 5 : 0);   // commit to a plan
         const opt: Option = { score, x, speed: speeds[s], mode: s, safe, blocker: blocker ?? (ttc < 3 && !walk ? limiter : null) };
