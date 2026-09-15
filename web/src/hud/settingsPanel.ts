@@ -48,7 +48,9 @@ export class SettingsPanel {
               private theme: Pick<Theme, 'title' | 'controls'> & { hudToggles: HudLabels['panel'] },
               private defaults: CoreSettings, private perfKeys: string[],
               private onChange: (key?: string) => void,
-              private perfStatus: () => PerfStatus) {
+              private perfStatus: () => PerfStatus,
+              /** Mounts extra, live UI into the Audio tab (the background track box). */
+              private mountAudioExtras?: (el: HTMLElement) => void) {
     this.root = document.createElement('div');
     this.root.id = 'settings';
     this.root.style.display = 'none';
@@ -149,6 +151,7 @@ export class SettingsPanel {
         ({ kind: 'toggle' as const, key, label: this.theme.hudToggles[key] })))}</div>`;
     } else if (tab === 'audio') {
       html += `<div class="cols"><div class="col">
+        ${this.mountAudioExtras ? '<div id="track-ui"></div>' : ''}
         <p class="grp">Master</p>
         ${this.chk('audio', 'Audio on')}${this.rng('volume', 'Volume', 0, 1, 0.05)}
         <p class="grp">Texture — additive layers</p>
@@ -164,6 +167,7 @@ export class SettingsPanel {
         <p class="grp">Event volumes</p>
         ${EVENT_VOL.map(([k, l]) => this.rng(k, l, 0, 1, 0.05)).join('')}
         <p class="grp">Space & balance</p>
+        ${this.rng('trackVolume', 'Track volume', 0, 1, 0.05)}
         ${this.rng('reverb', 'Reverb', 0, 1, 0.05)}
         ${this.rng('echo', 'Echo', 0, 1, 0.05)}
         ${this.rng('melodyBal', 'Music bed', 0, 1, 0.05)}
@@ -219,6 +223,8 @@ export class SettingsPanel {
 
     html += `</div><div class="set-foot">F1 to close</div>`;
     this.root.innerHTML = html;
+    const extras = this.root.querySelector<HTMLElement>('#track-ui');
+    if (extras && this.mountAudioExtras) this.mountAudioExtras(extras);
   }
 
   private twoCol(items: Control[]): string {

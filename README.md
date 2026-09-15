@@ -119,6 +119,8 @@ Actions** first.
 | `wan_interfaces` | `[ppp0]` | which gateway interfaces count as WAN, for inbound/outbound. Look at the `IN=`/`OUT=` fields of your firewall log lines; `eth8`–`eth10` are common on UDM/UDR |
 | `drop_log_types` | `[]` | log types to hide, e.g. `[system]` |
 | `drop_patterns` | UDM/AP chatter | regexes matched against raw lines and dropped before parsing (see `/drops`) |
+| `tracks_dir` | `tracks` | where uploaded background tracks are stored (relative to `relay/`, git-ignored) |
+| `max_track_mb` | `60` | largest background track the relay accepts |
 
 The relay understands both the classic iptables-style firewall logs and the
 CEF security events from gateways on the CyberSecure/Enhanced tier (IDS/IPS
@@ -355,6 +357,37 @@ The car is part of the band:
 Road roar rises with speed and rain comes in with the weather. **Move with the
 music** (Scene tab) makes the curb neon and your underglow swell on every bar.
 
+### Background tracks
+
+Play your own music in any theme. In F1 → Audio → **Background track**, upload
+an MP3, OGG, M4A, WAV or FLAC file. It's stored on the relay, so every screen
+can use it: pick a track per theme, and every screen showing that theme plays
+it within about 20 seconds, the kiosk included.
+
+- When a track loads, the viewer works out its **tempo, beat position and key**
+  (in a background worker, once per track) and saves the result on the relay.
+  The panel shows what it found; type a tempo to correct it, or **Re-detect**.
+- While a track plays, the theme's generated music steps aside. Its sound effects
+  and ambience stay on top, snapped to the track's beat and played in its key:
+  gunshots and groans, lasers and pings, the engine and horns. Music-driven
+  visuals follow the track's beat and loudness.
+- **Track volume** sits under Space & balance. Choose **None** to go back to the
+  theme's own soundtrack, or delete the track from the relay.
+
+The relay API behind it, handy for scripting:
+
+```bash
+curl -F file=@mytrack.mp3 http://<relay-host>:8080/api/tracks          # upload
+curl http://<relay-host>:8080/api/tracks                               # list + assignments
+curl -X PUT -H 'Content-Type: application/json' \
+  -d '{"theme":"racing","name":"mytrack.mp3"}' http://<relay-host>:8080/api/tracks-assign
+curl -X DELETE http://<relay-host>:8080/api/tracks/mytrack.mp3         # delete
+```
+
+A track assigned without analysis (for example, uploaded with curl) is analysed
+by the first screen that plays it. Background tracks need a relay, so they
+aren't available on the GitHub Pages demo.
+
 ### Mixing
 
 The **Audio** tab is shared by every theme:
@@ -564,6 +597,7 @@ brings three.js, and only screens showing it download it.
 - `GET /healthz`: syslog lines per host, WebSocket clients, event counters
 - `GET /drops`: which drop patterns are catching what
 - `GET /config.json`: the default theme and the themes in the build
+- `GET /api/tracks`: uploaded background tracks, their tempo/key and which theme plays which
 - After a relay restart, APs and gateways stop logging for 1–3 minutes. That's
   UniFi's log forwarder backing off; it reconnects on its own.
 

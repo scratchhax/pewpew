@@ -40,6 +40,7 @@ export interface CoreSettings {
   reverb: number;         // hangar reverb wet 0..1
   echo: number;           // dotted-delay level 0..1
   melodyBal: number;      // music bed vs event hits 0..1
+  trackVolume: number;    // uploaded background track level 0..1
   hueShift: number;       // rotate theme/HUD accent hues 0..360
   colorSat: number;       // colour intensity 0..1
   speed: number;          // global sim speed multiplier
@@ -87,6 +88,7 @@ export const CORE_DEFAULTS: CoreSettings = {
   reverb: 0.3,
   echo: 0.5,
   melodyBal: 0.65,
+  trackVolume: 0.8,
   hueShift: 0,
   colorSat: 1,
   speed: 1,

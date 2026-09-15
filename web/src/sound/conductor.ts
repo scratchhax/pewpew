@@ -1,4 +1,4 @@
-import type { AudioEngine, Cue, MusicPulse, Score, SfxOpts } from '../audio';
+import type { AudioEngine, Cue, MusicPulse, Score, SfxOpts, TrackClock } from '../audio';
 import type { State } from '../state';
 import { Bus, Synth, type Bed } from './synth';
 
@@ -67,6 +67,28 @@ export abstract class Style {
   abstract step(i: number, t: number, m: Mood): void;
   /** A melody note played by traffic (allow events). */
   abstract lead(t: number, f: number, g: number, pan: number): void;
+}
+
+/** The "style" while a background track plays: no notes of its own, just the track's tempo and key. */
+class TrackStyle extends Style {
+  readonly id = 'track';
+  readonly bpm: number;
+  readonly root: number;
+  readonly scale: number[];
+  readonly chords: number[][];
+  readonly barsPerChord = 1;
+  readonly leadOct = 4;
+
+  constructor(s: Synth, parent: Bus, clock: TrackClock) {
+    super(s, parent);
+    this.bpm = clock.bpm;
+    this.root = 16.3516 * Math.pow(2, clock.root / 12);   // the key's tonic at octave 0
+    this.scale = clock.minor ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11];
+    this.chords = [clock.minor ? [0, 3, 7] : [0, 4, 7]];
+  }
+
+  step(): void {}
+  lead(): void {}
 }
 
 export interface StyleDef {
@@ -236,7 +258,7 @@ export abstract class Conductor implements Score {
   // ── Score ──
   update(dt: number, state: State): void {
     const ctx = this.s.ctx, now = ctx.currentTime, st = this.core;
-    const silent = this.passthrough();
+    const silent = this.passthrough() && !this.track;
 
     const nightTarget = state.weather === 'hurricane' ? 1 : state.weather === 'storm' ? 0.5 : 0;
     this.mood.night += (nightTarget - this.mood.night) * Math.min(1, dt * 0.15);
@@ -250,6 +272,10 @@ export abstract class Conductor implements Score {
     this.ambience(dt, state, now, !silent);
     if (silent) return;
 
+    // a background track owns the tempo: follow its media clock, no rotation
+    if (this.track) {
+      this.followTrack(now);
+    } else {
     // rotation
     const pinned = this.wanted();
     if (pinned) {
@@ -257,6 +283,7 @@ export abstract class Conductor implements Score {
     } else if (now - this.rotatedAt > Math.max(1, this.setting<number>(this.cfg.rotateKey)) * 60) {
       this.rotatedAt = now;
       this.switchTo(this.order[(this.order.indexOf(this.cur.id) + 1) % this.order.length], now);
+    }
     }
     for (const style of this.styles.values()) {
       if (style.fadingUntil && now > style.fadingUntil) { style.fadingUntil = 0; style.exit(now); }
@@ -283,6 +310,40 @@ export abstract class Conductor implements Score {
 
   setThreatActive(on: boolean): void { this.mood.threat = on; }
 
+  // ── background track ──
+  protected track: TrackClock | null = null;
+  private trackStyle: TrackStyle | null = null;
+
+  setTrack(clock: TrackClock | null): void {
+    const now = this.s.ctx.currentTime;
+    if (this.track) { try { this.track.node.disconnect(this.meter); } catch { /* not connected */ } }
+    this.track = clock;
+    if (clock) {
+      // a silent style carrying the track's tempo and key, so effects snap and tune to it
+      const style = new TrackStyle(this.s, this.music, clock);
+      clock.node.connect(this.meter);                 // visuals follow the track's loudness
+      if (this.cur !== this.trackStyle) { this.cur.bus.set(0, now, 1); this.cur.fadingUntil = now + 5; }
+      this.trackStyle = style;
+      this.cur = style;
+      this.followTrack(now, true);
+    } else if (this.trackStyle) {
+      this.trackStyle = null;
+      const back = this.wanted() ?? this.order[0];
+      this.begin(this.styles.get(back)!, now + 0.1);
+    }
+  }
+
+  /** Keep our grid glued to the track: re-sync whenever the media clock and ours drift (seeks, loops, stalls). */
+  private followTrack(now: number, force = false): void {
+    const tr = this.track!, style = this.cur, beat = 60 / tr.bpm;
+    const epoch = now - tr.beatAt() * beat;             // audio time of the track's beat 0
+    if (force || Math.abs(epoch - this.epoch) > 0.03) {
+      this.epoch = epoch;
+      this.stepIdx = Math.ceil((now + 0.02 - epoch) / style.stepDur);
+      this.nextStep = epoch + this.stepIdx * style.stepDur;
+    }
+  }
+
   pulse(): MusicPulse {
     const ctx = this.s.ctx;
     // what the speakers are playing now, not what's scheduled
@@ -304,7 +365,7 @@ export abstract class Conductor implements Score {
       bpm: cur.bpm,
       energy: this.energy,
       heart: sinceHeart >= 0 && this.mood.threat ? Math.exp(-sinceHeart / 0.25) : 0,
-      style: this.cfg.styles.find((d) => d.id === cur.id)?.name ?? cur.id,
+      style: this.track ? 'Background track' : this.cfg.styles.find((d) => d.id === cur.id)?.name ?? cur.id,
     };
   }
 }

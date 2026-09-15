@@ -9,6 +9,8 @@ import { hsl } from './palette';
 import { Hud, hudLabels } from './hud/hud';
 import { Audio } from './audio';
 import { SettingsPanel } from './hud/settingsPanel';
+import { mountTrackUi } from './hud/trackUi';
+import { analyseTrack, listTracks, saveMeta, trackUrl, type TrackListing } from './tracks';
 import type { Theme } from './theme';
 import type { NetEvent } from './types';
 
@@ -89,6 +91,7 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
     audio.setReverb(settings.reverb);
     audio.setEcho(settings.echo);
     audio.setEnabled(settings.audio);
+    audio.setTrackVolume(settings.trackVolume);
     scene.settingsChanged(key);
     applyColors();
     applyPerf();
@@ -96,7 +99,35 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
     tier: settings.quality === 'custom' ? null : tuner.tier,
     why: bootPerf.why,
     reloadNeeded: settings.antialias !== initAntialias || settings.powerPref !== initPowerPref,
-  }));
+  }), (el) => mountTrackUi(el, { themeId: theme.id, themeTitle: theme.title, listing: () => trackListing, refresh: syncTracks }));
+
+  // ── background tracks: the relay says which track this theme plays; every screen follows ──
+  let trackListing: TrackListing | null = null;
+  let analysing: string | null = null;
+  async function syncTracks(): Promise<void> {
+    trackListing = await listTracks();
+    const name = trackListing?.assign[theme.id] ?? null;
+    const info = name ? trackListing!.tracks.find((t) => t.name === name) : undefined;
+    if (!name || !info) { audio.setTrack(null); return; }
+    if (!info.meta) {
+      // nobody has analysed it yet (e.g. uploaded with curl): do it here, once, and share the result
+      if (analysing === name) return;
+      analysing = name;
+      try {
+        const meta = await analyseTrack(name);
+        await saveMeta(name, meta);
+        info.meta = meta;
+      } catch (err) {
+        console.warn('[pewpew] track analysis failed', err);
+        return;
+      } finally {
+        analysing = null;
+      }
+    }
+    audio.setTrack(name, trackUrl(name), info.meta);
+  }
+  void syncTracks();
+  setInterval(() => { void syncTracks(); }, 20_000);
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'F1') { e.preventDefault(); panel.toggle(); }
