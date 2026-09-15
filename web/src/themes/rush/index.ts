@@ -5,6 +5,9 @@ import { RUSH_BUDGETS, RUSH_CONTROLS, RUSH_DEFAULTS, RUSH_HUD } from './settings
 import { makeArt, TILE } from './art';
 import { Course, CourseView, Backdrop } from './world';
 import { Actors } from './actors';
+import { rushScore } from './score';
+import { Dash } from './dash';
+import { hudLabels } from '../../hud/hud';
 import './hud.css';
 
 /**
@@ -25,6 +28,7 @@ export const rush: Theme<typeof RUSH_DEFAULTS> = {
   defaults: RUSH_DEFAULTS,
   budgets: RUSH_BUDGETS,
   controls: RUSH_CONTROLS,
+  score: rushScore,
   create,
 };
 export default rush;
@@ -79,7 +83,12 @@ async function create(host: ThemeHost<typeof RUSH_DEFAULTS>, init: RendererInit)
   app.renderer.on('resize', layout);
 
   course.ensure(0, 80);
+  const dash = new Dash();
+  const worldNames = hudLabels(RUSH_HUD).weather;
   const actors = new Actors({ back, mid, front, ui }, art, course);
+  let camNow = 0;
+  // the game's sounds, placed left to right by where they happen on screen
+  actors.onSfx = (name, x) => audio.sfx(name, { pan: Math.max(-0.8, Math.min(0.8, ((x - camNow) / vw) * 1.6 - 0.8)) });
 
   function applyBudgets(): void {
     actors.maxEnemies = settings.pMaxBaddies;
@@ -140,6 +149,7 @@ async function create(host: ThemeHost<typeof RUSH_DEFAULTS>, init: RendererInit)
         break;
       case 'dns':
         audio.cueSong('dns', ev.src_ip ?? undefined);
+        if (ev.dns_query) dash.domain(ev.dns_query.replace(/^www\./, ''));
         if (settings.pQueries && ev.dns_query && throttle.allow(`dns|${ev.dns_query}`, 8)) actors.query(ev.dns_query.replace(/^www\./, ''));
         break;
       case 'dhcp': {
@@ -194,6 +204,7 @@ async function create(host: ThemeHost<typeof RUSH_DEFAULTS>, init: RendererInit)
     course.ensure(Math.floor(camX / TILE) - 8, Math.ceil((camX + vw) / TILE) + 24);
     actors.update(dt, t, speed, camX, vw);
     const cam = Math.round(actors.hero.x - vw * 0.36);
+    camNow = cam;
 
     view.draw(course, cam, vw, t);
     backdrop.update(dt, cam, vw, vh, t);
@@ -201,6 +212,11 @@ async function create(host: ThemeHost<typeof RUSH_DEFAULTS>, init: RendererInit)
     world.position.set(-cam, 0);
     uiWorld.position.set(-cam, 0);
     audio.setThreatActive(actors.hunted);
+    dash.update(dtReal, {
+      state, stats: actors.stats, speed, eps: state.rate30s / 30, world: worldIdx,
+      worldName: [worldNames.calm, worldNames.storm, worldNames.hurricane][worldIdx],
+      power: actors.activePower(), hunted: actors.hunted, map: actors.mapInfo(), course,
+    });
 
     screen.position.set(Math.round(f.wanderX * 0.2), Math.round(f.wanderY * 0.2));
     app.render();

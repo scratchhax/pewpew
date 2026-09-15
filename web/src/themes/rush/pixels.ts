@@ -102,26 +102,30 @@ const GLYPHS: Record<string, string[]> = {
   "!": [".#.",".#.",".#.","...",".#."],
   "?": ["##.","..#",".#.","...",".#."],
   "+": ["...",".#.","###",".#.","..."],
-  "x": ["...","#.#",".#.","#.#","..."],
+  "*": ["...","#.#",".#.","#.#","..."],
   " ": ["...","...","...","...","..."],
   "'": [".#.",".#.","...","...","..."],
 };
 
+/** Draw text in the 3x5 font onto a canvas at (x, y) (top-left of the glyphs), with an optional 1px outline. */
+export function drawText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, outline: string | null = P.ink): number {
+  const s = text.toUpperCase();
+  const put = (ox: number, oy: number, col: string) => {
+    ctx.fillStyle = col;
+    for (let k = 0; k < s.length; k++) {
+      const g = GLYPHS[s[k]] ?? GLYPHS['?'];
+      for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) {
+        if (g[j][i] === '#') ctx.fillRect(x + k * 4 + i + ox, y + j + oy, 1, 1);
+      }
+    }
+  };
+  if (outline) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [1, 1]]) put(dx, dy, outline);
+  put(0, 0, color);
+  return s.length * 4;
+}
+
 /** Text as a texture in the 3x5 font, with a 1px dark outline so it reads over anything. */
 export function pixelText(text: string, color: string, outline = P.ink): Texture {
-  const s = text.toUpperCase();
-  const w = s.length * 4 + 1, h = 7;
-  return tex(canvas(w + 2, h, (ctx) => {
-    const put = (ox: number, oy: number, col: string) => {
-      ctx.fillStyle = col;
-      for (let k = 0; k < s.length; k++) {
-        const g = GLYPHS[s[k]] ?? GLYPHS['?'];
-        for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) {
-          if (g[j][i] === '#') ctx.fillRect(1 + k * 4 + i + ox, 1 + j + oy, 1, 1);
-        }
-      }
-    };
-    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [1, 1]]) put(dx, dy, outline);
-    put(0, 0, color);
-  }));
+  const w = text.length * 4 + 3;
+  return tex(canvas(w, 7, (ctx) => { drawText(ctx, text, 1, 1, color, outline); }));
 }

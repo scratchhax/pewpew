@@ -1,6 +1,7 @@
 import type { Budgets } from '../../perf';
 import type { Control } from '../../theme';
 import type { HudLabelOverrides } from '../../hud/hud';
+import { RUSH_MUSIC } from './score';
 
 /**
  * Packet Rush's own settings. Keys are p-prefixed: all themes share one saved
@@ -15,6 +16,12 @@ export const RUSH_DEFAULTS = {
   pDrone: true,          // threat → the hunter drone
   pWeather: true,        // rain in the factory, embers in the castle
   pTurbo: true,          // bursts of traffic light the turbo
+
+  // soundtrack
+  pMusicStyle: 'world' as string,   // world | rotate | a tune
+  pMusicRotate: 5,                  // minutes per calm tune
+  pSfx: 0.8,                        // game sound effects
+  pAmbience: 0.5,                   // rain in the factory
 
   // scene budgets = the HIGH preset
   pMaxBaddies: 10,
@@ -49,13 +56,19 @@ export const RUSH_CONTROLS = {
     range('pWeatherDensity', 'Weather', 0, 1.5, 0.05),
   ],
   color: [] as Control[],
+  audio: [
+    { kind: 'select', key: 'pMusicStyle', label: 'Music', options: RUSH_MUSIC } as Control,
+    range('pMusicRotate', 'Rotate every (min)', 1, 30, 1),
+    range('pSfx', 'Game sounds', 0, 1, 0.05),
+    range('pAmbience', 'Rain', 0, 1, 0.05),
+  ],
   colorHint: `Hue shift & intensity recolour the HUD accent. Event colours
         (gems green, baddies red, query blocks blue, rivals yellow, flags purple,
         the drone amber) stay fixed.`,
 };
 
 export const RUSH_HUD: HudLabelOverrides = {
-  uplink: 'WORLD',
+  uplink: 'COURSE',
   link: 'ONLINE',
   weather: { calm: 'GREEN HILLS', storm: 'NEON FACTORY', hurricane: 'LAVA CASTLE' },
   status: 'POWER',
@@ -71,11 +84,11 @@ export const RUSH_HUD: HudLabelOverrides = {
   noHostiles: '- NO BOSSES -',
   spectrum: 'SOUND TEST',
   flux: 'SPEED',
-  scan: 'RADAR',
+  scan: 'ITEM BOX',
   comms: 'QUEST LOG',
   panel: {
-    uplink: 'World', threatBar: 'Heat / boost bars', telemetry: 'Run stats',
+    uplink: 'Course map', threatBar: 'Heat / boost meters', telemetry: 'Run stats',
     mostWanted: 'Boss roster', terminal: 'Quest log', oscilloscope: 'Speed',
-    spectrum: 'Sound test', radar: 'Radar',
+    spectrum: 'Sound test', radar: 'Item box',
   },
 };

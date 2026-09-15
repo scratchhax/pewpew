@@ -311,8 +311,30 @@ speed, and ledges forgive landing a few pixels low. A hit scatters some gems
 pit, the bot bounces back out. Measured headless over 90 seconds of demo traffic,
 it misses a jump about once a run or less and stomps around 50 baddies.
 
-Packet Rush doesn't have its own soundtrack yet, so it plays the classic band.
-Its own chiptune score is coming.
+**The dash** is a 16-bit game's HUD, drawn in the pixel font. A top bar shows
+gems, score (it counts up), time and stage. The course panel is a mini-map of
+the ground around you with baddies, rivals, query blocks and flags on it, plus a
+stage progress bar to the goal. The item box shows the power-up running and its
+time left, and a breathing HUNT warning while the drone is after you. Heat and
+boost are rows of flames and bolts, and speed is a segmented meter. Every three
+minutes a **STAGE CLEAR** card slides in with the stage's gems, stomps, blocks,
+bricks, checkpoints and most-visited site.
+
+**The sound** is a chip band built for this scene: pulse waves at the classic
+12.5%, 25% and 50% widths, a triangle bass, noise drums and fast arpeggio
+chords. Five original tunes: **Green hills** (a bouncy overworld), **Airship
+march**, **Underground** (echoing minor), **Factory rush** (driving, with 32nd-note
+arps) and **Castle siege** (harmonic minor). Melodies are written in phrases: a
+motif, the motif with a twist, a contrasting line, and the motif coming home to
+the tonic. They're rewritten every couple of loops. By default the music
+**follows the world** (hills, airship and underground take turns on a calm
+network, the factory in a storm, the castle in a hurricane); you can also
+rotate or pin a tune. Sound effects fire the instant things happen and are
+pitched to the tune's key: jump and double-jump boings, gem chimes that climb
+the scale while you chain them, stomps, block bumps, a power-up run, brick
+crunches, a checkpoint fanfare on the beat, a falling bomb whistle and the
+blast, and a two-tone warning while the drone hunts you. **Game sounds** and
+**Rain** have their own sliders on the Audio tab.
 
 ### Choosing a theme
 

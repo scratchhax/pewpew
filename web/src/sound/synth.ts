@@ -132,7 +132,8 @@ export class Synth {
     return src;
   }
 
-  private run(o: OscillatorNode, t: number, end: number): void {
+  /** Start and schedule the stop of an oscillator, counted against the voice budget. */
+  run(o: OscillatorNode, t: number, end: number): void {
     o.start(t);
     o.stop(end + 0.05);
     this.live++;

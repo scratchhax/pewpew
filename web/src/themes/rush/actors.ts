@@ -219,6 +219,27 @@ export class Actors {
   }
   get hunted(): boolean { return this.drone.on && this.drone.wanted > 0; }
 
+  /** The power-up running now (the one with the most time left), for the item box. */
+  activePower(): { kind: Power; left: number; max: number } | null {
+    let best: { kind: Power; left: number; max: number } | null = null;
+    for (const k of Object.keys(this.powers) as Power[]) {
+      const left = this.powers[k];
+      if (left > 0 && (!best || left > best.left)) best = { kind: k, left, max: k === 'shoe' ? 6 : k === 'magnet' ? 9 : 12 };
+    }
+    return best;
+  }
+
+  /** Where things are on the course, for the dash's mini-map. */
+  mapInfo() {
+    return {
+      heroX: this.hero.x,
+      enemies: this.enemies.filter((e) => e.squash <= 0).map((e) => e.x),
+      flags: this.flags.map((f) => f.x),
+      queries: this.queries.filter((q) => !q.used).map((q) => q.x),
+      rivals: this.rivals.map((r) => r.x),
+    };
+  }
+
   // ── the planner ──
   /**
    * Fly a jump plan forward and score it: landing safely, stomping baddies,

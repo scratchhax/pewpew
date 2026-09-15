@@ -35,3 +35,27 @@ body[data-theme="rush"] #settings select { background: #333c57; color: #f4f4f4; 
 /* nothing blinks here */
 body[data-theme="rush"] .cursor { animation: none; }
 body[data-theme="rush"] #demo-badge { animation: none; opacity: 0.9; }
+
+/* ── the dash (dash.ts): pixel canvases in the shared panels ── */
+body[data-theme="rush"] canvas.rush-pix { display: block; image-rendering: pixelated; }
+body[data-theme="rush"] #weather,
+body[data-theme="rush"] #radar,
+body[data-theme="rush"] #scope,
+body[data-theme="rush"] #hud-bars .bar-row { display: none; }
+body[data-theme="rush"] #hud-topleft { min-width: 0; top: 76px; }
+body[data-theme="rush"] #conn { font-size: 11px; margin-bottom: 6px; }
+body[data-theme="rush"] #radar-wrap { top: 262px; }
+body[data-theme="rush"] #hud-bars { top: 76px; }
+body[data-theme="rush"] #hud-stats { top: 214px; }
+body[data-theme="rush"] #hud-mw { top: 356px; }
+body[data-theme="rush"] #hud-spec { bottom: 170px; }
+body[data-theme="rush"] .stat-row b, body[data-theme="rush"] .mw-n { color: #ffcd75; }
+body[data-theme="rush"] .mw-ip { color: #f4f4f4; }
+body[data-theme="rush"] .mw-bar i { background: repeating-linear-gradient(90deg, #b13e53 0 5px, #ef7d57 5px 6px); }
+body[data-theme="rush"] #rate { color: #73eff7; }
+#rush-top { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); filter: drop-shadow(4px 4px 0 rgba(0, 0, 0, 0.45)); }
+@media (max-width: 1500px) { #rush-topbar { width: 696px !important; height: 39px !important; } }
+@media (max-width: 1100px) { #rush-topbar { width: 464px !important; height: 26px !important; } }
+#rush-card { position: fixed; top: 22%; left: 50%; z-index: 15; pointer-events: none; transform: translateX(-50%);
+  filter: drop-shadow(6px 6px 0 rgba(0, 0, 0, 0.5)); }
+#rush-card[hidden] { display: none; }

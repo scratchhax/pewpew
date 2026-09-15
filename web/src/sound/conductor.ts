@@ -157,8 +157,8 @@ export abstract class Conductor implements Score {
   protected get core(): CoreAudio { return this.e.settings as unknown as CoreAudio; }
   protected setting<T>(key: string): T { return (this.e.settings as unknown as Record<string, T>)[key]; }
 
-  /** The pinned style, or null when rotating. */
-  private wanted(): string | null {
+  /** The pinned style, or null when rotating. A score can override this (e.g. to follow the scene). */
+  protected wanted(): string | null {
     const v = this.setting<string>(this.cfg.styleKey);
     return this.styles.has(v) ? v : null;
   }
