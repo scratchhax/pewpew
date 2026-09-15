@@ -24,6 +24,8 @@ export interface Fish {
   vel: Vector3;
   quat: Quaternion;
   fwd: Vector3;
+  yaw: number;           // heading in the horizontal plane (NaN until the fish first moves)
+  pitch: number;
   size: number;
   phase: number;
   bend: number;
@@ -84,7 +86,7 @@ export class Life {
 
   private spawn(def: SpeciesDef, role: Role, at: Vector3, ambient = false): Fish {
     const f: Fish = {
-      def, role, pos: at.clone(), vel: new Vector3(rand(-1, 1), 0, rand(-0.3, 0.3)).setLength(def.swim.cruise * 0.5), quat: new Quaternion(), fwd: new Vector3(1, 0, 0),
+      def, role, pos: at.clone(), vel: new Vector3(rand(-1, 1), 0, rand(-0.3, 0.3)).setLength(def.swim.cruise * 0.5), quat: new Quaternion(), fwd: new Vector3(1, 0, 0), yaw: NaN, pitch: 0,
       size: rand(0.85, 1.12), phase: Math.random() * 20, bend: 0, puff: 0, puffTarget: 0, goal: at.clone(), goalT: 0, speedK: rand(0.85, 1.1),
       leaving: false, state: 'in', stateT: 0, ambient, born: performance.now(), flee: 0,
     };
@@ -281,16 +283,28 @@ export class Life {
     f.vel.y = Math.max(-flat * 0.45, Math.min(flat * 0.45, f.vel.y));
     f.pos.addScaledVector(f.vel, dt);
 
-    // heading: follow the velocity, turning smoothly; hover in place when nearly still
+    // heading as yaw and pitch, so the fish always stays upright: it turns toward
+    // its velocity at a limited rate (reversing is a real U-turn), and holds its
+    // heading when it's nearly still
     const speed = f.vel.length();
-    const prev = tmpW.copy(f.fwd);
-    if (speed > 0.25) {
-      const k = 1 - Math.exp(-dt * (2 + agility * 1.5));
-      f.fwd.lerp(tmpU.copy(f.vel).divideScalar(speed), k).normalize();
-      if (Math.hypot(f.fwd.x, f.fwd.z) < 0.2) f.fwd.set(prev.x || 1, f.fwd.y, prev.z).normalize();
+    let turn = 0;
+    if (Number.isNaN(f.yaw)) f.yaw = Math.atan2(f.vel.z, f.vel.x);
+    if (flat > 0.2) {
+      const want = Math.atan2(f.vel.z, f.vel.x);
+      let dy = want - f.yaw;
+      dy -= Math.round(dy / (Math.PI * 2)) * Math.PI * 2;
+      const maxRate = (1.2 + agility * 0.9) * (f.flee > 0 ? 1.6 : 1);
+      const step = Math.max(-maxRate * dt, Math.min(maxRate * dt, dy * (1 - Math.exp(-dt * (2 + agility * 1.5)))));
+      f.yaw += step;
+      turn = step / Math.max(dt, 1e-3);
+      const wantPitch = Math.max(-0.45, Math.min(0.45, Math.atan2(f.vel.y, flat)));
+      f.pitch += (wantPitch - f.pitch) * (1 - Math.exp(-dt * 2.5));
+    } else {
+      f.pitch *= 1 - Math.min(1, dt * 1.5);
     }
-    const turn = -(prev.z * f.fwd.x - prev.x * f.fwd.z) / Math.max(dt, 1e-3);    // local turn rate (rad/s)
     f.bend += (Math.max(-0.22, Math.min(0.22, turn * 0.16)) - f.bend) * Math.min(1, dt * 5);
+    const cp = Math.cos(f.pitch);
+    f.fwd.set(Math.cos(f.yaw) * cp, Math.sin(f.pitch), Math.sin(f.yaw) * cp);
     const side = tmpU.crossVectors(f.fwd, UP).normalize();
     const up = tmpS.crossVectors(side, f.fwd).normalize();
     tmpM.makeBasis(f.fwd, up, side);
