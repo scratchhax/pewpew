@@ -31,7 +31,7 @@ export const MAINFRAME_DEFAULTS = {
   // scene budgets = the HIGH preset
   mMaxPackets: 900,
   mChunks: 4,            // board sections drawn ahead
-  mDetail: 1536,         // board texture width per section (px)
+  mDetail: 1280,         // board texture width per section (px)
   mBloom: true,
   mSmooth: true,         // multisampled edges (applies on reload)
 };
@@ -39,7 +39,7 @@ export const MAINFRAME_DEFAULTS = {
 export const MAINFRAME_BUDGETS: Budgets = {
   low: { mMaxPackets: 400, mChunks: 3, mDetail: 768, mBloom: false, mSmooth: false },
   medium: { mMaxPackets: 650, mChunks: 3, mDetail: 1024, mBloom: true, mSmooth: true },
-  high: { mMaxPackets: 900, mChunks: 4, mDetail: 1536, mBloom: true, mSmooth: true },
+  high: { mMaxPackets: 900, mChunks: 4, mDetail: 1280, mBloom: true, mSmooth: true },
   ultra: { mMaxPackets: 1300, mChunks: 5, mDetail: 2048, mBloom: true, mSmooth: true },
 };
 
@@ -79,7 +79,9 @@ export const MAINFRAME_CONTROLS = {
         (packets green, shatters red, lookups blue, parts yellow, antennas purple, worms amber) stay fixed.`,
 };
 
+/** Instrument modules racked over the board. */
 export const MAINFRAME_HUD: HudLabelOverrides = {
+  mark: '▸',
   uplink: 'BUS',
   link: 'ONLINE',
   weather: { calm: 'NOMINAL', storm: 'HEAVY LOAD', hurricane: 'OVERCLOCK' },

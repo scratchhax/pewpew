@@ -255,7 +255,9 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
   const camera = new PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.5, 1500);
   camera.position.set(0, 17, 64);
 
-  const target = new WebGLRenderTarget(window.innerWidth * ratio, window.innerHeight * ratio, { type: HalfFloatType, samples: msaa ? 4 : 0 });
+  // multisampling is charged per pixel of the whole screen, so big surfaces take fewer samples
+  const px = window.innerWidth * window.innerHeight * ratio * ratio;
+  const target = new WebGLRenderTarget(window.innerWidth * ratio, window.innerHeight * ratio, { type: HalfFloatType, samples: msaa ? (px > 2.2e6 ? 2 : 4) : 0 });
   const composer = new EffectComposer(renderer, target);
   composer.setPixelRatio(ratio);
   composer.setSize(window.innerWidth, window.innerHeight);

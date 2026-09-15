@@ -1,23 +1,86 @@
-/* Mainframe: black glass with electric-cyan hairlines over the board. Loaded only
-   with the mainframe theme; the accent comes from accentHue + the hue knob.
-   Nothing blinks: every change eases. */
+/* Mainframe: instrument modules racked over the board. Dark glass with a fine
+   measuring grid, cyan hairline frames with solder pads at the corners, LED
+   bargraphs and a serial console. Loaded only with the mainframe theme; the
+   accent comes from accentHue + the hue knob. Nothing blinks: every change eases. */
 body[data-theme="mainframe"] { background: #020406; }
-body[data-theme="mainframe"] #hud { color: #d8f6ff; }
-body[data-theme="mainframe"] .panel {
-  background: linear-gradient(160deg, rgba(4, 10, 14, 0.8), rgba(2, 6, 10, 0.6));
-  clip-path: none;
-  border: 1px solid rgba(90, 240, 255, 0.3);
-  box-shadow: 0 0 12px rgba(60, 220, 255, 0.12);
-  filter: none;
+body[data-theme="mainframe"] #hud {
+  color: #c9f7ff;
+  font-family: 'Cascadia Mono', Consolas, 'Courier New', monospace;
 }
-body[data-theme="mainframe"] .panel-head { border-bottom-color: rgba(90, 240, 255, 0.3); letter-spacing: 4px; }
+body[data-theme="mainframe"] .panel {
+  position: relative;
+  padding: 9px 13px 11px;
+  clip-path: none;
+  filter: none;
+  border: 1px solid rgba(90, 240, 255, 0.35);
+  border-radius: 2px;
+  /* a graticule, like the face of an instrument */
+  background:
+    repeating-linear-gradient(0deg, rgba(90, 240, 255, 0.045) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(90deg, rgba(90, 240, 255, 0.035) 0 1px, transparent 1px 8px),
+    linear-gradient(180deg, rgba(3, 14, 19, 0.88), rgba(1, 7, 10, 0.8));
+  box-shadow: inset 0 0 20px rgba(0, 90, 120, 0.3), 0 0 10px rgba(0, 180, 220, 0.1);
+}
+/* solder pads at opposite corners, where the module bolts to the rack */
+body[data-theme="mainframe"] .panel::before,
+body[data-theme="mainframe"] .panel::after {
+  content: ''; position: absolute; width: 5px; height: 5px; border-radius: 50%;
+  background: rgba(150, 245, 255, 0.45); box-shadow: 0 0 6px rgba(90, 240, 255, 0.45);
+}
+body[data-theme="mainframe"] .panel::before { left: 5px; top: 5px; }
+body[data-theme="mainframe"] .panel::after { right: 5px; bottom: 5px; }
+
+body[data-theme="mainframe"] .panel-head {
+  font-size: 9px; letter-spacing: 4px; color: #7ef3ff;
+  border-bottom: 1px dashed rgba(90, 240, 255, 0.28);
+  padding-bottom: 5px; margin-bottom: 8px;
+  text-shadow: 0 0 6px rgba(90, 240, 255, 0.35);
+}
 body[data-theme="mainframe"] .corner { border-color: rgba(90, 240, 255, 0.55); filter: none; }
-body[data-theme="mainframe"] .bar { background: rgba(20, 50, 60, 0.5); clip-path: none; }
-body[data-theme="mainframe"] #spec,
-body[data-theme="mainframe"] #scope { background: rgba(2, 8, 12, 0.6); }
 body[data-theme="mainframe"] #weather { color: #7ef3ff; text-shadow: 0 0 8px rgba(126, 243, 255, 0.5); }
+
+/* LED bargraphs: a lit bar behind a segment mask */
+body[data-theme="mainframe"] .bar {
+  position: relative; height: 11px; clip-path: none;
+  background: rgba(6, 26, 32, 0.85);
+  border: 1px solid rgba(90, 240, 255, 0.22);
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.6);
+}
+body[data-theme="mainframe"] .bar::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(90deg, transparent 0 6px, rgba(2, 8, 12, 0.92) 6px 8px);
+}
+body[data-theme="mainframe"] #threat-fill { background: linear-gradient(90deg, #ffbe4a, #ff5a5a); background-size: auto; }
+body[data-theme="mainframe"] #energy-fill { background: linear-gradient(90deg, #1e7bff, #7ef3ff); background-size: auto; }
+body[data-theme="mainframe"] .bar-label { width: 52px; }
+
+/* readouts with dotted leaders, like a datasheet */
+body[data-theme="mainframe"] .stat-row { letter-spacing: 1.5px; border-bottom: 1px dotted rgba(90, 240, 255, 0.14); }
+body[data-theme="mainframe"] .stat-row:last-child { border-bottom: none; }
+body[data-theme="mainframe"] .stat-row b { color: #e6feff; }
+body[data-theme="mainframe"] .mw-row { color: #ff8f8f; }
+body[data-theme="mainframe"] .mw-bar { background: rgba(50, 14, 14, 0.5); }
+
+body[data-theme="mainframe"] #spec,
+body[data-theme="mainframe"] #scope {
+  background: rgba(1, 10, 14, 0.7);
+  border: 1px solid rgba(90, 240, 255, 0.18);
+}
+body[data-theme="mainframe"] #radar {
+  background: rgba(1, 10, 14, 0.6);
+  border: 1px solid rgba(90, 240, 255, 0.25); border-radius: 2px;
+}
+body[data-theme="mainframe"] #rate { color: #7ef3ff; }
+
+/* the serial console */
+body[data-theme="mainframe"] #terminal { font-size: 11px; }
+body[data-theme="mainframe"] #terminal-body div { text-shadow: 0 0 6px rgba(0, 140, 180, 0.35); }
+
 body[data-theme="mainframe"] #settings {
-  background: rgba(3, 8, 12, 0.96); clip-path: none;
+  background:
+    repeating-linear-gradient(0deg, rgba(90, 240, 255, 0.03) 0 1px, transparent 1px 8px),
+    linear-gradient(180deg, rgba(3, 12, 16, 0.97), rgba(1, 7, 10, 0.97));
+  clip-path: none; border-radius: 2px;
   border: 1px solid rgba(90, 240, 255, 0.35); filter: none; color: #d8f6ff;
 }
 body[data-theme="mainframe"] .set-tab { color: #bfeef8; background: rgba(10, 40, 50, 0.5); border-color: rgba(90, 240, 255, 0.25); }

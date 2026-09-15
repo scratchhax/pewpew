@@ -381,6 +381,9 @@ the walls, the internet is everything outside. The HUD is relabelled to match
 | wifi | AP and gateway hosts are buildings: joins walk in the door, leaves and failures hurry out, and the building's lamp warms toward its recent activity |
 | system | the generator browns out: every light dims smoothly and recovers |
 
+**The HUD is the outpost's own paperwork:** notes on hand-cut card taped to the
+wall, stencilled headings, ammo-box gauges and a radio log on ruled paper.
+
 **Dead country.** The ground and trees are drained to grey-brown, with old
 bloodstains outside the walls. That happens once when the scene is built, so
 it costs nothing per frame. Traffic weather is the time of day: CALM is an
@@ -660,6 +663,9 @@ pulses, so it's never still, and addresses drift up through the air.
 | dhcp | a pick-and-place arm lowers a new part into an empty socket, labelled with the device's hostname |
 | wifi | rings spread from a printed antenna: wide purple ones for a join, short red ones for a failure |
 | system | a brownout: the LEDs, the light and the packets dim and recover |
+
+**The HUD is a rack of instrument modules:** graticule faces behind cyan
+hairline frames, solder pads at the corners, LED bargraphs and a serial console.
 
 Traffic weather is the board's load: **NOMINAL** on a calm network, **HEAVY
 LOAD** in a storm (faster traffic, a little faster flight), and **OVERCLOCK** in a
@@ -1048,6 +1054,10 @@ bundles every setting that trades looks for frame time.
   frames stay under 75% of the target for 5 seconds, Auto drops one tier. It
   never steps back up, so it can't flap, and the System tab says which tier
   it's running and why.
+- **If the GPU gives up**, the browser drops the scene's WebGL context and the
+  page goes black with nothing in the console. The viewer notices, steps down
+  one tier and reloads itself (twice at most), so a kiosk comes back on its
+  own. The console says so when it happens.
 - Moving any single value switches the preset to **Custom** and keeps your
   numbers.
 - **Render scale** trades sharpness for GPU work: 0.6 draws about a third of
@@ -1114,7 +1124,7 @@ Each scene adds its own budgets:
 |-----------|-----|--------|----------|-------|
 | Packets | 400 | 650 | 900 | 1300 |
 | Board ahead (sections) | 3 | 3 | 4 | 5 |
-| Board detail (texture width, px) | 768 | 1024 | 1536 | 2048 |
+| Board detail (texture width, px) | 768 | 1024 | 1280 | 2048 |
 | Bloom | off | on | on | on |
 | Smooth edges (multisampling) | off | on | on | on |
 

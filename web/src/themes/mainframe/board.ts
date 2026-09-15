@@ -1,6 +1,6 @@
 import {
   BoxGeometry, BufferGeometry, CanvasTexture, CircleGeometry, Color, CylinderGeometry, DoubleSide, Float32BufferAttribute,
-  Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, RepeatWrapping, SRGBColorSpace, Uint16BufferAttribute,
+  Group, LinearFilter, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, RepeatWrapping, SRGBColorSpace, Uint16BufferAttribute,
   Uint32BufferAttribute, Vector3, type Scene, type Texture,
 } from 'three';
 
@@ -566,7 +566,12 @@ export class Chunk {
 
   private finish(c: HTMLCanvasElement, cm: HTMLCanvasElement): void {
     const B = this.board;
-    const map = new CanvasTexture(c), metal = new CanvasTexture(cm);
+    // the metalness map only marks where copper and solder mask are, so half
+    // resolution is plenty and saves a third of a section's texture memory
+    const cmHalf = document.createElement('canvas');
+    cmHalf.width = Math.max(1, cm.width >> 1); cmHalf.height = Math.max(1, cm.height >> 1);
+    cmHalf.getContext('2d')!.drawImage(cm, 0, 0, cmHalf.width, cmHalf.height);
+    const map = new CanvasTexture(c), metal = new CanvasTexture(cmHalf);
     map.colorSpace = SRGBColorSpace;
     map.anisotropy = metal.anisotropy = 8;
     this.textures.push(map, metal);
@@ -585,6 +590,9 @@ export class Chunk {
       const tex = new CanvasTexture(this.lidAtlas);
       tex.colorSpace = SRGBColorSpace;
       tex.anisotropy = 4;
+      // slots sit side by side in the atlas, so mipmaps would bleed one lid into the next
+      tex.generateMipmaps = false;
+      tex.minFilter = LinearFilter;
       this.textures.push(tex);
       this.group.add(new Mesh(lids, new MeshStandardMaterial({ map: tex, roughness: 0.7, envMap: B.env, envMapIntensity: 0.3 })));
     }

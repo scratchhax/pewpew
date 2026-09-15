@@ -47,10 +47,10 @@ body[data-theme="aquarium"] #weather {
 body[data-theme="aquarium"] #radar-wrap { top: 140px; }
 body[data-theme="aquarium"] #radar { border-radius: 50%; background: rgba(2, 24, 36, 0.45); }
 
-/* top right: gauges, water readings, predators (stacked without overlapping) */
+/* top right: gauges, water readings, predators */
 body[data-theme="aquarium"] #hud-bars { top: 22px; width: 270px; gap: 9px; }
-body[data-theme="aquarium"] #hud-stats { top: 130px; width: 270px; }
-body[data-theme="aquarium"] #hud-mw { top: 300px; width: 270px; }
+body[data-theme="aquarium"] #hud-stats { width: 270px; }
+body[data-theme="aquarium"] #hud-mw { width: 270px; }
 body[data-theme="aquarium"] .bar-row { font-size: 12px; letter-spacing: 0.3px; gap: 10px; }
 body[data-theme="aquarium"] .bar-label { width: 84px; display: flex; justify-content: space-between; opacity: 1; color: #a9dce6; }
 body[data-theme="aquarium"] .bar-label span { color: #ffffff; font-weight: 600; }

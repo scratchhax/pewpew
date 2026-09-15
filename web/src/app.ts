@@ -1,5 +1,5 @@
 import { CORE_DEFAULTS, CoreSettings, ThemeSettings, loadSettings, saveSettings } from './settings';
-import { resolveBootPerf, applyTier, guessTier, perfKeys, AutoTuner } from './perf';
+import { resolveBootPerf, applyTier, guessTier, perfKeys, AutoTuner, TIERS, type Tier } from './perf';
 import { State } from './state';
 import { Feed } from './ws';
 import { classify } from './events';
@@ -14,6 +14,9 @@ import { ScenePicker } from './hud/scenePicker';
 import { analyseTrack, listTracks, saveMeta, trackUrl, type TrackListing } from './tracks';
 import type { Theme } from './theme';
 import type { NetEvent } from './types';
+
+/** How many times this tab has already stepped down after losing the GPU context. */
+const GPU_DROP_KEY = 'pewpew.gpuDrops';
 
 /**
  * Boot the viewer with a theme. Everything here is theme-independent: the
@@ -44,6 +47,25 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
     { antialias: settings.antialias, powerPref: settings.powerPref, resolution: settings.renderScale },
   );
   if (params.has('diag')) (window as any).__diag = { ...scene.diag?.() };
+
+  // A scene that asks for more than the GPU can hold loses its WebGL context,
+  // and the page just goes black with nothing in the console. Come back one
+  // quality tier lower instead, at most twice, so a kiosk recovers on its own.
+  document.getElementById('app')!.querySelector('canvas')?.addEventListener('webglcontextlost', (ev) => {
+    ev.preventDefault();
+    const now = (settings.quality === 'auto' ? tuner.tier : settings.quality) as Tier | null;
+    const next = now && TIERS.indexOf(now) > 0 ? TIERS[TIERS.indexOf(now) - 1] : null;
+    let drops = 0;
+    try { drops = Number(sessionStorage.getItem(GPU_DROP_KEY) ?? 0); } catch { /* private window */ }
+    console.warn('[pewpew] the GPU dropped the WebGL context'
+      + (next && drops < 2 ? `: reloading at ${next} quality` : ': reload to try again'));
+    if (!next || drops >= 2) return;
+    try { sessionStorage.setItem(GPU_DROP_KEY, String(drops + 1)); } catch { /* private window */ }
+    settings.quality = next;
+    applyTier(settings, theme.budgets, next);
+    saveSettings(settings);
+    setTimeout(() => location.reload(), 500);
+  });
 
   // HUD accent follows the colour knobs (event-law colours stay fixed)
   function applyColors(): void {

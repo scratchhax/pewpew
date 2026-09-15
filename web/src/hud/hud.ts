@@ -425,6 +425,27 @@ export class Hud {
       this.statAcc = 0;
       if (settings.telemetry) this.updateStats();
       if (settings.mostWanted) this.drawMostWanted();
+      this.stack(['hud-bars', 'hud-stats', 'hud-mw'], 12);
+      this.stack(['hud-topleft', 'radar-wrap'], 14);
+    }
+  }
+
+  private baseTop = new Map<string, number>();
+  /**
+   * Stack a column of panels: each one sits at its own CSS top, or below the
+   * one above it, whichever is lower. Panel heights depend on the scene's
+   * labels, font and padding, so a fixed offset can't hold for every theme.
+   */
+  private stack(ids: string[], gap: number): void {
+    let bottom = -1;
+    for (const id of ids) {
+      const el = q(id);
+      if (!this.baseTop.has(id)) this.baseTop.set(id, parseFloat(getComputedStyle(el).top) || 0);
+      if (el.style.display === 'none') continue;
+      const base = this.baseTop.get(id)!;
+      const top = bottom < 0 ? base : Math.max(base, bottom + gap);
+      if (el.style.top !== `${top}px`) el.style.top = `${top}px`;
+      bottom = top + el.getBoundingClientRect().height;
     }
   }
 

@@ -1,21 +1,90 @@
-/* Last Outpost: warm, rusted HUD. Loaded only with the zombie theme; the
-   accent colour itself comes from the theme's accentHue + the hue knob. */
-body[data-theme="zombie"] #hud { color: #f0dcb4; }
+/* Last Outpost: notes and salvaged gear taped to a plank wall, read by lamplight.
+   Hand-cut card, tape at the corners, stencilled headings and a ruled radio log.
+   Loaded only with the zombie theme; the accent comes from accentHue + the hue
+   knob. Nothing blinks in this theme. */
+body[data-theme="zombie"] #hud { color: #f0dcb4; font-family: 'Courier New', monospace; }
+
 body[data-theme="zombie"] .panel {
-  background: linear-gradient(160deg, rgba(34, 26, 16, 0.84), rgba(20, 16, 10, 0.64));
-  filter: drop-shadow(0 0 6px rgba(232, 106, 23, 0.22));
+  position: relative;
+  padding: 11px 14px 12px;
+  /* card stock: warm paper over lamplight, with a fibre grain */
+  background:
+    repeating-linear-gradient(94deg, rgba(255, 232, 186, 0.035) 0 2px, transparent 2px 6px),
+    radial-gradient(120% 90% at 20% 0%, rgba(232, 161, 58, 0.14), transparent 60%),
+    linear-gradient(162deg, rgba(48, 36, 22, 0.9), rgba(22, 17, 11, 0.76));
+  /* hand-cut, so no two edges are straight */
+  clip-path: polygon(0 5px, 7px 0, 38% 3px, calc(100% - 10px) 0, 100% 7px, calc(100% - 2px) 62%,
+    100% calc(100% - 6px), calc(100% - 13px) 100%, 44% calc(100% - 3px), 6px 100%, 1px calc(100% - 9px), 3px 40%);
+  filter: drop-shadow(2px 3px 5px rgba(0, 0, 0, 0.55));
 }
-body[data-theme="zombie"] .panel-head { border-bottom-color: rgba(232, 161, 58, 0.3); }
+/* a strip of tape holding it to the wall */
+body[data-theme="zombie"] .panel::after {
+  content: ''; position: absolute; top: 0; left: 16px; width: 54px; height: 13px;
+  background: linear-gradient(180deg, rgba(232, 214, 168, 0.34), rgba(226, 204, 156, 0.18));
+  border-left: 1px solid rgba(255, 240, 205, 0.16); border-right: 1px solid rgba(255, 240, 205, 0.16);
+  transform: rotate(-3.5deg);
+}
+body[data-theme="zombie"] #terminal::after { left: auto; right: 22px; transform: rotate(2.5deg); }
+
+body[data-theme="zombie"] .panel-head {
+  font-weight: bold; font-size: 10px; letter-spacing: 5px; color: #ffb454;
+  border-bottom: none; padding-bottom: 7px; margin-bottom: 9px;
+  /* a marker line drawn under the heading */
+  background: repeating-linear-gradient(90deg, rgba(232, 161, 58, 0.55) 0 7px, rgba(232, 161, 58, 0.12) 7px 11px) left bottom / 100% 2px no-repeat;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
 body[data-theme="zombie"] .corner {
   border-color: rgba(232, 106, 23, 0.6);
   filter: drop-shadow(0 0 5px rgba(232, 106, 23, 0.35));
 }
-body[data-theme="zombie"] .bar { background: rgba(60, 44, 24, 0.6); }
+
+/* the radio */
+body[data-theme="zombie"] #weather { color: #ffb454; text-shadow: 0 0 10px rgba(232, 106, 23, 0.5); }
+body[data-theme="zombie"] #radar {
+  border-radius: 50%; background: rgba(12, 20, 12, 0.55);
+  border: 2px solid rgba(232, 161, 58, 0.4); box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.6);
+}
+
+/* gauges read like ammo-box stencils */
+body[data-theme="zombie"] .bar {
+  height: 12px; clip-path: none; background: rgba(28, 20, 12, 0.85);
+  border: 1px solid rgba(232, 161, 58, 0.4); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+body[data-theme="zombie"] #threat-fill {
+  background: repeating-linear-gradient(90deg, #e2582a 0 7px, rgba(20, 10, 6, 0.55) 7px 10px);
+  background-size: auto;
+}
+body[data-theme="zombie"] #energy-fill {
+  background: repeating-linear-gradient(90deg, #c8a13a 0 7px, rgba(20, 14, 6, 0.55) 7px 10px);
+  background-size: auto;
+}
+body[data-theme="zombie"] .bar-label { width: 62px; }
+
+/* the survival log: a tally on ruled paper */
+body[data-theme="zombie"] .stat-row { letter-spacing: 1.5px; border-bottom: 1px dotted rgba(240, 220, 180, 0.14); }
+body[data-theme="zombie"] .stat-row:last-child { border-bottom: none; }
+body[data-theme="zombie"] .stat-row b { color: #ffd9a0; }
+body[data-theme="zombie"] .mw-row { color: #ff9a7a; }
+body[data-theme="zombie"] .mw-bar { background: rgba(50, 18, 12, 0.5); }
+
+/* the radio log, on ruled paper */
+body[data-theme="zombie"] #terminal {
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 15px, rgba(255, 224, 170, 0.055) 15px 16px),
+    radial-gradient(120% 90% at 20% 0%, rgba(232, 161, 58, 0.14), transparent 60%),
+    linear-gradient(162deg, rgba(48, 36, 22, 0.9), rgba(22, 17, 11, 0.76));
+}
 body[data-theme="zombie"] #spec,
-body[data-theme="zombie"] #scope { background: rgba(26, 20, 12, 0.55); }
+body[data-theme="zombie"] #scope { background: rgba(26, 20, 12, 0.6); border: 1px solid rgba(232, 161, 58, 0.25); }
+body[data-theme="zombie"] #rate { color: #ffb454; }
+body[data-theme="zombie"] #hint { letter-spacing: 2px; }
+
+/* the F1 panel, same card stock */
 body[data-theme="zombie"] #settings {
-  background: rgba(24, 18, 10, 0.96);
-  filter: drop-shadow(0 0 18px rgba(232, 106, 23, 0.25));
+  background:
+    repeating-linear-gradient(94deg, rgba(255, 232, 186, 0.03) 0 2px, transparent 2px 6px),
+    linear-gradient(162deg, rgba(40, 30, 18, 0.97), rgba(20, 15, 9, 0.97));
+  filter: drop-shadow(2px 4px 10px rgba(0, 0, 0, 0.6));
   color: #f0dcb4;
 }
 body[data-theme="zombie"] .set-top { border-bottom-color: rgba(232, 161, 58, 0.25); }
@@ -32,4 +101,4 @@ body[data-theme="zombie"] #settings select {
 }
 /* no blinking in this theme: steady cursor, steady demo badge */
 body[data-theme="zombie"] .cursor { animation: none; }
-body[data-theme="zombie"] #demo-badge { animation: none; opacity: 0.9; }
+body[data-theme="zombie"] #demo-badge { animation: none; opacity: 0.9; letter-spacing: 3px; }

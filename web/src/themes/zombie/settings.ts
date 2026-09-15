@@ -80,7 +80,9 @@ export const ZOMBIE_CONTROLS = {
         colour law holds.`,
 };
 
+/** Notes stencilled on salvaged card. */
 export const ZOMBIE_HUD: HudLabelOverrides = {
+  mark: '✚',
   uplink: 'RADIO',
   link: 'ON AIR',
   weather: { calm: 'OVERCAST', storm: 'DUSK', hurricane: 'HORDE NIGHT' },
