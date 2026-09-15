@@ -14,6 +14,8 @@ your own traffic. Pick a scene per screen:
   zooms in on the people behind the traffic
 - **Mainframe**: a slow, high flight over a circuit board while your traffic races
   along the traces, diving into chips to trace intruders
+- **Aquarium**: a 3D reef tank in the spirit of the old marine aquarium
+  screensavers, where your traffic swims past as fish
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -27,6 +29,8 @@ and never touches the network itself.
 | ![panopticon](docs/spy.png) | ![panopticon eye of god](docs/spy-eye.png) |
 | **Mainframe** | **Mainframe: inside the chip** |
 | ![mainframe](docs/mainframe.png) | ![mainframe inside a chip](docs/mainframe-die.png) |
+| **Aquarium** | **Aquarium: a shark comes through** |
+| ![aquarium](docs/aquarium.png) | ![aquarium shark](docs/aquarium-shark.png) |
 
 | Midnight Run | Packet Rush | Last Outpost |
 |---|---|---|
@@ -38,6 +42,7 @@ traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew
 [Packet Rush](https://scratchhax.github.io/pewpew/?theme=rush) ·
 [Panopticon](https://scratchhax.github.io/pewpew/?theme=spy) ·
 [Mainframe](https://scratchhax.github.io/pewpew/?theme=mainframe) ·
+[Aquarium](https://scratchhax.github.io/pewpew/?theme=aquarium) ·
 Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 
 ## Contents
@@ -46,7 +51,7 @@ Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - [Highlights](#highlights)
 - [Setup](#setup): [Relay](#1-start-the-relay) · [Viewer](#2-build-the-viewer) · [UniFi logging](#3-send-unifi-logs-to-the-relay) · [Check it's working](#4-check-its-working) · [`relay.yaml`](#relayrelayyaml)
 - [Using pewpew](#using-pewpew): [Keys](#keys) · [Switching scenes](#switching-scenes) · [Log inspector](#log-inspector) · [Settings](#settings-f1)
-- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe)
+- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium)
 - [Sound](#sound)
 - [Performance and quality](#performance-and-quality)
 - [URL parameters](#url-parameters)
@@ -82,9 +87,9 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
 
 ## Highlights
 
-- **Six scenes, one relay.** Every screen picks its own scene, so the kiosk
+- **Seven scenes, one relay.** Every screen picks its own scene, so the kiosk
   in the hall and the laptop on your desk can show different worlds at the same
-  time. Three are 2D (PixiJS) and three are full 3D (three.js); a screen only
+  time. Three are 2D (PixiJS) and four are full 3D (three.js); a screen only
   downloads the renderer its scene uses.
 - **A readable picture.** Each event type has one fixed colour in every scene
   and in the log: block is red, allow green, DNS blue, DHCP yellow, Wi-Fi
@@ -93,7 +98,7 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
   organ and chiptune in space; horror synth and dead west in the compound; drum
   and bass, eurobeat and a nu-metal riff on the street; an original chip band in
   Packet Rush; cold-war synth and swung spy jazz in Panopticon; acid house,
-  breakbeat and jungle in Mainframe. The scene's sounds play along on the beat and in key: lasers,
+  breakbeat and jungle in Mainframe; lounge, bossa and dub in the Aquarium. The scene's sounds play along on the beat and in key: lasers,
   gunfire, an engine that shifts gears in time, gem chimes that climb the scale.
   There are no audio files anywhere, though you can upload your own
   [background track](#background-tracks).
@@ -224,7 +229,7 @@ minutes to start logging after a settings change or a relay restart.
 |-----|---------|--------------|
 | `syslog_bind`, `syslog_port` | `0.0.0.0`, `5514` | where syslog (UDP) is received |
 | `http_host`, `http_port` | `0.0.0.0`, `8080` | the viewer, WebSocket and health endpoints |
-| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy` or `mainframe` (every scene is also at `/<id>/`) |
+| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe` or `aquarium` (every scene is also at `/<id>/`) |
 | `buffer_size` | `500` | recent events replayed to each newly opened browser |
 | `wan_interfaces` | `[ppp0]` | which gateway interfaces count as WAN, for inbound and outbound. Look at the `IN=`/`OUT=` fields of your firewall log lines; `eth8`–`eth10` are common on UDM and UDR |
 | `wan_ips`, `vpn_networks` | empty | optional WAN addresses and VPN networks, for direction and VPN badges |
@@ -255,7 +260,7 @@ included). `python3 relay/test_cef.py` self-checks the CEF parser, and
 ![scene picker](docs/scene-picker.png)
 
 Press **F2** for the scene picker. Click a card, use the arrow keys and Enter,
-or press 1–6; Esc closes it. The **Scene** dropdown at the top of the F1 panel
+or press 1–7; Esc closes it. The **Scene** dropdown at the top of the F1 panel
 does the same. The screen fades out and loads the new scene.
 
 The pick is saved in that browser, so a kiosk pointed at the plain
@@ -268,7 +273,7 @@ different screens can show different scenes at once:
 | URL | Scene |
 |-----|-------|
 | `http://<relay-host>:8080/` | this screen's saved pick, or else the relay's `default_theme` |
-| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/` | that scene (unknown names are a 404) |
+| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/` | that scene (unknown names are a 404) |
 | any URL + `?theme=racing` | that scene (handy on the Pages demo) |
 
 The viewer checks the URL path, then `?theme=`, then the screen's saved pick,
@@ -323,7 +328,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, brownouts, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, brownouts, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming, names and addresses, how many residents the reef holds, current, camera drift |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -331,7 +336,7 @@ panel's **Apply & reload**.
 
 ## Scenes
 
-All six scenes draw the same events with the same colours. Each has its own
+All seven scenes draw the same events with the same colours. Each has its own
 HUD, sound and settings.
 
 ### Orbital Command
@@ -692,6 +697,56 @@ chip** turns dives off, **Dive: threats in a minute** sets the threat trigger,
 **Dive: random every (min)** sets how often a random dive comes round, and
 **Flight speed** sets how fast the camera flies.
 
+### Aquarium
+
+![aquarium](docs/aquarium.png)
+
+A reef tank in real 3D, in the spirit of the old marine aquarium screensavers.
+Sunlight comes down through a rippling surface in slow shafts and throws
+moving caustics over the sand, the rocks, the coral and the fish. The water
+turns bluer and murkier with distance, and specks drift past in the current.
+The reef is live rock crusted with coralline algae and polyp colonies,
+branching, brain and table coral, sea fans, tube sponges, an anemone with a
+pair of clownfish, seagrass, and a stand of kelp in the murk, all swaying with
+the water. An air stone never stops bubbling. The camera drifts very slowly
+around the reef.
+
+The fish swim like fish: a wave runs down the body toward the tail, faster the
+faster they go, pectoral fins scull when they hover, bodies bend into their
+turns, and turns are real 3D turns rather than flips. They steer smoothly,
+keep out of each other's way and stay off the reef. A green chromis school
+lives on the reef, and a few residents (a yellow tang, a regal tang, a queen
+angelfish and a butterflyfish) wander it from the start, so the tank is never
+empty.
+
+| Event | In the tank |
+|-------|-------------|
+| allow | a school of green chromis swims across: outbound left to right, inbound right to left. Busier traffic makes bigger schools, and the first fish carries an address it talked to |
+| block | a spotted pufferfish swims up to the front, swells up with its spines out at the blocked address, holds, deflates and swims off |
+| threat | a reef shark cruises through with the attacker's address and the IDS signature. Every small fish near it scatters, and a warm amber light eases into the water while it's there |
+| dns | a burst of blue bubbles rises from the air stone, with the domain riding the biggest one up to the surface |
+| dhcp | a new resident (a tang, butterflyfish or angelfish) swims in with the device's hostname and stays on the reef. When the reef is full, the oldest newcomer swims away |
+| wifi | the treasure chest creaks open with a warm glow and a stream of purple bubbles for a join; for a failure its lid pops up and slams shut |
+| system | the tank light dims and slowly comes back |
+
+Traffic weather is the water: **CALM WATER** on a calm network, **CHOPPY** in a
+storm, and **RIP CURRENT** in a hurricane, where the current pulls harder, the
+kelp and grass lean over, the fish swim faster, the surface churns and the
+water turns murky.
+
+![aquarium in motion](docs/aquarium.gif)
+
+| The chest opens for a Wi-Fi join | A shark cruises through |
+|---|---|
+| ![aquarium chest](docs/aquarium-chest.png) | ![aquarium shark](docs/aquarium-shark.png) |
+
+Everything in the tank is generated in code when the scene loads: the fish are
+painted in side view and wrapped onto 3D bodies, and the rock, coral, kelp and
+sand are shaped from noise. In F1 → Scene, each event's fish or effect can be
+turned off, **Residents on the reef** sets how many residents stay before the
+oldest leaves, **Current** scales how much the water moves, and **Camera
+drift** stops the camera.
+
 ## Sound
 
 All sound is synthesized in the browser with the WebAudio API. Browsers only
@@ -887,6 +942,32 @@ The music drops to half volume during a dive. Fans hum and the board buzzes
 underneath, louder when it overclocks, and the rush of air rises with the
 flight speed.
 
+### Aquarium's soundtrack
+
+Four styles take turns, every 6 minutes by default:
+
+| Style | Sound |
+|-------|-------|
+| Lagoon | 80 bpm lounge: soft electric piano chords, a round bass, a rim click |
+| Tidepool | 96 bpm bossa: plucked patterns that change every few bars, a shaker, a soft pad |
+| Kelp dub | 70 bpm dub: echoing chord stabs, a deep sub bass, a lazy snare |
+| The abyss | 58 bpm ambient: slow pads, glass notes, a far-off choir |
+
+The tank plays along:
+
+| Event | Sound |
+|-------|-------|
+| allow | traffic plays the melody on the style's lead, and a school swishes past |
+| block | a swelling tone as the pufferfish inflates, and a sigh as it lets go |
+| threat | a low cello swell as the shark arrives, with a slow heartbeat while it's in the tank |
+| dns | bubbles blipping upward in key |
+| dhcp | a glass chime for the new resident |
+| wifi | the chest creaking open with a bell chord, or creaking and banging shut |
+| system | a sinking tone as the light dims |
+
+The pump hums, the water moves louder in rough weather, the air stone blips
+now and then, and bubbles pop softly at the surface.
+
 ### Background tracks
 
 Play your own music in any scene. In F1 → Audio → **Background track**, upload
@@ -947,6 +1028,7 @@ two volumes of its own:
 | Packet Rush | **Game sounds**, **Rain** |
 | Panopticon | **Surveillance sounds**, **Room & static** |
 | Mainframe | **Board sounds**, **Fans & buzz** |
+| Aquarium | **Tank sounds**, **Pump & water** |
 
 Each scene keeps its own choices.
 
@@ -1029,9 +1111,18 @@ Each scene adds its own budgets:
 
 | Mainframe | Low | Medium | **High** | Ultra |
 |-----------|-----|--------|----------|-------|
-| Packets | 300 | 500 | 700 | 1000 |
+| Packets | 400 | 650 | 900 | 1300 |
 | Board ahead (sections) | 3 | 3 | 4 | 5 |
 | Board detail (texture width, px) | 768 | 1024 | 1536 | 2048 |
+| Bloom | off | on | on | on |
+| Smooth edges (multisampling) | off | on | on | on |
+
+| Aquarium | Low | Medium | **High** | Ultra |
+|----------|-----|--------|----------|-------|
+| Fish | 120 | 200 | 300 | 460 |
+| Specks in the water | 600 | 1200 | 2000 | 3000 |
+| Shadows | off | off | on | on |
+| Caustics | on | on | on | on |
 | Bloom | off | on | on | on |
 | Smooth edges (multisampling) | off | on | on | on |
 
@@ -1061,13 +1152,16 @@ throttled 4×, High and Low both hold about 60 fps at 720p, in orbit and in the
 close-up. It hasn't been measured on a Pi yet. **Mainframe** is 3D as well.
 Measured the same way with the CPU throttled 4×, High and Low both hold about
 60 fps at 720p, on the board and inside a chip. It hasn't been measured on
-a Pi yet either.
+a Pi yet either. **Aquarium** is the heaviest scene, built for a desktop or
+laptop GPU: it takes about two seconds to grow the reef when it loads. Measured
+headless at 1080p on a desktop GPU with heavy demo traffic, High holds 60 fps
+with nearly 300 fish; with the CPU throttled 4×, Low holds 60 and High about 56.
 
 ## URL parameters
 
 | Parameter | Effect |
 |-----------|--------|
-| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy` or `mainframe` |
+| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe` or `aquarium` |
 | `?demo=1` | synthetic traffic, no relay needed |
 | `?showreel=1` | with the demo: a looping 60-second calm → build → hurricane → cooldown arc |
 | `?rate=40` | with the demo: about 40 events per second |
@@ -1126,7 +1220,7 @@ UDM / UDR / UCG / APs ──syslog UDP :5514──► relay (Python) ──JSON 
   stores uploaded background tracks.
 - **`web/`**: Vite and TypeScript. Orbital Command, Last Outpost and Packet
   Rush render with [PixiJS v8](https://pixijs.com/), Midnight Run,
-  Panopticon and Mainframe with [three.js](https://threejs.org/). The audio and nearly all graphics are
+  Panopticon, Mainframe and Aquarium with [three.js](https://threejs.org/). The audio and nearly all graphics are
   generated in code; Last Outpost adds one small sprite atlas.
 - **`deploy/`**: the systemd unit and the kiosk autostart entry.
 
@@ -1159,8 +1253,8 @@ handles the clock, style rotation, snapping sounds to the beat, chord lookup
 and the pulse, so a scene only writes its styles and what each event sounds
 like. Every scene's `score.ts` is a worked example, and `sound/groove.ts` shows
 how visuals can follow `audio.pulse()`. Nothing in the core imports a renderer,
-so a scene can use whatever it likes: Midnight Run, Panopticon and Mainframe
-bring three.js, and only screens showing one of them download it.
+so a scene can use whatever it likes: Midnight Run, Panopticon, Mainframe and
+Aquarium bring three.js, and only screens showing one of them download it.
 
 ### Development
 
@@ -1239,11 +1333,11 @@ Actions** first.
 - Syslog parsing vendored from
   [UniFi-Insights-Plus](https://github.com/jmasarweh/UniFi-Insights-Plus) (MIT).
 - [PixiJS v8](https://pixijs.com/) renders Orbital Command, Last Outpost and
-  Packet Rush; [three.js](https://threejs.org/) renders Midnight Run, Panopticon and Mainframe.
+  Packet Rush; [three.js](https://threejs.org/) renders Midnight Run, Panopticon, Mainframe and Aquarium.
 - Every sound and melody, every Orbital Command texture, Midnight Run's car,
   city and signs, all of Packet Rush's pixel art, Panopticon's planet,
-  satellites and surveillance scenes, and Mainframe's circuit boards and the
-  silicon inside its chips are generated in code.
+  satellites and surveillance scenes, Mainframe's circuit boards and the
+  silicon inside its chips, and the Aquarium's fish, reef and water are generated in code.
 - Last Outpost sprites: [Top-down Shooter](https://kenney.nl/assets/top-down-shooter)
   by [Kenney](https://kenney.nl) (CC0), packed into
   `web/src/themes/zombie/assets/atlas.png` with its license beside it.

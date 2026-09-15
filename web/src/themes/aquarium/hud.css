@@ -1,0 +1,42 @@
+/* Aquarium: frosted glass panels with sea-green hairlines, like a reef
+   controller's display. Loaded only with the aquarium theme; the accent comes
+   from accentHue + the hue knob. Nothing blinks: every change eases. */
+body[data-theme="aquarium"] { background: #02203a; }
+body[data-theme="aquarium"] #hud { color: #e4fbff; }
+body[data-theme="aquarium"] .panel {
+  background: linear-gradient(160deg, rgba(4, 30, 44, 0.62), rgba(2, 18, 30, 0.48));
+  clip-path: none;
+  border: 1px solid rgba(140, 230, 240, 0.28);
+  border-radius: 6px;
+  box-shadow: 0 4px 18px rgba(0, 10, 20, 0.35);
+  backdrop-filter: blur(3px);
+  filter: none;
+}
+body[data-theme="aquarium"] .panel-head { border-bottom-color: rgba(140, 230, 240, 0.28); letter-spacing: 3px; }
+body[data-theme="aquarium"] .corner { display: none; }
+body[data-theme="aquarium"] .bar { background: rgba(20, 70, 90, 0.5); clip-path: none; border-radius: 2px; }
+body[data-theme="aquarium"] #spec,
+body[data-theme="aquarium"] #scope { background: rgba(2, 20, 32, 0.5); }
+body[data-theme="aquarium"] #weather { color: #9ff0ff; text-shadow: 0 0 8px rgba(120, 230, 255, 0.45); }
+body[data-theme="aquarium"] #settings {
+  background: rgba(3, 22, 34, 0.96); clip-path: none; border-radius: 6px;
+  border: 1px solid rgba(140, 230, 240, 0.35); filter: none; color: #e4fbff;
+}
+body[data-theme="aquarium"] .set-tab { color: #c4eef6; background: rgba(10, 50, 66, 0.5); border-color: rgba(140, 230, 240, 0.25); }
+body[data-theme="aquarium"] .set-tab.active { color: #02141e; background: var(--accent); }
+body[data-theme="aquarium"] #settings select { background: rgba(8, 40, 54, 0.85); color: #e4fbff; border-color: rgba(140, 230, 240, 0.3); }
+body[data-theme="aquarium"] .cursor { animation: none; }
+body[data-theme="aquarium"] #demo-badge { animation: none; opacity: 0.9; }
+
+/* names and addresses beside the fish */
+#aq-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 8; overflow: hidden; }
+.aq-label {
+  position: absolute; left: 0; top: 0; white-space: nowrap;
+  font: 600 12px/1.2 'Segoe UI', system-ui, sans-serif; letter-spacing: 0.5px;
+  padding: 2px 8px; border-radius: 10px;
+  background: rgba(2, 24, 38, 0.45); border: 1px solid rgba(255, 255, 255, 0.18);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  opacity: 0; transition: opacity 0.9s ease;
+  will-change: transform;
+}
+.aq-label.on { opacity: 0.92; }
