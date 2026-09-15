@@ -94,7 +94,8 @@ interface Car extends Body {
   lane: number;
   laneNow: number;          // the lane it's actually steering for
   target: number;           // speed the driver wants
-  ratio: number;            // traffic cruise speed as a share of ours
+  ratio: number;            // traffic cruise speed as a share of our cruising speed
+  yieldCool: number;        // seconds before it will move over for us again
   age: number;
   phase: number;            // rival/police script phase
   life: number;
@@ -131,6 +132,8 @@ export interface TrafficHits {
   /** Change to our forward speed from collisions this frame (m/s). */
   playerDv: number;
   impacts: Impact[];
+  /** We just got boxed in: lean on the horn. */
+  honk: boolean;
 }
 
 /**
@@ -146,6 +149,7 @@ export class Traffic {
   player: CarRig;
   private pb: Body = { x: LANES[1], z: 0, vx: 0, speed: 30, yaw: 0, yawRate: 0, mass: 1.25, crashed: 0 };
   private playerLane = 1;
+  private boxed = 0;             // seconds stuck behind someone with no way through
   private cars: Car[] = [];
   private blocks: Block[] = [];
   private gates: Gate[] = [];
@@ -154,6 +158,7 @@ export class Traffic {
   private postMat = curved(new MeshStandardMaterial({ color: 0x15151c }));
   private barrierMat: MeshStandardMaterial | null = null;
   maxCars = 20;
+  private cruise = 30;
   far = 700;
 
   constructor(private scene: Scene, private glowTex: Texture) {
@@ -188,8 +193,8 @@ export class Traffic {
     }
     const car: Car = {
       rig, kind, lane, laneNow: lane, x: LANES[lane], z, vx: 0, speed, target: speed, yaw: 0, yawRate: 0,
-      mass: kind === 'police' ? 1.4 : 1, crashed: 0, age: 0, phase: 0, life: 0,
-      ratio: speed / Math.max(1, this.pb.speed),
+      mass: kind === 'police' ? 1.4 : 1, crashed: 0, age: 0, phase: 0, life: 0, yieldCool: 0,
+      ratio: speed / Math.max(1, this.cruise),
     };
     this.cars.push(car);
     return car;
@@ -201,8 +206,10 @@ export class Traffic {
     if (civil >= this.maxCars) return;
     const lane = (Math.random() * 4) | 0;
     // overtakers use the lane farthest from ours, so they don't brush past the camera
-    if (inbound) this.addCar('overtake', this.playerLane < 2 ? 3 : 0, NEAR - 2, playerSpeed * 1.3, color);
-    else this.addCar('traffic', lane, -this.far * (0.7 + Math.random() * 0.25), playerSpeed * (0.45 + Math.random() * 0.25), color);
+    if (inbound) { this.addCar('overtake', this.playerLane < 2 ? 3 : 0, NEAR - 2, playerSpeed * 1.3, color); return; }
+    const z = -this.far * (0.7 + Math.random() * 0.25);
+    if (this.bandFull(z)) return;
+    this.addCar('traffic', lane, z, this.cruise * (0.45 + Math.random() * 0.25), color);
   }
 
   /** DHCP: a rival appears up ahead with the device's name on a plate; we reel it in, race, it boosts away. */
@@ -292,16 +299,19 @@ export class Traffic {
   }
 
   // ── update ──
-  update(dt: number, t: number, playerSpeed: number, camera: PerspectiveCamera): TrafficHits {
-    const hits: TrafficHits = { smashed: 0, passed: 0, speedLimit: Infinity, playerDv: 0, impacts: [] };
+  /** `cruise`: the pace we want (traffic speeds are shares of it). */
+  update(dt: number, t: number, playerSpeed: number, cruise: number, aggression: number, camera: PerspectiveCamera): TrafficHits {
+    this.aggression = Math.max(0, Math.min(1, aggression));
+    const hits: TrafficHits = { smashed: 0, passed: 0, speedLimit: Infinity, playerDv: 0, impacts: [], honk: false };
     const pb = this.pb;
     pb.speed = playerSpeed;
+    this.cruise = cruise;
     // sub-step so fast closing speeds can't tunnel through each other on a slow frame
     const steps = Math.min(4, Math.max(1, Math.ceil(dt / 0.02)));
     const h = dt / steps;
 
-    this.drivePlayer(hits);
-    for (const c of this.cars) this.driveCar(c, playerSpeed, dt);
+    this.drivePlayer(hits, dt);
+    for (const c of this.cars) this.driveCar(c, playerSpeed, dt, cruise);
 
     for (let k = 0; k < steps; k++) {
       this.integrate(pb, h, 0);
@@ -347,30 +357,100 @@ export class Traffic {
   }
 
   // ── drivers ──
-  /** Our driver: keep the lane while there's room, move over when the next lane is clear, brake when boxed in. */
-  private drivePlayer(hits: TrafficHits): void {
+  /**
+   * Our driver weaves. Every frame it scores all four lanes by the clear road
+   * ahead (a barricade counts as open road: we smash those), checks that the
+   * sideways move is actually open, including any lane passed through on the
+   * way, and commits to the best one. It only brakes when there's truly no
+   * way through, and even then keeps looking.
+   */
+  private drivePlayer(hits: TrafficHits, dt: number): void {
     const pb = this.pb;
+    const clearAt = (x: number) => {
+      let gap = 300;
+      for (const c of this.cars) {
+        if (Math.abs(c.x - x) > 2.05 || c.z >= -1) continue;
+        // a car pulling away is less of a wall than one we're closing on
+        const closing = Math.max(0, pb.speed - c.speed);
+        const g = (-c.z - 4.6) + (closing < 2 ? 40 : 0);
+        if (g < gap) gap = g;
+      }
+      return gap;
+    };
+    // a busy network drives a battering ram; being boxed in for a moment makes anyone pushy
+    const agg = Math.max(this.aggression, Math.min(0.85, this.boxed * 1.4));
+    pb.mass = 1.25 + agg * 3;
     if (!pb.crashed) {
-      const here = this.roomAhead(LANES[this.playerLane], 0, null, false);
-      const blocked = this.roomAhead(LANES[this.playerLane], 0, null, true);
-      if (Math.min(here.gap, blocked.gap + 25) < 65) {
-        let best = this.playerLane, bestGap = Math.min(here.gap, blocked.gap + 25);
-        // squeeze past a wreck or a crawler with a smaller gap than a normal lane change needs
-        const stuck = here.car && (here.car.crashed > 0 || here.car.speed < this.pb.speed * 0.3) && here.gap < 30;
-        for (const l of [this.playerLane - 1, this.playerLane + 1]) {
-          if (l < 0 || l > 3 || !this.laneFree(LANES[l], stuck ? -7 : -11, stuck ? 6 : 10, null)) continue;
-          const r = this.roomAhead(LANES[l], 0, null, false);
-          if (r.gap > bestGap + 12) { best = l; bestGap = r.gap; }
+      const current = clearAt(LANES[this.playerLane]);
+      let best = this.playerLane, bestScore = -Infinity;
+      for (let l = 0; l < 4; l++) {
+        const tx = LANES[l];
+        if (l !== this.playerLane && !this.pathOpen(pb.x, tx, agg)) continue;
+        const gap = clearAt(tx);
+        // prefer open road; the busier it gets, the less we care about how far we have to move
+        const score = Math.min(gap, 220) - Math.abs(l - this.playerLane) * (7 - agg * 5) + (l === this.playerLane ? 12 - agg * 8 : 0);
+        if (score > bestScore) { bestScore = score; best = l; }
+      }
+      if (best !== this.playerLane && (current < 160 || clearAt(LANES[best]) > current + 50)) this.playerLane = best;
+      this.boxed = current < 30 && best === this.playerLane ? this.boxed + dt : 0;
+    }
+    // brake only when calm, and never to a crawl; when it's busy we barge through
+    const lead = this.roomAhead(pb.x, 0, null, false);
+    if (lead.car && lead.gap < 14 && agg < 0.55) {
+      hits.speedLimit = Math.max(this.cruise * (0.55 + agg * 0.4), lead.speed + (lead.gap - 4) * 1.6);
+    }
+    hits.honk = this.boxed > 0.5 && this.boxed - dt <= 0.5;
+  }
+
+  /** How hard our driver pushes: 0 on a quiet network, 1 when it's slammed. Set by the theme. */
+  aggression = 0;
+
+  /** Can our car slide sideways from x0 to x1 right now? Aggression accepts tighter gaps (and some paint). */
+  private pathOpen(x0: number, x1: number, agg: number): boolean {
+    const lo = Math.min(x0, x1) - (2.0 - agg * 0.6), hi = Math.max(x0, x1) + (2.0 - agg * 0.6);
+    const front = -8.5 + agg * 4.5, back = 6.5 - agg * 3.5;
+    for (const c of this.cars) {
+      if (Math.abs(c.x - x0) < 1.0) continue;         // cars in our own lane don't block a move out of it
+      if (c.x > lo && c.x < hi && c.z > front && c.z < back) return false;
+    }
+    return true;
+  }
+
+  /**
+   * There is always a path. Slower traffic in our planned lane moves over when
+   * it sees us coming; if it can't, it floors it and gets out of our way ahead.
+   * Returns true when this car is clearing the road (its speed is handled here).
+   */
+  private yieldTo(c: Car, dt: number): boolean {
+    c.yieldCool = Math.max(0, c.yieldCool - dt);
+    if (c.kind === 'police' || (c.kind === 'rival' && c.phase === 1)) return false;
+    const px = LANES[this.playerLane];
+    const reach = 90 + this.aggression * 60 + (this.boxed > 0.5 ? 40 : 0);
+    if (c.z > -3 || c.z < -reach || Math.abs(c.x - px) > 2.0 || c.speed > this.pb.speed - 1) return false;
+    if (c.yieldCool <= 0 && Math.abs(c.x - LANES[c.laneNow]) < 0.6) {
+      const away = this.pb.x < c.x ? [c.lane + 1, c.lane - 1] : [c.lane - 1, c.lane + 1];
+      for (const l of away) {
+        if (l < 0 || l > 3 || l === this.playerLane) continue;
+        if (this.laneFree(LANES[l], c.z - 9, c.z + 8, c)) {
+          c.lane = l; c.laneNow = l; c.yieldCool = 2;
+          return false;
         }
-        this.playerLane = best;
       }
     }
-    const lead = this.roomAhead(pb.x, 0, null, false);
-    if (lead.car && lead.gap < 30) hits.speedLimit = Math.max(4, lead.speed + (lead.gap - 10) * 0.9);
+    // nowhere to go: get out ahead of us
+    c.target = Math.max(c.target, this.pb.speed + 4 + this.aggression * 6);
+    return true;
+  }
+
+  /** Never fill every lane at one distance: new traffic skips a band that already has three cars. */
+  private bandFull(z: number): boolean {
+    let lanes = 0;
+    for (let l = 0; l < 4; l++) if (!this.laneFree(LANES[l], z - 18, z + 18, null)) lanes++;
+    return lanes >= 3;
   }
 
   /** Every other driver: its script picks a speed and lane; then it follows and overtakes like anyone. */
-  private driveCar(c: Car, playerSpeed: number, dt: number): void {
+  private driveCar(c: Car, playerSpeed: number, dt: number, cruise: number): void {
     if (c.crashed) return;
     if (c.kind === 'rival') {
       const hold = -6;
@@ -385,8 +465,11 @@ export class Traffic {
       else if (c.phase === 1) { c.target = playerSpeed + (c.z - hold) * 0.8; c.lane = beside; c.life -= dt; if (c.life <= 0) c.phase = 2; }
       else c.target = playerSpeed * 0.55;                  // shaken off: falls back
     } else {
-      c.target = playerSpeed * c.ratio;
+      // traffic keeps its own pace (a share of our cruising speed, not of our current
+      // speed), so our braking never drags the whole road into a jam
+      c.target = cruise * c.ratio;
     }
+    this.yieldTo(c, dt);
 
     // scripted cars only cut in when the lane is clear alongside
     if (c.kind === 'rival' || c.kind === 'police') {
@@ -433,8 +516,10 @@ export class Traffic {
         car.speed += Math.max(-accel * h, Math.min(accel * h, car.target - car.speed));
       }
       const laneX = isPlayer ? LANES[this.playerLane] : LANES[car.laneNow];
-      const wantVx = Math.max(-6, Math.min(6, (laneX - b.x) * 1.8));
-      b.vx += (wantVx - b.vx) * Math.min(1, h * 4);
+      // we flick across lanes; traffic drifts over at a civilian pace
+      const maxVx = isPlayer ? 9.5 : 5;
+      const wantVx = Math.max(-maxVx, Math.min(maxVx, (laneX - b.x) * (isPlayer ? 3 : 1.8)));
+      b.vx += (wantVx - b.vx) * Math.min(1, h * (isPlayer ? 7 : 4));
       b.yawRate *= Math.exp(-h * 5);
     }
     // grip turns the car to face where it's going; a spin fights it
@@ -533,7 +618,7 @@ export class Traffic {
           x: (p.position.x - body.x) * 1.5 + (Math.random() - 0.5) * 5, y: 3 + Math.random() * 5,
           z: -hitSpeed * (0.25 + Math.random() * 0.2), r: (Math.random() - 0.5) * 12,
         }));
-        body.speed *= body === this.pb ? 0.75 : 0.5;
+        body.speed *= body === this.pb ? 0.8 + this.aggression * 0.15 : 0.5;
         body.vx += (body.x - piece.position.x || (Math.random() - 0.5)) * 2;
         body.yawRate += (Math.random() - 0.5) * (body === this.pb ? 1.6 : 4);
         if (body !== this.pb) body.crashed = body.crashed || 0.001;

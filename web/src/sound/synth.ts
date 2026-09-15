@@ -574,6 +574,70 @@ export class Synth {
     this.out(env, bus, pan, 0.3, 0.15);
   }
 
+  /**
+   * A horn section hit: stacked saws with a lip scoop into the note, a bright
+   * filter blat, growing vibrato on long notes and an optional fall-off at the end.
+   */
+  section(bus: Bus, t: number, f: number, g: number, len: number, pan = 0, fall = false): void {
+    if (this.busy(6)) return;
+    const a = 0.012, r = fall ? 0.28 : 0.09, end = t + a + len + r;
+    const env = this.env(t, g, a, len, r);
+    if (!env) return;
+    const lp = this.filter('lowpass', 1200, 2.2);
+    lp.frequency.setValueAtTime(900, t);
+    lp.frequency.exponentialRampToValueAtTime(5200, t + 0.035);
+    lp.frequency.exponentialRampToValueAtTime(2200, t + a + len);
+    if (fall) lp.frequency.exponentialRampToValueAtTime(700, end);
+    const vib = this.osc('sine', 5.8, t, end);
+    const depth = this.gain(0);
+    depth.gain.setValueAtTime(0, t);
+    depth.gain.linearRampToValueAtTime(len > 0.25 ? 18 : 4, t + a + len);
+    vib.connect(depth);
+    const scoop = Math.pow(2, -1.5 / 12);
+    for (const [type, det, k, m] of [['sawtooth', -9, 0.33, 1], ['sawtooth', 9, 0.33, 1], ['sawtooth', 0, 0.2, 2], ['square', 3, 0.14, 1]] as const) {
+      const o = this.osc(type, f * m * scoop, t, end, det);
+      o.frequency.exponentialRampToValueAtTime(f * m, t + 0.045);
+      if (fall) {
+        o.frequency.setValueAtTime(f * m, t + a + len);
+        o.frequency.exponentialRampToValueAtTime(f * m * Math.pow(2, -5 / 12), end);
+      }
+      depth.connect(o.detune);
+      o.connect(this.gain(k)).connect(lp);
+    }
+    const bite = this.filter('peaking', 1400, 1.2);
+    bite.gain.value = 5;
+    const drive = this.ctx.createWaveShaper();
+    drive.curve = this.drive() as Float32Array<ArrayBuffer>;
+    lp.connect(bite).connect(this.gain(0.4)).connect(drive).connect(env);
+    this.out(env, bus, pan, 0.35, 0.12);
+  }
+
+  /** Whistle lead: a pure high tone that slides in from the previous note. */
+  whistle(bus: Bus, t: number, f: number, g: number, len: number, from = 0, pan = 0): void {
+    const start = from || f;
+    this.tone(bus, t, start, { g, a: 0.02, h: len, r: 0.12, glide: f / start, pan, rev: 0.4, echo: 0.35 });
+    this.tone(bus, t, start * 2, { type: 'square', g: g * 0.05, a: 0.02, h: len, r: 0.1, glide: f / start, lp: 4000, pan });
+  }
+
+  /** A crowd shouting "hey!": buzzy voices through "eh" vowel formants. */
+  hey(bus: Bus, t: number, g: number, pan = 0): void {
+    if (this.busy(8)) return;
+    for (const [f0, p, dt] of [[165, -0.4, 0], [196, 0.35, 0.012], [147, 0.05, 0.02]] as const) {
+      const a = 0.012, h = 0.07, r = 0.16, st = t + dt, end = st + a + h + r;
+      const env = this.env(st, g, a, h, r);
+      if (!env) continue;
+      const o = this.osc('sawtooth', f0 * 1.25, st, end);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.85, end);
+      const mix = this.gain(1);
+      for (const [ff, q, k] of [[620, 6, 1], [1850, 9, 0.7], [2600, 10, 0.35]] as const) {
+        o.connect(this.filter('bandpass', ff, q)).connect(this.gain(k * 2.2)).connect(mix);
+      }
+      this.noise(st, end, 1.2).connect(this.filter('bandpass', 2400, 1.5)).connect(this.gain(0.35)).connect(mix);
+      mix.connect(env);
+      this.out(env, bus, pan + p, 0.5);
+    }
+  }
+
   /** Koto / shamisen pluck: a hard attack that bends down onto the note and buzzes out. */
   koto(bus: Bus, t: number, f: number, g: number, pan = 0): void {
     const bend = Math.pow(2, 0.6 / 12);

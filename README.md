@@ -225,6 +225,18 @@ for everyone behind it. Your car is never taken out; it gets knocked about,
 loses speed and fishtails, then recovers. Sparks fly where metal meets metal,
 and every crash is heard in place.
 
+**There's always a path.** Your driver scores all four lanes by the open road
+ahead every frame, checks the move over is physically clear (including any
+lane crossed on the way), and flicks across. Slower traffic in your planned
+lane moves over when it sees you coming, or floors it to get out ahead if it
+can't. New traffic never fills every lane at the same distance, and traffic
+keeps its own pace, so one slow car can't jam the whole road. How hard your car
+pushes rises with the event rate. On a quiet network it weaves politely and
+only brakes as a last resort. On a busy one it's a battering ram: it takes
+tighter gaps, doesn't brake for cars, shoves them aside or spins them out, and
+keeps its momentum. Boxed in for more than a moment, it leans on the horn and
+turns pushy whatever the traffic.
+
 ### Choosing a theme
 
 One relay serves every theme, so different screens can show different themes
@@ -318,7 +330,7 @@ Seven styles take turns, every 6 minutes by default:
 
 | Style | Sound |
 |-------|-------|
-| Tokyo drift | hard-hitting hip-hop at 128 bpm: fat distorted synth-brass stabs in call-and-response, claps on the backbeat, 808s, a koto line in a Japanese scale, scratch fills and a temple gong (all original) |
+| Tokyo drift | a written song, not a generator: mid-2000s Tokyo street-racing hip-hop at 128 bpm with a horn-section hook (scoops, fall-offs, octaves and bari), a hard swung beat with claps and 808s, a whistle lead, crowd "hey!" shouts, koto, taiko, scratches and a temple gong, in a 32-bar intro / verse / hook / break / hook form. The hook and every part are original |
 | Street breaks | big-beat breakbeats at 132 bpm, a squelchy acid bass line, supersaw stabs when it's busy |
 | Night drive | slow synthwave (Em–C–A–D): octave bass, arpeggios, a saw lead melody |
 | Liquid DnB | 172 bpm rollers, a reese bass and airy seventh-chord pads |
@@ -333,6 +345,7 @@ The car is part of the band:
 | driving | an engine note pitched to the chord that climbs through each gear with speed; shifts wait for the beat and land with a turbo blow-off |
 | nitro | a whoosh and a roar as it lights |
 | collisions | a metal crash ringing in key for hard hits, a panel knock for light bumps, heard where they happen |
+| boxed in | a long lean on the horn |
 | block | a horn honking a fifth |
 | threat | a soft siren wail across two chord tones while the police are on you |
 | dhcp | a rival's engine revving past |

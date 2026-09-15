@@ -6,7 +6,7 @@ import type { Bed } from '../../sound/synth';
 /**
  * Midnight Run's soundtrack. Seven styles take turns (or one is pinned):
  *
- *   tokyo drift    : synth-brass stabs, claps, 808s, koto, scratches, a gong
+ *   tokyo drift    : a written song: horn hook, swung beat, whistle, crowd shouts, koto
  *   street breaks  : big-beat breaks, an acid bass line, stabs
  *   liquid dnb     : 172 bpm rollers, a reese bass, airy pads
  *   chrome riff    : drop-D palm-muted power chords and a heavy backbeat
@@ -223,74 +223,106 @@ class Euro extends Style {
 }
 
 // ── tokyo drift ────────────────────────────────────────────────────────────
+/** One note of a written part: step (16ths into the phrase), semitones above the tonic, length in steps. */
+type Note = [step: number, semi: number, len: number, fall?: boolean];
+
 /**
- * Hard-hitting hip-hop in the spirit of a Tokyo street-racing anthem (all
- * original): fat distorted synth-brass stabs in call-and-response bars, claps
- * on the backbeat, 808s under the kicks, a koto line in a Japanese scale,
- * scratch fills and a temple gong every eight bars.
+ * A mid-2000s Tokyo street-racing hip-hop anthem, written for this project
+ * (the hook and every part are original; the sound is the era's): a horn
+ * section hook with scoops and fall-offs, a hard swung beat with claps and
+ * 808s, a whistle lead, crowd "hey!" shouts, koto and taiko, scratches and a
+ * temple gong. Unlike the generative styles it's a *song*: fixed parts in a
+ * 32-bar form (intro, verse, hook, break, hook) that loops.
  */
 class Tokyo extends Style {
   readonly id = 'tokyo';
   readonly bpm = 128;
   readonly root = 34.65;                                       // C#
-  readonly scale = [0, 1, 5, 7, 8];                            // miyako-bushi
+  readonly scale = [0, 3, 5, 6, 7, 10];                        // minor blues
   readonly chords = [[0, 3, 7], [0, 3, 7], [-4, 0, 3], [-2, 2, 5]];     // C#m C#m A B
   readonly barsPerChord = 1;
   readonly leadOct = 4;
   readonly level = 0.4;
-  private call: Array<[number, number]> = [];      // [step, chord-tone index for the top voice]
-  private answer: Array<[number, number]> = [];
-  private kotoLine: number[] = [];
 
-  enter(): void { this.compose(); }
+  // the hook: two bars for the horn section, answered in the second bar (octave 3 above C#)
+  private static readonly HOOK: Note[] = [
+    [0, 7, 2], [3, 7, 1], [4, 10, 1], [6, 7, 2], [10, 3, 1], [11, 5, 1], [12, 6, 1], [14, 7, 2, true],
+    [16, 7, 2], [19, 10, 1], [20, 12, 2], [23, 10, 1], [24, 7, 1], [26, 5, 1], [28, 3, 1], [30, 0, 2, true],
+  ];
+  // verse stabs: short and punchy on the offbeats
+  private static readonly STABS: Note[] = [[0, 7, 1], [6, 7, 1], [10, 10, 1, true], [16, 3, 1], [22, 5, 1], [27, 7, 2, true]];
+  // whistle answer in the verse and the break
+  private static readonly WHISTLE: Note[] = [[0, 15, 3], [4, 17, 2], [6, 19, 4], [12, 17, 3], [16, 15, 2], [19, 12, 2], [22, 10, 6]];
+  // koto figure for the intro and the break
+  private static readonly KOTO: Note[] = [[0, 12, 2], [2, 13, 2], [4, 17, 2], [6, 19, 2], [8, 20, 4], [12, 19, 2], [14, 17, 2]];
 
-  private compose(): void {
-    // a punchy call on the first bar of each pair, a busier answer on the second
-    const calls = [[0, 3, 6, 8], [0, 3, 6, 10], [0, 2, 6, 8, 11], [0, 3, 8, 11]];
-    const answers = [[0, 2, 3, 6, 10, 12], [0, 3, 4, 7, 10, 13], [1, 3, 6, 8, 11, 14]];
-    this.call = pick(calls).map((s, k) => [s, k === 0 ? 0 : pick([0, 1, 2])]);
-    this.answer = pick(answers).map((s, k, arr) => [s, Math.max(0, 2 - Math.floor((k * 3) / arr.length))]);
-    let d = 5;
-    this.kotoLine = Array.from({ length: 8 }, (_, k) => {
-      d = Math.max(2, Math.min(9, d + pick([-2, -1, 1, 1, 2])));
-      return k === 3 || k === 7 ? -1 : d;
-    });
+  /** Where we are in the 32-bar song. */
+  private section(bar: number): 'intro' | 'verse' | 'hook' | 'break' {
+    const b = bar % 32;
+    return b < 4 ? 'intro' : b < 12 ? 'verse' : b < 20 ? 'hook' : b < 24 ? 'break' : 'hook';
+  }
+
+  private play(part: Note[], stepInPhrase: number, t: number, voice: (f: number, len: number, fall: boolean) => void): void {
+    for (const [st, semi, len, fall] of part) {
+      if (st === stepInPhrase) voice(this.root * Math.pow(2, 3 + semi / 12), len * this.stepDur, !!fall);
+    }
   }
 
   step(i: number, t: number, m: Mood): void {
     const s = this.s, b = this.bus, pos = i % 16, bar = Math.floor(i / 16);
+    const sec = this.section(bar), p2 = ((bar % 2) * 16) + pos;       // step within a two-bar phrase
     const root = this.tones(i, 1)[0];
-    if (pos === 0 && bar % 8 === 0) {
-      if (bar > 0) s.gong(b, t, this.tones(i, 2)[0], 0.035);
-      this.compose();
+    const swing = pos % 2 === 1 ? this.stepDur * 0.14 : 0;
+    const busy = m.night > 0.3 || m.tension > 0.3;
+
+    // ── drums ──
+    if (bar % 32 === 0 && pos === 0) s.gong(b, t, this.root * 4, 0.04);
+    if (sec === 'intro' || sec === 'break') {
+      if (pos === 0 || (sec === 'break' && pos === 10)) s.taiko(b, t, 0.16, -0.15);
+      if (sec === 'break' && pos === 8) s.taiko(b, t, 0.1, 0.25);
+      if (pos % 4 === 2) s.hat(b, t + swing, 0.01, 0.3);
+      if (sec === 'break' && bar % 4 === 3 && pos === 8) s.riser(b, t, 8 * this.stepDur, 0.04);
+    } else {
+      const kicks = busy ? [0, 3, 7, 10] : [0, 7, 10];
+      if (kicks.includes(pos)) {
+        s.kick(b, t, pos === 0 ? 0.22 : 0.16);
+        if (pos !== 3) s.eight08(b, t, pos === 7 ? root * 1.335 : root, 0.12, pos === 0 ? 0.4 : 0.22);
+      }
+      if (pos === 4 || pos === 12) { s.clap(b, t, 0.13, pos === 4 ? -0.1 : 0.1); s.snare(b, t, 0.04); }
+      if (sec === 'hook' && pos === 11) s.clap(b, t, 0.05, 0.3);             // pickup clap into the backbeat
+      s.hat(b, t + swing, pos % 2 ? 0.016 : 0.009, pos % 2 ? 0.3 : -0.25, pos === 14 && bar % 2 === 1);
+      if (sec === 'hook' && pos === 0 && bar % 2 === 0) s.taiko(b, t, 0.09, 0.2);
     }
 
-    // drums: syncopated kicks with 808s underneath, claps on 2 and 4
-    const kicks = m.night > 0.5 ? [0, 7, 10, 13] : [0, 7, 10];
-    if (kicks.includes(pos)) {
-      s.kick(b, t, pos === 0 ? 0.2 : 0.15);
-      if (pos !== 13) s.eight08(b, t, pos === 7 ? root * 1.498 : root, 0.12, pos === 7 ? 0.2 : 0.35);
-    }
-    if (pos === 4 || pos === 12) { s.clap(b, t, 0.12, pos === 4 ? -0.1 : 0.1); s.snare(b, t, 0.03); }
-    if (pos % 2 === 1) s.hat(b, t, 0.014, 0.3, pos === 15 && bar % 2 === 1);
-    else s.hat(b, t, 0.008, -0.25);
-    if (m.night > 0.4 && bar % 2 === 0 && pos === 0) s.taiko(b, t, 0.1, -0.2);
-
-    // the brass: call on even bars, answer on odd bars (calls only when it's quiet)
-    const phrase = bar % 2 === 0 ? this.call : m.night > 0.15 || m.tension > 0.2 ? this.answer : [];
-    for (const [st, top] of phrase) {
-      if (st !== pos) continue;
-      const c = this.tones(i, 3);
-      s.brass(b, t, c[0] / 2, 0.022, this.stepDur * 0.7, -0.25);
-      s.brass(b, t, c[top], 0.026, this.stepDur * 0.7, 0.25);
+    // ── crowd ──
+    if ((sec === 'hook' && bar % 2 === 1 && pos === 12) || (sec === 'intro' && bar % 4 === 3 && pos === 12)) {
+      s.hey(b, t, 0.09);
     }
 
-    // koto on the third bar of every four, a scratch fill closing the fourth
-    if (bar % 4 === 2 && pos % 2 === 0) {
-      const d = this.kotoLine[pos / 2];
-      if (d >= 0) s.koto(b, t, this.scaleTone(d, 4), 0.04, 0.15);
+    // ── horns ──
+    const horn = (f: number, len: number, fall: boolean) => {
+      s.section(b, t, f, 0.03, len * 0.85, -0.3, fall);
+      s.section(b, t + 0.008, f * 2, 0.018, len * 0.85, 0.3, fall);     // the octave above, like a real section
+      s.section(b, t + 0.004, f / 2, 0.02, len * 0.8, 0, false);        // and the bari underneath
+    };
+    if (sec === 'hook') this.play(Tokyo.HOOK, p2, t, horn);
+    if (sec === 'verse') this.play(Tokyo.STABS, p2, t, (f, len, fall) => s.section(b, t, f, 0.028, len * 0.7, 0.2, fall));
+
+    // ── whistle, koto, scratches ──
+    if ((sec === 'verse' && bar % 4 >= 2) || sec === 'break') {
+      let prev = 0;
+      for (const [st, semi, len] of Tokyo.WHISTLE) {
+        if (st === p2) s.whistle(b, t, this.root * Math.pow(2, 4 + semi / 12), 0.022, len * this.stepDur, prev, 0.15);
+        if (st < p2) prev = this.root * Math.pow(2, 4 + semi / 12);
+      }
     }
-    if (bar % 4 === 3 && pos === 12 && m.night > 0.2) s.scratch(b, t, 0.06, this.stepDur * 3, 0.2);
+    if (sec === 'intro' || (sec === 'break' && bar % 2 === 0)) {
+      this.play(Tokyo.KOTO, pos, t, (f) => s.koto(b, t, f, 0.045, -0.1));
+    }
+    if ((sec === 'verse' && bar % 4 === 3 && pos === 12) || (sec === 'hook' && bar % 8 === 3 && pos === 12)) {
+      s.scratch(b, t, 0.06, this.stepDur * 2, 0.25);
+      s.scratch(b, t + this.stepDur * 2, 0.05, this.stepDur * 2, -0.25);
+    }
   }
 
   lead(t: number, f: number, g: number, pan: number): void { this.s.koto(this.bus, t, f, g * 0.7, pan); }
@@ -440,6 +472,13 @@ class StreetConductor extends Conductor {
     const eng = this.setting<number>('rEngine');
     const pan = opts.pan ?? 0;
     const hard = Math.min(1.5, (opts.count ?? 5) / 6);
+    if (name === 'honk') {
+      // boxed in: a long lean on the horn, pitched to the chord
+      const t = s.ctx.currentTime + 0.02;
+      const f = this.chordAt(t, 3)[0];
+      for (const m of [1, 1.5]) s.tone(this.sfxBus, t, f * m, { type: 'square', g: 0.02 * eng + 0.01, a: 0.01, h: 0.5, r: 0.1, lp: 1800, pan, rev: 0.25 });
+      return;
+    }
     if (name === 'smash') {
       const t = this.slot('smash', 1, 0.3);
       if (t < 0) return;
