@@ -105,8 +105,15 @@ async function create(host: ThemeHost<typeof SPY_DEFAULTS>, init: RendererInit):
     else if (kind === 'block') { it.blocks.push(now); if (it.blocks.length > 200) it.blocks.splice(0, 100); if (!it.threats) it.klass = `INTERDICTED · ${rule}`.slice(0, 60); }
     else if (!it.klass) it.klass = `MONITORED · ${rule}`.slice(0, 60);
   };
+  /** Somewhere out in the world: not the LAN, and not broadcast, multicast, link-local or unspecified. */
+  const routable = (ip?: string | null): ip is string => {
+    if (!ip || isInternalIp(ip)) return false;
+    if (ip.includes(':')) return !/^(ff|fe8|::1?$)/i.test(ip);
+    const [a, b] = ip.split('.').map(Number);
+    return !(a === 0 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 100 && b >= 64 && b < 128));
+  };
   const external = (ev: NetEvent): string | null =>
-    ev.src_ip && !isInternalIp(ev.src_ip) ? ev.src_ip : ev.dst_ip && !isInternalIp(ev.dst_ip) ? ev.dst_ip : null;
+    routable(ev.src_ip) ? ev.src_ip : routable(ev.dst_ip) ? ev.dst_ip : null;
 
   const home = geo.home;
   const ground = () => new Vector3();
