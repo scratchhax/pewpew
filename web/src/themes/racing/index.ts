@@ -10,6 +10,8 @@ import { bend, bendAt } from './bend';
 import { glow } from './textures';
 import { racingScore } from './score';
 import { Groove } from '../../sound/groove';
+import { hudLabels } from '../../hud/hud';
+import { Dash } from './dash';
 import './hud.css';
 
 /** The event colour law, shared with the log legend. */
@@ -57,6 +59,8 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
   const traffic = new Traffic(scene, glowTex);
   traffic.poles = (zMin, zMax) => city.lampPosts(zMin, zMax);
   const fx = new Fx(scene, traffic.player.group, glowTex);
+  const dash = new Dash();
+  const weatherNames = hudLabels(RACING_HUD).weather;
 
   function applyBudgets(): void {
     far = settings.rDrawDistance;
@@ -81,6 +85,7 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
   function event(se: SceneEvent, replay: boolean): void {
     if (replay) return;
     arrivals++;
+    dash.event(se);
     const ev = se.ev;
     switch (se.kind) {
       case 'allow': {
@@ -187,6 +192,7 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
     }
     fx.update(dt, rain, nitro, speed, camera.position.z);
     audio.setThreatActive(traffic.police());
+    dash.update(dtReal, { state, speed, nitro, travelled, eps: state.rate30s / 30, map: traffic.mapData(), weather: weatherNames }, traffic.police());
 
     // chase camera: trails the car's lateral moves, looks down the (bent) road
     camX += (traffic.playerX * 0.65 - camX) * Math.min(1, dtReal * 3);

@@ -357,7 +357,7 @@ const STYLES: StyleDef[] = [
 export const RACING_MUSIC: Array<[string, string]> = [['rotate', 'Rotate'], ...STYLES.map((d): [string, string] => [d.id, d.name])];
 
 /** Top speed of each gear (m/s). */
-const GEARS = [0, 11, 20, 30, 41, 54, 70, 90];
+export const GEARS = [0, 11, 20, 30, 41, 54, 70, 90];
 
 class StreetConductor extends Conductor {
   private engine: { oscs: OscillatorNode[]; lp: BiquadFilterNode; level: GainNode };

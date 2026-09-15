@@ -86,12 +86,12 @@ export const RACING_HUD: HudLabelOverrides = {
   mostWanted: 'MOST WANTED',
   noHostiles: '— CLEAR ROAD —',
   spectrum: 'EQUALIZER',
-  flux: 'TACHOMETER',
-  scan: 'RADAR',
+  flux: 'TACH',
+  scan: 'RADAR DETECTOR',
   comms: 'POLICE SCANNER',
   panel: {
-    uplink: 'Sat nav', threatBar: 'Heat / nitro bars', telemetry: 'Race log',
-    mostWanted: 'Most wanted', terminal: 'Police scanner', oscilloscope: 'Tachometer',
-    spectrum: 'Equalizer', radar: 'Radar',
+    uplink: 'Sat nav map', threatBar: 'Heat / NOS gauges', telemetry: 'Race log',
+    mostWanted: 'Most wanted', terminal: 'Police scanner', oscilloscope: 'Tach',
+    spectrum: 'Equalizer', radar: 'Radar detector',
   },
 };

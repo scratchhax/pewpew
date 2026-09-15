@@ -130,9 +130,19 @@ interface Gate {
   bright: number;
   target: number;
   label?: { mat: MeshBasicMaterial; tex: CanvasTexture };
+  name: string;
+  good: boolean;
 }
 
 export interface Impact { x: number; z: number; strength: number; player: boolean }
+
+export interface MapData {
+  x: number;
+  planX: number;
+  cars: Array<{ x: number; z: number; kind: Kind; crashed: boolean; age: number }>;
+  blocks: Array<{ z: number; xs: number[] }>;
+  gates: Array<{ z: number; name: string; good: boolean }>;
+}
 
 /** What happened this frame. */
 export interface TrafficHits {
@@ -193,6 +203,16 @@ export class Traffic {
   }
 
   get playerX(): number { return this.pb.x; }
+
+  /** What the sat nav shows: every car, barricade and gate relative to us, and where our driver is heading. */
+  mapData(): MapData {
+    return {
+      x: this.pb.x, planX: this.plan.x,
+      cars: this.cars.map((c) => ({ x: c.x, z: c.z, kind: c.kind, crashed: c.crashed > 0, age: c.age })),
+      blocks: this.blocks.filter((b) => !b.smashed).map((b) => ({ z: b.z, xs: b.lanes.map((l) => LANES[l]) })),
+      gates: this.gates.map((g) => ({ z: g.z, name: g.name, good: g.good })),
+    };
+  }
   /** The lane our car is in or heading for. */
   private get playerLane(): number { return nearestLane(this.plan.x); }
   police(): boolean { return this.cars.some((c) => c.kind === 'police' && c.phase < 2 && !c.crashed); }
@@ -318,7 +338,7 @@ export class Traffic {
     const z = -this.far * 0.75;
     group.position.z = z;
     this.scene.add(group);
-    this.gates.push({ group, z, mat, bright: 0, target: good ? 1 : 0.4, label: { mat: lmat, tex } });
+    this.gates.push({ group, z, mat, bright: 0, target: good ? 1 : 0.4, label: { mat: lmat, tex }, name, good });
   }
 
   // ── update ──
@@ -456,7 +476,7 @@ export class Traffic {
     for (const x of [-12.2, -11.2, 11.2, 12.2]) targets.push(x);
 
     type Option = { score: number; x: number; speed: number; mode: number; safe: boolean; blocker: Car | null };
-    let best: Option | null = null;
+    let best: Option | null = null, bestWalk: Option | null = null;
     for (let s = 0; s < speeds.length; s++) {
       const D = speeds[s] - pb.speed, k = D < 0 ? kDown : kUp;
       const shiftAt = (t: number) => D * (t - (1 - Math.exp(-k * t)) / k);   // extra distance our speed change covers
@@ -504,9 +524,12 @@ export class Traffic {
           - (s === 1 ? 3 - agg * 4 : 0)                        // a busy network would rather be flat out
           + (Math.abs(x - this.plan.x) < 0.5 ? 3 : 0) + (s === this.plan.mode ? 5 : 0);   // commit to a plan
         const opt: Option = { score, x, speed: speeds[s], mode: s, safe, blocker: blocker ?? (ttc < 3 && !walk ? limiter : null) };
-        if (!best || score > best.score) best = opt;
+        if (walk) { if (!bestWalk || score > bestWalk.score) bestWalk = opt; }
+        else if (!best || score > best.score) best = opt;
       }
     }
+    // the sidewalk is strictly the escape: only when the road has no clean line, and back down as soon as it does
+    if (bestWalk && (!best || (!best.safe && (bestWalk.safe || bestWalk.score > best.score)))) best = bestWalk;
     this.plan = { x: best!.x, speed: best!.speed, mode: best!.mode, safe: best!.safe };
     this.lastOptions = best;
     // clear the way: whoever stands in our line

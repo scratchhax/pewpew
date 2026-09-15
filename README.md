@@ -216,6 +216,18 @@ view widens, and blue flames and speed lines kick in. Traffic weather is the
 rain: a dry (but always damp) night, then a wet storm, then a monsoon. Like
 Last Outpost, it never flashes: police lights, neon and brownouts all ease.
 
+**The dash.** The HUD is the car's instrument cluster, and every needle swings
+on a spring. Nothing blinks.
+
+| Instrument | What it shows |
+|------------|---------------|
+| Sat nav | a heading-up moving map: the winding road with its neon curbs, city blocks, cross streets named after recent DNS lookups, every car (rivals yellow, police swaying red and blue, wrecks grey), roadblocks and gates, the route your driver is taking, the next gate or roadblock with its distance, the weather and the miles covered |
+| Radar detector | an LED detector. Traffic lights up bands: X for DNS, DHCP and Wi-Fi, K for allowed flows, Ka for blocks, and laser for threats, locked on while the police are on you. It also has signal-strength LEDs and front, side and rear arrows (outbound, internal and inbound traffic) |
+| Heat | an analog coolant gauge from C to H with a red zone (threat level) |
+| NOS | an analog bottle-pressure gauge in PSI with a cyan sweet spot (network energy); it glows while the nitro fires |
+| Tach | an analog tachometer on the car's real gear and revs with a redline, a digital MPH readout, the gear, and the event rate |
+| Equalizer, race log, most wanted, police scanner | as in the other themes, restyled |
+
 **Physics.** Nothing drives through anything. Every car has a footprint,
 momentum, sideways velocity, a heading and spin. Drivers follow the car
 ahead, brake when a gap closes and only change lanes when the next lane is

@@ -39,3 +39,25 @@ body[data-theme="racing"] #settings select {
 /* no blinking in this theme */
 body[data-theme="racing"] .cursor { animation: none; }
 body[data-theme="racing"] #demo-badge { animation: none; opacity: 0.9; }
+
+/* the dashboard (dash.ts) draws its own gauges, detector and map into these panels */
+body[data-theme="racing"] #hud-bars .bar-row,
+body[data-theme="racing"] #radar,
+body[data-theme="racing"] #scope,
+body[data-theme="racing"] #weather { display: none; }
+body[data-theme="racing"] canvas.dash { display: block; }
+body[data-theme="racing"] #hud-topleft { min-width: 0; }
+body[data-theme="racing"] #conn { font-size: 11px; margin-bottom: 6px; }
+body[data-theme="racing"] #radar-wrap { top: 264px; }
+body[data-theme="racing"] #hud-stats { top: 218px; }
+body[data-theme="racing"] #hud-mw { top: 376px; }
+body[data-theme="racing"] #hud-spec { bottom: 226px; }
+body[data-theme="racing"] #rate { margin-top: 2px; }
+/* shorter screens: tuck the right-hand readouts in a little */
+@media (max-height: 860px) {
+  body[data-theme="racing"] #hud-stats,
+  body[data-theme="racing"] #hud-mw { transform: scale(0.82); transform-origin: top right; }
+  body[data-theme="racing"] #hud-stats { top: 212px; }
+  body[data-theme="racing"] #hud-mw { top: 342px; }
+}
+body[data-theme="racing"] #hud-bars { width: 300px; }
