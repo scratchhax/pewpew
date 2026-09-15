@@ -98,7 +98,7 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
   organ and chiptune in space; horror synth and dead west in the compound; drum
   and bass, eurobeat and a nu-metal riff on the street; an original chip band in
   Packet Rush; cold-war synth and swung spy jazz in Panopticon; acid house,
-  breakbeat and jungle in Mainframe; lounge, bossa and dub in the Aquarium. The scene's sounds play along on the beat and in key: lasers,
+  breakbeat and jungle in Mainframe; sea shanties, lounge, bossa and dub in the Aquarium. The scene's sounds play along on the beat and in key: lasers,
   gunfire, an engine that shifts gears in time, gem chimes that climb the scale.
   There are no audio files anywhere, though you can upload your own
   [background track](#background-tracks).
@@ -945,10 +945,12 @@ flight speed.
 
 ### Aquarium's soundtrack
 
-Four styles take turns, every 6 minutes by default:
+Six styles take turns, every 6 minutes by default:
 
 | Style | Sound |
 |-------|-------|
+| Sea shanty | a 6/8 shanty: a squeezebox pushing and pulling on the beat, a fiddle singing the verse, banjo between the beats, boots on the deck, and a crew that shouts back every fourth bar |
+| Capstan song | a slow 3/4 turn at the capstan: concertina oom-pah-pah, a cello underneath, a tin whistle over the top, and the crew humming along |
 | Lagoon | 80 bpm lounge: soft electric piano chords, a round bass, a rim click |
 | Tidepool | 96 bpm bossa: plucked patterns that change every few bars, a shaker, a soft pad |
 | Kelp dub | 70 bpm dub: echoing chord stabs, a deep sub bass, a lazy snare |
