@@ -12,6 +12,8 @@ your own traffic. Pick a scene per screen:
 - **Packet Rush**: a 16-bit side-scrolling runner, with boss fights
 - **Panopticon**: a made-up planet under surveillance, where the eye of god
   zooms in on the people behind the traffic
+- **Mainframe**: a low flight over a circuit board while your traffic races
+  along the traces, diving into chips to trace intruders
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -23,6 +25,8 @@ and never touches the network itself.
 | ![midnight run](docs/racing.png) | ![packet rush](docs/rush.png) |
 | **Panopticon** | **Panopticon: the eye of god** |
 | ![panopticon](docs/spy.png) | ![panopticon eye of god](docs/spy-eye.png) |
+| **Mainframe** | **Mainframe: inside the chip** |
+| ![mainframe](docs/mainframe.png) | ![mainframe inside a chip](docs/mainframe-die.png) |
 
 | Midnight Run | Packet Rush | Last Outpost |
 |---|---|---|
@@ -33,6 +37,7 @@ traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew
 [Midnight Run](https://scratchhax.github.io/pewpew/?theme=racing) ·
 [Packet Rush](https://scratchhax.github.io/pewpew/?theme=rush) ·
 [Panopticon](https://scratchhax.github.io/pewpew/?theme=spy) ·
+[Mainframe](https://scratchhax.github.io/pewpew/?theme=mainframe) ·
 Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 
 ## Contents
@@ -41,7 +46,7 @@ Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - [Highlights](#highlights)
 - [Setup](#setup): [Relay](#1-start-the-relay) · [Viewer](#2-build-the-viewer) · [UniFi logging](#3-send-unifi-logs-to-the-relay) · [Check it's working](#4-check-its-working) · [`relay.yaml`](#relayrelayyaml)
 - [Using pewpew](#using-pewpew): [Keys](#keys) · [Switching scenes](#switching-scenes) · [Log inspector](#log-inspector) · [Settings](#settings-f1)
-- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon)
+- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe)
 - [Sound](#sound)
 - [Performance and quality](#performance-and-quality)
 - [URL parameters](#url-parameters)
@@ -77,9 +82,9 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
 
 ## Highlights
 
-- **Five scenes, one relay.** Every screen picks its own scene, so the kiosk
+- **Six scenes, one relay.** Every screen picks its own scene, so the kiosk
   in the hall and the laptop on your desk can show different worlds at the same
-  time. Three are 2D (PixiJS) and two are full 3D (three.js); a screen only
+  time. Three are 2D (PixiJS) and three are full 3D (three.js); a screen only
   downloads the renderer its scene uses.
 - **A readable picture.** Each event type has one fixed colour in every scene
   and in the log: block is red, allow green, DNS blue, DHCP yellow, Wi-Fi
@@ -87,7 +92,8 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
 - **Generative soundtracks.** Every scene has its own band: synthwave, a pipe
   organ and chiptune in space; horror synth and dead west in the compound; drum
   and bass, eurobeat and a nu-metal riff on the street; an original chip band in
-  Packet Rush; cold-war synth and swung spy jazz in Panopticon. The scene's sounds play along on the beat and in key: lasers,
+  Packet Rush; cold-war synth and swung spy jazz in Panopticon; acid house,
+  breakbeat and jungle in Mainframe. The scene's sounds play along on the beat and in key: lasers,
   gunfire, an engine that shifts gears in time, gem chimes that climb the scale.
   There are no audio files anywhere, though you can upload your own
   [background track](#background-tracks).
@@ -218,7 +224,7 @@ minutes to start logging after a settings change or a relay restart.
 |-----|---------|--------------|
 | `syslog_bind`, `syslog_port` | `0.0.0.0`, `5514` | where syslog (UDP) is received |
 | `http_host`, `http_port` | `0.0.0.0`, `8080` | the viewer, WebSocket and health endpoints |
-| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush` or `spy` (every scene is also at `/<id>/`) |
+| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy` or `mainframe` (every scene is also at `/<id>/`) |
 | `buffer_size` | `500` | recent events replayed to each newly opened browser |
 | `wan_interfaces` | `[ppp0]` | which gateway interfaces count as WAN, for inbound and outbound. Look at the `IN=`/`OUT=` fields of your firewall log lines; `eth8`–`eth10` are common on UDM and UDR |
 | `wan_ips`, `vpn_networks` | empty | optional WAN addresses and VPN networks, for direction and VPN badges |
@@ -249,7 +255,7 @@ included). `python3 relay/test_cef.py` self-checks the CEF parser, and
 ![scene picker](docs/scene-picker.png)
 
 Press **F2** for the scene picker. Click a card, use the arrow keys and Enter,
-or press 1–5; Esc closes it. The **Scene** dropdown at the top of the F1 panel
+or press 1–6; Esc closes it. The **Scene** dropdown at the top of the F1 panel
 does the same. The screen fades out and loads the new scene.
 
 The pick is saved in that browser, so a kiosk pointed at the plain
@@ -262,7 +268,7 @@ different screens can show different scenes at once:
 | URL | Scene |
 |-----|-------|
 | `http://<relay-host>:8080/` | this screen's saved pick, or else the relay's `default_theme` |
-| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/` | that scene (unknown names are a 404) |
+| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/` | that scene (unknown names are a 404) |
 | any URL + `?theme=racing` | that scene (handy on the Pages demo) |
 
 The viewer checks the URL path, then `?theme=`, then the screen's saved pick,
@@ -317,7 +323,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, brownouts, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -325,7 +331,7 @@ panel's **Apply & reload**.
 
 ## Scenes
 
-All five scenes draw the same events with the same colours. Each has its own
+All six scenes draw the same events with the same colours. Each has its own
 HUD, sound and settings.
 
 ### Orbital Command
@@ -625,6 +631,67 @@ the taskings off, **Eye: threats in a minute** sets the threat trigger, and
 **Eye: random sweep every (min)** sets how often a random sweep comes round
 (as often as every 30 seconds).
 
+### Mainframe
+
+![mainframe](docs/mainframe.png)
+
+A low, fast flight over a real-looking circuit board while your network races
+along its traces. The board is generated in sections ahead of the camera: green
+solder mask, copper traces, gold pads and vias, silkscreen outlines, part
+numbers, and text taken from your own traffic (addresses, hostnames, domains,
+rule names). The parts on it are 3D: chips with pins and laser-etched lids,
+capacitor towers, heat sinks, spinning fans, headers, crystals and LEDs, all lit
+by neon reflections. The camera weaves between four "streets" of parallel
+traces, banks into its turns, climbs over the tall parts and drops back down
+into the gaps. Between events the board keeps up a dim chatter of clock and bus
+pulses, so it's never still, and addresses drift up through the air.
+
+| Event | On the board |
+|-------|--------------|
+| allow | green light pulses streaking along the traces: outbound races ahead from behind the camera, inbound comes at it, and some turn off down a branch into a chip |
+| block | a red pulse runs at a firewall chip and shatters on its pins |
+| threat | a worm: a glitching chain crawling along a trace toward a chip, which glows amber. ICE launches from the chip and hunts it down, and the worm breaks apart |
+| dns | a blue pulse reaches a lookup tower, and the domain scrolls across the tower's LED lid |
+| dhcp | a pick-and-place arm lowers a new part into an empty socket, labelled with the device's hostname |
+| wifi | rings spread from a printed antenna: wide purple ones for a join, short red ones for a failure |
+| system | a brownout: the LEDs, the light and the packets dim and recover |
+
+Traffic weather is the board's load: **NOMINAL** on a calm network, **HEAVY
+LOAD** in a storm (faster traffic, faster flight), and **OVERCLOCK** in a
+hurricane, where the light turns orange, the fans spin up, the packets run hot
+and heat haze shimmers over the board.
+
+**Diving into a chip.** It runs on the same schedule as Panopticon's eye of god:
+enough threats inside a minute, one address hitting 12 blocks in a minute, or a
+random dive about every 2 minutes. A dive lasts about 23 seconds:
+
+1. **Lock.** A chip up ahead is tasked. Its lid is re-etched with the
+   target's address, it glows, and the camera lines up on it.
+2. **Descend.** The camera swoops down onto the chip, and the lid lights up
+   with the gold die underneath.
+3. **Through.** A gold lattice rushes past as the camera falls through the
+   silicon.
+4. **Inside.** A low flight over the die itself: rows of standard cells,
+   memory macros and copper buses, with the target's traffic streaming amber.
+   A traceroute to the target types itself out hop by hop, followed by the
+   signal, IDS signature or firewall rule, and contacts in the last minute.
+   Then **INTRUSION TRACED** eases in.
+5. **Surface.** Back out through the lattice onto the board. The chip keeps a
+   TRACED label.
+
+![mainframe dive](docs/mainframe.gif)
+
+| Descending onto the chip | Inside the chip |
+|---|---|
+| ![descending](docs/mainframe-lock.png) | ![inside the die](docs/mainframe-die.png) |
+
+The traceroute is made up (plausible carriers and latencies, the same for the
+same address), because pewpew never sends anything onto the network. Nothing
+flashes: the glows, lattice and stamp all ease. In F1 → Scene, **Dive into a
+chip** turns dives off, **Dive: threats in a minute** sets the threat trigger,
+**Dive: random every (min)** sets how often a random dive comes round, and
+**Flight speed** sets how fast the camera flies.
+
 ## Sound
 
 All sound is synthesized in the browser with the WebAudio API. Browsers only
@@ -791,6 +858,35 @@ The operation plays along:
 The music drops to half volume while the eye works. An operations-room hum sits
 underneath, with radio static that rises with the DEFCON level.
 
+### Mainframe's soundtrack
+
+Five styles take turns, every 6 minutes by default:
+
+| Style | Sound |
+|-------|-------|
+| Acid trace | 126 bpm acid house: a squelching, sliding 303 line with a filter that sweeps across the bars, four-on-the-floor kicks, claps and open hats |
+| Phreak breaks | 136 bpm breakbeat: a hoover stab diving into each chord, rave piano, a pulsing bass |
+| Deep dive | 138 bpm trance: offbeat bass, pluck arpeggios, a wide pad, gated supersaw chords when it's busy |
+| Jungle bus | 170 bpm jungle: chopped snares, a rolling reese bass, an 808 sub at night, scratches |
+| Handshake | 100 bpm electro: syncopated 808s, a robotic square-wave riff, modem-like noise sweeps |
+
+The board plays along:
+
+| Event | Sound |
+|-------|-------|
+| allow | traffic plays the melody on the style's lead |
+| block | a glassy shatter in key as a firewall stops the packet |
+| threat | a glitch stutter as the worm crawls in; ICE chirps, and a small blast when the worm dies |
+| dns | a data chirp from the lookup tower |
+| dhcp | the pick-and-place servo whirring down, and a click as the part seats |
+| wifi | rising pings for a join, a crackle for a failure |
+| system | a brownout sweep |
+| dive | a lock-on tone, a rising rush on the way down, a whoosh through the die, ticks as the traceroute types, and a big hit for INTRUSION TRACED |
+
+The music drops to half volume during a dive. Fans hum and the board buzzes
+underneath, louder when it overclocks, and the rush of air rises with the
+flight speed.
+
 ### Background tracks
 
 Play your own music in any scene. In F1 → Audio → **Background track**, upload
@@ -850,6 +946,7 @@ two volumes of its own:
 | Midnight Run | **Engine & nitro**, **Road & rain** |
 | Packet Rush | **Game sounds**, **Rain** |
 | Panopticon | **Surveillance sounds**, **Room & static** |
+| Mainframe | **Board sounds**, **Fans & buzz** |
 
 Each scene keeps its own choices.
 
@@ -930,6 +1027,14 @@ Each scene adds its own budgets:
 | Bloom | off | on | on | on |
 | Close-up shadows | off | off | on | on |
 
+| Mainframe | Low | Medium | **High** | Ultra |
+|-----------|-----|--------|----------|-------|
+| Packets | 300 | 500 | 700 | 1000 |
+| Board ahead (sections) | 4 | 5 | 6 | 8 |
+| Board detail (texture width, px) | 512 | 1024 | 1024 | 2048 |
+| Bloom | off | on | on | on |
+| Heat haze | off | off | on | on |
+
 **Measured on a Raspberry Pi Compute Module 5** (Chromium kiosk at
 2560×1440, Auto → Low, demo traffic):
 
@@ -953,13 +1058,16 @@ smaller devices, not yet tuned for a Pi. **Panopticon** is 3D too. The planet
 is generated once when the scene loads (about a second on a desktop GPU), which
 keeps each frame cheap. Measured headless on a desktop GPU with the CPU
 throttled 4×, High and Low both hold about 60 fps at 720p, in orbit and in the
-close-up. It hasn't been measured on a Pi yet.
+close-up. It hasn't been measured on a Pi yet. **Mainframe** is 3D as well.
+Measured the same way with the CPU throttled 4×, High holds about 48–54 fps and
+Low about 55–58 fps, on the board and inside a chip. It hasn't been measured on
+a Pi yet either.
 
 ## URL parameters
 
 | Parameter | Effect |
 |-----------|--------|
-| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush` or `spy` |
+| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy` or `mainframe` |
 | `?demo=1` | synthetic traffic, no relay needed |
 | `?showreel=1` | with the demo: a looping 60-second calm → build → hurricane → cooldown arc |
 | `?rate=40` | with the demo: about 40 events per second |
@@ -1017,8 +1125,8 @@ UDM / UDR / UCG / APs ──syslog UDP :5514──► relay (Python) ──JSON 
   ring buffer of recent events, broadcasts every event to every browser, and
   stores uploaded background tracks.
 - **`web/`**: Vite and TypeScript. Orbital Command, Last Outpost and Packet
-  Rush render with [PixiJS v8](https://pixijs.com/), Midnight Run and
-  Panopticon with [three.js](https://threejs.org/). The audio and nearly all graphics are
+  Rush render with [PixiJS v8](https://pixijs.com/), Midnight Run,
+  Panopticon and Mainframe with [three.js](https://threejs.org/). The audio and nearly all graphics are
   generated in code; Last Outpost adds one small sprite atlas.
 - **`deploy/`**: the systemd unit and the kiosk autostart entry.
 
@@ -1051,8 +1159,8 @@ handles the clock, style rotation, snapping sounds to the beat, chord lookup
 and the pulse, so a scene only writes its styles and what each event sounds
 like. Every scene's `score.ts` is a worked example, and `sound/groove.ts` shows
 how visuals can follow `audio.pulse()`. Nothing in the core imports a renderer,
-so a scene can use whatever it likes: Midnight Run and Panopticon bring
-three.js, and only screens showing one of them download it.
+so a scene can use whatever it likes: Midnight Run, Panopticon and Mainframe
+bring three.js, and only screens showing one of them download it.
 
 ### Development
 
@@ -1131,10 +1239,11 @@ Actions** first.
 - Syslog parsing vendored from
   [UniFi-Insights-Plus](https://github.com/jmasarweh/UniFi-Insights-Plus) (MIT).
 - [PixiJS v8](https://pixijs.com/) renders Orbital Command, Last Outpost and
-  Packet Rush; [three.js](https://threejs.org/) renders Midnight Run and Panopticon.
+  Packet Rush; [three.js](https://threejs.org/) renders Midnight Run, Panopticon and Mainframe.
 - Every sound and melody, every Orbital Command texture, Midnight Run's car,
-  city and signs, all of Packet Rush's pixel art, and Panopticon's planet,
-  satellites and surveillance scenes are generated in code.
+  city and signs, all of Packet Rush's pixel art, Panopticon's planet,
+  satellites and surveillance scenes, and Mainframe's circuit boards and the
+  silicon inside its chips are generated in code.
 - Last Outpost sprites: [Top-down Shooter](https://kenney.nl/assets/top-down-shooter)
   by [Kenney](https://kenney.nl) (CC0), packed into
   `web/src/themes/zombie/assets/atlas.png` with its license beside it.

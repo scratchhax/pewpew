@@ -1,0 +1,58 @@
+/* Mainframe: black glass with electric-cyan hairlines over the board. Loaded only
+   with the mainframe theme; the accent comes from accentHue + the hue knob.
+   Nothing blinks: every change eases. */
+body[data-theme="mainframe"] { background: #020406; }
+body[data-theme="mainframe"] #hud { color: #d8f6ff; }
+body[data-theme="mainframe"] .panel {
+  background: linear-gradient(160deg, rgba(4, 10, 14, 0.8), rgba(2, 6, 10, 0.6));
+  clip-path: none;
+  border: 1px solid rgba(90, 240, 255, 0.3);
+  box-shadow: 0 0 12px rgba(60, 220, 255, 0.12);
+  filter: none;
+}
+body[data-theme="mainframe"] .panel-head { border-bottom-color: rgba(90, 240, 255, 0.3); letter-spacing: 4px; }
+body[data-theme="mainframe"] .corner { border-color: rgba(90, 240, 255, 0.55); filter: none; }
+body[data-theme="mainframe"] .bar { background: rgba(20, 50, 60, 0.5); clip-path: none; }
+body[data-theme="mainframe"] #spec,
+body[data-theme="mainframe"] #scope { background: rgba(2, 8, 12, 0.6); }
+body[data-theme="mainframe"] #weather { color: #7ef3ff; text-shadow: 0 0 8px rgba(126, 243, 255, 0.5); }
+body[data-theme="mainframe"] #settings {
+  background: rgba(3, 8, 12, 0.96); clip-path: none;
+  border: 1px solid rgba(90, 240, 255, 0.35); filter: none; color: #d8f6ff;
+}
+body[data-theme="mainframe"] .set-tab { color: #bfeef8; background: rgba(10, 40, 50, 0.5); border-color: rgba(90, 240, 255, 0.25); }
+body[data-theme="mainframe"] .set-tab.active { color: #02080a; background: var(--accent); }
+body[data-theme="mainframe"] #settings select { background: rgba(8, 30, 38, 0.85); color: #d8f6ff; border-color: rgba(90, 240, 255, 0.3); }
+body[data-theme="mainframe"] .cursor { animation: none; }
+body[data-theme="mainframe"] #demo-badge { animation: none; opacity: 0.9; }
+
+/* ── the dive ── */
+#mf-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 8; overflow: hidden; font-family: 'Courier New', monospace; }
+.dive { position: absolute; inset: 0; opacity: 0; transition: opacity 0.6s ease; color: #e8fbff; }
+.dive.on { opacity: 1; }
+.dive-top { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); display: flex; gap: 14px; align-items: center;
+  font-size: 12px; letter-spacing: 4px; white-space: nowrap; }
+.dive-tag { padding: 4px 12px; border: 1px solid #7ef3ff; color: #7ef3ff; font-weight: bold; background: rgba(0, 0, 0, 0.5); }
+.dive-task { text-shadow: 0 0 4px #000; }
+.dive-reticle { position: absolute; left: 0; top: 0; width: 200px; height: 200px; opacity: 0; }
+.dive-reticle i { position: absolute; width: 24%; height: 24%; border: 2px solid #ffb347; }
+.dive-reticle i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; }
+.dive-reticle i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; }
+.dive-reticle i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; }
+.dive-reticle i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; }
+.dive-level { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); font-size: 11px; letter-spacing: 4px; color: #c9b8ff;
+  text-shadow: 0 0 6px rgba(160, 120, 255, 0.6); white-space: nowrap; }
+.dive-trace { position: absolute; left: 24px; top: 290px; width: 600px; margin: 0; padding: 14px 16px 16px;
+  font: 12px/1.6 'Courier New', monospace; letter-spacing: 0.5px; white-space: pre; color: #dff7ff;
+  background: rgba(4, 3, 12, 0.8); border-left: 3px solid #7ef3ff;
+  opacity: 0; transform: translateX(-12px); transition: opacity 0.5s ease, transform 0.5s ease; }
+.dive.inside .dive-trace { opacity: 1; transform: none; }
+.dive-trace:empty { display: none; }
+.dive-stamp { position: absolute; left: 120px; top: 600px; padding: 8px 18px; font-size: 26px; font-weight: bold; letter-spacing: 6px;
+  color: #ffb347; border: 3px solid #ffb347; background: rgba(20, 10, 0, 0.4); white-space: nowrap;
+  opacity: 0; transform: rotate(-6deg) scale(1.3); transition: opacity 0.6s ease, transform 0.6s ease; }
+.dive-stamp.on { opacity: 0.95; transform: rotate(-6deg) scale(1); }
+@media (max-height: 900px) {
+  .dive-trace { top: 250px; font-size: 11px; width: 540px; }
+  .dive-stamp { top: 540px; font-size: 22px; }
+}
