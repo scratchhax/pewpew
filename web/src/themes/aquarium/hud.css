@@ -1,32 +1,93 @@
-/* Aquarium: frosted glass panels with sea-green hairlines, like a reef
-   controller's display. Loaded only with the aquarium theme; the accent comes
-   from accentHue + the hue knob. Nothing blinks: every change eases. */
+/* Aquarium: a reef tank controller. Rounded glass tiles in deep teal, a soft
+   sans-serif, pill-shaped gauges and a bubble beside each title. Loaded only
+   with the aquarium theme; the accent comes from accentHue + the hue knob.
+   Nothing blinks: every change eases. */
 body[data-theme="aquarium"] { background: #02203a; }
-body[data-theme="aquarium"] #hud { color: #e4fbff; }
+body[data-theme="aquarium"] #hud {
+  color: #d9f6fb;
+  font-family: 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
+}
+body[data-theme="aquarium"] .corner,
+body[data-theme="aquarium"] #scanlines { display: none !important; }
+
 body[data-theme="aquarium"] .panel {
-  background: linear-gradient(160deg, rgba(4, 30, 44, 0.62), rgba(2, 18, 30, 0.48));
   clip-path: none;
-  border: 1px solid rgba(140, 230, 240, 0.28);
-  border-radius: 6px;
-  box-shadow: 0 4px 18px rgba(0, 10, 20, 0.35);
-  backdrop-filter: blur(3px);
   filter: none;
+  border-radius: 14px;
+  padding: 10px 14px 12px;
+  background: linear-gradient(170deg, rgba(20, 70, 92, 0.55), rgba(4, 30, 46, 0.62));
+  border: 1px solid rgba(170, 240, 255, 0.2);
+  box-shadow: inset 0 1px 0 rgba(220, 250, 255, 0.18), 0 6px 22px rgba(0, 12, 24, 0.35);
+  backdrop-filter: blur(6px);
 }
-body[data-theme="aquarium"] .panel-head { border-bottom-color: rgba(140, 230, 240, 0.28); letter-spacing: 3px; }
-body[data-theme="aquarium"] .corner { display: none; }
-body[data-theme="aquarium"] .bar { background: rgba(20, 70, 90, 0.5); clip-path: none; border-radius: 2px; }
+body[data-theme="aquarium"] .panel-head {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.6px; color: #bff3ff;
+  border-bottom: none; padding-bottom: 0; margin-bottom: 8px;
+}
+/* a little bubble before each title */
+body[data-theme="aquarium"] .panel-head::before {
+  content: ''; flex: none; width: 9px; height: 9px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.95) 0 18%, rgba(160, 235, 255, 0.35) 40%, rgba(160, 235, 255, 0.1) 70%);
+  border: 1px solid rgba(200, 245, 255, 0.7);
+}
+body[data-theme="aquarium"] .cursor { display: none; }
+body[data-theme="aquarium"] #expand-log {
+  margin-left: auto; font: inherit; font-size: 11px; font-weight: 500;
+  border-radius: 10px; padding: 1px 10px;
+}
+
+/* top left: the controller */
+body[data-theme="aquarium"] #hud-topleft { font-size: 13px; min-width: 170px; }
+body[data-theme="aquarium"] #conn { letter-spacing: 0.4px; }
+body[data-theme="aquarium"] #weather {
+  font-size: 18px; font-weight: 300; letter-spacing: 0.5px; color: #8ff0ff;
+  text-shadow: 0 0 10px rgba(120, 230, 255, 0.35);
+}
+body[data-theme="aquarium"] #radar-wrap { top: 140px; }
+body[data-theme="aquarium"] #radar { border-radius: 50%; background: rgba(2, 24, 36, 0.45); }
+
+/* top right: gauges, water readings, predators (stacked without overlapping) */
+body[data-theme="aquarium"] #hud-bars { top: 22px; width: 270px; gap: 9px; }
+body[data-theme="aquarium"] #hud-stats { top: 130px; width: 270px; }
+body[data-theme="aquarium"] #hud-mw { top: 300px; width: 270px; }
+body[data-theme="aquarium"] .bar-row { font-size: 12px; letter-spacing: 0.3px; gap: 10px; }
+body[data-theme="aquarium"] .bar-label { width: 84px; display: flex; justify-content: space-between; opacity: 1; color: #a9dce6; }
+body[data-theme="aquarium"] .bar-label span { color: #ffffff; font-weight: 600; }
+body[data-theme="aquarium"] .bar { clip-path: none; height: 8px; border-radius: 4px; background: rgba(4, 34, 50, 0.7); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4); overflow: hidden; }
+body[data-theme="aquarium"] #threat-fill { border-radius: 4px; background: linear-gradient(90deg, #ffd27a, #ff8a6a); background-size: auto; }
+body[data-theme="aquarium"] #energy-fill { border-radius: 4px; background: linear-gradient(90deg, #3fb8ff, #6ff0e0); background-size: auto; }
+body[data-theme="aquarium"] .stat-row { font-size: 12px; letter-spacing: 0.3px; line-height: 1.85; }
+body[data-theme="aquarium"] .stat-row span { color: #a9dce6; }
+body[data-theme="aquarium"] .stat-row b { color: #ffffff; font-weight: 600; font-variant-numeric: tabular-nums; }
+body[data-theme="aquarium"] .mw-empty { font-size: 12px; letter-spacing: 0.3px; opacity: 0.55; }
+body[data-theme="aquarium"] .mw-row { font-size: 12px; letter-spacing: 0.2px; color: #ffb3a3; font-variant-numeric: tabular-nums; }
+body[data-theme="aquarium"] .mw-bar { clip-path: none; height: 6px; border-radius: 3px; background: rgba(60, 20, 20, 0.45); overflow: hidden; }
+body[data-theme="aquarium"] .mw-bar i { border-radius: 3px; background: linear-gradient(90deg, #ff9a7a, #ff6b6b); }
+body[data-theme="aquarium"] .mw-n { color: #ff8f7a; }
+
+/* bottom right: reef life and current */
+body[data-theme="aquarium"] #hud-spec { bottom: 150px; }
 body[data-theme="aquarium"] #spec,
-body[data-theme="aquarium"] #scope { background: rgba(2, 20, 32, 0.5); }
-body[data-theme="aquarium"] #weather { color: #9ff0ff; text-shadow: 0 0 8px rgba(120, 230, 255, 0.45); }
-body[data-theme="aquarium"] #settings {
-  background: rgba(3, 22, 34, 0.96); clip-path: none; border-radius: 6px;
-  border: 1px solid rgba(140, 230, 240, 0.35); filter: none; color: #e4fbff;
+body[data-theme="aquarium"] #scope { border-radius: 8px; background: rgba(2, 24, 36, 0.5); }
+body[data-theme="aquarium"] #rate { font-size: 12px; letter-spacing: 0.3px; color: #8ff0ff; }
+
+/* bottom left: the tank log */
+body[data-theme="aquarium"] #terminal { font-family: 'Cascadia Mono', Consolas, 'Courier New', monospace; font-size: 11px; opacity: 0.95; }
+body[data-theme="aquarium"] #hint { font-family: 'Segoe UI', system-ui, sans-serif; letter-spacing: 0.3px; }
+body[data-theme="aquarium"] #demo-badge {
+  animation: none; opacity: 0.9; font-family: 'Segoe UI', system-ui, sans-serif; letter-spacing: 1px;
+  border-radius: 10px; clip-path: none;
 }
-body[data-theme="aquarium"] .set-tab { color: #c4eef6; background: rgba(10, 50, 66, 0.5); border-color: rgba(140, 230, 240, 0.25); }
+
+/* F1 panel */
+body[data-theme="aquarium"] #settings {
+  background: rgba(3, 26, 38, 0.96); clip-path: none; border-radius: 14px;
+  border: 1px solid rgba(170, 240, 255, 0.3); filter: none; color: #e4fbff;
+}
+body[data-theme="aquarium"] .set-tab { color: #c4eef6; background: rgba(10, 50, 66, 0.5); border-color: rgba(170, 240, 255, 0.25); border-radius: 8px; }
 body[data-theme="aquarium"] .set-tab.active { color: #02141e; background: var(--accent); }
-body[data-theme="aquarium"] #settings select { background: rgba(8, 40, 54, 0.85); color: #e4fbff; border-color: rgba(140, 230, 240, 0.3); }
-body[data-theme="aquarium"] .cursor { animation: none; }
-body[data-theme="aquarium"] #demo-badge { animation: none; opacity: 0.9; }
+body[data-theme="aquarium"] #settings select { background: rgba(8, 40, 54, 0.85); color: #e4fbff; border-color: rgba(170, 240, 255, 0.3); }
 
 /* names and addresses beside the fish */
 #aq-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 8; overflow: hidden; }
@@ -40,3 +101,6 @@ body[data-theme="aquarium"] #demo-badge { animation: none; opacity: 0.9; }
   will-change: transform;
 }
 .aq-label.on { opacity: 0.92; }
+
+/* the log keeps a monospace body but a matching title */
+body[data-theme="aquarium"] #terminal .panel-head { font-family: 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif; }

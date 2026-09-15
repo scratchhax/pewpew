@@ -121,7 +121,9 @@ async function create(host: ThemeHost<typeof AQUARIUM_DEFAULTS>, init: RendererI
     }
   }
 
-  let dimTarget = 1, dimHoldUntil = 0;
+  let dimTarget = 1, dimHoldUntil = 0, nextDimAt = 0;
+  const sysTimes: number[] = [];
+  const bootAt = performance.now();
   let sharkQueued = false, sharkLabel = '';
   function event(se: SceneEvent, replay: boolean): void {
     if (replay) return;
@@ -187,9 +189,18 @@ async function create(host: ThemeHost<typeof AQUARIUM_DEFAULTS>, init: RendererI
         break;
       }
       case 'system': {
-        if (!settings.qDimming || !throttle.allow(`sys|${ev.syslog_host}`, 6) || !throttle.allow('sys|dim', 10)) break;
-        audio.cueSong('system');
-        dimTarget = 0.45; dimHoldUntil = now + 1600;
+        // gateways and APs log system lines all the time, so one line means nothing:
+        // only a burst well above this network's usual rate (a reboot, a re-provision)
+        // dims the light, and at most every couple of minutes
+        sysTimes.push(now);
+        while (sysTimes.length && now - sysTimes[0] > 300000) sysTimes.shift();
+        if (throttle.allow(`sys|${ev.syslog_host}`, 6)) audio.cueSong('system');
+        let recent = 0;
+        for (let i = sysTimes.length - 1; i >= 0 && now - sysTimes[i] < 20000; i--) recent++;
+        const usual = (sysTimes.length - recent) / Math.max(1, Math.min(14, (now - bootAt - 20000) / 20000));
+        if (!settings.qDimming || now < nextDimAt || now - bootAt < 60000 || recent < Math.max(6, usual * 3)) break;
+        nextDimAt = now + 120000;
+        dimTarget = 0.6; dimHoldUntil = now + 2500;
         audio.sfx('dim');
         break;
       }

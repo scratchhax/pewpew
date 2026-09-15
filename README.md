@@ -328,7 +328,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, brownouts, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming, names and addresses, how many residents the reef holds, current, camera drift |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, brownouts, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -709,7 +709,8 @@ The reef is live rock crusted with coralline algae and polyp colonies,
 branching, brain and table coral, sea fans, tube sponges, an anemone with a
 pair of clownfish, seagrass, and a stand of kelp in the murk, all swaying with
 the water. An air stone never stops bubbling. The camera drifts very slowly
-around the reef.
+around the reef. The HUD reads like a reef tank controller: stress and oxygen
+gauges, water readings, predators, reef life, the current and a fish finder.
 
 The fish swim like fish: a wave runs down the body toward the tail, faster the
 faster they go, pectoral fins scull when they hover, bodies bend into their
@@ -727,7 +728,7 @@ empty.
 | dns | a burst of blue bubbles rises from the air stone, with the domain riding the biggest one up to the surface |
 | dhcp | a new resident (a tang, butterflyfish or angelfish) swims in with the device's hostname and stays on the reef. When the reef is full, the oldest newcomer swims away |
 | wifi | the treasure chest creaks open with a warm glow and a stream of purple bubbles for a join; for a failure its lid pops up and slams shut |
-| system | the tank light dims and slowly comes back |
+| system | gateways and APs log system lines constantly, so single lines don't do anything. A burst well above your network's usual rate (a reboot or a re-provision, say) dims the tank light, which slowly comes back. At most once every two minutes |
 
 Traffic weather is the water: **CALM WATER** on a calm network, **CHOPPY** in a
 storm, and **RIP CURRENT** in a hurricane, where the current pulls harder, the
@@ -963,7 +964,7 @@ The tank plays along:
 | dns | bubbles blipping upward in key |
 | dhcp | a glass chime for the new resident |
 | wifi | the chest creaking open with a bell chord, or creaking and banging shut |
-| system | a sinking tone as the light dims |
+| system | a sinking tone when the light dims |
 
 The pump hums, the water moves louder in rough weather, the air stone blips
 now and then, and bubbles pop softly at the surface.

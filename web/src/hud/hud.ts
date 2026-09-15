@@ -27,6 +27,8 @@ export interface HudLabels {
   scan: string;
   comms: string;
   demo: string;
+  /** The mark in front of each panel title (empty for none). */
+  mark: string;
   /** Names of the HUD toggles in the F1 panel's HUD tab. */
   panel: Record<'uplink' | 'threatBar' | 'telemetry' | 'mostWanted' | 'terminal'
     | 'oscilloscope' | 'spectrum' | 'radar' | 'scanlines', string>;
@@ -57,6 +59,7 @@ export const DEFAULT_HUD_LABELS: HudLabels = {
   scan: 'SCAN',
   comms: 'COMMS LOG',
   demo: 'DEMO DATA',
+  mark: '◢',
   panel: {
     uplink: 'Uplink', threatBar: 'Ship status bars', telemetry: 'Telemetry',
     mostWanted: 'Most wanted', terminal: 'Comms log', oscilloscope: 'Sensor flux',
@@ -116,6 +119,7 @@ export class Hud {
 
   constructor(settings: Settings, private labels: HudLabels = DEFAULT_HUD_LABELS) {
     const L = labels;
+    const M = L.mark ? `${L.mark} ` : '';
     this.root = document.createElement('div');
     this.root.id = 'hud';
     this.root.innerHTML = `
@@ -123,19 +127,19 @@ export class Hud {
       <div class="corner tl"></div><div class="corner tr"></div>
       <div class="corner bl"></div><div class="corner br"></div>
       <div id="hud-topleft" class="panel">
-        <div class="panel-head">◢ ${L.uplink}</div>
+        <div class="panel-head">${M}${L.uplink}</div>
         <div id="conn"><span id="conn-dot"></span><span id="conn-text">${L.link}</span></div>
         <div id="weather">${L.weather.calm}</div>
       </div>
       <div id="hud-bars" class="panel">
-        <div class="panel-head">◢ ${L.status}</div>
+        <div class="panel-head">${M}${L.status}</div>
         <div class="bar-row"><span class="bar-label">${L.threat}<span id="threat-num">15</span></span>
           <div class="bar"><div id="threat-fill"></div></div></div>
         <div class="bar-row"><span class="bar-label">${L.power}<span id="energy-num">30</span></span>
           <div class="bar"><div id="energy-fill"></div></div></div>
       </div>
       <div id="hud-stats" class="panel">
-        <div class="panel-head">◢ ${L.telemetry}</div>
+        <div class="panel-head">${M}${L.telemetry}</div>
         <div class="stat-row"><span>${L.uptime}</span><b id="stat-uptime">00:00:00</b></div>
         <div class="stat-row"><span>${L.contacts}</span><b id="stat-clients">0</b></div>
         <div class="stat-row"><span>${L.nodes}</span><b id="stat-nodes">0</b></div>
@@ -143,24 +147,24 @@ export class Hud {
         <div class="stat-row"><span>${L.traffic}</span><b id="stat-total">0</b></div>
       </div>
       <div id="hud-mw" class="panel">
-        <div class="panel-head">◢ ${L.mostWanted}</div>
+        <div class="panel-head">${M}${L.mostWanted}</div>
         <div id="mw-body"><div class="mw-empty">${L.noHostiles}</div></div>
       </div>
       <div id="hud-spec" class="panel">
-        <div class="panel-head">◢ ${L.spectrum}</div>
+        <div class="panel-head">${M}${L.spectrum}</div>
         <canvas id="spec" width="236" height="52"></canvas>
       </div>
       <div id="scope-wrap" class="panel">
-        <div class="panel-head">◢ ${L.flux}</div>
+        <div class="panel-head">${M}${L.flux}</div>
         <canvas id="scope" width="220" height="48"></canvas>
         <div id="rate">0 ev/s</div>
       </div>
       <div id="radar-wrap" class="panel">
-        <div class="panel-head">◢ ${L.scan}</div>
+        <div class="panel-head">${M}${L.scan}</div>
         <canvas id="radar" width="110" height="110"></canvas>
       </div>
       <div id="terminal" class="panel">
-        <div class="panel-head">◢ ${L.comms}<span class="cursor">▮</span><button id="expand-log" type="button" aria-label="Open log inspector">Expand ↗</button></div>
+        <div class="panel-head">${M}${L.comms}<span class="cursor">▮</span><button id="expand-log" type="button" aria-label="Open log inspector">Expand ↗</button></div>
         <div class="log-wrap"><div id="terminal-body"></div></div>
       </div>
       <div id="demo-badge" style="display:none">${L.demo}</div>

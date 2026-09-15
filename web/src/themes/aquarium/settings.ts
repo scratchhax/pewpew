@@ -14,7 +14,7 @@ export const AQUARIUM_DEFAULTS = {
   qBubbles: true,        // dns → bubbles rise from the air stone with the domain
   qResidents: true,      // dhcp → a new resident fish with the device's name
   qChest: true,          // wifi → the treasure chest opens (or slams shut)
-  qDimming: true,        // system → the tank light dims
+  qDimming: true,        // a burst of system logs → the tank light dims
   qLabels: true,         // names and addresses beside the fish
   qResidentMax: 12,      // residents on the reef before the oldest swims off
   qCurrent: 1,           // how much the water moves
@@ -52,7 +52,7 @@ export const AQUARIUM_CONTROLS = {
     toggle('qSchools', 'Schools (allow)'), toggle('qPuffers', 'Pufferfish (block)'),
     toggle('qSharks', 'Shark (threat)'), toggle('qBubbles', 'Bubbles (DNS)'),
     toggle('qResidents', 'Residents (DHCP)'), toggle('qChest', 'Treasure chest (Wi-Fi)'),
-    toggle('qDimming', 'Light dims (system)'), toggle('qLabels', 'Names & addresses'),
+    toggle('qDimming', 'Light dims (system log bursts)'), toggle('qLabels', 'Names & addresses'),
     range('qResidentMax', 'Residents on the reef', 2, 30, 1),
     range('qCurrent', 'Current', 0, 2, 0.05),
     toggle('qCamera', 'Camera drift'),
@@ -75,28 +75,31 @@ export const AQUARIUM_CONTROLS = {
   colorHint: `Hue shift & intensity recolour the HUD accent. The fish keep their own colours.`,
 };
 
+/** The HUD reads like a reef tank controller. */
 export const AQUARIUM_HUD: HudLabelOverrides = {
-  uplink: 'PUMP',
-  link: 'FLOWING',
-  weather: { calm: 'CALM WATER', storm: 'CHOPPY', hurricane: 'RIP CURRENT' },
-  status: 'REEF',
-  threat: 'PREDATOR',
-  power: 'LIGHT',
-  telemetry: 'WATER',
-  uptime: 'UPTIME',
-  contacts: 'FISH',
-  nodes: 'RESIDENTS',
-  denied: 'REPELLED',
-  traffic: 'SCHOOLS',
-  mostWanted: 'PREDATORS',
-  noHostiles: '— THE REEF IS QUIET —',
-  spectrum: 'SONAR',
-  flux: 'CURRENT',
-  scan: 'SONAR',
-  comms: 'TANK LOG',
+  mark: '',
+  uplink: 'Reef controller',
+  link: 'Pump running',
+  weather: { calm: 'Calm water', storm: 'Choppy', hurricane: 'Rip current' },
+  status: 'Livestock',
+  threat: 'Stress',
+  power: 'Oxygen',
+  telemetry: 'Water',
+  uptime: 'Runtime',
+  contacts: 'Fish',
+  nodes: 'Sensors',
+  denied: 'Repelled',
+  traffic: 'Readings',
+  mostWanted: 'Predators',
+  noHostiles: 'No predators about',
+  spectrum: 'Reef life',
+  flux: 'Current',
+  scan: 'Fish finder',
+  comms: 'Tank log',
+  demo: 'Demo tank',
   panel: {
-    uplink: 'Pump', threatBar: 'Reef bars', telemetry: 'Water',
+    uplink: 'Reef controller', threatBar: 'Stress & oxygen', telemetry: 'Water',
     mostWanted: 'Predators', terminal: 'Tank log', oscilloscope: 'Current',
-    spectrum: 'Sonar', radar: 'Sonar (radar)',
+    spectrum: 'Reef life', radar: 'Fish finder',
   },
 };
