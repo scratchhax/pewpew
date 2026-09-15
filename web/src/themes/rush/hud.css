@@ -1,0 +1,37 @@
+/* Packet Rush: chunky 16-bit panels, solid colours, hard edges. Loaded only with
+   the rush theme; the accent colour comes from accentHue + the hue knob. */
+body[data-theme="rush"] { background: #1a1c2c; }
+body[data-theme="rush"] #app canvas { image-rendering: pixelated; }
+body[data-theme="rush"] #hud { color: #f4f4f4; font-weight: bold; }
+body[data-theme="rush"] #scanlines { display: none !important; }
+body[data-theme="rush"] .panel {
+  background: rgba(26, 28, 44, 0.86);
+  clip-path: none;
+  border: 3px solid #f4f4f4;
+  box-shadow: inset 0 0 0 2px #29366f, 4px 4px 0 rgba(0, 0, 0, 0.45);
+  filter: none;
+}
+body[data-theme="rush"] .panel-head {
+  color: #ffcd75;
+  border-bottom: 2px solid #3b5dc9;
+  letter-spacing: 2px;
+}
+body[data-theme="rush"] .corner { display: none; }
+body[data-theme="rush"] .bar { background: #333c57; clip-path: none; }
+body[data-theme="rush"] #spec,
+body[data-theme="rush"] #scope { background: #1a1c2c; }
+body[data-theme="rush"] #settings {
+  background: #1a1c2c;
+  clip-path: none;
+  border: 3px solid #f4f4f4;
+  box-shadow: inset 0 0 0 2px #29366f, 6px 6px 0 rgba(0, 0, 0, 0.5);
+  filter: none;
+  color: #f4f4f4;
+}
+body[data-theme="rush"] .set-top { border-bottom-color: #3b5dc9; }
+body[data-theme="rush"] .set-tab { color: #94b0c2; background: #333c57; border-color: #566c86; }
+body[data-theme="rush"] .set-tab.active { color: #1a1c2c; background: #ffcd75; }
+body[data-theme="rush"] #settings select { background: #333c57; color: #f4f4f4; border-color: #566c86; }
+/* nothing blinks here */
+body[data-theme="rush"] .cursor { animation: none; }
+body[data-theme="rush"] #demo-badge { animation: none; opacity: 0.9; }

@@ -277,6 +277,43 @@ second, your car averages 99 to 104% of its cruising speed, never drops below
 85% of it (only briefly, after a hard knock), and takes about 13 to 18 knocks a
 minute.
 
+### Packet Rush
+
+Your network as a 16-bit auto-runner. A little courier bot with a red scarf races
+right through a course that's generated just ahead of it, in chunky pixel art at
+a whole-number scale (the view is about 250 pixels tall). Everything is drawn in
+code from pixel maps, including the 3x5 pixel font. No image files.
+
+| Event | In the game |
+|-------|-------------|
+| allow | green gems: outbound ones wait ahead in arcs and lines, inbound ones fly in from behind and bounce to rest |
+| block | crawlers and hoppers to stomp; a burst of blocks puts a brick wall across the course, and the bot smashes straight through |
+| threat | the hunter drone: it hovers ahead and drops bombs while the heat lasts |
+| dns | a floating query block; the bot headbutts it, the domain pops out in pixel letters, and a power-up drops: turbo shoes, a gem magnet, or a shield bubble |
+| dhcp | a rival runner wearing the device's hostname drops in, races alongside, then dashes off |
+| wifi | a checkpoint antenna flag that rises with the AP's name as the bot passes (joins), or a bent, broken one (failures) |
+| system | a power flicker rolls across the backdrop |
+
+Traffic weather picks the world: **Green Hills** on a calm network, a **Neon
+Factory** in the rain in a storm, and a **Lava Castle** with rising embers in a
+hurricane. New ground is built in the new world, so the change rolls in from the
+right while the parallax backdrop cross-fades. Traffic sets the run speed, and a
+burst lights the turbo (speed trails).
+
+**Autoplay.** The bot plans like Midnight Run's driver. About twenty times a
+second it tries jumps (a hop or a full jump, now or a moment later, with or
+without a second jump in the air) and flies each one forward through the course,
+the baddies, gems, query blocks and falling bombs. It picks the one that lands
+safely, preferring stomps, gems and blocks, and the smallest jump that works. It
+never stops. The generator only builds gaps the bot can clear at its current
+speed, and ledges forgive landing a few pixels low. A hit scatters some gems
+(grab them back) with a soft shimmer instead of a blink. On the rare miss into a
+pit, the bot bounces back out. Measured headless over 90 seconds of demo traffic,
+it misses a jump about once a run or less and stomps around 50 baddies.
+
+Packet Rush doesn't have its own soundtrack yet, so it plays the classic band.
+Its own chiptune score is coming.
+
 ### Choosing a theme
 
 One relay serves every theme, so different screens can show different themes
@@ -285,7 +322,7 @@ at once:
 | URL | Theme |
 |-----|-------|
 | `http://<relay-host>:8080/` | the relay's `default_theme` |
-| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/` | that theme (unknown names are a 404) |
+| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/` | that theme (unknown names are a 404) |
 | any URL + `?theme=racing` | that theme (handy on the Pages demo) |
 
 The viewer checks the URL path, then `?theme=`, then this screen's own pick
@@ -293,7 +330,7 @@ The viewer checks the URL path, then `?theme=`, then this screen's own pick
 theme is its own bundle, so a screen only downloads the theme it shows.
 
 **Switching scenes without touching the URL** (kiosks): press **F2** for the
-scene picker (click a card, or use the arrow keys and Enter, or press 1–3;
+scene picker (click a card, or use the arrow keys and Enter, or press 1–4;
 Esc closes), or use the **Scene** dropdown at the top of the **F1** panel. The
 screen fades out and loads the new scene. The pick is saved in that browser,
 so a kiosk that opens the plain `http://<relay-host>:8080/` comes back to it
