@@ -55,6 +55,7 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
   const road = new Road(scene, far);
   const city = new City(scene, far);
   const traffic = new Traffic(scene, glowTex);
+  traffic.poles = (zMin, zMax) => city.lampPosts(zMin, zMax);
   const fx = new Fx(scene, traffic.player.group, glowTex);
 
   function applyBudgets(): void {
@@ -73,7 +74,7 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
   // ── driving state ──
   let speed = 30, travelled = 0, wet = 0.45, rain = 0, nitro = 0;
   let rateFast = 0, rateSlow = 0, arrivals = 0;
-  let camX = 0, camShake = 0, fov = 62, bootT = -1, nitroOn = false, speedLimit = Infinity, boost = 0, aggression = 0, lastWall = performance.now() / 1000;
+  let camX = 0, camShake = 0, fov = 62, bootT = -1, nitroOn = false, boost = 0, aggression = 0, lastWall = performance.now() / 1000;
   const groove = new Groove();
   const bendTarget = { x: 0, y: 0 };
 
@@ -144,8 +145,8 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
     const cruise = 26 + Math.min(34, rateSlow * 1.1);
     // how hard our driver pushes through traffic: polite on a quiet network, a battering ram when it's slammed
     aggression += (Math.min(1, Math.max(0, (rateSlow - 8) / 22) + nitro * 0.35) - aggression) * Math.min(1, dtReal * 0.5);
-    // our driver's plan: a boost to make a gap before it closes, or (last resort) easing off
-    const want = Math.min(cruise + nitro * 16 + boost, speedLimit);
+    // no brakes: when it gets wild the car goes faster, and puts its foot down to make a gap before it closes
+    const want = cruise + nitro * 16 + aggression * 8 + boost;
     speed += (want - speed) * Math.min(1, dt * (want < speed ? 6 : 0.9 + aggression * 1.3));
     travelled += speed * dt;
 
@@ -172,9 +173,8 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
 
     road.update(dt, speed, wet, beatGlow);
     city.update(dt, speed, wet);
-    const hits = traffic.update(dt, t, speed, cruise + nitro * 16, aggression, camera);
+    const hits = traffic.update(dt, t, speed, cruise + nitro * 16 + aggression * 8, aggression, camera);
     if (hits.honk) audio.sfx('honk', { pan: Math.max(-1, Math.min(1, traffic.playerX / 8)) });
-    speedLimit = hits.speedLimit;
     boost = hits.boost;
     traffic.player.underglowMat.opacity *= settings.rMusicVisuals && groove.style ? 0.75 + groove.downbeat * 0.35 : 1;
     // collisions: our speed takes the hit, sparks fly where metal met metal, the crash is heard in place

@@ -227,18 +227,23 @@ for everyone behind it. Your car is never taken out; it gets knocked about,
 loses speed and fishtails, then recovers. Sparks fly where metal meets metal,
 and every crash is heard in place.
 
-**There's always a path.** Your driver plans in space and time. About twelve
-times a second it tries around a hundred moves: any point across the road
-(between lanes and along the curb included), each at cruising speed, with a
-boost, or braking. It plays each one forward for two seconds against where
-every car will be, using your car's real sideways grip and acceleration. Wrecks
-count as wide, fast-slowing obstacles sliding for the shoulder. The best clean
-move wins. Lane centres, short moves and keeping speed are preferred, and
-braking is the last resort.
+**There's always a path, and no brakes.** Your car has no brake lights, and it
+never slows down for traffic. It holds its cruising speed or puts its foot down,
+and a busy network makes it faster. Your driver plans in space and time. About
+twelve times a second it tries around a hundred moves: any point across the road
+(between lanes and along the curb included), up the curb onto the sidewalk
+(dodging the street-light poles), each at cruising speed or with a boost. It
+plays each one forward for two seconds against where every car will be, using
+your car's real sideways grip and acceleration. Wrecks count as wide,
+fast-slowing obstacles sliding for the shoulder. The best clean move wins. Lane
+centres and short moves are preferred, and the sidewalk is the escape route
+when the road is shut. The car hops the curb with a thump and sparks, and gets
+back on the road when there's room. Hits barely cost it any speed: the other
+car takes the shove.
 
-When nothing is clean, your driver gets wild. It accepts tighter gaps, flicks
-across harder with the tail hanging out, gets heavier to shove with, stops
-treating braking as an option, and leans on the horn. The cars in the way are
+When nothing is clean, your driver gets wild. It accepts tighter gaps (paint
+gets traded), flicks across harder with the tail hanging out, gets heavier to
+shove with, and leans on the horn. The cars in the way are
 asked to clear it: an outside-lane car squeezes onto the curb so you can go by
 on the inside, others change lanes, and if they can't they floor it. Rivals
 and police pace themselves off your cruising speed, not your current speed, so
@@ -247,10 +252,10 @@ traffic never fills every lane at the same distance, and traffic keeps its own
 pace. How wild your driver starts rises with the event rate: polite on a quiet
 network, a battering ram on a busy one.
 
-Measured headless over two minutes of demo traffic at 12 events a second, your
-car holds 99% of its cruising speed, is never held up for more than a moment,
-and takes about 6 knocks a minute. At 28 events a second it still holds 97%
-while shoving through.
+Measured headless over two minutes of demo traffic at 12, 20 and 30 events a
+second, your car averages 99 to 104% of its cruising speed, never drops below
+85% of it (only briefly, after a hard knock), and takes about 13 to 18 knocks a
+minute.
 
 ### Choosing a theme
 

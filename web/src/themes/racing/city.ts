@@ -178,6 +178,13 @@ export class City {
     }
   }
 
+  /** Street-light poles between two distances, as [x, z]: the only thing on the sidewalk our driver has to miss. */
+  lampPosts(zMin: number, zMax: number): Array<[number, number]> {
+    const out: Array<[number, number]> = [];
+    for (const s of this.slots) if (s.lamp && s.z > zMin && s.z < zMax) out.push([s.side * (ROAD_WIDTH / 2 + 1.2), s.z]);
+    return out;
+  }
+
   /** A DNS lookup: the next sign to come over the horizon shows the domain, in DNS blue. */
   takeover(domain: string): void {
     if (this.pendingText.length > 4) this.pendingText.shift();

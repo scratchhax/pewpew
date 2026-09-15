@@ -37,6 +37,9 @@ const SHOULDER = 8.0;
 const ROAD_EDGE = 8.2;
 /** How far across our driver will go: wheels on the curb, clear of a car sitting in the outside lane. */
 const PLAYER_EDGE = 7.4;
+/** The curb line, and the far side of the sidewalk (clear of the buildings). */
+const CURB = 8.55;
+const SIDEWALK_EDGE = 13.2;
 /** How far a civilian squeezes onto the curb to let us by. */
 const PULL = 1.9;
 
@@ -135,8 +138,6 @@ export interface Impact { x: number; z: number; strength: number; player: boolea
 export interface TrafficHits {
   smashed: number;
   passed: number;
-  /** When our driver is boxed in: the speed to ease down to. */
-  speedLimit: number;
   /** Extra speed our driver wants over cruising, to get past before a gap closes (m/s). */
   boost: number;
   /** Change to our forward speed from collisions this frame (m/s). */
@@ -160,7 +161,7 @@ export class Traffic {
   private pb: Body = { x: LANES[1], z: 0, vx: 0, speed: 30, yaw: 0, yawRate: 0, mass: 1.25, crashed: 0 };
   private boxed = 0;             // seconds without a clean way through
   /** Our driver's plan: where across the road to be, and the speed to do it at. */
-  private plan = { x: LANES[1], speed: 30, mode: 0, safe: true };   // mode: 0 cruise, 1 boost, 2 brake
+  private plan = { x: LANES[1], speed: 30, mode: 0, safe: true };   // mode: 0 cruise, 1 boost (no brakes)
   private planT = 0;
   /** The last plan's winners (for ?diag). */
   lastOptions: unknown = null;
@@ -168,6 +169,8 @@ export class Traffic {
   private agg = 0;
   /** Extra visual yaw while the tail hangs out. */
   private drift = 0;
+  private onWalk = false;
+  private lift = 0;
   private cars: Car[] = [];
   private blocks: Block[] = [];
   private gates: Gate[] = [];
@@ -322,7 +325,7 @@ export class Traffic {
   /** `cruise`: the pace we want (traffic speeds are shares of it). */
   update(dt: number, t: number, playerSpeed: number, cruise: number, aggression: number, camera: PerspectiveCamera): TrafficHits {
     this.aggression = Math.max(0, Math.min(1, aggression));
-    const hits: TrafficHits = { smashed: 0, passed: 0, speedLimit: Infinity, boost: 0, playerDv: 0, impacts: [], honk: false };
+    const hits: TrafficHits = { smashed: 0, passed: 0, boost: 0, playerDv: 0, impacts: [], honk: false };
     const pb = this.pb;
     pb.speed = playerSpeed;
     this.cruise = cruise;
@@ -345,8 +348,15 @@ export class Traffic {
     const heading = -Math.atan2(pb.vx, Math.max(6, pb.speed));
     const slide = pb.crashed ? 0 : Math.min(1, Math.abs(pb.vx) / 9) * (0.15 + this.agg * 1.1);
     this.drift += (Math.max(-0.5, Math.min(0.5, heading * slide * 2.2)) - this.drift) * Math.min(1, dt * 3.5);
+    // up and down the curb: a hop, sparks off the sills and a thump
+    const onWalk = Math.abs(pb.x) > CURB;
+    if (onWalk !== this.onWalk) {
+      this.onWalk = onWalk;
+      hits.impacts.push({ x: Math.sign(pb.x) * CURB, z: 0, strength: 1.6, player: true });
+    }
+    this.lift += ((onWalk ? 0.25 : 0) - this.lift) * Math.min(1, dt * 14);
     const pg = this.player.group;
-    pg.position.set(pb.x, 0, 0);
+    pg.position.set(pb.x, this.lift, 0);
     pg.rotation.set(0, pb.yaw + this.drift, Math.max(-0.08, Math.min(0.08, pb.vx * 0.012)));
     this.spin(this.player, playerSpeed, dt);
     this.player.underglowMat.opacity = 0.85 + 0.15 * Math.sin(t * 1.3);
@@ -404,16 +414,18 @@ export class Traffic {
     this.planT -= dt;
     if (this.planT <= 0) { this.planT = 0.08; this.replan(agg); }
     this.boxed = this.plan.safe ? Math.max(0, this.boxed - dt * 1.5) : this.boxed + dt;
-    if (this.plan.speed < pb.speed - 0.5) hits.speedLimit = this.plan.speed;
-    else if (this.plan.speed > this.cruise + 0.5) hits.boost = this.plan.speed - this.cruise;
+    if (this.plan.speed > this.cruise + 0.5) hits.boost = this.plan.speed - this.cruise;
     hits.honk = this.boxed > 0.6 && this.boxed - dt <= 0.6;
   }
 
   /** How hard our driver pushes: 0 on a quiet network, 1 when it's slammed. Set by the theme. */
   aggression = 0;
+  /** Street-light poles between two distances, as [x, z] (set by the theme; the sidewalk is otherwise open). */
+  poles: (zMin: number, zMax: number) => Array<[number, number]> = () => [];
 
   private replan(agg: number): void {
     const pb = this.pb, H = 1.8, DT = 0.1, N = 18, S = N + 1;
+    const poles = this.poles(-(pb.speed + 30) * H - 10, 10);
     // where each car that matters will be, step by step (relative to us at our current speed)
     const cars = this.cars.filter((c) => c.z < 60 && c.z > -(pb.speed + 20) * H - 20);
     const cx = new Float32Array(cars.length * S), cz = new Float32Array(cars.length * S);
@@ -432,22 +444,27 @@ export class Traffic {
         }
       }
     });
+    // no brakes on this car: it holds its speed or puts its foot down
     const kUp = 0.9 + agg * 1.3, kDown = 6;
-    const speeds = [this.cruise, this.cruise + 8 + agg * 10, Math.max(8, Math.min(pb.speed, this.cruise) * 0.6)];
+    const speeds = [this.cruise, this.cruise + 8 + agg * 12];
     const maxVx = 9.5 + agg * 6;
     // how close counts as a hit: some breathing room when calm, a coat of paint when it's wild
     const mx = 2 * HALF_W + 0.4 - agg * 0.36, mz = 2 * HALF_L + 2.5 - agg * 1.9;
+    // where to aim: anywhere on the road, and when it's wild, up the curb and down the sidewalk
+    const targets: number[] = [];
+    for (let x = -PLAYER_EDGE; x <= PLAYER_EDGE + 1e-3; x += 0.46) targets.push(x);
+    for (const x of [-12.2, -11.2, 11.2, 12.2]) targets.push(x);
 
     type Option = { score: number; x: number; speed: number; mode: number; safe: boolean; blocker: Car | null };
-    let best: Option | null = null, bestGo: Option | null = null;
+    let best: Option | null = null;
     for (let s = 0; s < speeds.length; s++) {
       const D = speeds[s] - pb.speed, k = D < 0 ? kDown : kUp;
       const shiftAt = (t: number) => D * (t - (1 - Math.exp(-k * t)) / k);   // extra distance our speed change covers
       const shiftH = shiftAt(H), vH = pb.speed + D * (1 - Math.exp(-k * H));
-      for (let x = -PLAYER_EDGE; x <= PLAYER_EDGE + 1e-3; x += 0.46) {
+      for (const x of targets) {
         // fly the move
-        let px = pb.x, vx = pb.vx, hitT = H, blocker: Car | null = null;
-        for (let n = 1; n <= N && !blocker; n++) {
+        let px = pb.x, vx = pb.vx, hitT = H, blocker: Car | null = null, pole = false;
+        for (let n = 1; n <= N && !blocker && !pole; n++) {
           const want = Math.max(-maxVx, Math.min(maxVx, (x - px) * 3));
           vx += (want - vx) * Math.min(1, DT * 7);
           px += vx * DT;
@@ -455,6 +472,11 @@ export class Traffic {
           for (let i = 0; i < cars.length; i++) {
             const j = i * S + n, wreck = cars[i].crashed ? 1.4 : 0;   // a spinning car is as wide as it is long
             if (Math.abs(cx[j] - px) < mx + wreck && Math.abs(cz[j] + shift) < mz + wreck) { hitT = (n - 1) * DT; blocker = cars[i]; break; }
+          }
+          if (Math.abs(px) > 8.6) {
+            for (const [qx, qz] of poles) {
+              if (Math.abs(qx - px) < HALF_W + 0.35 && Math.abs(qz + pb.speed * n * DT + shift) < HALF_L + 1.2) { hitT = (n - 1) * DT; pole = true; break; }
+            }
           }
         }
         // past the horizon: how long until we'd run up on whatever is ahead in that line
@@ -471,23 +493,24 @@ export class Traffic {
         }
         let offLane = 9;
         for (const l of LANES) offLane = Math.min(offLane, Math.abs(l - x));
-        const safe = !blocker;
+        const walk = Math.abs(x) > 9;
+        const safe = !blocker && !pole;
         const score = (safe ? 60 : (hitT / H) * 40 - 30)
-          + Math.min(ttc, 4) * 6                               // open road ahead (past a few seconds it's all the same)
+          + Math.min(walk ? 8 : ttc, 4) * 6                    // open road ahead (past a few seconds it's all the same)
           - Math.abs(x - pb.x) * (1.6 - agg * 1.1)             // effort: the wilder it gets, the less a long move costs
-          - offLane * (2.2 - agg * 1.3)                        // lane centres look like driving
-          - (Math.abs(x) > 6.6 ? 5 - agg * 3.5 : 0)            // the curb is for when it's wild
-          - (s === 2 ? 26 + agg * 34 : s === 1 ? 3 : 0)        // braking is the last resort, and when it's busy hardly one
+          - (walk ? 13 - agg * 5                                // the sidewalk: when the road is shut, or it's wild anyway
+            : Math.abs(x) > 6.6 ? 5 - agg * 3.5                // riding the curb
+            : offLane * (2.2 - agg * 1.3))                     // lane centres look like driving
+          - (s === 1 ? 3 - agg * 4 : 0)                        // a busy network would rather be flat out
           + (Math.abs(x - this.plan.x) < 0.5 ? 3 : 0) + (s === this.plan.mode ? 5 : 0);   // commit to a plan
-        const opt: Option = { score, x, speed: speeds[s], mode: s, safe, blocker: blocker ?? (ttc < 3 ? limiter : null) };
+        const opt: Option = { score, x, speed: speeds[s], mode: s, safe, blocker: blocker ?? (ttc < 3 && !walk ? limiter : null) };
         if (!best || score > best.score) best = opt;
-        if (s !== 2 && (!bestGo || score > bestGo.score)) bestGo = opt;
       }
     }
-    this.plan = { x: best!.x, speed: best!.speed, mode: best!.mode, safe: best!.safe && best!.mode !== 2 };
-    this.lastOptions = { best, bestGo };
-    // clear the way: whoever stands in the best line that doesn't brake
-    const inWay = bestGo?.blocker;
+    this.plan = { x: best!.x, speed: best!.speed, mode: best!.mode, safe: best!.safe };
+    this.lastOptions = best;
+    // clear the way: whoever stands in our line
+    const inWay = best!.blocker;
     if (inWay && (!this.plan.safe || inWay.z < 0)) this.clearWay(inWay);
   }
 
@@ -585,7 +608,7 @@ export class Traffic {
     if (b.crashed) {
       // out of control: tyres scrub the speed off, the spin slowly dies, it slides for the shoulder
       b.crashed += h;
-      b.speed = Math.max(0, b.speed - (isPlayer ? 5 : 9) * h);
+      b.speed = Math.max(0, b.speed - (isPlayer ? 1.5 : 9) * h);   // we keep our foot in it even while sliding
       b.vx *= Math.exp(-h * 1.2);
       b.yawRate *= Math.exp(-h * (isPlayer ? 2.2 : 0.8));
       if (!isPlayer && b.crashed > 0.5) b.vx += (Math.sign(b.x || 1) * SHOULDER - b.x) * 1.6 * h;
@@ -611,9 +634,10 @@ export class Traffic {
 
     b.x += b.vx * h;
     if (!isPlayer) b.z += (playerSpeed - b.speed) * h;
-    // the curb
-    if (Math.abs(b.x) > ROAD_EDGE) {
-      b.x = Math.sign(b.x) * ROAD_EDGE;
+    // the curb for traffic; for us, the far edge of the sidewalk
+    const edge = isPlayer ? SIDEWALK_EDGE : ROAD_EDGE;
+    if (Math.abs(b.x) > edge) {
+      b.x = Math.sign(b.x) * edge;
       b.vx = -b.vx * 0.3;
       b.yawRate *= 0.6;
     }
@@ -663,8 +687,10 @@ export class Traffic {
     const vn = rvx * nx + rvz * nz;
     if (vn >= 0) return;
     const j = (-(1 + RESTITUTION) * vn) / (wa + wb);
-    a.vx += j * nx * wa; a.speed -= j * nz * wa;
-    b.vx -= j * nx * wb; b.speed += j * nz * wb;
+    // we plough on: a hit takes only a little of our speed (the other car takes the full shove)
+    const dA = -j * nz * wa, dB = j * nz * wb;
+    a.vx += j * nx * wa; a.speed += pa && dA < 0 ? dA * 0.3 : dA;
+    b.vx -= j * nx * wb; b.speed += pbb && dB < 0 ? dB * 0.3 : dB;
 
     // off-centre impulses spin each car: tau = r.z*F.x - r.x*F.z
     const spinA = ((pz - a.z) * (j * nx) - (px - a.x) * (j * nz)) * wa * 0.45;
@@ -702,7 +728,7 @@ export class Traffic {
           x: (p.position.x - body.x) * 1.5 + (Math.random() - 0.5) * 5, y: 3 + Math.random() * 5,
           z: -hitSpeed * (0.25 + Math.random() * 0.2), r: (Math.random() - 0.5) * 12,
         }));
-        body.speed *= body === this.pb ? 0.8 + this.aggression * 0.15 : 0.5;
+        body.speed *= body === this.pb ? 0.96 : 0.5;
         body.vx += (body.x - piece.position.x || (Math.random() - 0.5)) * 2;
         body.yawRate += (Math.random() - 0.5) * (body === this.pb ? 1.6 : 4);
         if (body !== this.pb) body.crashed = body.crashed || 0.001;
