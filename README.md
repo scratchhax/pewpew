@@ -12,8 +12,9 @@ your own traffic. Pick a scene per screen:
 - **Packet Rush**: a 16-bit side-scrolling runner, with boss fights
 - **Panopticon**: a made-up planet under surveillance, where the eye of god
   zooms in on the people behind the traffic
-- **Mainframe**: a slow, high flight over a circuit board while your traffic races
-  along the traces, diving into chips to trace intruders
+- **Mainframe**: a god's-eye flight over a glowing circuit board at night, in
+  the spirit of *Hackers*, where your traffic races the traces and turns at the
+  junctions, diving into chips to trace intruders
 - **Aquarium**: a 3D reef tank in the spirit of the old marine aquarium
   screensavers, where your traffic swims past as fish
 
@@ -643,20 +644,26 @@ the taskings off, **Eye: threats in a minute** sets the threat trigger, and
 
 ![mainframe](docs/mainframe.png)
 
-A slow, high flight over a big, busy, real-looking circuit board while your network races
-along its traces. The board is generated in sections ahead of the camera: green
-solder mask, copper traces, gold pads and vias, silkscreen outlines, part
-numbers, and text taken from your own traffic (addresses, hostnames, domains,
-rule names). The parts on it are 3D: chips with pins and laser-etched lids,
-capacitor towers, heat sinks, spinning fans, headers, crystals and LEDs, all lit
-by neon reflections. The camera flies high and unhurried, so you can take in a wide stretch of board at once, and drifts across ten "streets" of parallel
-traces, banks into its turns, climbs over the tall parts and drops back down
-into the gaps. Between events the board keeps up a dim chatter of clock and bus
-pulses, so it's never still, and addresses drift up through the air.
+A god's-eye flight over a big, busy circuit board at night, in the spirit of
+*Hackers*, while your network races along its traces. The board is generated in
+sections ahead of the camera: a near-black teal solder mask where the copper
+itself glows, cyan streets of parallel traces running the length of the board,
+cross streets running its width, gold pads and vias, faint silkscreen outlines
+and part numbers, and text taken from your own traffic (addresses, hostnames,
+domains, rule names). The parts on it are 3D: dark chips with pins and softly
+lit, laser-etched lids, capacitor towers, heat sinks, spinning fans, headers,
+crystals and LEDs. The board carries on to either side and fades into a teal
+haze at the horizon.
+
+The camera looks steeply down, so the board is laid out below like a map. It
+slides slowly between the ten streets, barely banks, drifts a little in
+heading, breathes up and down, and climbs over the tall parts. Between events
+the board keeps up a chatter of short bolts of light, so it's never still, and
+addresses drift up through the air.
 
 | Event | On the board |
 |-------|--------------|
-| allow | green light pulses streaking along the traces: outbound races ahead from behind the camera, inbound comes at it, and some turn off down a branch into a chip |
+| allow | short green bolts racing along the traces: outbound races ahead from behind the camera, inbound comes at it. Some turn off down a branch into a chip, and some take a hard turn at a junction, run along a cross street and turn off down another street |
 | block | a red pulse runs at a firewall chip and shatters on its pins |
 | threat | a worm: a glitching chain crawling along a trace toward a chip, which glows amber. ICE launches from the chip and hunts it down, and the worm breaks apart |
 | dns | a blue pulse reaches a lookup tower, and the domain scrolls across the tower's LED lid |

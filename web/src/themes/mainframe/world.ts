@@ -110,11 +110,12 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
   const env = neonEnv(renderer);
 
   const scene = new Scene();
-  scene.background = new Color(0x020406);
-  scene.fog = new FogExp2(0x020406, 0.0017);
-  const key = new DirectionalLight(0xcfe6ff, 2.2);
+  // night over the board: a teal haze at the horizon, and so little light that the glowing copper carries the scene
+  scene.background = new Color(0x04141a);
+  scene.fog = new FogExp2(0x04141a, 0.0011);
+  const key = new DirectionalLight(0xcfe6ff, 0.4);
   key.position.set(-40, 90, 30);
-  scene.add(key, key.target, new HemisphereLight(0x5a88b0, 0x0a0f0c, 0.55));
+  scene.add(key, key.target, new HemisphereLight(0x2a6a80, 0x010304, 0.22));
 
   const inner = new Scene();
   inner.background = new Color(0x05020c);
@@ -132,7 +133,8 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
   composer.setPixelRatio(ratio);
   composer.setSize(window.innerWidth, window.innerHeight);
   const pass = new RenderPass(scene, camera);
-  const bloom = new UnrealBloomPass(new Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.75, 0.55, 0.8);
+  // a lower threshold so the glowing traces bloom, not just the brightest packets
+  const bloom = new UnrealBloomPass(new Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.75, 0.55, 0.5);
   const lens = new ShaderPass(LensShader);
   composer.addPass(pass);
   composer.addPass(bloom);

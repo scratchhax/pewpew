@@ -138,12 +138,34 @@ export class Traffic {
       const rt = routes[Math.floor(Math.random() * routes.length)];
       if (rt) {
         const start = new Vector3(rt.pts[0].x, 0.12, outbound ? camZ + 30 : camZ - 260);
-        this.launch(makeRoute([start, ...rt.pts], rt.chip), color, 80 + Math.random() * 40, 15 + Math.random() * 8, undefined, 2.6);
+        this.launch(makeRoute([start, ...rt.pts], rt.chip), color, 110 + Math.random() * 50, 4 + Math.random() * 3, undefined, 2);
         return;
       }
     }
+    // some traffic turns at a junction onto a cross street, and off again onto another street
+    if (Math.random() < 0.45 && this.bolt(color, outbound, camZ)) return;
     const z0 = outbound ? camZ + 30 : camZ - 300, z1 = outbound ? camZ - 300 : camZ + 40;
-    this.launch(makeRoute([new Vector3(x, 0.12, z0), new Vector3(x, 0.12, z1)]), color, 70 + Math.random() * 60, 15 + Math.random() * 12, undefined, 2.8);
+    this.launch(makeRoute([new Vector3(x, 0.12, z0), new Vector3(x, 0.12, z1)]), color, 120 + Math.random() * 60, 4 + Math.random() * 4, undefined, 2.2);
+  }
+
+  /** A bolt: down a street, a hard turn at a junction along a cross street, and away down another street. */
+  bolt(color: Color, outbound: boolean, camZ: number): boolean {
+    const cross = this.board.crossRoutes(camZ - 20, camZ - 200);
+    const rt = cross[Math.floor(Math.random() * cross.length)];
+    if (!rt) return false;
+    const zc = rt.pts[0].z;
+    const near = STREETS.filter((s) => Math.abs(s - this.camX) < 170);
+    if (near.length < 2) return false;
+    const i = Math.floor(Math.random() * near.length);
+    let j = i + (Math.random() < 0.5 ? -1 : 1) * (1 + Math.floor(Math.random() * 3));
+    j = Math.max(0, Math.min(near.length - 1, j));
+    if (j === i) j = i === 0 ? 1 : i - 1;
+    const s1 = near[i], s2 = near[j];
+    // come in from behind the camera (outbound) or from far ahead (inbound), and carry on the same way
+    const zStart = outbound ? camZ + 30 : zc - 160, zEnd = outbound ? zc - 140 : camZ + 30;
+    const pts = [new Vector3(s1, 0.12, zStart), new Vector3(s1, 0.12, zc), new Vector3(s2, 0.12, zc), new Vector3(s2, 0.12, zEnd)];
+    this.launch(makeRoute(pts), color, 140 + Math.random() * 60, 4 + Math.random() * 4, undefined, 2);
+    return true;
   }
 
   /** The board's own chatter between events: dim clock and bus pulses, so it's never still. */
@@ -522,7 +544,7 @@ export class Traffic {
       tmpQ.setFromAxisAngle(UP, Math.atan2(tmpD.x, tmpD.z));
       tmpM.compose(tmpV, tmpQ, tmpS.set(p.width, 1, len));
       this.mesh.setMatrixAt(n, tmpM);
-      this.mesh.setColorAt(n, this.col.copy(p.color).multiplyScalar(2.2 * this.dim));
+      this.mesh.setColorAt(n, this.col.copy(p.color).multiplyScalar(3.2 * this.dim));
       n++;
     }
     this.mesh.count = n;

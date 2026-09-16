@@ -6,17 +6,19 @@ import {
 
 /**
  * The board: an endless circuit board generated in sections ahead of the
- * camera and dropped behind it. Each section is a painted texture (solder mask,
- * traces, gold pads and vias, silkscreen outlines and text) under real 3D parts
+ * camera and dropped behind it. Each section is a painted texture (a near-black
+ * mask, traces, gold pads and vias, faint silkscreen outlines and text) with a
+ * second, half-resolution map of what glows (the streets, cross streets, vias
+ * and pads, which bloom into light), under real 3D parts
  * (chips with pins and laser-etched lids, electrolytic capacitor towers, heat
  * sinks, case fans, headers, crystals, LEDs). Parts are written straight into
  * a few shared vertex buffers per section, and every static chip lid shares
  * one label atlas, so a section costs a handful of draw calls. A plain board
  * skirt runs out past the edges so the view never ends in black.
  *
- * Six "streets" of parallel traces run the length of the board; every chip
- * gets branch traces to its nearest street, and those are the routes packets
- * travel. The same generator also builds the inside of a chip (style 'die'):
+ * Ten "streets" of parallel traces run the length of the board and two cross
+ * streets run its width; every chip gets branch traces to its nearest street.
+ * Packets travel the streets, the branches, and turn at the junctions. The same generator also builds the inside of a chip (style 'die'):
  * a silicon floor of standard-cell rows, memory macros and copper buses.
  */
 
@@ -25,6 +27,8 @@ export const HALF = W / 2;
 export const CH = 128;                         // section length
 export const STREETS = [-190, -148, -106, -64, -22, 22, 64, 106, 148, 190];
 export const TRACE_OFFS = [-4, -2, 0, 2, 4];
+/** Where the cross streets run, as distance into a section. */
+export const CROSS_US = [43, 85];
 /** The blocks of parts between the streets (and out past the last ones). */
 const X_BLOCKS: Array<[number, number]> = [[-236, -198], ...STREETS.slice(0, -1).map((s, i): [number, number] => [s + 8, STREETS[i + 1] - 8]), [198, 236]];
 export type Style = 'pcb' | 'die';
@@ -64,7 +68,8 @@ function rng(seed: number): () => number {
 }
 
 const PALETTE = {
-  pcb: { mask: '#0b3a27', trace: '#1c6a45', traceHi: '#2a8a5c', pad: '#d4aa4a', silk: '#e9efe6', hole: '#1a1208' },
+  // night: a near-black teal board where the copper itself glows
+  pcb: { mask: '#03080b', trace: '#0c3b44', traceHi: '#39f0ff', pad: '#ffbf5a', silk: '#6fcfe8', hole: '#010203' },
   die: { mask: '#140c26', trace: '#9a6232', traceHi: '#d09048', pad: '#e0b458', silk: '#b9a8ff', hole: '#07040e' },
 };
 
@@ -181,6 +186,8 @@ export class Chunk {
   readonly group = new Group();
   readonly chips: Chip[] = [];
   readonly routes: Route[] = [];
+  /** Routes along the cross streets (x from -HALF to HALF). */
+  readonly cross: Route[] = [];
   readonly fans: Mesh[] = [];
   readonly antennas: Array<{ x: number; z: number }> = [];
   readonly z0: number;
@@ -189,6 +196,8 @@ export class Chunk {
   private meshers: Record<PartList, Mesher> = { plastic: new Mesher(), metal: new Mesher(), led: new Mesher(), lid: new Mesher(), grille: new Mesher() };
   private g: CanvasRenderingContext2D;
   private gm: CanvasRenderingContext2D;
+  /** What glows: painted at half resolution (bloom softens it anyway), black everywhere else. Board only, not the die. */
+  private ge: CanvasRenderingContext2D | null = null;
   private lidAtlas: HTMLCanvasElement;
   private lidSlot = 0;
   private k: number;
@@ -208,11 +217,18 @@ export class Chunk {
     c.width = cm.width = px; c.height = cm.height = py;
     this.g = c.getContext('2d')!;
     this.gm = cm.getContext('2d')!;
+    let ce: HTMLCanvasElement | null = null;
+    if (board.style === 'pcb') {
+      ce = document.createElement('canvas');
+      ce.width = Math.max(1, px >> 1); ce.height = Math.max(1, py >> 1);
+      this.ge = ce.getContext('2d')!;
+      this.ge.setTransform(0.5, 0, 0, 0.5, 0, 0);   // same coordinates as the colour canvas
+    }
     this.lidAtlas = document.createElement('canvas');
     this.lidAtlas.width = this.lidAtlas.height = LID_ATLAS;
     this.paintBase(px, py);
     if (board.style === 'pcb') this.buildPcb(); else this.buildDie();
-    this.finish(c, cm);
+    this.finish(c, cm, ce);
   }
 
   // ── canvas helpers: x in board units, u = distance into the section (0..CH) ──
@@ -230,46 +246,60 @@ export class Chunk {
       g.fillRect(r() * px, r() * py, 1 + r() * 3, 1 + r() * 3);
     }
     this.gm.fillStyle = '#000'; this.gm.fillRect(0, 0, px, py);
+    if (this.ge) { this.ge.fillStyle = '#000'; this.ge.fillRect(0, 0, px, py); }
     if (this.board.style === 'die') {
       g.strokeStyle = 'rgba(160,140,255,0.06)'; g.lineWidth = 1;
       for (let x = -HALF; x <= HALF; x += 2) { g.beginPath(); g.moveTo(this.cx(x), 0); g.lineTo(this.cx(x), py); g.stroke(); }
     }
   }
 
-  private line(pts: Array<[number, number]>, width: number, color: string, metal = false): void {
-    for (const [ctx, col] of [[this.g, color], ...(metal ? [[this.gm, '#fff']] : [])] as Array<[CanvasRenderingContext2D, string]>) {
-      ctx.strokeStyle = col; ctx.lineWidth = Math.max(1, width * this.k); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  private line(pts: Array<[number, number]>, width: number, color: string, metal = false, emit = 0): void {
+    const targets = [[this.g, color, 1, 1], ...(metal ? [[this.gm, '#fff', 1, 1]] : []), ...(emit > 0 && this.ge ? [[this.ge, color, emit, 2]] : [])] as Array<[CanvasRenderingContext2D, string, number, number]>;
+    for (const [ctx, col, alpha, minPx] of targets) {
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = col; ctx.lineWidth = Math.max(minPx, width * this.k); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
       ctx.beginPath();
       pts.forEach(([x, u], i) => (i ? ctx.lineTo(this.cx(x), this.cy(u)) : ctx.moveTo(this.cx(x), this.cy(u))));
       ctx.stroke();
+      ctx.globalAlpha = 1;
     }
   }
 
-  private rect(x: number, u: number, w: number, d: number, color: string, metal = false): void {
+  private rect(x: number, u: number, w: number, d: number, color: string, metal = false, emit = 0): void {
     this.g.fillStyle = color;
     this.g.fillRect(this.cx(x - w / 2), this.cy(u + d / 2), w * this.k, d * this.k);
     if (metal) { this.gm.fillStyle = '#fff'; this.gm.fillRect(this.cx(x - w / 2), this.cy(u + d / 2), w * this.k, d * this.k); }
+    if (emit > 0 && this.ge) {
+      this.ge.globalAlpha = emit; this.ge.fillStyle = color;
+      this.ge.fillRect(this.cx(x - w / 2), this.cy(u + d / 2), Math.max(2, w * this.k), Math.max(2, d * this.k));
+      this.ge.globalAlpha = 1;
+    }
   }
 
   private outline(x: number, u: number, w: number, d: number): void {
     const g = this.g;
-    g.strokeStyle = this.pal.silk; g.globalAlpha = 0.75; g.lineWidth = Math.max(1, 0.25 * this.k);
+    g.strokeStyle = this.pal.silk; g.globalAlpha = this.board.style === 'pcb' ? 0.3 : 0.75; g.lineWidth = Math.max(1, 0.25 * this.k);
     g.strokeRect(this.cx(x - w / 2), this.cy(u + d / 2), w * this.k, d * this.k);
     g.globalAlpha = 1;
   }
 
   private text(x: number, u: number, s: string, size: number, color = this.pal.silk, alpha = 0.85, align: CanvasTextAlign = 'left'): void {
-    const g = this.g;
-    g.save();
-    g.globalAlpha = alpha; g.fillStyle = color; g.textAlign = align; g.textBaseline = 'middle';
-    g.font = `bold ${Math.max(6, size * this.k)}px 'Courier New', monospace`;
-    g.fillText(s, this.cx(x), this.cy(u));
-    g.restore();
+    const night = this.board.style === 'pcb';
+    for (const [ctx, a] of [[this.g, night ? alpha * 0.45 : alpha], ...(night && this.ge && size >= 4 ? [[this.ge, alpha * 0.3]] : [])] as Array<[CanvasRenderingContext2D, number]>) {
+      ctx.save();
+      ctx.globalAlpha = a; ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'middle';
+      ctx.font = `bold ${Math.max(6, size * this.k)}px 'Courier New', monospace`;
+      ctx.fillText(s, this.cx(x), this.cy(u));
+      ctx.restore();
+    }
   }
 
-  private via(x: number, u: number, r = 0.55): void {
-    for (const [ctx, col, rad] of [[this.g, this.pal.pad, r], [this.gm, '#fff', r], [this.g, this.pal.hole, r * 0.45]] as Array<[CanvasRenderingContext2D, string, number]>) {
+  private via(x: number, u: number, r = 0.55, emit = 0.9): void {
+    const glow = this.ge && emit > 0 ? [[this.ge, this.pal.pad, r * 1.15, emit], [this.ge, '#000', r * 0.45, 1]] : [];
+    for (const [ctx, col, rad, alpha] of [[this.g, this.pal.pad, r, 1], [this.gm, '#fff', r, 1], [this.g, this.pal.hole, r * 0.45, 1], ...glow] as Array<[CanvasRenderingContext2D, string, number, number]>) {
+      ctx.globalAlpha = alpha;
       ctx.fillStyle = col; ctx.beginPath(); ctx.arc(this.cx(x), this.cy(u), Math.max(1, rad * this.k), 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -317,7 +347,7 @@ export class Chunk {
           const pu = side === 1 || side === 3 ? u + o : u + (side === 0 ? d / 2 + 0.7 : -d / 2 - 0.7);
           const horiz = side === 1 || side === 3;
           this.part('metal', B.box, px, 0.3, pu, horiz ? 1.5 : 0.45, 0.22, horiz ? 0.45 : 1.5, 0xc8c8cc);
-          this.rect(px, pu, horiz ? 1.9 : 0.6, horiz ? 0.6 : 1.9, pal.pad, true);
+          this.rect(px, pu, horiz ? 1.9 : 0.6, horiz ? 0.6 : 1.9, pal.pad, true, 0.55);
         }
       }
     }
@@ -337,7 +367,7 @@ export class Chunk {
       const jog = (r() < 0.5 ? -1 : 1) * Math.min(3, Math.abs(tx - pinX) * 0.3);
       const bendX = tx - dir * Math.abs(jog);
       const pts2: Array<[number, number]> = [[tx, pu + jog], [bendX, pu], [pinX, pu]];
-      this.line(pts2, 0.5, pal.trace);
+      this.line(pts2, 0.5, pal.trace, false, 0.35);
       this.via(tx, pu + jog, 0.5);
       const route = makeRoute(pts2.map(([px, pz]) => new Vector3(px, 0.12, this.z(pz))), chip);
       chip.routes.push(route);
@@ -382,7 +412,7 @@ export class Chunk {
     for (const s of [-1, 1]) {
       const ex = horiz ? x + s * L * 0.42 : x, eu = horiz ? u : u + s * D * 0.42;
       this.part('metal', B.box, ex, 0.45, eu, horiz ? L * 0.16 : L, 0.52, horiz ? D : D * 0.16, 0xd9d9dc);
-      this.rect(ex, eu, horiz ? L * 0.3 : L * 1.2, horiz ? D * 1.2 : D * 0.3, this.pal.pad, true);
+      this.rect(ex, eu, horiz ? L * 0.3 : L * 1.2, horiz ? D * 1.2 : D * 0.3, this.pal.pad, true, 0.45);
     }
     this.raise(x, u, L, D, 0.8);
   }
@@ -422,11 +452,19 @@ export class Chunk {
     // streets: bundles of parallel traces the length of the section, with vias
     for (const sx of STREETS) {
       for (const off of TRACE_OFFS) {
-        this.line([[sx + off, 0], [sx + off, CH]], 0.55, pal.traceHi);
+        this.line([[sx + off, 0], [sx + off, CH]], 0.55, pal.traceHi, false, off === 0 ? 1 : 0.5);
         for (let u = r() * 10; u < CH; u += 12 + r() * 20) this.via(sx + off, u, 0.5);
       }
     }
-    for (const cu of [43, 85]) for (const o of [-3, -1, 1, 3]) this.line([[-HALF, cu + o], [HALF, cu + o]], 0.5, pal.trace);
+    // cross streets run the width of the board: bolts turn onto them at the junctions
+    for (const cu of CROSS_US) {
+      for (const o of [-3, -1, 1, 3]) this.line([[-HALF, cu + o], [HALF, cu + o]], 0.5, pal.traceHi, false, Math.abs(o) === 1 ? 0.75 : 0.45);
+      for (const sx of STREETS) this.via(sx, cu, 0.8, 1);
+      for (const o of [-1, 1]) {
+        const pts: Array<[number, number]> = [[-HALF, cu + o], [HALF, cu + o]];
+        this.cross.push(makeRoute(pts.map(([px, pu]) => new Vector3(px, 0.12, this.z(pu))), null));
+      }
+    }
     const us: Array<[number, number]> = [[3, 38], [48, 80], [90, 125]];
     const blocks: Array<{ x0: number; x1: number; u0: number; u1: number }> = [];
     for (const [x0, x1] of X_BLOCKS) for (const [u0, u1] of us) blocks.push({ x0, x1, u0, u1 });
@@ -519,7 +557,7 @@ export class Chunk {
       case 'antenna': {
         const zig: Array<[number, number]> = [];
         for (let i = 0; i < 9; i++) { const x = b.x0 + 3 + i * ((bw - 6) / 8); zig.push(i % 2 ? [x, b.u0 + 12] : [x, b.u0 + 4]); zig.push(i % 2 ? [x, b.u0 + 4] : [x, b.u0 + 12]); }
-        this.line(zig, 0.8, this.pal.pad, true);
+        this.line(zig, 0.8, this.pal.pad, true, 0.8);
         this.antennas.push({ x: cx, z: this.z(b.u0 + 8) });
         this.part('metal', this.board.tpl.box, cx, 1.1, cu + 8, 12, 1.6, 10, 0xc3c6cc);
         this.raise(cx, cu + 8, 12, 10, 1.8);
@@ -564,7 +602,7 @@ export class Chunk {
     }
   }
 
-  private finish(c: HTMLCanvasElement, cm: HTMLCanvasElement): void {
+  private finish(c: HTMLCanvasElement, cm: HTMLCanvasElement, ce: HTMLCanvasElement | null): void {
     const B = this.board;
     // the metalness map only marks where copper and solder mask are, so half
     // resolution is plenty and saves a third of a section's texture memory
@@ -575,9 +613,22 @@ export class Chunk {
     map.colorSpace = SRGBColorSpace;
     map.anisotropy = metal.anisotropy = 8;
     this.textures.push(map, metal);
-    const floor = new Mesh(B.geo.quad, new MeshStandardMaterial({
-      map, metalnessMap: metal, metalness: 1, roughness: B.style === 'die' ? 0.35 : 0.48, envMap: B.env, envMapIntensity: 0.9,
-    }));
+    const floorMat = new MeshStandardMaterial({
+      map, metalnessMap: metal, metalness: 1, roughness: B.style === 'die' ? 0.35 : 0.48, envMap: B.env, envMapIntensity: B.style === 'die' ? 0.9 : 0.35,
+    });
+    if (ce) {
+      // the copper glows: bright enough over bloom's threshold to haze into light
+      const emissive = new CanvasTexture(ce);
+      emissive.colorSpace = SRGBColorSpace;
+      emissive.anisotropy = 8;
+      this.textures.push(emissive);
+      floorMat.emissive.set(0xffffff);
+      floorMat.emissiveMap = emissive;
+      floorMat.emissiveIntensity = B.glow;
+      B.floors.add(floorMat);
+      this.floorMat = floorMat;
+    }
+    const floor = new Mesh(B.geo.quad, floorMat);
     floor.scale.set(W, 1, CH);
     floor.position.set(0, 0, this.z0 - CH / 2);
     this.group.add(floor);
@@ -594,12 +645,12 @@ export class Chunk {
       tex.generateMipmaps = false;
       tex.minFilter = LinearFilter;
       this.textures.push(tex);
-      this.group.add(new Mesh(lids, new MeshStandardMaterial({ map: tex, roughness: 0.7, envMap: B.env, envMapIntensity: 0.3 })));
+      this.group.add(new Mesh(lids, new MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: B.style === 'pcb' ? 0.4 : 0, roughness: 0.7, envMap: B.env, envMapIntensity: 0.3 })));
     }
     // the board carries on to either side: the same section repeated, sharing its geometry and textures,
     // so banking never shows an edge (off-screen copies are frustum-culled)
     const originals = [...this.group.children];
-    for (const dx of [-W, W]) {
+    for (const dx of [-2 * W, -W, W, 2 * W]) {
       for (const o of originals) {
         if (!(o instanceof Mesh)) continue;
         const copy = new Mesh(o.geometry, o.material);
@@ -612,8 +663,11 @@ export class Chunk {
     B.scene.add(this.group);
   }
 
+  private floorMat: MeshStandardMaterial | null = null;
+
   dispose(): void {
     this.board.scene.remove(this.group);
+    if (this.floorMat) this.board.floors.delete(this.floorMat);
     const shared = new Set<unknown>([...Object.values(this.board.geo), ...Object.values(this.board.mats)]);
     this.group.traverse((o) => {
       if (!(o instanceof Mesh)) return;
@@ -668,6 +722,11 @@ export class Board {
   readonly tpl = { box: template(this.geo.box), cyl: template(this.geo.cyl), disc: template(this.geo.disc), quad: template(this.geo.quad) };
   readonly mats: BoardMaterials;
   private skirt: Mesh;
+  private skirtMat: MeshStandardMaterial;
+  /** Every live section's floor material, so the glow can be turned up or down at once. */
+  readonly floors = new Set<MeshStandardMaterial>();
+  /** How brightly the copper glows (brownouts dim it, overclocking pushes it). */
+  glow = 1.1;
   detail = 1024;
   /** Recent strings from the network (IPs, hostnames, domains, rules) for the silkscreen. */
   words: () => string = () => '';
@@ -676,24 +735,40 @@ export class Board {
 
   constructor(readonly scene: Scene, readonly style: Style, readonly env: Texture) {
     this.mats = new BoardMaterials(env);
-    // the board runs on past the edges: a plain, repeating mask with vias
+    // the board runs on past the edges into the haze: dark mask, glowing cyan verticals and gold pads
     const c = document.createElement('canvas');
     c.width = c.height = 128;
     const g = c.getContext('2d')!;
-    g.fillStyle = PALETTE[style].mask; g.fillRect(0, 0, 128, 128);
-    g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, 0, 128, 128);
-    g.fillStyle = PALETTE[style].trace;
-    for (let i = 0; i < 128; i += 32) g.fillRect(i + 14, 0, 3, 128);
-    g.fillStyle = PALETTE[style].pad;
-    for (let i = 0; i < 128; i += 32) { g.beginPath(); g.arc(i + 15.5, 60, 3, 0, Math.PI * 2); g.fill(); }
+    const pal = PALETTE[style];
+    g.fillStyle = style === 'pcb' ? '#000' : pal.mask; g.fillRect(0, 0, 128, 128);
+    g.fillStyle = style === 'pcb' ? pal.traceHi : pal.trace;
+    for (let i = 0; i < 128; i += 32) g.fillRect(i + 15, 0, 2, 128);
+    g.fillStyle = pal.pad;
+    for (let i = 0; i < 128; i += 32) { g.beginPath(); g.arc(i + 16, 60, 3, 0, Math.PI * 2); g.fill(); }
     const tex = new CanvasTexture(c);
     tex.colorSpace = SRGBColorSpace;
     tex.wrapS = tex.wrapT = RepeatWrapping;
     tex.repeat.set(60, 60);
     tex.anisotropy = 8;
-    this.skirt = new Mesh(new PlaneGeometry(2400, 2400).rotateX(-Math.PI / 2), new MeshStandardMaterial({ map: tex, roughness: 0.6, envMap: env, envMapIntensity: 0.4 }));
+    this.skirtMat = style === 'pcb'
+      ? new MeshStandardMaterial({ color: pal.mask, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.35, roughness: 0.8, envMap: env, envMapIntensity: 0.15 })
+      : new MeshStandardMaterial({ map: tex, roughness: 0.6, envMap: env, envMapIntensity: 0.4 });
+    this.skirt = new Mesh(new PlaneGeometry(2400, 2400).rotateX(-Math.PI / 2), this.skirtMat);
     this.skirt.position.y = -0.06;
     scene.add(this.skirt);
+  }
+
+  /** Set how brightly the copper glows on every section (and faintly on the skirt). */
+  setGlow(v: number): void {
+    this.glow = v;
+    for (const m of this.floors) m.emissiveIntensity = v;
+    if (this.style === 'pcb') this.skirtMat.emissiveIntensity = v * 0.28;
+  }
+
+  crossRoutes(z0: number, z1: number): Route[] {
+    const out: Route[] = [];
+    for (const c of this.chunks.values()) for (const r of c.cross) if (r.pts[0].z <= z0 && r.pts[0].z >= z1) out.push(r);
+    return out;
   }
 
   /** Keep sections from just behind `camZ` to `ahead` sections in front; builds at most one per call. */
@@ -755,7 +830,7 @@ export class Board {
     tex.colorSpace = SRGBColorSpace;
     tex.anisotropy = 4;
     chip.chunk.textures.push(tex);
-    const top = new Mesh(this.geo.quad, new MeshStandardMaterial({ map: tex, roughness: 0.7, envMap: this.env, envMapIntensity: 0.3 }));
+    const top = new Mesh(this.geo.quad, new MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: this.style === 'pcb' ? 0.55 : 0, roughness: 0.7, envMap: this.env, envMapIntensity: 0.3 }));
     top.scale.set(chip.w * 0.96, 1, chip.d * 0.96);
     top.position.set(chip.x, chip.h + 0.04, chip.z);
     chip.chunk.group.add(top);

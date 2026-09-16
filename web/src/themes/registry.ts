@@ -20,7 +20,7 @@ export const SCENES: Record<string, { title: string; blurb: string; accent: stri
   racing: { title: 'Midnight Run', blurb: 'A neon street race: traffic, roadblocks, rivals and police chases.', accent: '#ff3fb4' },
   rush: { title: 'Packet Rush', blurb: 'A 16-bit runner: gems, stompable baddies, query blocks, rivals and a hunter drone.', accent: '#41a6f6' },
   spy: { title: 'Panopticon', blurb: 'A made-up planet under watch: signal arcs, satellites, and an eye of god that zooms in on the people behind the traffic.', accent: '#e8c26a' },
-  mainframe: { title: 'Mainframe', blurb: 'Flying low over a circuit board while your traffic races along the traces, and diving into chips to trace intruders.', accent: '#7ef3ff' },
+  mainframe: { title: 'Mainframe', blurb: 'A god\'s-eye flight over a glowing circuit board at night: traffic races the traces, and dives into chips trace intruders.', accent: '#7ef3ff' },
   aquarium: { title: 'Aquarium', blurb: 'A reef tank: schools of fish for your traffic, pufferfish for blocks, a shark for threats, and bubbles for DNS lookups.', accent: '#6fe6ff' },
 };
 /** Themes in picker order: the known scenes first (as the README lists them), then any others. */

@@ -235,10 +235,11 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     for (const fan of board.fans()) fan.rotation.y += dt * (8 + heat * 16);
     board.mats.led.color.setScalar(dim * pulse);
     world.key.color.copy(keyCool).lerp(keyHot, heat * 0.8);
-    world.key.intensity = 2.2 * (0.35 + 0.65 * dim);
+    world.key.intensity = 0.4 * (0.35 + 0.65 * dim);
+    board.setGlow(1.1 * dim * pulse * (1 + heat * 0.35));
     world.key.position.set(flight.x - 40, 90, flight.z + 30);
     world.key.target.position.set(flight.x, 0, flight.z - 40);
-    (world.scene.fog as { density: number }).density = 0.0017 + heat * 0.0008;
+    (world.scene.fog as { density: number }).density = 0.0011 + heat * 0.0006;
     const lens = world.lens.uniforms;
     lens.uTime.value += dtReal;
     lens.uHeat.value = heat * 0.7;
