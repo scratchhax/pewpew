@@ -1,7 +1,7 @@
 import { MeshStandardMaterial, Vector3, type PerspectiveCamera, type Scene } from 'three';
 import type { AudioCues } from '../../theme';
 import { Board, makeRoute, STREETS, type Chip } from './board';
-import { BlastDoors, Corruption, ENDINGS, FirewallRing, Ripple, type Ending } from './endings';
+import { BlastDoors, BurnLine, Corruption, ENDINGS, FirewallRing, Ripple, type Ending } from './endings';
 import { Flight } from './flight';
 import { COL, Traffic } from './traffic';
 import type { World } from './world';
@@ -145,7 +145,8 @@ export class Dive {
   private seedT = 0;
   private chase: Vector3[] = [];
   private chaseLens: number[] = [];
-  private trailT = 0;
+  private burn: BurnLine | null = null;
+  private strikeSpeed = 150;
   private get surfaceDur(): number { return 0.9 + (this.ending === 'counter' ? EXIT_CHASE : EXIT); }
 
   constructor(private world: World, private board: Board, private traffic: Traffic, private audio: AudioCues, overlay: HTMLElement) {
@@ -478,8 +479,10 @@ export class Dive {
       this.exitTo.copy(this.chase[3]);
       // the counter-strike itself: a bright bolt racing ahead along the attacker's route
       const flat = [new Vector3(pin.x, 0.12, pin.z), new Vector3(street.x, 0.12, street.z), new Vector3(street.x, 0.12, street.z - 520)];
-      this.traffic.trail(makeRoute(flat), COL.ice, 150, 22, 3.4);
-      this.trailT = 0;
+      this.traffic.trail(makeRoute(flat), COL.ice, this.strikeSpeed, 22, 3.4);
+      // the route catches fire behind the strike as it goes
+      this.burn?.dispose();
+      this.burn = new BurnLine(this.world.scene, [flat[0], flat[1], new Vector3(street.x, 0.12, street.z - 360)]);
       this.status('COUNTER-STRIKE · FOLLOWING THE LINE', 'act');
       this.audio.sfx('chase');
     }
@@ -539,15 +542,16 @@ export class Dive {
     lens.uZoom.value = 0.55 * Math.sin(Math.PI * clamp01(s * 1.15));
     const lid = chip.top?.material as MeshStandardMaterial | undefined;
     if (lid) lid.emissiveIntensity = 0.55 + 1.85 * (1 - clamp01(s * 3));
-    // the attacker's route burns out behind the camera
-    this.trailT -= dt;
-    if (s < 0.85 && this.trailT <= 0) {
-      this.trailT = 0.09;
-      const flat = this.chase.slice(1).map((p) => new Vector3(p.x, 0.12, p.z));
-      flat[flat.length - 1].z -= 220;
-      this.traffic.trail(makeRoute(flat), COL.threat, 70, 30, 2.4);
-    }
+    // the attacker's route burns just behind the strike, ahead of us, and cools as we fly over it
+    this.burn?.ignite(this.strikeSpeed * k - 6);
     if (s >= 0.5 && s - dt / EXIT_CHASE < 0.5) { this.restamp('SOURCE BLOCKED', 'safe'); this.status('ATTACKER ROUTE BURNED · SOURCE BLOCKED', 'good'); this.audio.sfx('blocked'); }
+  }
+
+  /** Effects that outlive the dive itself (the burning route cooling off). Call every frame. */
+  afterglow(dt: number): void {
+    if (!this.burn) return;
+    this.burn.update(dt);
+    if (this.burn.done) { this.burn.dispose(); this.burn = null; }
   }
 
   private innerStep(dt: number, camera: PerspectiveCamera, wanderX: number, wanderY: number, busy: number, speed = 30): void {

@@ -110,6 +110,77 @@ export class Corruption {
   private minZ(): number { let m = Infinity; for (const s of this.seeds) m = Math.min(m, s.z); return m; }
 }
 
+/**
+ * The attacker's route catching fire where the counter-strike passes, then
+ * cooling to nothing: short glowing segments laid along the route that light
+ * up in order and fade from orange through red to dark.
+ */
+export class BurnLine {
+  private mesh: InstancedMesh;
+  private segs: Array<{ pos: Vector3; rot: number; arc: number; lit: number }> = [];
+  private t = 0;
+  private col = new Color();
+  private readonly hot = new Color(0xffb347);
+  private readonly ember = new Color(0xff3a1a);
+  constructor(private scene: Scene, pts: Vector3[], step = 2.4, private width = 3.2) {
+    let arc = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], len = a.distanceTo(b);
+      const rot = Math.atan2(b.x - a.x, b.z - a.z);
+      for (let d = 0; d < len; d += step) {
+        this.segs.push({ pos: a.clone().lerp(b, d / len).setY(0.3), rot, arc: arc + d, lit: -1 });
+      }
+      arc += len;
+    }
+    const tex = glowStrip();
+    const mat = new MeshBasicMaterial({ map: tex, transparent: true, blending: AdditiveBlending, depthWrite: false, toneMapped: false });
+    this.mesh = new InstancedMesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), mat, this.segs.length);
+    this.mesh.instanceMatrix.setUsage(DynamicDrawUsage);
+    this.mesh.frustumCulled = false;
+    this.mesh.count = 0;
+    scene.add(this.mesh);
+  }
+  /** Everything up to this distance along the route is burning. */
+  ignite(arc: number): void { for (const s of this.segs) if (s.lit < 0 && s.arc <= arc) s.lit = this.t; }
+  get done(): boolean { return this.segs.every((s) => s.lit >= 0 && this.t - s.lit > 3.2); }
+  update(dt: number): void {
+    this.t += dt;
+    let n = 0;
+    for (const s of this.segs) {
+      if (s.lit < 0) continue;
+      const age = this.t - s.lit;
+      if (age > 3.2) continue;
+      // catches over a moment, then cools
+      const heat = smooth(age / 0.18) * Math.exp(-Math.max(0, age - 0.18) / 0.9);
+      tmpQ.setFromAxisAngle(tmpV.set(0, 1, 0), s.rot);
+      tmpM.compose(s.pos, tmpQ, tmpS.set(this.width * (0.8 + heat * 0.5), 1, 3.2));
+      this.mesh.setMatrixAt(n, tmpM);
+      this.mesh.setColorAt(n, this.col.copy(this.ember).lerp(this.hot, heat).multiplyScalar(heat * 2.6));
+      n++;
+    }
+    this.mesh.count = n;
+    this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+  }
+  dispose(): void {
+    this.scene.remove(this.mesh);
+    this.mesh.geometry.dispose();
+    const m = this.mesh.material as MeshBasicMaterial;
+    m.map?.dispose(); m.dispose();
+  }
+}
+
+/** A soft bar of light, bright down the middle. */
+function glowStrip(): Texture {
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 32;
+  const g = c.getContext('2d')!;
+  const gr = g.createLinearGradient(0, 0, 32, 0);
+  gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
+  return new CanvasTexture(c);
+}
+
 /** An expanding ring on the floor: the purge wave inside, the shockwave on the board. */
 export class Ripple {
   private rings: Array<{ mesh: Mesh; mat: MeshBasicMaterial; delay: number }> = [];

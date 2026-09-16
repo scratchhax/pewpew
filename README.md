@@ -705,8 +705,9 @@ short story: something got in, we find it, and we deal with it.
      hazard stripes and red firewall walls rise around the chip, where they stay.
    - **Counter-strike.** The trace locks onto the source and a counter-strike
      launches back up the line as the corruption drains away. Instead of climbing
-     out, the camera rides the strike out of the chip, along its trace and away
-     down the attacker's street, the route burning out behind it.
+     out, the camera chases the strike out of the chip, along its trace and away
+     down the attacker's street. The route catches fire right behind the strike
+     and cools to embers as the camera flies over it.
      **SOURCE BLOCKED.**
 6. **Back to the flight.** Every ending finishes exactly where the flight
    carries on, at cruising height and speed, so there's no jump.

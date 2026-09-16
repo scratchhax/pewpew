@@ -217,6 +217,7 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     while (ambientT < 0) { ambientT += 1 / 3; if (settings.mPackets) traffic.ambient(flight.z); }
     checkDive();
     const view = dive.update(dtReal, world.camera, f.wanderX, f.wanderY);
+    dive.afterglow(dtReal);
     if (dive.exitZ !== lastExit) { lastExit = dive.exitZ; flight.z = dive.exitZ; flight.x = dive.exitX; flight.vx = 0; flight.alt = dive.exitAlt; }
     const rate = state.rate30s / 30;
     // slow and high: plenty of time to take in the board
