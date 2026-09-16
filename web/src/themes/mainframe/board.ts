@@ -180,7 +180,8 @@ function fanGrille(): Texture {
 }
 
 type PartList = 'plastic' | 'metal' | 'led' | 'lid' | 'grille';
-const LID_ATLAS = 1024, LID_SLOT = 256;
+/** Lid atlas and slot size: the board is seen from far above, the die from close up. */
+const LID = { pcb: { atlas: 512, slot: 128 }, die: { atlas: 1024, slot: 256 } };
 
 export class Chunk {
   readonly group = new Group();
@@ -225,7 +226,7 @@ export class Chunk {
       this.ge.setTransform(0.5, 0, 0, 0.5, 0, 0);   // same coordinates as the colour canvas
     }
     this.lidAtlas = document.createElement('canvas');
-    this.lidAtlas.width = this.lidAtlas.height = LID_ATLAS;
+    this.lidAtlas.width = this.lidAtlas.height = LID[board.style].atlas;
     this.paintBase(px, py);
     if (board.style === 'pcb') this.buildPcb(); else this.buildDie();
     this.finish(c, cm, ce);
@@ -377,11 +378,12 @@ export class Chunk {
   }
 
   private atlasLid(chip: Chip): void {
+    const { atlas: LID_ATLAS, slot: LID_SLOT } = LID[this.board.style];
     if (this.lidSlot >= (LID_ATLAS / LID_SLOT) ** 2) return;
     const per = LID_ATLAS / LID_SLOT;
     const ox = (this.lidSlot % per) * LID_SLOT, oy = Math.floor(this.lidSlot / per) * LID_SLOT;
     this.lidSlot++;
-    const lw = LID_SLOT, lh = Math.max(64, Math.min(LID_SLOT, Math.round(LID_SLOT * chip.d / chip.w)));
+    const lw = LID_SLOT, lh = Math.max(LID_SLOT / 4, Math.min(LID_SLOT, Math.round(LID_SLOT * chip.d / chip.w)));
     const g = this.lidAtlas.getContext('2d')!;
     g.save();
     g.translate(ox, oy);
@@ -748,12 +750,12 @@ export class Board {
     const tex = new CanvasTexture(c);
     tex.colorSpace = SRGBColorSpace;
     tex.wrapS = tex.wrapT = RepeatWrapping;
-    tex.repeat.set(60, 60);
+    tex.repeat.set(200, 200);
     tex.anisotropy = 8;
     this.skirtMat = style === 'pcb'
       ? new MeshStandardMaterial({ color: pal.mask, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.35, roughness: 0.8, envMap: env, envMapIntensity: 0.15 })
       : new MeshStandardMaterial({ map: tex, roughness: 0.6, envMap: env, envMapIntensity: 0.4 });
-    this.skirt = new Mesh(new PlaneGeometry(2400, 2400).rotateX(-Math.PI / 2), this.skirtMat);
+    this.skirt = new Mesh(new PlaneGeometry(8000, 8000).rotateX(-Math.PI / 2), this.skirtMat);
     this.skirt.position.y = -0.06;
     scene.add(this.skirt);
   }
@@ -772,11 +774,11 @@ export class Board {
   }
 
   /** Keep sections from just behind `camZ` to `ahead` sections in front; builds at most one per call. */
-  update(camZ: number, ahead: number): void {
-    this.skirt.position.z = camZ - 600 - ((camZ % 40) + 40) % 40;
+  update(camZ: number, ahead: number, behind = 1): void {
+    this.skirt.position.z = camZ - 2000 - ((camZ % 40) + 40) % 40;
     const cur = Math.floor(-camZ / CH);
-    for (const [i, c] of this.chunks) if (i < cur - 1 || i > cur + ahead + 1) { c.dispose(); this.chunks.delete(i); }
-    for (let i = cur - 1; i <= cur + ahead; i++) {
+    for (const [i, c] of this.chunks) if (i < cur - behind || i > cur + ahead + 1) { c.dispose(); this.chunks.delete(i); }
+    for (let i = cur - behind; i <= cur + ahead; i++) {
       if (i < 0 || this.chunks.has(i)) continue;
       const t0 = performance.now();
       this.chunks.set(i, new Chunk(this, i));
@@ -785,8 +787,8 @@ export class Board {
     }
   }
 
-  fill(camZ: number, ahead: number): void {
-    for (let n = 0; n < ahead + 3; n++) this.update(camZ, ahead);
+  fill(camZ: number, ahead: number, behind = 1): void {
+    for (let n = 0; n < ahead + behind + 2; n++) this.update(camZ, ahead, behind);
   }
 
   heightAt(x: number, z: number): number {

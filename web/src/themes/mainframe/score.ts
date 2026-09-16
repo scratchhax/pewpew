@@ -277,7 +277,14 @@ class BoardConductor extends Conductor {
         s.crackle(this.sfxBus, now, 0.03 * fx * st.gWifi, pan);
         return;
       case 'brownout':
-        s.tone(this.sfxBus, now, 220, { type: 'sawtooth', g: 0.04 * fx, a: 0.01, h: 0.2, r: 1.2, glide: 0.25, lp: 1600, lpTo: 120, q: 4, rev: 0.4 });
+        // a relay drops out with a thunk, the mains hum sags away, then the supply catches and whines back up
+        s.noiseHit(this.sfxBus, now, { type: 'bandpass', f: 1100, q: 2.5, g: 0.05 * fx, a: 0.001, r: 0.05 });
+        s.tom(this.sfxBus, now, 72, 0.07 * fx, 0);
+        s.tone(this.sfxBus, now + 0.02, 100, { type: 'sawtooth', g: 0.03 * fx, a: 0.01, h: 0.12, r: 0.7, glide: 0.45, lp: 520, lpTo: 110, q: 1.2, rev: 0.25 });
+        s.tone(this.sfxBus, now + 0.02, 50, { g: 0.05 * fx, a: 0.01, h: 0.12, r: 0.7, glide: 0.5 });
+        s.tone(this.sfxBus, now + 0.95, 50, { g: 0.035 * fx, a: 0.35, h: 0.2, r: 0.5, glide: 2 });
+        s.tone(this.sfxBus, now + 0.95, 2400, { g: 0.004 * fx, a: 0.45, h: 0.1, r: 0.35, glide: 1.5, rev: 0.3 });
+        s.noiseHit(this.sfxBus, now + 1.0, { type: 'bandpass', f: 1800, q: 3, g: 0.02 * fx, a: 0.001, r: 0.04 });
         return;
       case 'lock': {
         const f = this.notes ? this.chordAt(now, 5)[0] : 1318.5;

@@ -655,11 +655,12 @@ lit, laser-etched lids, capacitor towers, heat sinks, spinning fans, headers,
 crystals and LEDs. The board carries on to either side and fades into a teal
 haze at the horizon.
 
-The camera looks steeply down, so the board is laid out below like a map. It
-slides slowly between the ten streets, barely banks, drifts a little in
-heading, breathes up and down, and climbs over the tall parts. Between events
-the board keeps up a chatter of short bolts of light, so it's never still, and
-addresses drift up through the air.
+The camera flies very high and looks steeply down, so a whole district of the
+board is laid out below like a city at night and you can watch events happen
+all across it. It slides slowly between the ten streets, barely banks, drifts a
+little in heading and breathes up and down. Between events the board keeps up a
+chatter of short bolts of light, so it's never still, and addresses drift up
+through the air.
 
 | Event | On the board |
 |-------|--------------|
@@ -949,7 +950,7 @@ The board plays along:
 | dns | a data chirp from the lookup tower |
 | dhcp | the pick-and-place servo whirring down, and a click as the part seats |
 | wifi | rising pings for a join, a crackle for a failure |
-| system | a brownout sweep |
+| system | a brownout: a relay thunks off and the mains hum sags away, then the supply catches and whines back up |
 | dive | a lock-on tone, a rising rush on the way down, a whoosh through the die, ticks as the traceroute types, and a big hit for INTRUSION TRACED |
 
 The music drops to half volume during a dive. Fans hum and the board buzzes

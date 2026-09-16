@@ -112,7 +112,7 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
   const scene = new Scene();
   // night over the board: a teal haze at the horizon, and so little light that the glowing copper carries the scene
   scene.background = new Color(0x04141a);
-  scene.fog = new FogExp2(0x04141a, 0.0011);
+  scene.fog = new FogExp2(0x04141a, 0.00045);
   const key = new DirectionalLight(0xcfe6ff, 0.4);
   key.position.set(-40, 90, 30);
   scene.add(key, key.target, new HemisphereLight(0x2a6a80, 0x010304, 0.22));
@@ -124,7 +124,7 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
   innerKey.position.set(30, 80, 20);
   inner.add(innerKey, innerKey.target, new HemisphereLight(0x8a6ad0, 0x0a0614, 0.7));
 
-  const camera = new PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 900);
+  const camera = new PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 3000);
   // multisampled scene target: the board is all thin traces and pins, which crawl without it
   // multisampling is charged per pixel of the whole screen, so big surfaces take fewer samples
   const px = window.innerWidth * window.innerHeight * ratio * ratio;
