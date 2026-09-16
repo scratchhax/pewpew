@@ -62,15 +62,33 @@ export class TextAtlas {
     if (this.words.length > 400) this.words.splice(0, 200);
   }
 
+  private first = true;
+
+  /**
+   * Repaint only a few cells and leave the rest alone: the canvas is
+   * persistent, so listings keep scrolling by undisturbed and new words
+   * trickle in, instead of every face flashing to fresh text at once.
+   */
   rebuild(): void {
+    for (let r = 0; r < ROWS; r++) {
+      for (let col = 0; col < COLS; col++) {
+        if (this.first || Math.random() < 0.18) this.drawCell(col, r);
+      }
+    }
+    this.first = false;
+    this.texture.needsUpdate = true;
+  }
+
+  private drawCell(col: number, row: number): void {
     const c = this.ctx;
+    const x = col * CW, y = row * CH;
     c.fillStyle = '#000';
-    c.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    c.fillRect(x, y, CW, CH);
     const pick = (): string =>
       this.words.length && Math.random() < 0.34
         ? this.words[(Math.random() * this.words.length) | 0]
         : TOKENS[(Math.random() * TOKENS.length) | 0];
-    const box = (word: string, x: number, y: number): void => {
+    const box = (word: string, by: number): void => {
       const size = word.length > 11 ? 15 : word.length > 8 ? 19 : 24;
       c.font = `bold ${size}px "Courier New", monospace`;
       const bw = c.measureText(word).width + 12;
@@ -79,22 +97,16 @@ export class TextAtlas {
       const bx = x + 4 + Math.random() * (CW - 8 - bw);
       c.strokeStyle = 'rgba(52, 200, 255, 0.4)';
       c.lineWidth = 2;
-      c.strokeRect(bx, y, bw, bh);
+      c.strokeRect(bx, by, bw, bh);
       c.fillStyle = word === 'GARBAGE' || word === 'GOD' ? '#e8fbff' : '#5fe6ff';
-      c.fillText(word, bx + 6, y + bh - 6);
+      c.fillText(word, bx + 6, by + bh - 6);
     };
-    for (let r = 0; r < ROWS; r++) {
-      for (let col = 0; col < COLS; col++) {
-        const x = col * CW, y = r * CH;
-        box(pick(), x, y + 3 + Math.random() * 8);
-        if (Math.random() < 0.85) box(pick(), x, y + 38 + Math.random() * 8);
-        if (Math.random() < 0.8) {
-          c.font = `bold 15px "Courier New", monospace`;
-          c.fillStyle = 'rgba(40, 165, 205, 0.7)';
-          c.fillText(SUBS[(Math.random() * SUBS.length) | 0], x + 7, y + CH - 8);
-        }
-      }
+    box(pick(), y + 3 + Math.random() * 8);
+    if (Math.random() < 0.85) box(pick(), y + 38 + Math.random() * 8);
+    if (Math.random() < 0.8) {
+      c.font = `bold 15px "Courier New", monospace`;
+      c.fillStyle = 'rgba(40, 165, 205, 0.7)';
+      c.fillText(SUBS[(Math.random() * SUBS.length) | 0], x + 7, y + CH - 8);
     }
-    this.texture.needsUpdate = true;
   }
 }
