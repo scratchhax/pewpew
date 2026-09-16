@@ -19,8 +19,8 @@ your own traffic. Pick a scene per screen:
   screensavers, where your traffic swims past as fish
 - **The Gibson**: the storage wall from *Hackers* — a computer city of
   translucent monolith blocks lined in glowing cyan, flown through at street
-  level with full 90-degree turns at every intersection, until the camera
-  swings around to lock onto a red file and trace the intruder
+  level and turning at every corner, until the camera swings around to lock
+  onto a red file and trace the intruder
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -789,9 +789,9 @@ drift** stops the camera.
 ![the gibson](docs/gibson.png)
 
 The storage wall from *Hackers*, rebuilt in 3D as a computer city: a grid of
-tower blocks with streets in both directions, flown at street level with a
-full 90-degree turn at every intersection - the whole city swings around the
-camera, exactly like the film's flythrough. The translucent monoliths are
+tower blocks with streets in both directions, flown at street level, turning
+at every corner - the whole city swings around the camera, exactly like the
+film's flythrough. The translucent monoliths are
 always standing, and their faces are covered in glowing cyan listings set in
 neat digital boxes — `STATUS`, `ERROR`, `REPORT`, `Security`, `R606`,
 `>OVERRIDE`, hex and binary — including the hostnames, addresses and domains
