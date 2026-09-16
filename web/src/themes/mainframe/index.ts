@@ -53,10 +53,6 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
   const board = new Board(world.scene, 'pcb', world.env);
   board.words = () => words[Math.floor(Math.random() * words.length)];
   const traffic = new Traffic(world.scene, board);
-  // the camera flies very high: traffic has to spawn across a much bigger patch of board, and be big and quick enough to read
-  traffic.view = { behind: 60, ahead: 280, halfW: 260, size: 1.8, speed: 1.5 };
-  /** Sections the camera can see: from well behind it to far ahead. */
-  const ahead = () => settings.mChunks + 1, BEHIND = 1;
   traffic.onEvent = (name, x) => audio.sfx(name, { pan: (x - flight.x) / 60 });
   const flight = new Flight();
   const dive = new Dive(world, board, traffic, audio, overlay);
@@ -69,7 +65,7 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     dive.detail = settings.mDetail;
   }
   applyBudgets();
-  board.fill(flight.z, ahead(), BEHIND);
+  board.fill(flight.z, settings.mChunks);
   window.addEventListener('resize', () => world.resize(window.innerWidth, window.innerHeight));
 
   // ── intelligence for the dive's triggers and trace panel ──
@@ -225,13 +221,12 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     if (dive.exitZ !== lastExit) { lastExit = dive.exitZ; flight.z = dive.exitZ; flight.alt = 18; }
     const rate = state.rate30s / 30;
     // slow and high: plenty of time to take in the board
-    // high up, so the ground has to move faster to feel like flight
-    const speed = (26 + Math.min(15, rate * 0.5) + heat * 10) * settings.mFlightSpeed * dive.speedFactor;
+    const speed = (17 + Math.min(10, rate * 0.35) + heat * 7) * settings.mFlightSpeed * dive.speedFactor;
     if (!view?.controlsCamera) {
       flight.update(dt, board, world.camera, { speed, steerX: dive.steerX, low: 9 - heat * 2, wanderX: f.wanderX, wanderY: f.wanderY });
     }
     audio.sfx('fly', { count: flight.speed });
-    board.update(flight.z, ahead(), BEHIND);
+    board.update(flight.z, settings.mChunks);
     traffic.camX = flight.x;
     traffic.speedScale = 1 + heat * 0.35;
     traffic.dim = dim * pulse;
@@ -244,7 +239,7 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     board.setGlow(1.1 * dim * pulse * (1 + heat * 0.35));
     world.key.position.set(flight.x - 40, 90, flight.z + 30);
     world.key.target.position.set(flight.x, 0, flight.z - 40);
-    (world.scene.fog as { density: number }).density = 0.0008 + heat * 0.0004;
+    (world.scene.fog as { density: number }).density = 0.0011 + heat * 0.0006;
     const lens = world.lens.uniforms;
     lens.uTime.value += dtReal;
     lens.uHeat.value = heat * 0.7;

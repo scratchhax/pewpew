@@ -12,8 +12,8 @@ export class Flight {
   alt = 12;
   vx = 0;
   speed = 26;
-  /** Height above the low point: very high over the board, low inside a chip. */
-  lift = 200;
+  /** Height above the low point: high over the board, lower inside a chip. */
+  lift = 62;
   private targetX = 0;
   private nextTurn = 2;
   private roll = 0;
@@ -38,19 +38,15 @@ export class Flight {
     // clearance over the parts coming up
     let h = 0;
     for (let dz = 6; dz <= 46; dz += 4) for (let dx = -10; dx <= 10; dx += 5) h = Math.max(h, board.heightAt(this.x + dx, this.z - dz));
-    // drift and breathing scale with height, so they read the same from up high
-    const k = Math.max(1, this.lift / 140);
-    const base = (o.low ?? 9) + this.lift + (Math.sin(this.t * 0.11) * 6 + Math.sin(this.t * 0.037 + 1) * 4) * k;
+    const base = (o.low ?? 9) + this.lift + Math.sin(this.t * 0.11) * 6 + Math.sin(this.t * 0.037 + 1) * 4;
     const altTarget = Math.max(base, h + 7);
-    // pop up over a tall part quickly; coming back up from a dive, rise at a steady pace
-    const rate = altTarget > this.alt ? (altTarget - this.alt > 60 ? 0.9 : 2.6) : 0.7;
-    this.alt += (altTarget - this.alt) * Math.min(1, dt * rate);
+    this.alt += (altTarget - this.alt) * Math.min(1, dt * (altTarget > this.alt ? 2.6 : 0.7));
     // barely any bank: a god's-eye view, not a plane
     this.roll += (-this.vx * 0.014 * 0.2 - this.roll) * Math.min(1, dt * 3);
-    const breathe = Math.sin(this.t * 0.23) * 1.5 * k;
+    const breathe = Math.sin(this.t * 0.23) * 1.5;
     camera.position.set(this.x + (o.wanderX ?? 0) * 0.01, this.alt + breathe + (o.wanderY ?? 0) * 0.005, this.z);
     // looking steeply down: the board is laid out below like a map, with a slow drift in heading
-    this.look.set(this.x + this.vx * 0.35 + Math.sin(this.t * 0.05) * 6 * k, 0, this.z - (this.alt * 0.25 + 6));
+    this.look.set(this.x + this.vx * 0.35 + Math.sin(this.t * 0.05) * 6, 0, this.z - (this.alt * 0.25 + 6));
     camera.up.set(Math.sin(this.roll), Math.cos(this.roll), 0);
     camera.lookAt(this.look);
     camera.fov = 58 + Math.min(12, (this.speed - 26) * 0.22);

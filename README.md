@@ -655,11 +655,11 @@ lit, laser-etched lids, capacitor towers, heat sinks, spinning fans, headers,
 crystals and LEDs. The board carries on to either side and fades into a teal
 haze at the horizon.
 
-The camera flies high and looks steeply down, so a good stretch of the board is
-laid out below like a city at night and you can watch events happen across it. It slides slowly between the ten streets, barely banks, drifts a
-little in heading and breathes up and down. Between events the board keeps up a
-chatter of short bolts of light, so it's never still, and addresses drift up
-through the air.
+The camera looks steeply down, so the board is laid out below like a map. It
+slides slowly between the ten streets, barely banks, drifts a little in
+heading, breathes up and down, and climbs over the tall parts. Between events
+the board keeps up a chatter of short bolts of light, so it's never still, and
+addresses drift up through the air.
 
 | Event | On the board |
 |-------|--------------|
