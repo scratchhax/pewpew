@@ -93,11 +93,13 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
   applyBudgets();
   window.addEventListener('resize', () => world.resize(window.innerWidth, window.innerHeight));
 
-  let floatT = 0;
-  const banner = (text: string, color: string, every: number) => {
+  // the film's signs are rare, punctuation not wallpaper: minutes apart
+  let nextDeny = 0, nextGrant = 0;
+  const banner = (text: string, color: string, nextRef: 'deny' | 'grant', everySec: number, jitterSec: number) => {
     const now = performance.now();
-    if (!settings.gBanners || now < floatT) return;
-    floatT = now + every * 1000;
+    if (!settings.gBanners || now < (nextRef === 'deny' ? nextDeny : nextGrant)) return;
+    if (nextRef === 'deny') nextDeny = now + (everySec + Math.random() * jitterSec) * 1000;
+    else nextGrant = now + (everySec + Math.random() * jitterSec) * 1000;
     billboards.spawn(text, color);
   };
 
@@ -119,7 +121,7 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
         if (!throttle.allow(`gb|blk|${ev.src_ip}|${ev.dst_port}`, 1.0)) break;
         towers.flag(uOf(who), 3);
         audio.sfx('denied', { pan: (Math.random() - 0.5) * 1.2 });
-        banner('ACCESS DENIED', '#ff5050', 7);
+        banner('ACCESS DENIED', '#ff5050', 'deny', 45, 45);
         break;
       }
       case 'threat': {
@@ -150,7 +152,7 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
         audio.cueSong('wifi');
         if (se.wifi === 'joined') {
           audio.sfx('granted');
-          banner('PASSWORD ACCEPTED', '#9fd8ff', 10);
+          banner('PASSWORD ACCEPTED', '#dff2ff', 'grant', 70, 50);
           towers.pulse(uOf(ev.mac_address ?? ev.src_ip));
         } else if (se.wifi === 'bad') {
           audio.sfx('denied', { pan: 0.3 });

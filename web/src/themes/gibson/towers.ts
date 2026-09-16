@@ -5,11 +5,11 @@ import {
 import type { TextAtlas } from './textatlas';
 
 /**
- * The storage wall: a grid of glowing monoliths drifting toward the camera,
- * each face showing a few lines of the listings atlas scrolling up or down,
- * with the etched edge-frame of the movie's perspex towers. Towers scroll
- * past, recycle at the far edge and rise back in. Events flash faces white-
- * blue, or burn a tower red while it's flagged.
+ * The storage wall: a grid of smoked-glass monoliths drifting toward the
+ * camera, each face showing large words from the listings atlas scrolling
+ * up or down, edge-lit with the glowing rim-frame of the movie's perspex
+ * towers. Towers scroll past, recycle at the far edge and rise back in.
+ * Events flash faces white, or burn a tower red while it's flagged.
  */
 
 const SP_X = 2.6;
@@ -36,30 +36,42 @@ const VERT = /* glsl */`
 const FRAG = /* glsl */`
   precision highp float;
   uniform sampler2D uAtlas;
-  uniform float uRows, uLinesPerUnit, uFogD, uPulse;
-  uniform vec3 uCamPos, uTower, uText, uRed, uTextRed;
+  uniform float uCols, uRows, uPitch, uFogD, uPulse;
+  uniform vec3 uCamPos, uFill, uEdge, uText, uRed, uTextRed;
   varying vec3 vLocal, vWorld, vN;
   varying float vSeed, vScroll, vFlash, vRed, vH;
+  float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
   void main() {
     vec3 n = normalize(vN);
     float top = step(0.5, abs(n.y));
     float u = abs(n.x) > 0.5 ? (vLocal.z + 0.5) : (vLocal.x + 0.5);
     float v = vLocal.y + 0.5;
-    // the etched frame around each face, brightest thing after the text
-    float e = min(min(u, 1.0 - u), min(v, 1.0 - v));
-    float frame = smoothstep(0.05, 0.012, e);
-    // pick one whole atlas line so the text never bleeds across two
-    float lines = max(1.0, floor(vH * uLinesPerUnit));
-    float row = floor(v * lines + vScroll + vSeed * 17.0);
-    row = mod(row, uRows);
-    float tx = texture2D(uAtlas, vec2(u, (row + 0.5) / uRows)).r;
-    tx *= 1.0 - top;
-    vec3 towerC = mix(uTower, uRed, vRed);
+    // the edge-lit rim of the film's perspex towers: thin, bright, white-cyan.
+    // measured along each face's own two axes, so tops keep a rim square and
+    // not a full white slab
+    float ex = 0.5 - abs(vLocal.x);
+    float ey = 0.5 - abs(vLocal.y);
+    float ez = 0.5 - abs(vLocal.z);
+    float e = top > 0.5 ? min(ex, ez) : (abs(n.x) > 0.5 ? min(ey, ez) : min(ex, ey));
+    float frame = smoothstep(0.035, 0.004, e);
+    // scrolling word strips: one atlas cell (one whole word) per line, the
+    // cell aspect matching the face strip so glyphs read as words, not bars
+    float g = (v * vH + vScroll) / uPitch;
+    float idx = floor(g);
+    float f = g - idx;
+    float hs = h21(vec2(vSeed * 91.7 + 13.0, idx + 0.5));
+    float cx = floor(mod(hs * 997.0, uCols));
+    float cy = floor(mod(hs * 39187.0, uRows));
+    vec2 tuv = vec2((cx + 0.04 + u * 0.92) / uCols, (cy + 0.05 + f * 0.9) / uRows);
+    float tx = texture2D(uAtlas, tuv).r * (1.0 - top);
+    vec3 fill = mix(uFill, uRed * 0.22, vRed);
+    vec3 edge = mix(uEdge, uRed, vRed);
     vec3 textC = mix(uText, uTextRed, vRed);
-    vec3 col = towerC * (0.045 + frame * (0.55 + vFlash * 2.2));
-    col += textC * tx * (0.7 + vFlash * 2.4) * uPulse;
-    col += towerC * vFlash * 0.16;
-    col *= mix(1.0, 0.22, top);
+    vec3 col = fill * 0.9;
+    col += edge * frame * (0.62 + vFlash * 2.6);
+    col += textC * tx * (1.25 + vFlash * 2.2) * uPulse;
+    col += edge * vFlash * 0.12;
+    col *= mix(1.0, 0.3, top);
     // black fog: the far wall dissolves, like the film's storage cavern
     float d = length(vWorld - uCamPos);
     col *= exp(-uFogD * uFogD * d * d);
@@ -83,15 +95,17 @@ export class Towers {
     this.material = new ShaderMaterial({
       uniforms: {
         uAtlas: { value: atlas.texture },
+        uCols: { value: atlas.cols },
         uRows: { value: atlas.rows },
-        uLinesPerUnit: { value: 1.15 },
+        uPitch: { value: 1.25 },
         uFogD: { value: 0.044 },
         uPulse: { value: 1 },
         uCamPos: { value: new Vector3(0, 8, 7) },
-        uTower: { value: new Color(0x3a3aff) },
-        uText: { value: new Color(0xddddff) },
-        uRed: { value: new Color(0xff2626) },
-        uTextRed: { value: new Color(0xffb0b0) },
+        uFill: { value: new Color(0x0d1c26) },
+        uEdge: { value: new Color(0xdff8ff) },
+        uText: { value: new Color(0xeaf6ff) },
+        uRed: { value: new Color(0xff2e2e) },
+        uTextRed: { value: new Color(0xffb8b8) },
       },
       vertexShader: VERT,
       fragmentShader: FRAG,
@@ -117,7 +131,7 @@ export class Towers {
     this.hT = f(() => 3 + Math.random() * 5);
     this.h = f(0);
     this.scroll = f(() => Math.random() * 64);
-    this.scrollV = f(() => (Math.random() < 0.5 ? -1 : 1) * (0.15 + Math.random() * 0.35));
+    this.scrollV = f(() => (Math.random() < 0.5 ? -1 : 1) * (0.06 + Math.random() * 0.1));
     this.flash = f(0);
     this.redT = f(0);
     this.aSeed = inst('aSeed', f(() => Math.random()), geo);
@@ -179,7 +193,7 @@ export class Towers {
         this.aSeed.setX(i, Math.random());
       }
       this.h[i] += (this.hT[i] - this.h[i]) * Math.min(1, dt * 1.1);
-      this.scroll[i] += this.scrollV[i] * dt * 2.4;
+      this.scroll[i] += this.scrollV[i] * dt;
       this.flash[i] *= Math.exp(-dt * 2.6);
       if (this.redT[i] > 0) this.redT[i] -= dt;
       this.m.makeScale(1, this.h[i], 1);

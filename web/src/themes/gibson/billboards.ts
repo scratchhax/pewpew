@@ -46,12 +46,12 @@ export class Billboards {
     return tex;
   }
 
-  /** Spawn a sign far above the wall; caller rate-limits. */
-  spawn(text: string, color = '#9fb0ff'): void {
-    if (this.active.length > 6) return;
+  /** Spawn a sign far above the wall; caller rate-limits hard. */
+  spawn(text: string, color = '#dff2ff'): void {
+    if (this.active.length > 2) return;
     const tex = this.texture(text, color);
     const aspect = tex.image.width / tex.image.height;
-    const h = 1.1;
+    const h = 0.8;
     const mesh = new Mesh(
       new PlaneGeometry(h * aspect, h),
       new MeshBasicMaterial({ map: tex, transparent: true, blending: AdditiveBlending, depthWrite: false }),
