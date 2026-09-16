@@ -64,7 +64,7 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
   scene.background = new Color(0x000004);
 
   const camera = new PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 160);
-  camera.position.set(0, 8, 7);
+  camera.position.set(0, 5.5, 7);
 
   const px = window.innerWidth * window.innerHeight * ratio * ratio;
   const target = new WebGLRenderTarget(window.innerWidth * ratio, window.innerHeight * ratio, { type: HalfFloatType, samples: msaa ? (px > 2.2e6 ? 2 : 4) : 0 });

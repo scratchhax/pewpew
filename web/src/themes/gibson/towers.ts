@@ -5,11 +5,12 @@ import {
 import type { TextAtlas } from './textatlas';
 
 /**
- * The storage wall: a grid of smoked-glass monoliths drifting toward the
- * camera, each face showing large words from the listings atlas scrolling
- * up or down, edge-lit with the glowing rim-frame of the movie's perspex
- * towers. Towers scroll past, recycle at the far edge and rise back in.
- * Events flash faces white, or burn a tower red while it's flagged.
+ * The storage wall: a corridor of smoked-glass monoliths lining the way
+ * toward the vanishing point, each face covered in glowing cyan listings from
+ * the atlas — words in tidy digital boxes — scrolling up or down, with the
+ * edge-lit rim-frame of the movie's perspex towers. Towers scroll past,
+ * recycle at the far edge and rise back in. Events flash faces white-cyan,
+ * or burn a tower red while it's flagged.
  */
 
 const SP_X = 2.6;
@@ -63,13 +64,14 @@ const FRAG = /* glsl */`
     float cx = floor(mod(hs * 997.0, uCols));
     float cy = floor(mod(hs * 39187.0, uRows));
     vec2 tuv = vec2((cx + 0.04 + u * 0.92) / uCols, (cy + 0.05 + f * 0.9) / uRows);
-    float tx = texture2D(uAtlas, tuv).r * (1.0 - top);
+    vec3 tcol = texture2D(uAtlas, tuv).rgb;
+    float tx = max(tcol.r, max(tcol.g, tcol.b)) * (1.0 - top);
     vec3 fill = mix(uFill, uRed * 0.22, vRed);
     vec3 edge = mix(uEdge, uRed, vRed);
     vec3 textC = mix(uText, uTextRed, vRed);
     vec3 col = fill * 0.9;
     col += edge * frame * (0.62 + vFlash * 2.6);
-    col += textC * tx * (1.25 + vFlash * 2.2) * uPulse;
+    col += textC * tx * (1.85 + vFlash * 2.2) * uPulse;
     col += edge * vFlash * 0.12;
     col *= mix(1.0, 0.3, top);
     // black fog: the far wall dissolves, like the film's storage cavern
@@ -97,13 +99,13 @@ export class Towers {
         uAtlas: { value: atlas.texture },
         uCols: { value: atlas.cols },
         uRows: { value: atlas.rows },
-        uPitch: { value: 1.25 },
+        uPitch: { value: 0.75 },
         uFogD: { value: 0.044 },
         uPulse: { value: 1 },
-        uCamPos: { value: new Vector3(0, 8, 7) },
-        uFill: { value: new Color(0x0d1c26) },
-        uEdge: { value: new Color(0xdff8ff) },
-        uText: { value: new Color(0xeaf6ff) },
+        uCamPos: { value: new Vector3(0, 5.5, 7) },
+        uFill: { value: new Color(0x061016) },
+        uEdge: { value: new Color(0x9fefff) },
+        uText: { value: new Color(0x53e0ff) },
         uRed: { value: new Color(0xff2e2e) },
         uTextRed: { value: new Color(0xffb8b8) },
       },
@@ -124,9 +126,14 @@ export class Towers {
       for (let i = 0; i < this.n; i++) a[i] = typeof fill === 'function' ? fill(i) : fill;
       return a;
     };
-    // even column counts leave a corridor down the middle for the camera,
-    // like the film: towers pass on both sides, never through the lens
-    this.x = f((i) => ((i % cols) - cols / 2 + 0.5) * SP_X);
+    // a corridor down the middle for the camera, like the film: lanes of
+    // towers line the left and right, the centre stays an open data path
+    const half = Math.ceil(cols / 2);
+    this.x = f((i) => {
+      const j = i % cols;
+      const side = j < half ? -1 : 1;
+      return side * (1.1 + (j % half)) * SP_X;
+    });
     this.z = f((i) => -5 - Math.floor(i / cols) * SP_Z);
     this.hT = f(() => 3 + Math.random() * 5);
     this.h = f(0);

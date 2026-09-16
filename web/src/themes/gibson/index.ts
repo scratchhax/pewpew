@@ -194,7 +194,7 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
     const speed = (2.0 + Math.min(6, rate * 0.15) + heat * 2.2) * settings.gScrollSpeed * (lockOn ? 0.3 : 1);
     const camX = (lockOn ? lockTarget.x : 0) * 0.25 + f.wanderX * 0.0015;
     world.camera.position.x += (camX - world.camera.position.x) * Math.min(1, dtReal * 1.4);
-    world.camera.position.y = 8 + f.wanderY * 0.0006;
+    world.camera.position.y = 5.5 + f.wanderY * 0.0006;
     world.camera.lookAt(look);
 
     const fog = 0.044 + heat * 0.005;
