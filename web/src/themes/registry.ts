@@ -22,6 +22,7 @@ export const SCENES: Record<string, { title: string; blurb: string; accent: stri
   spy: { title: 'Panopticon', blurb: 'A made-up planet under watch: signal arcs, satellites, and an eye of god that zooms in on the people behind the traffic.', accent: '#e8c26a' },
   mainframe: { title: 'Mainframe', blurb: 'A god\'s-eye flight over a glowing circuit board at night: traffic races the traces, and dives into chips trace intruders.', accent: '#7ef3ff' },
   aquarium: { title: 'Aquarium', blurb: 'A reef tank: schools of fish for your traffic, pufferfish for blocks, a shark for threats, and bubbles for DNS lookups.', accent: '#6fe6ff' },
+  gibson: { title: 'The Gibson', blurb: 'The storage wall from the movie: pulses of light climb the towers, a DHCP lease writes a new one, and the camera locks onto red intruder files.', accent: '#5a63ff' },
 };
 /** Themes in picker order: the known scenes first (as the README lists them), then any others. */
 export const SCENE_ORDER = [...Object.keys(SCENES).filter((id) => THEME_IDS.includes(id)), ...THEME_IDS.filter((id) => !(id in SCENES))];
