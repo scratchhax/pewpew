@@ -19,7 +19,7 @@ import './hud.css';
  * shatter against firewall chips, IDS threats are worms crawling toward a chip
  * until ICE hunts them down, DNS lookups scroll across lookup towers' LED lids,
  * DHCP leases get a new part fitted by a pick-and-place arm, Wi-Fi joins ring
- * out from printed antennas, system events brown the board out, and traffic
+ * out from printed antennas, and traffic
  * weather overclocks it. Every so often, on the same schedule as Panopticon's
  * eye of god, the camera dives into a chip and traces the intruder from inside
  * the silicon. Rendered with three.js.
@@ -95,7 +95,7 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     else if (!it.klass) it.klass = `MONITORED · ${rule}`.slice(0, 54);
   };
 
-  let dimTarget = 1, dim = 1, floatGate = 0;
+  let floatGate = 0;
   function event(se: SceneEvent, replay: boolean): void {
     const ev = se.ev;
     const ext = external(ev);
@@ -153,9 +153,8 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
         break;
       }
       case 'system': {
-        if (!throttle.allow(`sys|${ev.syslog_host}`, 6)) break;
-        audio.cueSong('system');
-        if (settings.mBrownouts) { dimTarget = 0.3; setTimeout(() => { dimTarget = 1; }, 900); audio.sfx('brownout'); }
+        // gateway and AP status lines have nothing on the board to become: the music still hears them
+        if (throttle.allow(`sys|${ev.syslog_host}`, 6)) audio.cueSong('system');
         break;
       }
     }
@@ -211,7 +210,6 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     groove.update(dtReal, settings.mMusicVisuals ? audio.pulse() : null);
     const w = state.weather;
     heat += ((w === 'hurricane' ? 1 : w === 'storm' ? 0.4 : 0) - heat) * Math.min(1, dtReal * 0.25);
-    dim += (dimTarget - dim) * Math.min(1, dtReal * (dimTarget < dim ? 5 : 1.2));
     const pulse = settings.mMusicVisuals && groove.style ? 0.85 + groove.downbeat * 0.3 + groove.energy * 0.15 : 1;
 
     ambientT -= dtReal * (9 + heat * 10);
@@ -229,14 +227,14 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     board.update(flight.z, settings.mChunks);
     traffic.camX = flight.x;
     traffic.speedScale = 1 + heat * 0.35;
-    traffic.dim = dim * pulse;
+    traffic.dim = pulse;
     traffic.update(dt);
     traffic.cull(flight.z);
     for (const fan of board.fans()) fan.rotation.y += dt * (8 + heat * 16);
-    board.mats.led.color.setScalar(dim * pulse);
+    board.mats.led.color.setScalar(pulse);
     world.key.color.copy(keyCool).lerp(keyHot, heat * 0.8);
-    world.key.intensity = 0.4 * (0.35 + 0.65 * dim);
-    board.setGlow(1.1 * dim * pulse * (1 + heat * 0.35));
+    world.key.intensity = 0.4;
+    board.setGlow(1.1 * pulse * (1 + heat * 0.35));
     world.key.position.set(flight.x - 40, 90, flight.z + 30);
     world.key.target.position.set(flight.x, 0, flight.z - 40);
     (world.scene.fog as { density: number }).density = 0.0011 + heat * 0.0006;

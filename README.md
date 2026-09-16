@@ -329,7 +329,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, brownouts, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -669,7 +669,6 @@ addresses drift up through the air.
 | dns | a blue pulse reaches a lookup tower, and the domain scrolls across the tower's LED lid |
 | dhcp | a pick-and-place arm lowers a new part into an empty socket, labelled with the device's hostname |
 | wifi | rings spread from a printed antenna: wide purple ones for a join, short red ones for a failure |
-| system | a brownout: the LEDs, the light and the packets dim and recover |
 
 **The HUD is a rack of instrument modules:** graticule faces behind cyan
 hairline frames, solder pads at the corners, LED bargraphs and a serial console.
@@ -949,7 +948,6 @@ The board plays along:
 | dns | a data chirp from the lookup tower |
 | dhcp | the pick-and-place servo whirring down, and a click as the part seats |
 | wifi | rising pings for a join, a crackle for a failure |
-| system | a brownout: a relay thunks off and the mains hum sags away, then the supply catches and whines back up |
 | dive | a lock-on tone, a rising rush on the way down, a whoosh through the die, ticks as the traceroute types, and a big hit for INTRUSION TRACED |
 
 The music drops to half volume during a dive. Fans hum and the board buzzes

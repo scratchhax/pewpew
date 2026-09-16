@@ -14,7 +14,6 @@ export const MAINFRAME_DEFAULTS = {
   mLookups: true,        // dns → the domain scrolls across a lookup tower
   mParts: true,          // dhcp → a pick-and-place arm fits a new part
   mAntennas: true,       // wifi → antenna rings
-  mBrownouts: true,      // system → a brownout rolls down the board
   mFloatText: true,      // addresses and hex drifting in the air
   mDive: true,           // dive into a chip: triggers like the eye of god
   mDiveThreats: 3,       // IDS/IPS threats inside a minute that trigger a dive
@@ -53,7 +52,7 @@ export const MAINFRAME_CONTROLS = {
     toggle('mPackets', 'Packets (allow)'), toggle('mFirewalls', 'Firewalls (block)'),
     toggle('mWorms', 'Worms & ICE (threat)'), toggle('mLookups', 'Lookup towers (DNS)'),
     toggle('mParts', 'Pick-and-place (DHCP)'), toggle('mAntennas', 'Antennas (Wi-Fi)'),
-    toggle('mBrownouts', 'Brownouts (system)'), toggle('mFloatText', 'Floating addresses'),
+    toggle('mFloatText', 'Floating addresses'),
     toggle('mMusicVisuals', 'Move with the music'),
     range('mFlightSpeed', 'Flight speed', 0.4, 2, 0.05),
     toggle('mDive', 'Dive into a chip'),

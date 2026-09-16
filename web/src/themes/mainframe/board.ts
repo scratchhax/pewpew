@@ -725,7 +725,7 @@ export class Board {
   private skirtMat: MeshStandardMaterial;
   /** Every live section's floor material, so the glow can be turned up or down at once. */
   readonly floors = new Set<MeshStandardMaterial>();
-  /** How brightly the copper glows (brownouts dim it, overclocking pushes it). */
+  /** How brightly the copper glows (the music breathes it, overclocking pushes it). */
   glow = 1.1;
   detail = 1024;
   /** Recent strings from the network (IPs, hostnames, domains, rules) for the silkscreen. */
