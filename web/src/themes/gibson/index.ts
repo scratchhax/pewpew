@@ -182,7 +182,15 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
       if (performance.now() > lockUntil) endLock();
       else lookWant.copy(lockTarget);
     }
-    if (!lockOn) lookWant.set(f.wanderX * 0.01 + Math.sin(flyT * 0.08) * 1.3, 1.1 + Math.sin(flyT * 0.055) * 0.7, -30);
+    flyT += dtReal;
+    // stay inside the corridor's air-rights: the lane faces sit at |x| ~2.36,
+    // the shortest towers rise to 3 - so the flight stays under their tops
+    const camX = lockOn ? lockTarget.x * 0.25 + f.wanderX * 0.0015
+      : Math.sin(flyT * 0.09) * 1.25 + Math.sin(flyT * 0.041) * 0.55;
+    const camY = lockOn ? 4.2 : 3.5 + Math.sin(flyT * 0.067) * 1.05 + Math.sin(flyT * 0.029) * 0.35;
+    // look where the flight is going: the gaze leads the sway, so each swing
+    // reads as a turn down a lane, not a listing camera
+    if (!lockOn) lookWant.set(f.wanderX * 0.01 + camX * 2.4 + Math.sin(flyT * 0.11 + 2.0) * 1.4, 1.2 + Math.sin(flyT * 0.055) * 0.5, -30);
     look.lerp(lookWant, Math.min(1, dtReal * 1.2));
     if (lockOn) {
       const sp = lockTarget.clone().project(world.camera);
@@ -192,14 +200,11 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
 
     const rate = state.rate30s / 30;
     const speed = (0.9 + Math.min(2.5, rate * 0.06) + heat * 0.9) * settings.gScrollSpeed * (lockOn ? 0.3 : 1);
-    flyT += dtReal;
-    const camX = (lockOn ? lockTarget.x : 0) * 0.25
-      + (lockOn ? f.wanderX * 0.0015 : Math.sin(flyT * 0.13) * 2.1 + Math.sin(flyT * 0.051) * 1.7);
     world.camera.position.x += (camX - world.camera.position.x) * Math.min(1, dtReal * 1.4);
-    const camY = 5.3 + Math.sin(flyT * 0.083) * 1.7 + Math.sin(flyT * 0.037) * 1.0 + f.wanderY * 0.0006;
     world.camera.position.y += (camY - world.camera.position.y) * Math.min(1, dtReal * 1.2);
     world.camera.lookAt(look);
-    if (!lockOn) world.camera.rotateZ(Math.sin(flyT * 0.061 + 1.0) * 0.04);
+    // bank into the turn: roll follows how hard the flight is swinging
+    if (!lockOn) world.camera.rotateZ(-(camX - world.camera.position.x) * 0.09);
 
     const fog = 0.044 + heat * 0.005;
     towers.update(dt, speed, world.camera.position);
