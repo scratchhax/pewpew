@@ -17,10 +17,10 @@ your own traffic. Pick a scene per screen:
   junctions, diving into chips to trace intruders
 - **Aquarium**: a 3D reef tank in the spirit of the old marine aquarium
   screensavers, where your traffic swims past as fish
-- **The Gibson**: the storage wall from *Hackers* — a corridor of monoliths
-  lined in glowing cyan, their faces covered in terminal listings, drifting
-  past toward the vanishing point, until the camera swings around to lock
-  onto a red file and trace the intruder
+- **The Gibson**: the storage wall from *Hackers* — a corridor of translucent
+  monoliths lined in glowing cyan, their faces covered in terminal listings,
+  flown through slowly toward the vanishing point, until the camera swings
+  around to lock onto a red file and trace the intruder
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -337,7 +337,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, new towers, access banners, target lock, move with the music, scroll speed |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -789,15 +789,15 @@ drift** stops the camera.
 ![the gibson](docs/gibson.png)
 
 The storage wall from *Hackers*, rebuilt in 3D: a one-point-perspective
-corridor through a pitch-black void. Towers like server racks line the left
-and right, their faces covered in glowing cyan listings set in neat digital
-boxes — `STATUS`, `ERROR`, `REPORT`, `Security`, `R606`, `>OVERRIDE`, hex and
+corridor through a pitch-black void. Translucent server-rack monoliths,
+always standing, line the left and right as you drift slowly through them,
+their faces covered in glowing cyan listings set in neat digital boxes —
+`STATUS`, `ERROR`, `REPORT`, `Security`, `R606`, `>OVERRIDE`, hex and
 binary — including the hostnames, addresses and domains your own traffic has
 passed by. The floor is laced with cyan circuit traces that run straight to
 the dark vanishing point ahead, the towers wear the glowing edge-frame of the
 film's perspex originals, and ACCESS GRANTED / ACCESS DENIED signs glide past
-now and then. When the wall gets busy it scrolls faster, and a file being
-written rises out of the floor.
+now and then. When the wall gets busy it scrolls faster.
 
 | Event | On the wall |
 |-------|-------------|
@@ -805,7 +805,7 @@ written rises out of the floor.
 | block | a tower burns red for a moment, and an **ACCESS DENIED** sign glides over the tops |
 | threat | a tower is flagged red and the camera swings around to lock onto it — reticle, `TRACKING · <attacker>` readout, the wall slows to a crawl, and the file is stamped **INTRUSION TRACED** as the lock releases |
 | dns | the domain joins the listings scrolling down every face |
-| dhcp | a brand-new tower rises out of the floor, with the device's hostname in the listings |
+| dhcp | one far tower rewrites itself, with the device's hostname in its listings |
 | wifi | a join gets a **PASSWORD ACCEPTED** sign and a bright face pulse; a failure flashes one red |
 | system | nothing on the wall; the music hears it |
 
@@ -1056,7 +1056,7 @@ The wall plays along:
 | block | the denial crackle with a falling tone |
 | threat | two rising lock-on tones and a sweep as the camera swings out, and a big hit with a chord when the file is found |
 | dns | a blip in key as the domain joins the listings |
-| dhcp | a servo whirr and a click as the new tower rises |
+| dhcp | a servo whirr and a click as the tower rewrites itself |
 | wifi | a bell chord for a join, the crackle for a failure |
 | system | nothing; the band carries it |
 

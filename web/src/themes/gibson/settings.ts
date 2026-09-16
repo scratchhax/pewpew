@@ -10,7 +10,7 @@ import { GIBSON_MUSIC } from './score';
 export const GIBSON_DEFAULTS = {
   gPulses: true,        // allow → light pulses run up a tower's face
   gLookups: true,       // dns → the domain joins the scrolling listings
-  gWrites: true,        // dhcp → a new tower rises out of the floor
+  gWrites: true,        // dhcp → a far tower rewrites itself
   gBanners: true,       // ACCESS GRANTED / DENIED / PASSWORD ACCEPTED billboards
   gLock: true,          // threat → the camera swings to lock a red intruder file
   gMusicVisuals: true,  // glow and listings breathe with the music
@@ -45,7 +45,7 @@ export const GIBSON_CONTROLS = {
   scene: [
     toggle('gPulses', 'Face pulses (allow)'),
     toggle('gLookups', 'Scrolling listings (DNS)'),
-    toggle('gWrites', 'New towers (DHCP)'),
+    toggle('gWrites', 'Tower rewrites (DHCP)'),
     toggle('gBanners', 'Access banners'),
     toggle('gLock', 'Target lock (threat)'),
     toggle('gMusicVisuals', 'Move with the music'),
