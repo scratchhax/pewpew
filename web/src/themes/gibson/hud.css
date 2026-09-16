@@ -1,0 +1,83 @@
+/* The Gibson: the movie's terminal framing over the storage wall. Near-black
+   panels with hairline violet frames, blue-white monospace, everything glowing
+   a little like etched perspex. Loaded only with the gibson theme. Nothing
+   blinks: every change eases. */
+body[data-theme="gibson"] { background: #000004; }
+body[data-theme="gibson"] #hud {
+  color: #cfd6ff;
+  font-family: 'Cascadia Mono', Consolas, 'Courier New', monospace;
+}
+body[data-theme="gibson"] .panel {
+  position: relative;
+  padding: 9px 13px 11px;
+  clip-path: none;
+  filter: none;
+  border: 1px solid rgba(90, 100, 255, 0.4);
+  border-radius: 1px;
+  background: linear-gradient(180deg, rgba(6, 6, 26, 0.88), rgba(2, 2, 12, 0.82));
+  box-shadow: inset 0 0 22px rgba(40, 30, 140, 0.28), 0 0 12px rgba(60, 70, 255, 0.12);
+}
+body[data-theme="gibson"] .panel-head {
+  font-size: 9px; letter-spacing: 4px; color: #aab6ff;
+  border-bottom: 1px solid rgba(90, 100, 255, 0.3);
+  padding-bottom: 5px; margin-bottom: 8px;
+  text-shadow: 0 0 8px rgba(90, 110, 255, 0.45);
+}
+body[data-theme="gibson"] .corner { border-color: rgba(120, 130, 255, 0.55); filter: none; }
+body[data-theme="gibson"] #weather { color: #aab6ff; text-shadow: 0 0 8px rgba(120, 140, 255, 0.5); }
+
+body[data-theme="gibson"] .bar {
+  height: 10px; clip-path: none;
+  background: rgba(8, 8, 30, 0.85);
+  border: 1px solid rgba(90, 100, 255, 0.25);
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.6);
+}
+body[data-theme="gibson"] #threat-fill { background: linear-gradient(90deg, #ffbe4a, #ff4040); background-size: auto; }
+body[data-theme="gibson"] #energy-fill { background: linear-gradient(90deg, #4050ff, #aab6ff); background-size: auto; }
+body[data-theme="gibson"] .bar-label { width: 52px; }
+
+body[data-theme="gibson"] .stat-row { letter-spacing: 1.5px; border-bottom: 1px dotted rgba(90, 100, 255, 0.16); }
+body[data-theme="gibson"] .stat-row:last-child { border-bottom: none; }
+body[data-theme="gibson"] .stat-row b { color: #e6eaff; }
+body[data-theme="gibson"] .mw-row { color: #ff8f8f; }
+body[data-theme="gibson"] .mw-bar { background: rgba(40, 10, 14, 0.5); }
+
+body[data-theme="gibson"] #spec,
+body[data-theme="gibson"] #scope { background: rgba(4, 4, 20, 0.7); border: 1px solid rgba(90, 100, 255, 0.2); }
+body[data-theme="gibson"] #radar { background: rgba(4, 4, 20, 0.6); border: 1px solid rgba(90, 100, 255, 0.28); border-radius: 1px; }
+body[data-theme="gibson"] #rate { color: #aab6ff; }
+
+body[data-theme="gibson"] #terminal { font-size: 11px; }
+body[data-theme="gibson"] #terminal-body div { text-shadow: 0 0 6px rgba(60, 80, 200, 0.4); }
+
+body[data-theme="gibson"] #settings {
+  background: linear-gradient(180deg, rgba(5, 5, 22, 0.97), rgba(2, 2, 10, 0.97));
+  clip-path: none; border-radius: 1px;
+  border: 1px solid rgba(90, 100, 255, 0.4); filter: none; color: #dfe4ff;
+}
+body[data-theme="gibson"] .set-tab { color: #cfd6ff; background: rgba(16, 18, 60, 0.5); border-color: rgba(90, 100, 255, 0.25); }
+body[data-theme="gibson"] .set-tab.active { color: #04041a; background: var(--accent); }
+body[data-theme="gibson"] #settings select { background: rgba(10, 12, 44, 0.85); color: #dfe4ff; border-color: rgba(90, 100, 255, 0.3); }
+body[data-theme="gibson"] .cursor { animation: none; }
+body[data-theme="gibson"] #demo-badge { animation: none; opacity: 0.9; }
+
+/* ── the target lock ── */
+#gib-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 8; overflow: hidden; font-family: 'Courier New', monospace; }
+.gb-lock { position: absolute; inset: 0; opacity: 0; transition: opacity 0.6s ease; color: #ffd8d8; }
+.gb-lock.on { opacity: 1; }
+.gb-reticle { position: absolute; left: 50%; top: 42%; width: 220px; height: 220px; transform: translate(-50%, -50%); }
+.gb-reticle i { position: absolute; width: 26%; height: 26%; border: 2px solid #ff5050; }
+.gb-reticle i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; }
+.gb-reticle i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; }
+.gb-reticle i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; }
+.gb-reticle i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; }
+.gb-track { position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+  padding: 5px 16px; font-size: 12px; letter-spacing: 4px; white-space: nowrap;
+  color: #ff8080; border: 1px solid #ff5050; background: rgba(30, 0, 4, 0.55); text-shadow: 0 0 6px rgba(255, 60, 60, 0.5); }
+.gb-stamp { position: absolute; left: 50%; top: 58%; padding: 10px 22px; font-size: 28px; font-weight: bold; letter-spacing: 7px;
+  color: #ffb040; border: 3px solid #ffb040; background: rgba(24, 12, 0, 0.45); white-space: nowrap;
+  opacity: 0; transform: translate(-50%, -50%) rotate(-5deg) scale(1.3); transition: opacity 0.6s ease, transform 0.6s ease; }
+.gb-stamp.on { opacity: 0.95; transform: translate(-50%, -50%) rotate(-5deg) scale(1); }
+@media (max-height: 900px) {
+  .gb-stamp { font-size: 22px; }
+}
