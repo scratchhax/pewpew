@@ -6,7 +6,7 @@ import { Groove } from '../../sound/groove';
 import { GIBSON_BUDGETS, GIBSON_CONTROLS, GIBSON_DEFAULTS, GIBSON_HUD } from './settings';
 import { createWorld } from './world';
 import { TextAtlas } from './textatlas';
-import { Towers } from './towers';
+import { CITY_P, Towers } from './towers';
 import { Ground } from './ground';
 import { Billboards } from './billboards';
 import { gibsonScore } from './score';
@@ -95,6 +95,9 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
 
   // the film's signs are rare, punctuation not wallpaper: minutes apart
   let nextDeny = 0, nextGrant = 0, flyT = Math.random() * 100;
+  // the intersection turn: full 90s down the computer city's grid
+  const TURN_DUR = 3.2;
+  let turning = false, turnT = 0, turnDone = 0, turnDir = 1, crossIn = CITY_P * (1 + ((Math.random() * 2) | 0));
   const banner = (text: string, color: string, nextRef: 'deny' | 'grant', everySec: number, jitterSec: number) => {
     const now = performance.now();
     if (!settings.gBanners || now < (nextRef === 'deny' ? nextDeny : nextGrant)) return;
@@ -183,28 +186,53 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
       else lookWant.copy(lockTarget);
     }
     flyT += dtReal;
-    // stay inside the corridor's air-rights: the lane faces sit at |x| ~3.9,
-    // the shortest towers rise to 3 - the flight stays well under their tops
-    const camX = lockOn ? lockTarget.x * 0.25 + f.wanderX * 0.0015
-      : Math.sin(flyT * 0.085) * 2.1 + Math.sin(flyT * 0.037) * 0.85;
-    const camY = lockOn ? 3.0 : 2.4 + Math.sin(flyT * 0.067) * 0.5 + Math.sin(flyT * 0.029) * 0.3;
-    // look where the flight is going: the gaze leads the sway, so each swing
-    // reads as a turn down a lane, not a listing camera
-    if (!lockOn) lookWant.set(f.wanderX * 0.01 + camX * 2.6 + Math.sin(flyT * 0.11 + 2.0) * 1.4, 1.5 + Math.sin(flyT * 0.055) * 0.4, -30);
-    look.lerp(lookWant, Math.min(1, dtReal * 1.2));
+    const rate = state.rate30s / 30;
+    const speed = (0.9 + Math.min(2.5, rate * 0.06) + heat * 0.9) * settings.gScrollSpeed * (lockOn ? 0.3 : 1);
+
+    // the computer city: fly down a corridor and make a full 90-degree turn
+    // at every intersection. The camera stays put and the whole city swings
+    // around it - that swing IS the turn.
+    if (turning) {
+      turnT += dtReal;
+      const p = Math.min(1, turnT / TURN_DUR);
+      const ease = p * p * (3 - 2 * p);
+      const dNow = turnDir * (Math.PI / 2) * ease;
+      const dStep = dNow - turnDone;
+      turnDone = dNow;
+      towers.rotate(dStep, 0, 7);
+      billboards.rotate(dStep, 0, 7);
+      if (p >= 1) { turning = false; crossIn = CITY_P * (1 + ((Math.random() * 2) | 0)); }
+    } else if (!lockOn) {
+      crossIn -= speed * dtReal;
+      if (crossIn <= 0) {
+        turning = true; turnT = 0; turnDone = 0;
+        turnDir = Math.random() < 0.5 ? -1 : 1;
+      }
+    }
+    const turnP = turning ? Math.min(1, turnT / TURN_DUR) : 0;
+
+    // the flight: straight down the corridor at street level, low under the
+    // towers; during a turn it looks into the corner and banks through it
+    const camX = lockOn ? lockTarget.x * 0.25 + f.wanderX * 0.0015 : f.wanderX * 0.0012;
+    const camY = lockOn ? 3.0 : 2.4 + Math.sin(flyT * 0.067) * 0.35 + f.wanderY * 0.0004;
+    if (!lockOn) {
+      lookWant.set(
+        f.wanderX * 0.01 + turnDir * turnP * 5.5,
+        1.4 + Math.sin(flyT * 0.055) * 0.3,
+        -30 + turnP * 14,
+      );
+    }
+    look.lerp(lookWant, Math.min(1, dtReal * (turning ? 2.6 : 1.2)));
     if (lockOn) {
       const sp = lockTarget.clone().project(world.camera);
       reticle.style.left = `${(sp.x * 0.5 + 0.5) * 100}%`;
       reticle.style.top = `${(-sp.y * 0.5 + 0.5) * 100}%`;
     }
 
-    const rate = state.rate30s / 30;
-    const speed = (0.9 + Math.min(2.5, rate * 0.06) + heat * 0.9) * settings.gScrollSpeed * (lockOn ? 0.3 : 1);
     world.camera.position.x += (camX - world.camera.position.x) * Math.min(1, dtReal * 1.4);
     world.camera.position.y += (camY - world.camera.position.y) * Math.min(1, dtReal * 1.2);
     world.camera.lookAt(look);
-    // bank into the turn: roll follows how hard the flight is swinging
-    if (!lockOn) world.camera.rotateZ(-(camX - world.camera.position.x) * 0.09);
+    if (turning) world.camera.rotateZ(-turnDir * Math.sin(Math.PI * turnP) * 0.06);
 
     const fog = 0.044 + heat * 0.005;
     towers.update(dt, speed, world.camera.position);

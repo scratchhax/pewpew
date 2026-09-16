@@ -29,45 +29,43 @@ const FRAG = /* glsl */`
     float w = 0.045;
     float LW = 2.6;
     float SEG = 17.0;
-    float BH = 9.5;
-    float li = floor(P.x / LW);
-    float lf = fract(P.x / LW);
-    float si = floor(P.y / SEG);
-    float sf = fract(P.y / SEG);
     float mask = 0.0;
     float pulse = 0.0;
-    // up to three parallel traces per street; each run lives in whole blocks
-    // and starts or ends at a pad, so runs read long and routed, not noisy
-    for (int k = 0; k < 3; k++) {
-      float fk = float(k);
-      float seed = li * 4.0 + fk;
-      float on = step(0.42, h21(vec2(seed, si)));
-      float d = abs(lf - (0.2 + fk * 0.3)) * LW;
-      float tr = smoothstep(w, 0.0, d) * on;
-      // pads at the ends of each run
-      float endPad = on * step(0.93, max(sf, 0.0)) * smoothstep(w * 2.4, w * 1.2, d);
-      float startPad = on * step(sf, 0.07) * smoothstep(w * 2.4, w * 1.2, d);
-      mask = max(mask, max(tr, max(endPad, startPad)));
-      // an energy pulse racing down this run: bright head, short tail
-      float ph = fract(uTime * (0.35 + h21(vec2(seed, 5.0)) * 0.5) + h21(vec2(seed + 0.5, si)));
-      float dd = mod(sf - ph, 1.0);
-      pulse += tr * exp(-dd * 9.0) * step(dd, 0.3) * (0.55 + 0.45 * h21(vec2(seed, si)));
+    // trace streets run along BOTH axes, so the board looks like home no
+    // matter which way down the grid the flight just turned; each run lives
+    // in whole blocks and starts or ends at a pad
+    for (int a = 0; a < 2; a++) {
+      vec2 Q = a == 0 ? P : P.yx;
+      float o = float(a) * 31.7;
+      float li = floor(Q.x / LW);
+      float lf = fract(Q.x / LW);
+      float si = floor(Q.y / SEG);
+      float sf = fract(Q.y / SEG);
+      for (int k = 0; k < 3; k++) {
+        float fk = float(k);
+        float seed = li * 4.0 + fk + o;
+        float on = step(0.42, h21(vec2(seed, si)));
+        float d = abs(lf - (0.2 + fk * 0.3)) * LW;
+        float tr = smoothstep(w, 0.0, d) * on;
+        float endPad = on * step(0.93, sf) * smoothstep(w * 2.4, w * 1.2, d);
+        float startPad = on * step(sf, 0.07) * smoothstep(w * 2.4, w * 1.2, d);
+        mask = max(mask, max(tr, max(endPad, startPad)));
+        float ph = fract(uTime * (0.35 + h21(vec2(seed, 5.0)) * 0.5) + h21(vec2(seed + 0.5, si)));
+        float dd = mod(sf - ph, 1.0);
+        pulse += tr * exp(-dd * 9.0) * step(dd, 0.3) * (0.55 + 0.45 * h21(vec2(seed, si)));
+      }
     }
-    // full-width cross buses, sparse, with their own pulses
-    float bi = floor(P.y / BH);
-    float bf = fract(P.y / BH);
-    float bus = step(0.45, h21(vec2(bi, 7.3))) * smoothstep(w, 0.0, min(bf, 1.0 - bf) * BH);
-    mask = max(mask, bus);
-    float phb = fract(uTime * 0.28 + h21(vec2(bi, 2.0)));
-    float ddx = mod(P.x / 46.0 + 0.5 - phb, 1.0);
-    pulse += bus * exp(-ddx * 8.0) * step(ddx, 0.22);
-    // via pads where a bus meets a street, wherever a trace crosses
+    // via pads where the lane grids cross
+    vec2 lx = vec2(mod(P.x, LW), mod(P.y, LW));
+    float pad = 0.0;
     for (int k = 0; k < 3; k++) {
-      float d = abs(lf - (0.2 + float(k) * 0.3)) * LW;
-      float pad = smoothstep(0.11, 0.07, length(vec2(d, min(bf, 1.0 - bf) * BH * 0.5)));
-      mask = max(mask, pad * step(0.45, h21(vec2(bi, 7.3))));
+      float ox = abs(lx.x - (0.2 + float(k) * 0.3) * LW);
+      pad = max(pad, smoothstep(0.11, 0.07, length(vec2(ox, abs(lx.y - 0.5 * LW) * 0.35))));
+      float oz = abs(lx.y - (0.2 + float(k) * 0.3) * LW);
+      pad = max(pad, smoothstep(0.11, 0.07, length(vec2(abs(lx.x - 0.5 * LW) * 0.35, oz))));
     }
-    float bright = 0.5 + 0.5 * h21(vec2(li, si * 0.5 + 7.0));
+    mask = max(mask, pad);
+    float bright = 0.5 + 0.5 * h21(vec2(floor(P.x / LW), floor(P.y / SEG) * 0.5 + 7.0));
     vec3 col = uColor * mask * bright * uPulse + (uColor + vec3(0.45)) * pulse * 2.4;
     float d = length(vWorld - uCamPos);
     col *= exp(-uFogD * uFogD * d * d);

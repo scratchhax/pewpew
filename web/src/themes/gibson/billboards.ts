@@ -66,6 +66,18 @@ export class Billboards {
     this.active.push({ mesh, z: mesh.position.z, t: Math.random() * 6 });
   }
 
+  /** Swing the signs with the city when the flight turns at an intersection. */
+  rotate(d: number, px: number, pz: number): void {
+    const c = Math.cos(d), s = Math.sin(d);
+    for (const b of this.active) {
+      const x = b.mesh.position.x, z = b.z;
+      b.mesh.position.x = px + (x - px) * c - (z - pz) * s;
+      b.z = pz + (x - px) * s + (z - pz) * c;
+      b.mesh.position.z = b.z;
+      b.mesh.rotation.y -= d;
+    }
+  }
+
   update(dt: number, speed: number): void {
     for (let i = this.active.length - 1; i >= 0; i--) {
       const b = this.active[i];

@@ -17,10 +17,10 @@ your own traffic. Pick a scene per screen:
   junctions, diving into chips to trace intruders
 - **Aquarium**: a 3D reef tank in the spirit of the old marine aquarium
   screensavers, where your traffic swims past as fish
-- **The Gibson**: the storage wall from *Hackers* — a corridor of translucent
-  monoliths lined in glowing cyan, their faces covered in terminal listings,
-  flown through slowly toward the vanishing point, until the camera swings
-  around to lock onto a red file and trace the intruder
+- **The Gibson**: the storage wall from *Hackers* — a computer city of
+  translucent monolith blocks lined in glowing cyan, flown through at street
+  level with full 90-degree turns at every intersection, until the camera
+  swings around to lock onto a red file and trace the intruder
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -788,17 +788,17 @@ drift** stops the camera.
 
 ![the gibson](docs/gibson.png)
 
-The storage wall from *Hackers*, rebuilt in 3D: a one-point-perspective
-corridor through a pitch-black void. Translucent server-rack monoliths,
-always standing, line the left and right as you drift slowly through them,
-their faces covered in glowing cyan listings set in neat digital boxes —
-`STATUS`, `ERROR`, `REPORT`, `Security`, `R606`, `>OVERRIDE`, hex and
-binary — including the hostnames, addresses and domains your own traffic has
-passed by. The floor is laced with cyan circuit traces that run straight to
-the dark vanishing point ahead, the towers wear the glowing edge-frame of the
-film's perspex originals, and ACCESS GRANTED / ACCESS DENIED signs hang on a
-tower face and pulse. The flight itself drifts slowly side to side, up and
-down through the lanes. When the wall gets busy it scrolls faster.
+The storage wall from *Hackers*, rebuilt in 3D as a computer city: a grid of
+tower blocks with streets in both directions, flown at street level with a
+full 90-degree turn at every intersection - the whole city swings around the
+camera, exactly like the film's flythrough. The translucent monoliths are
+always standing, and their faces are covered in glowing cyan listings set in
+neat digital boxes — `STATUS`, `ERROR`, `REPORT`, `Security`, `R606`,
+`>OVERRIDE`, hex and binary — including the hostnames, addresses and domains
+your own traffic has passed by. The streets are wired like a circuit board,
+with energy pulses racing down the copper toward you, and ACCESS GRANTED /
+ACCESS DENIED signs hang on a tower face and pulse. When the wall gets busy
+it scrolls faster.
 
 | Event | On the wall |
 |-------|-------------|

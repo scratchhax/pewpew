@@ -14,8 +14,9 @@ import type { TextAtlas } from './textatlas';
  */
 
 const SP_X = 2.6;
-const SP_Z = 2.4;
 const CAM_Z = 7;
+/** the city's block period: corridor + block + corridor, same on both axes */
+export const CITY_P = 13;
 
 const VERT = /* glsl */`
   attribute float aSeed;
@@ -122,28 +123,38 @@ export class Towers {
     this.build(scene, 7, 10);
   }
 
-  /** Rebuild the grid (settings changed): cols × rows towers. */
+  /**
+   * Rebuild the city (settings changed): a grid of tower blocks with
+   * corridors between them on both axes - cols block columns across, rows
+   * block rows deep. The flight works its way down a corridor and turns at
+   * the intersections, like the film's computer city.
+   */
   build(scene: Scene, cols: number, rows: number): void {
     if (this.mesh) { scene.remove(this.mesh); this.mesh.geometry.dispose(); }
     if (this.hull) scene.remove(this.hull);
     this.cols = cols; this.rows = rows;
-    this.n = cols * rows;
+    const half = Math.max(1, cols >> 1);
+    this.n = half * 2 * rows * 9;
     const geo = new BoxGeometry(1, 1, 1);
     const f = (fill: number | ((i: number) => number)): Float32Array => {
       const a = new Float32Array(this.n);
       for (let i = 0; i < this.n; i++) a[i] = typeof fill === 'function' ? fill(i) : fill;
       return a;
     };
-    // a wide corridor down the middle for the camera, like the film: lanes of
-    // towers line the left and right, the centre stays an open data path wide
-    // enough for the flight to swing through
-    const half = Math.ceil(cols / 2);
+    // blocks of 3x3 towers with corridors of open air between block edges;
+    // corridors sit on multiples of CITY_P along both axes, camera rides x=0
     this.x = f((i) => {
-      const j = i % cols;
-      const side = j < half ? -1 : 1;
-      return side * (1.7 + (j % half)) * SP_X;
+      const s = (i / 9) | 0, slot = i % 9;
+      const bi = s % half;
+      const side = ((s / half) | 0) % 2 === 0 ? -1 : 1;
+      return side * (bi + 0.5) * CITY_P + ((slot % 3) - 1) * SP_X;
     });
-    this.z = f((i) => -5 - Math.floor(i / cols) * SP_Z);
+    this.z = f((i) => {
+      const s = (i / 9) | 0;
+      const bz = (s / (half * 2)) | 0;
+      const slot = i % 9;
+      return 7 - CITY_P * (bz + 1.5) + (((slot / 3) | 0) - 1) * SP_X;
+    });
     this.hT = f(() => 3 + Math.random() * 5);
     this.h = f((i) => this.hT[i]);
     this.scroll = f(() => Math.random() * 64);
@@ -170,7 +181,21 @@ export class Towers {
     scene.add(this.hull);
   }
 
-  get span(): number { return this.rows * SP_Z; }
+  get span(): number { return this.rows * CITY_P; }
+
+  /**
+   * Swing the whole city by d radians around (px, pz). The camera stays put:
+   * rotating the world around it is the turn. A quarter turn maps the block
+   * lattice onto itself, so the corridor the flight wanted is now ahead.
+   */
+  rotate(d: number, px: number, pz: number): void {
+    const c = Math.cos(d), s = Math.sin(d);
+    for (let i = 0; i < this.n; i++) {
+      const dx = this.x[i] - px, dz = this.z[i] - pz;
+      this.x[i] = px + dx * c - dz * s;
+      this.z[i] = pz + dx * s + dz * c;
+    }
+  }
 
   /** u ∈ 0..1 picks a column; flashes the nearest tower in it. */
   pulse(u: number): void { this.nearest(u, (i) => { this.flash[i] = 1; }); }
