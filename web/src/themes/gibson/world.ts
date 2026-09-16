@@ -72,8 +72,8 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
   composer.setPixelRatio(ratio);
   composer.setSize(window.innerWidth, window.innerHeight);
   const pass = new RenderPass(scene, camera);
-  // a low threshold: the edge frames and the listings are the whole scene, let them bloom
-  const bloom = new UnrealBloomPass(new Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.8, 0.5, 0.35);
+  // a higher threshold: only the bright rims, words and signs bloom, not the fills
+  const bloom = new UnrealBloomPass(new Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.5, 0.45, 0.62);
   const lens = new ShaderPass(LensShader);
   composer.addPass(pass);
   composer.addPass(bloom);

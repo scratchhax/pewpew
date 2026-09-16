@@ -65,8 +65,8 @@ export const GIBSON_CONTROLS = {
     toggle('gSmooth', 'Smooth edges (on reload)'),
   ],
   color: [] as Control[],
-  colorHint: `Hue shift & intensity recolour the HUD accent. Event colours
-        (pulses blue, denials red, writes green, lookups ice, Wi-Fi purple) stay fixed.`,
+  colorHint: `Hue shift & intensity recolour the HUD accent. The wall's own
+        colours stay fixed: white-cyan edges and words, red for denials and flagged towers, cyan traces.`,
 };
 
 /** The terminal framing over the storage wall. */

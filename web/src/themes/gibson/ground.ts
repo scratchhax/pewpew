@@ -1,7 +1,7 @@
 import { Color, Mesh, PlaneGeometry, ShaderMaterial, Vector3 } from 'three';
 
 /**
- * The floor of the storage cavern: a dark plane laced with violet circuit
+ * The floor of the storage cavern: a black plane laced with cyan circuit
  * traces that scroll toward the camera, every cell a random corner, run or
  * pad like the film's etched ground plane, dissolving into black fog.
  */
@@ -59,7 +59,7 @@ export class Ground {
         uSpeed: { value: 0.05 },
         uFogD: { value: 0.044 },
         uPulse: { value: 1 },
-        uColor: { value: new Color(0x8a2be2) },
+        uColor: { value: new Color(0x3fd9ff) },
         uCamPos: { value: new Vector3(0, 8, 7) },
       },
       vertexShader: VERT,

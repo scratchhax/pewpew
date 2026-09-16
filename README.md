@@ -17,9 +17,10 @@ your own traffic. Pick a scene per screen:
   junctions, diving into chips to trace intruders
 - **Aquarium**: a 3D reef tank in the spirit of the old marine aquarium
   screensavers, where your traffic swims past as fish
-- **The Gibson**: the storage wall from *Hackers* — a grid of glowing blue
-  monoliths drifting past in the dark, your data scrolling down their faces,
-  until the camera swings around to lock onto a red file and trace the intruder
+- **The Gibson**: the storage wall from *Hackers* — a forest of dark glass
+  monoliths edged in glowing white, drifting past in the dark, your data
+  scrolling down their faces, until the camera swings around to lock onto a
+  red file and trace the intruder
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -787,14 +788,14 @@ drift** stops the camera.
 
 ![the gibson](docs/gibson.png)
 
-The storage wall from *Hackers*, rebuilt in 3D: a grid of glowing monoliths
-drifts slowly toward you through black fog, every face showing a few lines of
-listings scrolling up or down — hex junk, directory entries (`GARBAGE >>>`),
-and the hostnames, addresses and domains your own traffic has passed by. The
-towers have the etched edge-frame of the film's perspex originals, the floor
-below is laced with violet circuit traces, and ACCESS GRANTED / ACCESS DENIED
-signs float past overhead. When the wall gets busy it scrolls faster, and a
-file being written rises out of the floor.
+The storage wall from *Hackers*, rebuilt in 3D: a forest of smoked-glass
+monoliths drifts slowly toward you through black fog, each one edge-lit like
+the film's perspex originals — dark faces picked out by glowing white rims —
+showing a few large words scrolling up or down, from the movie's `STATUS`,
+`R606` and `>OVERRIDE` to the hostnames, addresses and domains your own
+traffic has passed by. The floor below is laced with cyan circuit traces, and
+ACCESS GRANTED / ACCESS DENIED signs glide past now and then. When the wall
+gets busy it scrolls faster, and a file being written rises out of the floor.
 
 | Event | On the wall |
 |-------|-------------|
