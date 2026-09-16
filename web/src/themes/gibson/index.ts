@@ -94,13 +94,13 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
   window.addEventListener('resize', () => world.resize(window.innerWidth, window.innerHeight));
 
   // the film's signs are rare, punctuation not wallpaper: minutes apart
-  let nextDeny = 0, nextGrant = 0;
+  let nextDeny = 0, nextGrant = 0, flyT = Math.random() * 100;
   const banner = (text: string, color: string, nextRef: 'deny' | 'grant', everySec: number, jitterSec: number) => {
     const now = performance.now();
     if (!settings.gBanners || now < (nextRef === 'deny' ? nextDeny : nextGrant)) return;
     if (nextRef === 'deny') nextDeny = now + (everySec + Math.random() * jitterSec) * 1000;
     else nextGrant = now + (everySec + Math.random() * jitterSec) * 1000;
-    billboards.spawn(text, color);
+    billboards.spawn(text, color, towers.pickFace());
   };
 
   function event(se: SceneEvent, replay: boolean): void {
@@ -182,7 +182,7 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
       if (performance.now() > lockUntil) endLock();
       else lookWant.copy(lockTarget);
     }
-    if (!lockOn) lookWant.set(f.wanderX * 0.01, 1.0, -30);
+    if (!lockOn) lookWant.set(f.wanderX * 0.01 + Math.sin(flyT * 0.08) * 1.3, 1.1 + Math.sin(flyT * 0.055) * 0.7, -30);
     look.lerp(lookWant, Math.min(1, dtReal * 1.2));
     if (lockOn) {
       const sp = lockTarget.clone().project(world.camera);
@@ -192,10 +192,14 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
 
     const rate = state.rate30s / 30;
     const speed = (0.9 + Math.min(2.5, rate * 0.06) + heat * 0.9) * settings.gScrollSpeed * (lockOn ? 0.3 : 1);
-    const camX = (lockOn ? lockTarget.x : 0) * 0.25 + f.wanderX * 0.0015;
+    flyT += dtReal;
+    const camX = (lockOn ? lockTarget.x : 0) * 0.25
+      + (lockOn ? f.wanderX * 0.0015 : Math.sin(flyT * 0.13) * 2.1 + Math.sin(flyT * 0.051) * 1.7);
     world.camera.position.x += (camX - world.camera.position.x) * Math.min(1, dtReal * 1.4);
-    world.camera.position.y = 5.5 + f.wanderY * 0.0006;
+    const camY = 5.3 + Math.sin(flyT * 0.083) * 1.7 + Math.sin(flyT * 0.037) * 1.0 + f.wanderY * 0.0006;
+    world.camera.position.y += (camY - world.camera.position.y) * Math.min(1, dtReal * 1.2);
     world.camera.lookAt(look);
+    if (!lockOn) world.camera.rotateZ(Math.sin(flyT * 0.061 + 1.0) * 0.04);
 
     const fog = 0.044 + heat * 0.005;
     towers.update(dt, speed, world.camera.position);

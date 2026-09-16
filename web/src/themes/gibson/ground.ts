@@ -18,13 +18,13 @@ const VERT = /* glsl */`
 
 const FRAG = /* glsl */`
   precision highp float;
-  uniform float uTime, uSpeed, uFogD, uPulse;
+  uniform float uOff, uFogD, uPulse;
   uniform vec3 uColor, uCamPos;
   varying vec2 vUv;
   varying vec3 vWorld;
   float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
   void main() {
-    vec2 g = vec2(vUv.x * 60.0, vUv.y * 60.0 + uTime * uSpeed);
+    vec2 g = vec2(vUv.x * 60.0, vUv.y * 60.0 + uOff);
     vec2 id = floor(g);
     vec2 p = fract(g) - 0.5;
     float r = h21(id);
@@ -55,12 +55,11 @@ export class Ground {
   constructor(scene: import('three').Scene) {
     this.material = new ShaderMaterial({
       uniforms: {
-        uTime: { value: 0 },
-        uSpeed: { value: 0.05 },
+        uOff: { value: 0 },
         uFogD: { value: 0.044 },
         uPulse: { value: 1 },
         uColor: { value: new Color(0x3fd9ff) },
-        uCamPos: { value: new Vector3(0, 8, 7) },
+        uCamPos: { value: new Vector3(0, 5.5, 7) },
       },
       vertexShader: VERT,
       fragmentShader: FRAG,
@@ -74,8 +73,9 @@ export class Ground {
 
   /** speed: wall scroll units/sec; pulse: music glow; fog: distance fade. */
   update(dt: number, speed: number, pulse: number, fog: number, camPos: Vector3): void {
-    this.material.uniforms.uTime.value += dt;
-    this.material.uniforms.uSpeed.value = 0.02 + speed * 0.012;
+    // 60 cells over 120 world units: half a cell per world unit, so the
+    // traces track the towers exactly and the whole cavern flies past together
+    this.material.uniforms.uOff.value += speed * dt * 0.5;
     this.material.uniforms.uPulse.value = pulse;
     this.material.uniforms.uFogD.value = fog;
     this.material.uniforms.uCamPos.value.copy(camPos);

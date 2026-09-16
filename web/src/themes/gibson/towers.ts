@@ -1,6 +1,6 @@
 import {
   AdditiveBlending, BoxGeometry, Color, DynamicDrawUsage, InstancedBufferAttribute, InstancedMesh,
-  Matrix4, ShaderMaterial, Vector3, type Scene,
+  Matrix4, MeshBasicMaterial, ShaderMaterial, Vector3, type Scene,
 } from 'three';
 import type { TextAtlas } from './textatlas';
 
@@ -81,9 +81,11 @@ const FRAG = /* glsl */`
   }`;
 
 export interface LockPick { x: number; y: number; z: number; index: number; }
+export interface FacePick { x: number; y: number; z: number; side: number; }
 
 export class Towers {
   mesh!: InstancedMesh;
+  hull!: InstancedMesh;
   readonly material: ShaderMaterial;
   private n = 0;
   private x!: Float32Array; private z!: Float32Array; private h!: Float32Array; private hT!: Float32Array;
@@ -123,6 +125,7 @@ export class Towers {
   /** Rebuild the grid (settings changed): cols × rows towers. */
   build(scene: Scene, cols: number, rows: number): void {
     if (this.mesh) { scene.remove(this.mesh); this.mesh.geometry.dispose(); }
+    if (this.hull) scene.remove(this.hull);
     this.cols = cols; this.rows = rows;
     this.n = cols * rows;
     const geo = new BoxGeometry(1, 1, 1);
@@ -154,7 +157,16 @@ export class Towers {
     this.mesh = new InstancedMesh(geo, this.material, this.n);
     this.mesh.instanceMatrix.setUsage(DynamicDrawUsage);
     this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 2;
     scene.add(this.mesh);
+    // a dim solid hull behind the additive glow: gives the towers a little
+    // body, so ones behind go softly dark through them instead of staying crisp
+    this.hull = new InstancedMesh(geo, new MeshBasicMaterial({
+      color: new Color(0x06141d), transparent: true, opacity: 0.5, depthWrite: false,
+    }), this.n);
+    this.hull.instanceMatrix.setUsage(DynamicDrawUsage);
+    this.hull.frustumCulled = false;
+    scene.add(this.hull);
   }
 
   get span(): number { return this.rows * SP_Z; }
@@ -191,6 +203,16 @@ export class Towers {
     return { x: this.x[i], y: this.h[i] * 0.6, z: this.z[i], index: i };
   }
 
+  /** Pick a far tower's corridor-facing side for a sign to hang on. */
+  pickFace(): FacePick | null {
+    const cand: number[] = [];
+    for (let i = 0; i < this.n; i++) if (this.z[i] < -this.span * 0.4 && this.h[i] > 4) cand.push(i);
+    if (!cand.length) return null;
+    const i = cand[(Math.random() * cand.length) | 0];
+    const side = this.x[i] > 0 ? -1 : 1;
+    return { x: this.x[i] + side * 0.55, y: this.h[i] * (0.5 + Math.random() * 0.3), z: this.z[i], side };
+  }
+
   redCount(): number { let k = 0; for (let i = 0; i < this.n; i++) if (this.redT[i] > 0) k++; return k; }
 
   update(dt: number, speed: number, camPos: Vector3): void {
@@ -215,6 +237,8 @@ export class Towers {
       this.aH.setX(i, this.h[i]);
     }
     this.mesh.instanceMatrix.needsUpdate = true;
+    (this.hull.instanceMatrix.array as Float32Array).set(this.mesh.instanceMatrix.array as Float32Array);
+    this.hull.instanceMatrix.needsUpdate = true;
     this.aSeed.needsUpdate = true;
     this.aScroll.needsUpdate = this.aFlash.needsUpdate = this.aRed.needsUpdate = this.aH.needsUpdate = true;
     this.material.uniforms.uCamPos.value.copy(camPos);
