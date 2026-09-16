@@ -134,13 +134,14 @@ export class Towers {
       for (let i = 0; i < this.n; i++) a[i] = typeof fill === 'function' ? fill(i) : fill;
       return a;
     };
-    // a corridor down the middle for the camera, like the film: lanes of
-    // towers line the left and right, the centre stays an open data path
+    // a wide corridor down the middle for the camera, like the film: lanes of
+    // towers line the left and right, the centre stays an open data path wide
+    // enough for the flight to swing through
     const half = Math.ceil(cols / 2);
     this.x = f((i) => {
       const j = i % cols;
       const side = j < half ? -1 : 1;
-      return side * (1.1 + (j % half)) * SP_X;
+      return side * (1.7 + (j % half)) * SP_X;
     });
     this.z = f((i) => -5 - Math.floor(i / cols) * SP_Z);
     this.hT = f(() => 3 + Math.random() * 5);

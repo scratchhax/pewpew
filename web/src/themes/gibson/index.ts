@@ -183,14 +183,14 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
       else lookWant.copy(lockTarget);
     }
     flyT += dtReal;
-    // stay inside the corridor's air-rights: the lane faces sit at |x| ~2.36,
-    // the shortest towers rise to 3 - so the flight stays under their tops
+    // stay inside the corridor's air-rights: the lane faces sit at |x| ~3.9,
+    // the shortest towers rise to 3 - the flight stays well under their tops
     const camX = lockOn ? lockTarget.x * 0.25 + f.wanderX * 0.0015
-      : Math.sin(flyT * 0.09) * 1.25 + Math.sin(flyT * 0.041) * 0.55;
-    const camY = lockOn ? 4.2 : 3.5 + Math.sin(flyT * 0.067) * 1.05 + Math.sin(flyT * 0.029) * 0.35;
+      : Math.sin(flyT * 0.085) * 2.1 + Math.sin(flyT * 0.037) * 0.85;
+    const camY = lockOn ? 3.0 : 2.4 + Math.sin(flyT * 0.067) * 0.5 + Math.sin(flyT * 0.029) * 0.3;
     // look where the flight is going: the gaze leads the sway, so each swing
     // reads as a turn down a lane, not a listing camera
-    if (!lockOn) lookWant.set(f.wanderX * 0.01 + camX * 2.4 + Math.sin(flyT * 0.11 + 2.0) * 1.4, 1.2 + Math.sin(flyT * 0.055) * 0.5, -30);
+    if (!lockOn) lookWant.set(f.wanderX * 0.01 + camX * 2.6 + Math.sin(flyT * 0.11 + 2.0) * 1.4, 1.5 + Math.sin(flyT * 0.055) * 0.4, -30);
     look.lerp(lookWant, Math.min(1, dtReal * 1.2));
     if (lockOn) {
       const sp = lockTarget.clone().project(world.camera);
