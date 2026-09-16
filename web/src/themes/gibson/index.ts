@@ -13,11 +13,11 @@ import { gibsonScore } from './score';
 import './hud.css';
 
 /**
- * The Gibson: the storage wall from the movie, drifting past in the dark.
- * Towers of scrolling listings are your data; allowed traffic sends a pulse
- * of light climbing a face, a denial burns one red and floats an ACCESS
- * DENIED sign over the tops, a DHCP lease writes a brand-new tower that
- * rises out of the floor, and DNS lookups join the listings. When an IDS
+ * The Gibson: the storage wall from the movie, flown slowly through in the
+ * dark. Translucent towers of scrolling listings line the corridor as your
+ * data; allowed traffic sends a pulse of light climbing a face, a denial
+ * burns one red and floats an ACCESS DENIED sign over the tops, a DHCP lease
+ * rewrites a far tower, and DNS lookups join the listings. When an IDS
  * threat lands, the camera swings around to lock onto a red file and rides
  * it until it passes — intruder traced. Rendered with three.js.
  */
@@ -191,7 +191,7 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
     }
 
     const rate = state.rate30s / 30;
-    const speed = (2.0 + Math.min(6, rate * 0.15) + heat * 2.2) * settings.gScrollSpeed * (lockOn ? 0.3 : 1);
+    const speed = (0.9 + Math.min(2.5, rate * 0.06) + heat * 0.9) * settings.gScrollSpeed * (lockOn ? 0.3 : 1);
     const camX = (lockOn ? lockTarget.x : 0) * 0.25 + f.wanderX * 0.0015;
     world.camera.position.x += (camX - world.camera.position.x) * Math.min(1, dtReal * 1.4);
     world.camera.position.y = 5.5 + f.wanderY * 0.0006;

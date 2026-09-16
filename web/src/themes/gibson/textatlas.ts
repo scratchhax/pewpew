@@ -66,30 +66,32 @@ export class TextAtlas {
     const c = this.ctx;
     c.fillStyle = '#000';
     c.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    const pick = (): string =>
+      this.words.length && Math.random() < 0.34
+        ? this.words[(Math.random() * this.words.length) | 0]
+        : TOKENS[(Math.random() * TOKENS.length) | 0];
+    const box = (word: string, x: number, y: number): void => {
+      const size = word.length > 11 ? 15 : word.length > 8 ? 19 : 24;
+      c.font = `bold ${size}px "Courier New", monospace`;
+      const bw = c.measureText(word).width + 12;
+      if (bw > CW - 10) return;
+      const bh = size + 8;
+      const bx = x + 4 + Math.random() * (CW - 8 - bw);
+      c.strokeStyle = 'rgba(52, 200, 255, 0.4)';
+      c.lineWidth = 2;
+      c.strokeRect(bx, y, bw, bh);
+      c.fillStyle = word === 'GARBAGE' || word === 'GOD' ? '#e8fbff' : '#5fe6ff';
+      c.fillText(word, bx + 6, y + bh - 6);
+    };
     for (let r = 0; r < ROWS; r++) {
       for (let col = 0; col < COLS; col++) {
-        if (Math.random() < 0.05) continue;
-        let word: string;
-        if (this.words.length && Math.random() < 0.34) word = this.words[(Math.random() * this.words.length) | 0];
-        else word = TOKENS[(Math.random() * TOKENS.length) | 0];
-        const size = word.length > 11 ? 18 : word.length > 8 ? 24 : 30;
-        c.font = `bold ${size}px "Courier New", monospace`;
-        const w = c.measureText(word).width;
-        const bw = w + 12;
-        if (bw > CW - 10) continue;
-        const bh = size + 9;
-        const bx = 5 + Math.random() * (CW - 10 - bw);
-        const by = 4 + Math.random() * (CH * 0.55 - bh);
-        c.strokeStyle = 'rgba(52, 200, 255, 0.4)';
-        c.lineWidth = 2;
-        c.strokeRect(col * CW + bx, r * CH + by, bw, bh);
-        c.fillStyle = word === 'GARBAGE' || word === 'GOD' ? '#e8fbff' : '#5fe6ff';
-        c.fillText(word, col * CW + bx + 6, r * CH + by + bh - 6);
-        if (Math.random() < 0.75) {
+        const x = col * CW, y = r * CH;
+        box(pick(), x, y + 3 + Math.random() * 8);
+        if (Math.random() < 0.85) box(pick(), x, y + 38 + Math.random() * 8);
+        if (Math.random() < 0.8) {
           c.font = `bold 15px "Courier New", monospace`;
           c.fillStyle = 'rgba(40, 165, 205, 0.7)';
-          const sub = SUBS[(Math.random() * SUBS.length) | 0];
-          c.fillText(sub, col * CW + 7, r * CH + CH - 8);
+          c.fillText(SUBS[(Math.random() * SUBS.length) | 0], x + 7, y + CH - 8);
         }
       }
     }

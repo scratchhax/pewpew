@@ -1,16 +1,16 @@
 import {
-  BoxGeometry, Color, DynamicDrawUsage, InstancedBufferAttribute, InstancedMesh,
+  AdditiveBlending, BoxGeometry, Color, DynamicDrawUsage, InstancedBufferAttribute, InstancedMesh,
   Matrix4, ShaderMaterial, Vector3, type Scene,
 } from 'three';
 import type { TextAtlas } from './textatlas';
 
 /**
- * The storage wall: a corridor of smoked-glass monoliths lining the way
- * toward the vanishing point, each face covered in glowing cyan listings from
- * the atlas — words in tidy digital boxes — scrolling up or down, with the
- * edge-lit rim-frame of the movie's perspex towers. Towers scroll past,
- * recycle at the far edge and rise back in. Events flash faces white-cyan,
- * or burn a tower red while it's flagged.
+ * The storage wall: a corridor of translucent monoliths lining the way
+ * toward the vanishing point, always standing tall as you fly through them,
+ * each face covered in glowing cyan listings from the atlas — words in tidy
+ * digital boxes — scrolling up or down, with the edge-lit rim-frame of the
+ * movie's perspex towers. Towers drift past and recycle at the far edge.
+ * Events flash faces white-cyan, or burn a tower red while it's flagged.
  */
 
 const SP_X = 2.6;
@@ -69,9 +69,9 @@ const FRAG = /* glsl */`
     vec3 fill = mix(uFill, uRed * 0.22, vRed);
     vec3 edge = mix(uEdge, uRed, vRed);
     vec3 textC = mix(uText, uTextRed, vRed);
-    vec3 col = fill * 0.9;
-    col += edge * frame * (0.62 + vFlash * 2.6);
-    col += textC * tx * (1.85 + vFlash * 2.2) * uPulse;
+    vec3 col = fill * 0.35;
+    col += edge * frame * (0.5 + vFlash * 2.6);
+    col += textC * tx * (1.6 + vFlash * 2.2) * uPulse;
     col += edge * vFlash * 0.12;
     col *= mix(1.0, 0.3, top);
     // black fog: the far wall dissolves, like the film's storage cavern
@@ -111,6 +111,11 @@ export class Towers {
       },
       vertexShader: VERT,
       fragmentShader: FRAG,
+      // translucent hologram glass: additive and depth-write off, so towers
+      // behind show through the ones in front, order-independent on black
+      transparent: true,
+      blending: AdditiveBlending,
+      depthWrite: false,
     });
     this.build(scene, 7, 10);
   }
@@ -136,7 +141,7 @@ export class Towers {
     });
     this.z = f((i) => -5 - Math.floor(i / cols) * SP_Z);
     this.hT = f(() => 3 + Math.random() * 5);
-    this.h = f(0);
+    this.h = f((i) => this.hT[i]);
     this.scroll = f(() => Math.random() * 64);
     this.scrollV = f(() => (Math.random() < 0.5 ? -1 : 1) * (0.06 + Math.random() * 0.1));
     this.flash = f(0);
@@ -160,7 +165,7 @@ export class Towers {
   /** u ∈ 0..1 picks a column; burns the nearest tower red for `secs`. */
   flag(u: number, secs: number): void { this.nearest(u, (i) => { this.redT[i] = Math.max(this.redT[i], secs); }); }
 
-  /** A file is being written: recycle a far tower in the column nearest u and let it rise. */
+  /** A file is being written: a far tower in the column nearest u rewrites itself. */
   raise(u: number): void {
     const xt = (u - 0.5) * this.cols * SP_X;
     let best = -1, bd = Infinity;
@@ -170,8 +175,7 @@ export class Towers {
       if (d < bd) { bd = d; best = i; }
     }
     if (best < 0) return;
-    this.h[best] = 0.02;
-    this.hT[best] = 3 + Math.random() * 5;
+    this.hT[best] = this.h[best] = 3 + Math.random() * 5;
     this.flash[best] = 1;
     this.aSeed.setX(best, Math.random());
   }
@@ -195,11 +199,10 @@ export class Towers {
       this.z[i] += speed * dt;
       if (this.z[i] > CAM_Z + 2) {
         this.z[i] -= span;
-        this.h[i] = 0.02;
         this.hT[i] = 3 + Math.random() * 5;
+        this.h[i] = this.hT[i];
         this.aSeed.setX(i, Math.random());
       }
-      this.h[i] += (this.hT[i] - this.h[i]) * Math.min(1, dt * 1.1);
       this.scroll[i] += this.scrollV[i] * dt;
       this.flash[i] *= Math.exp(-dt * 2.6);
       if (this.redT[i] > 0) this.redT[i] -= dt;
