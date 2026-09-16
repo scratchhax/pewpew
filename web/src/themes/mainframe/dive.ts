@@ -17,7 +17,7 @@ import type { World } from './world';
  *   inside   flying low over the die: standard cells, memory macros, copper
  *            buses, the target's traffic streaming amber; a traceroute to the
  *            target types itself out and INTRUSION TRACED eases in
- *   surface  back out through the lattice onto the board
+ *   surface  back out through the lattice, up off the chip and into the flight again
  */
 
 export interface DiveTarget {
@@ -30,7 +30,9 @@ export interface DiveTarget {
 }
 
 type Phase = 'idle' | 'lock' | 'descend' | 'through' | 'inside' | 'surface';
-const DUR = { lock: 3, descend: 3.2, through: 1.2, inside: 13.5, surface: 2.4 };
+/** surface = 0.9 s rising inside the die, then the climb off the chip back to cruising height. */
+const EXIT = 3.2;
+const DUR = { lock: 3, descend: 3.2, through: 1.2, inside: 13.5, surface: 0.9 + EXIT };
 
 const ease = (x: number) => { const u = Math.max(0, Math.min(1, x)); return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; };
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
@@ -108,7 +110,17 @@ export class Dive {
   speedFactor = 1;
   detail = 1024;
   maxPackets = 400;
+  /** Where the flight picks up again after a dive (changes once per dive). */
   exitZ = 0;
+  exitX = 0;
+  exitAlt = 80;
+  /** The board flight, so the climb out can end exactly where it will take over. */
+  flight: Flight | null = null;
+  private cruiseAlt = 80;
+  private cruiseSpeed = 26;
+  private exitFrom = new Vector3();
+  private exitTo = new Vector3();
+  private exitLook = new Vector3();
 
   constructor(private world: World, private board: Board, private traffic: Traffic, private audio: AudioCues, overlay: HTMLElement) {
     this.el = document.createElement('div');
@@ -148,6 +160,8 @@ export class Dive {
     this.steerX = chip.x;
     this.speedFactor = 0.85;
     this.velInit = false;
+    this.cruiseAlt = this.world.camera.position.y;
+    this.cruiseSpeed = speed;
     // the lid glows with the die as the camera comes down onto it
     const lid = chip.top!.material as MeshStandardMaterial;
     lid.emissive.setRGB(1, 0.78, 0.45);
@@ -287,16 +301,47 @@ export class Dive {
             this.parts.stamp.classList.remove('on');
             this.parts.trace.textContent = '';
             this.parts.level.textContent = '';
-            const lid = chip.top?.material as MeshStandardMaterial | undefined;
-            if (lid) { lid.emissiveIntensity = 0; lid.emissiveMap = null; lid.needsUpdate = true; }
-            this.exitZ = chip.z - 8;
-            this.steerX = null;
-            this.speedFactor = 1;
+            // out of the die just above the lid, where the dive went in, and the climb ends where the flight carries on
+            this.exitFrom.set(chip.x, chip.h + 4.5, chip.z + 3.5);
+            this.exitTo.set(chip.x, this.cruiseAlt, chip.z + 3.5 - this.cruiseSpeed * EXIT * 0.5);
+            this.audio.sfx('ascend');
           }
-          lens.uDive.value = 1 - clamp01((this.t - 0.9) / 1.2);
-          view = { scene: this.world.scene, camera, inside: false, controlsCamera: false };
+          // mirror of the descent: rising slowly off the chip, gathering speed forward, the view swinging up from the lid to the road ahead
+          const s = clamp01((this.t - 0.9) / EXIT);
+          const up = s * s * (3 - 2 * s);
+          camera.position.set(
+            chip.x,
+            this.exitFrom.y + (this.exitTo.y - this.exitFrom.y) * up,
+            this.exitFrom.z + (this.exitTo.z - this.exitFrom.z) * s * s,
+          );
+          const pose = this.flight
+            ? this.flight.pose(chip.x, this.exitTo.y, camera.position.z, this.cruiseSpeed, this.exitLook)
+            : { y: this.exitTo.y, fov: 58 };
+          camera.position.y += (pose.y - this.exitTo.y) * up;
+          const b = clamp01(s / 0.85), swing = b * b * (3 - 2 * b);
+          this.look.copy(top).lerp(this.exitLook, swing);
+          camera.up.set(0, 1, 0);
+          camera.lookAt(this.look);
+          camera.fov = 44 + (pose.fov - 44) * up;
+          camera.updateProjectionMatrix();
+          lens.uDive.value = 1 - clamp01((this.t - 0.9) / 0.9);
+          lens.uZoom.value = 0.9 * (1 - clamp01(s / 0.6)) ** 2;
+          // the lid's die glow cools back to its etched label
+          const lid = chip.top?.material as MeshStandardMaterial | undefined;
+          if (lid) lid.emissiveIntensity = 2.4 * (1 - up);
+          view = { scene: this.world.scene, camera, inside: false, controlsCamera: true };
         }
-        if (this.t >= DUR.surface) this.finish();
+        if (this.t >= DUR.surface) {
+          // hand back to the flight exactly where the climb ended
+          this.exitX = chip.x;
+          this.exitAlt = this.cruiseAlt;
+          this.exitZ = this.exitTo.z;
+          this.steerX = null;
+          this.speedFactor = 1;
+          const lid = chip.top?.material as MeshStandardMaterial | undefined;
+          if (lid) { lid.emissive.setRGB(1, 1, 1); lid.emissiveIntensity = 0.55; lid.needsUpdate = true; }
+          this.finish();
+        }
         break;
       }
     }

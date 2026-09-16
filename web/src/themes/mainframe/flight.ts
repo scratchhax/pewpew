@@ -20,6 +20,12 @@ export class Flight {
   private t = 0;
   private look = new Vector3();
 
+  /** Where the flight would put the camera and aim it from (x, alt, z): lets a dive hand the view back without a jump. */
+  pose(x: number, alt: number, z: number, speed: number, look: Vector3): { y: number; fov: number } {
+    look.set(x + Math.sin(this.t * 0.05) * 6, 0, z - (alt * 0.25 + 6));
+    return { y: alt + Math.sin(this.t * 0.23) * 1.5, fov: 58 + Math.min(12, (speed - 26) * 0.22) };
+  }
+
   update(dt: number, board: Board, camera: PerspectiveCamera, o: { speed: number; steerX?: number | null; low?: number; wanderX?: number; wanderY?: number }): void {
     this.t += dt;
     this.speed += (o.speed - this.speed) * Math.min(1, dt * 0.8);

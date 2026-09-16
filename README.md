@@ -680,7 +680,7 @@ hot.
 
 **Diving into a chip.** It runs on the same schedule as Panopticon's eye of god:
 enough threats inside a minute, one address hitting 12 blocks in a minute, or a
-random dive about every 2 minutes. A dive lasts about 23 seconds:
+random dive about every 2 minutes. A dive lasts about 25 seconds:
 
 1. **Lock.** A chip up ahead is tasked. Its lid is re-etched with the
    target's address, it glows, and the camera lines up on it.
@@ -693,8 +693,10 @@ random dive about every 2 minutes. A dive lasts about 23 seconds:
    A traceroute to the target types itself out hop by hop, followed by the
    signal, IDS signature or firewall rule, and contacts in the last minute.
    Then **INTRUSION TRACED** eases in.
-5. **Surface.** Back out through the lattice onto the board. The chip keeps a
-   TRACED label.
+5. **Surface.** Back out through the lattice to just above the chip, then a
+   climb up and forward off it as the lid's glow cools and the view swings up
+   to the board ahead, ending exactly where the flight carries on. The chip keeps
+   a TRACED label.
 
 ![mainframe dive](docs/mainframe.gif)
 

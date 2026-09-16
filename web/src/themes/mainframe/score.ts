@@ -297,6 +297,11 @@ class BoardConductor extends Conductor {
         if (this.notes) for (const f of this.chordAt(now, 3)) s.supersaw(this.sfxBus, now, f, 0.012 * fx, 0.5, 0);
         return;
       }
+      case 'ascend':
+        // lifting off the chip: a long rising rush that settles into the flight
+        s.noiseHit(this.sfxBus, now, { type: 'bandpass', f: 180, fTo: 2600, q: 1.2, g: 0.07 * fx, a: 0.4, h: 1.2, r: 1.6, rev: 0.4 });
+        s.tone(this.sfxBus, now, 55, { g: 0.06 * fx, a: 0.3, h: 0.8, r: 1.4, glide: 2, rev: 0.3 });
+        return;
       case 'surface':
         s.noiseHit(this.sfxBus, now, { type: 'bandpass', f: 250, fTo: 4200, q: 1.5, g: 0.08 * fx, a: 0.8, r: 0.9, rev: 0.4 });
         return;

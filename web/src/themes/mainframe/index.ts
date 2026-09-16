@@ -56,6 +56,7 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
   traffic.onEvent = (name, x) => audio.sfx(name, { pan: (x - flight.x) / 60 });
   const flight = new Flight();
   const dive = new Dive(world, board, traffic, audio, overlay);
+  dive.flight = flight;
   const groove = new Groove();
 
   function applyBudgets(): void {
@@ -216,7 +217,7 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     while (ambientT < 0) { ambientT += 1 / 3; if (settings.mPackets) traffic.ambient(flight.z); }
     checkDive();
     const view = dive.update(dtReal, world.camera, f.wanderX, f.wanderY);
-    if (dive.exitZ !== lastExit) { lastExit = dive.exitZ; flight.z = dive.exitZ; flight.alt = 18; }
+    if (dive.exitZ !== lastExit) { lastExit = dive.exitZ; flight.z = dive.exitZ; flight.x = dive.exitX; flight.vx = 0; flight.alt = dive.exitAlt; }
     const rate = state.rate30s / 30;
     // slow and high: plenty of time to take in the board
     const speed = (17 + Math.min(10, rate * 0.35) + heat * 7) * settings.mFlightSpeed * dive.speedFactor;
