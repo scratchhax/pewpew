@@ -796,13 +796,14 @@ their faces covered in glowing cyan listings set in neat digital boxes —
 binary — including the hostnames, addresses and domains your own traffic has
 passed by. The floor is laced with cyan circuit traces that run straight to
 the dark vanishing point ahead, the towers wear the glowing edge-frame of the
-film's perspex originals, and ACCESS GRANTED / ACCESS DENIED signs glide past
-now and then. When the wall gets busy it scrolls faster.
+film's perspex originals, and ACCESS GRANTED / ACCESS DENIED signs hang on a
+tower face and pulse. The flight itself drifts slowly side to side, up and
+down through the lanes. When the wall gets busy it scrolls faster.
 
 | Event | On the wall |
 |-------|-------------|
 | allow | a pulse of light climbs the nearest face |
-| block | a tower burns red for a moment, and an **ACCESS DENIED** sign glides over the tops |
+| block | a tower burns red for a moment, and an **ACCESS DENIED** sign pulses on a face |
 | threat | a tower is flagged red and the camera swings around to lock onto it — reticle, `TRACKING · <attacker>` readout, the wall slows to a crawl, and the file is stamped **INTRUSION TRACED** as the lock releases |
 | dns | the domain joins the listings scrolling down every face |
 | dhcp | one far tower rewrites itself, with the device's hostname in its listings |

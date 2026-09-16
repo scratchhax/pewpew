@@ -11,7 +11,7 @@ const SP_Z = 2.4;
 
 export class Billboards {
   private group = new Group();
-  private active: Array<{ mesh: Mesh; z: number }> = [];
+  private active: Array<{ mesh: Mesh; z: number; t: number }> = [];
   private cache = new Map<string, CanvasTexture>();
   private rows: number;
 
@@ -46,19 +46,24 @@ export class Billboards {
     return tex;
   }
 
-  /** Spawn a sign far above the wall; caller rate-limits hard. */
-  spawn(text: string, color = '#dff2ff'): void {
+  /** Spawn a sign on a far tower face (side facing the corridor); caller rate-limits hard. */
+  spawn(text: string, color = '#dff2ff', face?: { x: number; y: number; z: number; side: number } | null): void {
     if (this.active.length > 2) return;
     const tex = this.texture(text, color);
     const aspect = tex.image.width / tex.image.height;
-    const h = 0.8;
+    const h = 1.15;
     const mesh = new Mesh(
       new PlaneGeometry(h * aspect, h),
       new MeshBasicMaterial({ map: tex, transparent: true, blending: AdditiveBlending, depthWrite: false }),
     );
-    mesh.position.set((Math.random() - 0.5) * 14, 9 + Math.random() * 2, -this.rows * SP_Z - 4);
+    if (face) {
+      mesh.position.set(face.x, face.y, face.z);
+      mesh.rotation.y = face.side * Math.PI / 2;
+    } else {
+      mesh.position.set((Math.random() - 0.5) * 14, 9 + Math.random() * 2, -this.rows * SP_Z - 4);
+    }
     this.group.add(mesh);
-    this.active.push({ mesh, z: mesh.position.z });
+    this.active.push({ mesh, z: mesh.position.z, t: Math.random() * 6 });
   }
 
   update(dt: number, speed: number): void {
@@ -66,6 +71,10 @@ export class Billboards {
       const b = this.active[i];
       b.z += speed * dt;
       b.mesh.position.z = b.z;
+      // a slow breathing pulse so the sign reads across the cavern
+      b.t += dt;
+      const k = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(b.t * 3.2));
+      (b.mesh.material as MeshBasicMaterial).opacity = k;
       if (b.z > CAM_Z + 1) {
         this.group.remove(b.mesh);
         b.mesh.geometry.dispose();
