@@ -260,6 +260,21 @@ export class Traffic {
 
   get wormsAlive(): number { return this.worms.filter((w) => w.dying < 0).length; }
 
+  /** A streak along any route (a dive's counter-strike and its burning trail). */
+  trail(route: Route, color: Color, speed: number, len: number, width: number): void { this.launch(route, color, speed, len, undefined, width); }
+
+  /** Every packet of this colour breaks apart where it is. */
+  shatter(color: Color): number {
+    let n = 0;
+    for (const p of this.packets) {
+      if (!p.alive || !p.color.equals(color) || p.d < 0) continue;
+      p.alive = false;
+      this.burst(this.pointAt(p.route, p.d, tmpV).clone(), color, n < 20 ? 5 : 2);
+      n++;
+    }
+    return n;
+  }
+
   // ── shards ───────────────────────────────────────────────────────────────
   burst(at: Vector3, color: Color, n: number): void {
     for (let i = 0; i < n && this.shards.length < 480; i++) {

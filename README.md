@@ -680,7 +680,8 @@ hot.
 
 **Diving into a chip.** It runs on the same schedule as Panopticon's eye of god:
 enough threats inside a minute, one address hitting 12 blocks in a minute, or a
-random dive about every 2 minutes. A dive lasts about 25 seconds:
+random dive about every 2 minutes. A dive lasts about 30 seconds and tells a
+short story: something got in, we find it, and we deal with it.
 
 1. **Lock.** A chip up ahead is tasked. Its lid is re-etched with the
    target's address, it glows, and the camera lines up on it.
@@ -689,14 +690,26 @@ random dive about every 2 minutes. A dive lasts about 25 seconds:
 3. **Through.** A gold lattice rushes past as the camera falls through the
    silicon.
 4. **Inside.** A low flight over the die itself: rows of standard cells,
-   memory macros and copper buses, with the target's traffic streaming amber.
-   A traceroute to the target types itself out hop by hop, followed by the
-   signal, IDS signature or firewall rule, and contacts in the last minute.
-   Then **INTRUSION TRACED** eases in.
-5. **Surface.** Back out through the lattice to just above the chip, then a
-   climb up and forward off it as the lid's glow cools and the view swings up
-   to the board ahead, ending exactly where the flight carries on. The chip keeps
-   a TRACED label.
+   memory macros and copper buses. Red corruption spreads over the die while
+   the intruder's traffic streams amber, and a traceroute to the target types
+   itself out hop by hop, followed by the signal, IDS signature or firewall
+   rule, and contacts in the last minute. **INTRUSION TRACED** eases in.
+5. **The counter-measure.** One of three, picked at random each dive, with a
+   status line saying what's happening:
+   - **Purge.** ICE floods the buses and a cyan wave sweeps across the die,
+     turning the corruption clean. **THREAT PURGED.** Climbing back out, the lid
+     reads SECURED and a cyan shockwave rings out across the board.
+   - **Quarantine.** Hazard-striped blast doors drop across the buses one after
+     another, and the intruder's traffic shatters against them; the corruption
+     stops spreading. **QUARANTINED.** Climbing back out, the lid is sealed with
+     hazard stripes and red firewall walls rise around the chip, where they stay.
+   - **Counter-strike.** The trace locks onto the source and a counter-strike
+     launches back up the line as the corruption drains away. Instead of climbing
+     out, the camera rides the strike out of the chip, along its trace and away
+     down the attacker's street, the route burning out behind it.
+     **SOURCE BLOCKED.**
+6. **Back to the flight.** Every ending finishes exactly where the flight
+   carries on, at cruising height and speed, so there's no jump.
 
 ![mainframe dive](docs/mainframe.gif)
 

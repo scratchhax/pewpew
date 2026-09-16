@@ -682,7 +682,10 @@ export class Chunk {
 }
 
 /** A chip's lid: maker, part number, date code, and an optional line of data. */
-function drawLid(g: CanvasRenderingContext2D, w: number, h: number, chip: Chip, data?: string, hot = false): void {
+export type LidTone = boolean | 'safe' | 'hazard';
+
+function drawLid(g: CanvasRenderingContext2D, w: number, h: number, chip: Chip, data?: string, tone: LidTone = false): void {
+  const hot = tone === true, safe = tone === 'safe', hazard = tone === 'hazard';
   if (chip.kind === 'macro') {
     g.fillStyle = '#231a3e'; g.fillRect(0, 0, w, h);
     g.strokeStyle = 'rgba(200,170,255,0.35)'; g.lineWidth = 1;
@@ -693,19 +696,27 @@ function drawLid(g: CanvasRenderingContext2D, w: number, h: number, chip: Chip, 
     return;
   }
   const grd = g.createLinearGradient(0, 0, w, h);
-  grd.addColorStop(0, hot ? '#2a0f0a' : '#17181b'); grd.addColorStop(1, hot ? '#1a0806' : '#0e0f11');
+  grd.addColorStop(0, hot ? '#2a0f0a' : safe ? '#06222a' : hazard ? '#1c1408' : '#17181b');
+  grd.addColorStop(1, hot ? '#1a0806' : safe ? '#03141a' : hazard ? '#0f0a04' : '#0e0f11');
   g.fillStyle = grd; g.fillRect(0, 0, w, h);
+  if (hazard) {
+    // a hazard-striped border: sealed
+    g.save();
+    g.beginPath(); g.rect(0, 0, w, h); g.rect(10, 10, w - 20, h - 20); g.clip('evenodd');
+    for (let x = -h; x < w + h; x += 22) { g.fillStyle = '#ffc93a'; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 11, 0); g.lineTo(x + 11 - h, h); g.lineTo(x - h, h); g.fill(); }
+    g.restore();
+  }
   g.fillStyle = 'rgba(255,255,255,0.08)';
   g.beginPath(); g.arc(18, h - 18, 7, 0, Math.PI * 2); g.fill();
-  g.fillStyle = hot ? 'rgba(255,170,120,0.9)' : 'rgba(205,210,215,0.62)';
+  g.fillStyle = hot ? 'rgba(255,170,120,0.9)' : safe ? 'rgba(126,243,255,0.9)' : hazard ? 'rgba(255,210,90,0.9)' : 'rgba(205,210,215,0.62)';
   g.textBaseline = 'top';
   const big = Math.round(Math.min(34, h * 0.22));
   g.font = `bold ${big}px 'Courier New', monospace`;
-  g.fillText(chip.name, 16, 12);
+  g.fillText(chip.name, hazard ? 20 : 16, hazard ? 16 : 12);
   g.font = `${Math.round(big * 0.6)}px 'Courier New', monospace`;
   g.fillText(chip.kind === 'fw' ? 'PACKET FILTER' : chip.kind === 'rom' ? 'LOOKUP' : chip.kind.toUpperCase() + ' ' + (2300 + (chip.name.length * 37) % 99), 16, 16 + big);
   if (data) {
-    g.fillStyle = hot ? '#ffb070' : 'rgba(180,240,255,0.85)';
+    g.fillStyle = hot ? '#ffb070' : safe ? '#bffaff' : hazard ? '#ff6a50' : 'rgba(180,240,255,0.85)';
     g.font = `bold ${Math.round(big * 0.7)}px 'Courier New', monospace`;
     g.fillText(data, 16, h - big * 0.9 - 10);
   }
@@ -839,7 +850,7 @@ export class Board {
   }
 
   /** (Re)draw a chip's own lid. */
-  etch(chip: Chip, data?: string, hot = false): void {
+  etch(chip: Chip, data?: string, hot: LidTone = false): void {
     if (!chip.canvas) this.lid(chip);
     const cv = chip.canvas!;
     drawLid(cv.getContext('2d')!, cv.width, cv.height, chip, data, hot);

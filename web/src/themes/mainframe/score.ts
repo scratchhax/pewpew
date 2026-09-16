@@ -297,6 +297,34 @@ class BoardConductor extends Conductor {
         if (this.notes) for (const f of this.chordAt(now, 3)) s.supersaw(this.sfxBus, now, f, 0.012 * fx, 0.5, 0);
         return;
       }
+      case 'purge': {
+        // a bright wash sweeping outward, in key
+        s.noiseHit(this.sfxBus, now, { type: 'highpass', f: 900, fTo: 6000, q: 0.8, g: 0.05 * fx, a: 0.25, h: 0.6, r: 1.6, rev: 0.6 });
+        if (this.notes) this.chordAt(now, 4).forEach((f, k) => s.glass(this.sfxBus, now + 0.1 + k * 0.12, f, 0.018 * fx, (k - 1) * 0.5));
+        return;
+      }
+      case 'purged':
+      case 'blocked': {
+        s.boom(this.sfxBus, now, 0.08 * fx);
+        if (this.notes) for (const f of this.chordAt(now, 4)) s.supersaw(this.sfxBus, now, f, 0.01 * fx, 0.9, 0);
+        return;
+      }
+      case 'door':
+        s.boom(this.sfxBus, now, 0.1 * fx);
+        s.noiseHit(this.sfxBus, now, { type: 'bandpass', f: 700, q: 1.5, g: 0.06 * fx, a: 0.001, r: 0.25, pan, rev: 0.3 });
+        return;
+      case 'sealed':
+        s.tone(this.sfxBus, now, 98, { type: 'square', g: 0.03 * fx, a: 0.02, h: 0.5, r: 0.8, lp: 700, rev: 0.4 });
+        s.tone(this.sfxBus, now + 0.35, 73.4, { type: 'square', g: 0.03 * fx, a: 0.02, h: 0.8, r: 1, lp: 600, rev: 0.4 });
+        return;
+      case 'counter':
+        s.riser(this.sfxBus, now, 1.2, 0.06 * fx);
+        for (let k = 0; k < 4; k++) s.zap(this.sfxBus, now + 0.8 + k * 0.08, 900 + k * 220, 0.02 * fx, (k - 1.5) * 0.3);
+        return;
+      case 'chase':
+        s.noiseHit(this.sfxBus, now, { type: 'bandpass', f: 400, fTo: 3800, q: 1, g: 0.08 * fx, a: 0.3, h: 2.4, r: 1.4, rev: 0.3 });
+        s.tone(this.sfxBus, now, 60, { type: 'sawtooth', g: 0.03 * fx, a: 0.4, h: 2.2, r: 1, glide: 2.5, lp: 500 });
+        return;
       case 'ascend':
         // lifting off the chip: a long rising rush that settles into the flight
         s.noiseHit(this.sfxBus, now, { type: 'bandpass', f: 180, fTo: 2600, q: 1.2, g: 0.07 * fx, a: 0.4, h: 1.2, r: 1.6, rev: 0.4 });
