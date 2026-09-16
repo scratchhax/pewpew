@@ -13,7 +13,7 @@ export class Flight {
   vx = 0;
   speed = 26;
   /** Height above the low point: very high over the board, low inside a chip. */
-  lift = 560;
+  lift = 200;
   private targetX = 0;
   private nextTurn = 2;
   private roll = 0;
