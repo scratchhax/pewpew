@@ -96,7 +96,7 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
   // the film's signs are rare, punctuation not wallpaper: minutes apart
   let nextDeny = 0, nextGrant = 0, flyT = Math.random() * 100;
   // the intersection turn: full 90s down the computer city's grid
-  const TURN_DUR = 3.2;
+  const TURN_DUR = 2.2;
   let turning = false, turnT = 0, turnDone = 0, turnDir = 1, crossIn = CITY_P * (1 + ((Math.random() * 2) | 0));
   const banner = (text: string, color: string, nextRef: 'deny' | 'grant', everySec: number, jitterSec: number) => {
     const now = performance.now();
@@ -187,11 +187,12 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
     }
     flyT += dtReal;
     const rate = state.rate30s / 30;
-    const speed = (0.9 + Math.min(2.5, rate * 0.06) + heat * 0.9) * settings.gScrollSpeed * (lockOn ? 0.3 : 1);
+    const speed = (0.9 + Math.min(2.5, rate * 0.06) + heat * 0.9) * settings.gScrollSpeed * (lockOn ? 0.3 : turning ? 0 : 1);
 
-    // the computer city: fly down a corridor and make a full 90-degree turn
-    // at every intersection. The camera stays put and the whole city swings
-    // around it - that swing IS the turn.
+    // the computer city: fly down a street and turn at every intersection.
+    // The camera holds still at the corner while the whole city swings around
+    // it, so the lattice stays true: when the swing ends, the new street is
+    // dead ahead. The flow pauses for the pivot and resumes out the other side.
     if (turning) {
       turnT += dtReal;
       const p = Math.min(1, turnT / TURN_DUR);
