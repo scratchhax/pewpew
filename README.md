@@ -964,7 +964,7 @@ The board plays along:
 | dns | a data chirp from the lookup tower |
 | dhcp | the pick-and-place servo whirring down, and a click as the part seats |
 | wifi | rising pings for a join, a crackle for a failure |
-| dive | a lock-on tone, a rising rush on the way down, a whoosh through the die, ticks as the traceroute types, and a big hit for INTRUSION TRACED |
+| dive | a lock-on tone, a rising rush on the way down, a whoosh through the die, ticks as the traceroute types, and a big hit for INTRUSION TRACED. Then the ending: a bright wash sweeping out for a purge, heavy slams as the blast doors land and a low two-note seal for a quarantine, or a rising zap as the counter-strike launches and a long rush as the camera chases it. The payoff (THREAT PURGED, SOURCE BLOCKED) lands with a hit and a chord, and climbing out has a rising whoosh |
 
 The music drops to half volume during a dive. Fans hum and the board buzzes
 underneath, louder when it overclocks, and the rush of air rises with the
