@@ -96,8 +96,9 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
   // the film's signs are rare, punctuation not wallpaper: minutes apart
   let nextDeny = 0, nextGrant = 0, flyT = Math.random() * 100;
   // the intersection turn: full 90s down the computer city's grid
-  const TURN_DUR = 2.2;
+  const TURN_DUR = 1.8;
   let turning = false, turnT = 0, turnDone = 0, turnDir = 1, crossIn = CITY_P * (1 + ((Math.random() * 2) | 0));
+  let rotCum = 0, driftX = 0, driftZ = 0;
   const banner = (text: string, color: string, nextRef: 'deny' | 'grant', everySec: number, jitterSec: number) => {
     const now = performance.now();
     if (!settings.gBanners || now < (nextRef === 'deny' ? nextDeny : nextGrant)) return;
@@ -187,26 +188,38 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
     }
     flyT += dtReal;
     const rate = state.rate30s / 30;
-    const speed = (0.9 + Math.min(2.5, rate * 0.06) + heat * 0.9) * settings.gScrollSpeed * (lockOn ? 0.3 : turning ? 0 : 1);
+    const speed = (0.9 + Math.min(2.5, rate * 0.06) + heat * 0.9) * settings.gScrollSpeed * (lockOn ? 0.3 : turning ? 0.55 : 1);
 
-    // the computer city: fly down a street and turn at every intersection.
-    // The camera holds still at the corner while the whole city swings around
-    // it, so the lattice stays true: when the swing ends, the new street is
-    // dead ahead. The flow pauses for the pivot and resumes out the other side.
+    // the computer city: fly down a street and glide through a turn at every
+    // intersection - the flow eases down instead of stopping, the whole city
+    // (towers, signs and the ground board alike) swings around the camera, and
+    // the flight eases back to the middle of the new street as it speeds up
     if (turning) {
       turnT += dtReal;
       const p = Math.min(1, turnT / TURN_DUR);
-      const ease = p * p * (3 - 2 * p);
+      const ease = p * p * p * (p * (p * 6 - 15) + 10);
       const dNow = turnDir * (Math.PI / 2) * ease;
       const dStep = dNow - turnDone;
       turnDone = dNow;
       towers.rotate(dStep, 0, 7);
       billboards.rotate(dStep, 0, 7);
-      if (p >= 1) { turning = false; crossIn = CITY_P * (1 + ((Math.random() * 2) | 0)); }
+      rotCum += dStep;
+      ground.setRot(rotCum);
+      // how far the flowing city slid off its lattice while we swung
+      const c = Math.cos(dStep), s = Math.sin(dStep);
+      const dx = driftX * c - driftZ * s;
+      driftZ = driftX * s + driftZ * c + speed * dtReal;
+      driftX = dx;
+      if (p >= 1) {
+        turning = false;
+        crossIn = CITY_P * (1 + ((Math.random() * 2) | 0)) - driftZ;
+      }
     } else if (!lockOn) {
+      // the city slid forward through the corner: the next one is closer
+      driftX *= Math.exp(-dtReal * 1.1);
       crossIn -= speed * dtReal;
       if (crossIn <= 0) {
-        turning = true; turnT = 0; turnDone = 0;
+        turning = true; turnT = 0; turnDone = 0; driftX = 0; driftZ = 0;
         turnDir = Math.random() < 0.5 ? -1 : 1;
       }
     }
@@ -214,7 +227,8 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
 
     // the flight: straight down the corridor at street level, low under the
     // towers; during a turn it looks into the corner and banks through it
-    const camX = lockOn ? lockTarget.x * 0.25 + f.wanderX * 0.0015 : f.wanderX * 0.0012;
+    const camX = lockOn ? lockTarget.x * 0.25 + f.wanderX * 0.0015
+      : f.wanderX * 0.0012 - driftX;
     const camY = lockOn ? 3.0 : 2.4 + Math.sin(flyT * 0.067) * 0.35 + f.wanderY * 0.0004;
     if (!lockOn) {
       lookWant.set(
