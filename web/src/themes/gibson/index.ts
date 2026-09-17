@@ -6,20 +6,22 @@ import { Groove } from '../../sound/groove';
 import { GIBSON_BUDGETS, GIBSON_CONTROLS, GIBSON_DEFAULTS, GIBSON_HUD } from './settings';
 import { createWorld } from './world';
 import { TextAtlas } from './textatlas';
-import { CITY_P, Towers } from './towers';
+import { CITY_P, TURN_R, Towers } from './towers';
 import { Ground } from './ground';
 import { Billboards } from './billboards';
 import { gibsonScore } from './score';
 import './hud.css';
 
 /**
- * The Gibson: the storage wall from the movie, flown slowly through in the
- * dark. Translucent towers of scrolling listings line the corridor as your
- * data; allowed traffic sends a pulse of light climbing a face, a denial
- * burns one red and floats an ACCESS DENIED sign over the tops, a DHCP lease
+ * The Gibson: the storage wall as a computer city, flown slowly through in
+ * the dark. Translucent towers of scrolling listings stand in a fixed lattice
+ * of blocks; the flight patrols its streets, gliding straight down most
+ * blocks and swinging a full ninety degrees at the odd intersection, banking
+ * like a patrol car. Allowed traffic sends a pulse of light climbing a face,
+ * a denial burns one red and hangs an ACCESS DENIED sign on it, a DHCP lease
  * rewrites a far tower, and DNS lookups join the listings. When an IDS
- * threat lands, the camera swings around to lock onto a red file and rides
- * it until it passes — intruder traced. Rendered with three.js.
+ * threat lands, the gaze swings onto a red file and rides it until it
+ * passes - intruder traced. Rendered with three.js.
  */
 export const gibson: Theme<typeof GIBSON_DEFAULTS> = {
   id: 'gibson',
@@ -40,7 +42,7 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
   const atlas = new TextAtlas();
   const towers = new Towers(world.scene, atlas);
   const ground = new Ground(world.scene);
-  const billboards = new Billboards(world.scene, towers.rows);
+  const billboards = new Billboards(world.scene);
   const groove = new Groove();
 
   const overlay = document.createElement('div');
@@ -56,14 +58,11 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
 
   // ── target lock ──
   // The lock grabs where the flagged file is at lock-on time and holds the
-  // gaze on it, timer-driven: a quality rebuild of the tower grid mid-lock
-  // can't strand it.
+  // gaze on it, timer-driven: a lattice wrap mid-lock can't strand it.
   const uOf = (s?: string | null) => (s ? (hash(s) % 1000) / 1000 : Math.random());
   const lockTarget = new Vector3();
   let lockOn = false;
   let lockUntil = 0;
-  const look = new Vector3(0, 1.0, -30);
-  const lookWant = new Vector3(0, 1.0, -30);
 
   function startLock(ip: string | null): boolean {
     if (lockOn) return false;
@@ -95,10 +94,71 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
 
   // the film's signs are rare, punctuation not wallpaper: minutes apart
   let nextDeny = 0, nextGrant = 0, flyT = Math.random() * 100;
-  // the intersection turn: full 90s down the computer city's grid
-  const TURN_DUR = 1.8;
-  let turning = false, turnT = 0, turnDone = 0, turnDir = 1, crossIn = CITY_P * (1 + ((Math.random() * 2) | 0));
-  let rotCum = 0, driftX = 0, driftZ = 0;
+
+  // ── the flight ──
+  // The city stands still; the camera flies it. Headings are the four street
+  // directions (k = 0..3, forward = (sin, cos)(k·pi/2)); flight rides the
+  // street lattice lines. At each intersection it goes straight about half
+  // the time, and otherwise carves a quarter arc of radius TURN_R - which
+  // fits inside the street width, so the flight can't clip a tower or leave
+  // the city - landing exactly on the crossing street's line. Straights ease
+  // their speed down through a turn; nothing ever stops.
+  let cx = 0, cz = 40;
+  let kHead = 2; // down the street x = 0, heading -z
+  let decidedFor = -1;
+  let arc: null | { cX: number; cZ: number; p: number; d: number; k0: number; axis: 'x' | 'z'; nLine: number } = null;
+  let roll = 0;
+  const fOf = (k: number): [number, number] => [[0, 1], [1, 0], [0, -1], [-1, 0]][k] as [number, number];
+  const look = new Vector3(0, 1.5, 10);
+  const lookWant = new Vector3(0, 1.5, 10);
+
+  /** the next street line ahead, as (lattice index, distance along heading) */
+  function nextLine(): [number, number] {
+    if (kHead === 0) { const n = Math.floor(cz / CITY_P) + 1; return [n, n * CITY_P - cz]; }
+    if (kHead === 2) { const n = Math.floor(cz / CITY_P); return [n, cz - n * CITY_P]; }
+    if (kHead === 1) { const n = Math.floor(cx / CITY_P) + 1; return [n, n * CITY_P - cx]; }
+    const n = Math.floor(cx / CITY_P); return [n, cx - n * CITY_P];
+  }
+
+  function fly(dtReal: number, v: number): void {
+    if (arc) {
+      arc.p = Math.min(arc.p + (v * dtReal) / TURN_R, Math.PI / 2);
+      // position on the arc: center + radius vector, sweeping a quarter turn
+      const a = arc.k0 * (Math.PI / 2) - arc.d * (Math.PI / 2 - arc.p);
+      cx = arc.cX + TURN_R * Math.sin(a);
+      cz = arc.cZ + TURN_R * Math.cos(a);
+      if (arc.p >= Math.PI / 2) {
+        // land exactly on the crossing street, then straighten out
+        if (arc.axis === 'z') cz = arc.nLine * CITY_P; else cx = arc.nLine * CITY_P;
+        kHead = (arc.k0 + arc.d + 4) % 4;
+        arc = null;
+      }
+      return;
+    }
+    const [fx, fz] = fOf(kHead);
+    cx += fx * v * dtReal;
+    cz += fz * v * dtReal;
+    if (lockOn) return;
+    const [n, dist] = nextLine();
+    if (dist <= TURN_R && n !== decidedFor) {
+      decidedFor = n;
+      const r = Math.random();
+      if (r < 0.5) return; // patrol car goes straight through
+      const d = r < 0.75 ? 1 : -1;
+      // snap onto the arc's start: exactly TURN_R before the intersection
+      const line = n * CITY_P;
+      const sx = kHead === 1 ? line - TURN_R : kHead === 3 ? line + TURN_R : cx;
+      const sz = kHead === 0 ? line - TURN_R : kHead === 2 ? line + TURN_R : cz;
+      const phi0 = kHead * (Math.PI / 2);
+      // arc center sits TURN_R to the turn side of the start point
+      arc = {
+        cX: sx + d * TURN_R * Math.cos(phi0),
+        cZ: sz - d * TURN_R * Math.sin(phi0),
+        p: 0, d, k0: kHead, axis: kHead % 2 === 0 ? 'z' : 'x', nLine: line / CITY_P,
+      };
+    }
+  }
+
   const banner = (text: string, color: string, nextRef: 'deny' | 'grant', everySec: number, jitterSec: number) => {
     const now = performance.now();
     if (!settings.gBanners || now < (nextRef === 'deny' ? nextDeny : nextGrant)) return;
@@ -181,81 +241,42 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
     heat += ((w === 'hurricane' ? 1 : w === 'storm' ? 0.4 : 0) - heat) * Math.min(1, dtReal * 0.25);
     const pulse = settings.gMusicVisuals && groove.style ? 0.85 + groove.downbeat * 0.25 + groove.energy * 0.15 : 1;
 
-    // the lock: slow the wall, swing the camera onto the red file, ride it past
-    if (lockOn) {
-      if (performance.now() > lockUntil) endLock();
-      else lookWant.copy(lockTarget);
-    }
+    // the lock: slow the flight, swing the gaze onto the red file, ride past
+    if (lockOn && performance.now() > lockUntil) endLock();
     flyT += dtReal;
     const rate = state.rate30s / 30;
-    const speed = (0.9 + Math.min(2.5, rate * 0.06) + heat * 0.9) * settings.gScrollSpeed * (lockOn ? 0.3 : turning ? 0.55 : 1);
+    const v = (0.9 + Math.min(2.5, rate * 0.06) + heat * 0.9) * settings.gScrollSpeed * (lockOn ? 0.3 : arc ? 0.7 : 1);
+    fly(dtReal, v);
 
-    // the computer city: fly down a street and glide through a turn at every
-    // intersection - the flow eases down instead of stopping, the whole city
-    // (towers, signs and the ground board alike) swings around the camera, and
-    // the flight eases back to the middle of the new street as it speeds up
-    if (turning) {
-      turnT += dtReal;
-      const p = Math.min(1, turnT / TURN_DUR);
-      const ease = p * p * p * (p * (p * 6 - 15) + 10);
-      const dNow = turnDir * (Math.PI / 2) * ease;
-      const dStep = dNow - turnDone;
-      turnDone = dNow;
-      towers.rotate(dStep, 0, 7);
-      billboards.rotate(dStep, 0, 7);
-      rotCum += dStep;
-      ground.setRot(rotCum);
-      // how far the flowing city slid off its lattice while we swung
-      const c = Math.cos(dStep), s = Math.sin(dStep);
-      const dx = driftX * c - driftZ * s;
-      driftZ = driftX * s + driftZ * c + speed * dtReal;
-      driftX = dx;
-      if (p >= 1) {
-        turning = false;
-        crossIn = CITY_P * (1 + ((Math.random() * 2) | 0)) - driftZ;
-      }
-    } else if (!lockOn) {
-      // the city slid forward through the corner: the next one is closer
-      driftX *= Math.exp(-dtReal * 1.1);
-      crossIn -= speed * dtReal;
-      if (crossIn <= 0) {
-        turning = true; turnT = 0; turnDone = 0; driftX = 0; driftZ = 0;
-        turnDir = Math.random() < 0.5 ? -1 : 1;
-      }
-    }
-    const turnP = turning ? Math.min(1, turnT / TURN_DUR) : 0;
-
-    // the flight: straight down the corridor at street level, low under the
-    // towers; during a turn it looks into the corner and banks through it
-    const camX = lockOn ? lockTarget.x * 0.25 + f.wanderX * 0.0015
-      : f.wanderX * 0.0012 - driftX;
     const camY = lockOn ? 3.0 : 2.4 + Math.sin(flyT * 0.067) * 0.35 + f.wanderY * 0.0004;
-    if (!lockOn) {
-      lookWant.set(
-        f.wanderX * 0.01 + turnDir * turnP * 5.5,
-        1.4 + Math.sin(flyT * 0.055) * 0.3,
-        -30 + turnP * 14,
-      );
-    }
-    look.lerp(lookWant, Math.min(1, dtReal * (turning ? 2.6 : 1.2)));
     if (lockOn) {
+      lookWant.copy(lockTarget);
       const sp = lockTarget.clone().project(world.camera);
       reticle.style.left = `${(sp.x * 0.5 + 0.5) * 100}%`;
       reticle.style.top = `${(-sp.y * 0.5 + 0.5) * 100}%`;
+    } else {
+      // gaze down the street we're on; mid-arc the heading rotates with the
+      // flight, so the look leads it naturally into and out of the turn
+      const a = arc ? arc.k0 * (Math.PI / 2) + arc.d * arc.p : kHead * (Math.PI / 2);
+      lookWant.set(cx + Math.sin(a) * 20 + f.wanderX * 0.0012, 1.5 + Math.sin(flyT * 0.055) * 0.3, cz + Math.cos(a) * 20);
     }
+    look.lerp(lookWant, Math.min(1, dtReal * 2.2));
 
-    world.camera.position.x += (camX - world.camera.position.x) * Math.min(1, dtReal * 1.4);
-    world.camera.position.y += (camY - world.camera.position.y) * Math.min(1, dtReal * 1.2);
+    world.camera.position.set(cx + f.wanderX * 0.001, camY, cz);
     world.camera.lookAt(look);
-    if (turning) world.camera.rotateZ(-turnDir * Math.sin(Math.PI * turnP) * 0.06);
+    // bank through the arc, easing in and out like a patrol car
+    const rollWant = arc && !lockOn ? -arc.d * Math.sin((arc.p / (Math.PI / 2)) * Math.PI) * 0.07 : 0;
+    roll += (rollWant - roll) * Math.min(1, dtReal * 4);
+    if (roll !== 0) world.camera.rotateZ(roll);
 
     const fog = 0.044 + heat * 0.005;
-    towers.update(dt, speed, world.camera.position);
-    ground.update(dt, speed, pulse, fog, world.camera.position);
-    billboards.update(dt, speed);
+    const [fx, fz] = fOf(kHead);
+    towers.update(dt, cx, cz, kHead);
+    ground.update(dt, pulse, fog, cx, cz);
+    billboards.update(dt, cx, cz, fx, fz);
     (towers.material.uniforms.uPulse.value as number) = pulse;
     world.lens.uniforms.uTime.value += dtReal;
-    audio.sfx('scroll', { count: speed * 10 });
+    audio.sfx('scroll', { count: v * 10 });
     audio.setThreatActive(lockOn || towers.redCount() > 0);
     world.render(settings.gBloom);
   }
@@ -266,10 +287,10 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
     applyBudgets,
     settingsChanged() { applyBudgets(); },
     setResolution(scale) { world.setPixelRatio(scale); },
-    stats: () => ({ calls: world.renderer.info.render.calls, tris: world.renderer.info.render.triangles, towers: towers.cols * towers.rows, red: towers.redCount(), lock: lockOn ? 'ON' : 'off', signs: billboards.count }),
+    stats: () => ({ calls: world.renderer.info.render.calls, tris: world.renderer.info.render.triangles, towers: towers.count, red: towers.redCount(), lock: lockOn ? 'ON' : 'off', signs: billboards.count }),
     diag: () => ({
       renderer: world.renderer, scene: world.scene, camera: world.camera, atlas, towers, ground, billboards, audio,
-      banner: (t?: string) => billboards.spawn(t ?? 'ACCESS GRANTED', '#9fd8ff'),
+      banner: (t?: string) => billboards.spawn(t ?? 'ACCESS GRANTED', '#9fd8ff', towers.pickFace()),
       lock: (ip?: string) => startLock(ip ?? '10.0.0.666'),
       stopRebuild: () => window.clearInterval(rebuildTimer),
     }),

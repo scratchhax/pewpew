@@ -18,9 +18,9 @@ your own traffic. Pick a scene per screen:
 - **Aquarium**: a 3D reef tank in the spirit of the old marine aquarium
   screensavers, where your traffic swims past as fish
 - **The Gibson**: the storage wall from *Hackers* — a computer city of
-  translucent monolith blocks lined in glowing cyan, flown through at street
-  level and turning at every corner, until the camera swings around to lock
-  onto a red file and trace the intruder
+  translucent monolith blocks lined in glowing cyan, patrolled at street
+  level with sweeping ninety-degree corners, until the camera swings around
+  to lock onto a red file and trace the intruder
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -788,17 +788,19 @@ drift** stops the camera.
 
 ![the gibson](docs/gibson.png)
 
-The storage wall from *Hackers*, rebuilt in 3D as a computer city: a grid of
-tower blocks with streets in both directions, flown at street level, turning
-at every corner - the whole city swings around the camera, exactly like the
-film's flythrough. The translucent monoliths are
+The storage wall from *Hackers*, rebuilt in 3D as a computer city: a lattice
+of tower blocks with streets in both directions, all standing still in true
+world coordinates while the camera flies the streets — gliding straight down
+most blocks and carving a full ninety-degree turn at about every other
+intersection, banking like a patrol car, exactly like the film's
+flythrough. The translucent monoliths are
 always standing, and their faces are covered in glowing cyan listings set in
 neat digital boxes — `STATUS`, `ERROR`, `REPORT`, `Security`, `R606`,
 `>OVERRIDE`, hex and binary — including the hostnames, addresses and domains
 your own traffic has passed by. The streets are wired like a circuit board,
 with energy pulses racing down the copper toward you, and ACCESS GRANTED /
 ACCESS DENIED signs hang on a tower face and pulse. When the wall gets busy
-it scrolls faster.
+it flies faster.
 
 | Event | On the wall |
 |-------|-------------|
@@ -816,7 +818,7 @@ Traffic weather is the load on the wall: **STANDBY**, **PAGING** in a storm and
 The listings, the traces and every tower are generated in code; no textures
 ship with the scene. In F1 → Scene, each event's effect can be turned off,
 **Target lock (threat)** turns the camera lock off, and **Scroll speed** scales
-the drift of the wall.
+the pace of the patrol.
 
 ## Sound
 

@@ -5,18 +5,21 @@ import {
 import type { TextAtlas } from './textatlas';
 
 /**
- * The storage wall: a corridor of translucent monoliths lining the way
- * toward the vanishing point, always standing tall as you fly through them,
- * each face covered in glowing cyan listings from the atlas — words in tidy
- * digital boxes — scrolling up or down, with the edge-lit rim-frame of the
- * movie's perspex towers. Towers drift past and recycle at the far edge.
- * Events flash faces white-cyan, or burn a tower red while it's flagged.
+ * The computer city: a static lattice of tower blocks on a grid, with open
+ * streets running between them on both axes. Nothing here moves through the
+ * world - the camera flies through it. Each tower lives in a block of the
+ * lattice; the blocks themselves wrap around the camera's current block, so
+ * the city is endless in every direction the flight turns toward, and the
+ * streets always line up because everything hangs off the same lattice.
+ * Faces carry the listings atlas, scroll up or down, flash white-cyan on
+ * events, or burn red while a file is flagged.
  */
 
 const SP_X = 2.6;
-const CAM_Z = 7;
-/** the city's block period: corridor + block + corridor, same on both axes */
+/** the city's block period: street + block + street, same on both axes */
 export const CITY_P = 13;
+/** the flight turns on arcs of this radius - it fits inside the street width */
+export const TURN_R = 3;
 
 const VERT = /* glsl */`
   attribute float aSeed;
@@ -75,27 +78,34 @@ const FRAG = /* glsl */`
     col += textC * tx * (1.6 + vFlash * 2.2) * uPulse;
     col += edge * vFlash * 0.12;
     col *= mix(1.0, 0.3, top);
-    // black fog: the far wall dissolves, like the film's storage cavern
+    // black fog: the far blocks dissolve, like the film's storage cavern
     float d = length(vWorld - uCamPos);
     col *= exp(-uFogD * uFogD * d * d);
     gl_FragColor = vec4(col, 1.0);
   }`;
 
 export interface LockPick { x: number; y: number; z: number; index: number; }
-export interface FacePick { x: number; y: number; z: number; side: number; }
+export interface FacePick { x: number; y: number; z: number; nx: number; nz: number; }
 
 export class Towers {
   mesh!: InstancedMesh;
   hull!: InstancedMesh;
   readonly material: ShaderMaterial;
   private n = 0;
-  private x!: Float32Array; private z!: Float32Array; private h!: Float32Array; private hT!: Float32Array;
+  /** fixed lattice slot of each tower, and its offset within the block */
+  private bi!: Int32Array; private bj!: Int32Array;
+  private lx!: Float32Array; private lz!: Float32Array;
+  /** current world position, recomputed from the lattice every frame */
+  private x!: Float32Array; private z!: Float32Array;
+  private h!: Float32Array; private hT!: Float32Array;
   private scroll!: Float32Array; private scrollV!: Float32Array; private flash!: Float32Array; private redT!: Float32Array;
+  private prevB!: Int32Array;
   private aSeed!: InstancedBufferAttribute; private aScroll!: InstancedBufferAttribute;
   private aFlash!: InstancedBufferAttribute; private aRed!: InstancedBufferAttribute; private aH!: InstancedBufferAttribute;
   private m = new Matrix4();
   cols = 0; rows = 0;
-  private xSpan = 1;
+  /** last camera position + heading, kept for the event pickers */
+  private camX = 0; private camZ = 0; private fx = 0; private fz = -1;
 
   constructor(scene: Scene, atlas: TextAtlas) {
     this.material = new ShaderMaterial({
@@ -106,7 +116,7 @@ export class Towers {
         uPitch: { value: 0.75 },
         uFogD: { value: 0.044 },
         uPulse: { value: 1 },
-        uCamPos: { value: new Vector3(0, 5.5, 7) },
+        uCamPos: { value: new Vector3(0, 2.5, 40) },
         uFill: { value: new Color(0x061016) },
         uEdge: { value: new Color(0x9fefff) },
         uText: { value: new Color(0x53e0ff) },
@@ -125,38 +135,37 @@ export class Towers {
   }
 
   /**
-   * Rebuild the city (settings changed): a grid of tower blocks with
-   * corridors between them on both axes - cols block columns across, rows
-   * block rows deep. The flight works its way down a corridor and turns at
-   * the intersections, like the film's computer city.
+   * Rebuild the city (settings changed): a lattice of cols x rows blocks
+   * wrapping around the camera's block, each block a 3x3 grove of towers.
+   * Streets run along the lattice lines; the flight rides the streets.
    */
   build(scene: Scene, cols: number, rows: number): void {
     if (this.mesh) { scene.remove(this.mesh); this.mesh.geometry.dispose(); }
     if (this.hull) scene.remove(this.hull);
     this.cols = cols; this.rows = rows;
-    const half = Math.max(1, cols >> 1);
-    this.xSpan = half * 2 * CITY_P;
-    this.n = half * 2 * rows * 9;
+    const nbi = Math.max(4, cols);
+    const nbj = Math.max(6, rows * 2);
+    this.n = nbi * nbj * 9;
     const geo = new BoxGeometry(1, 1, 1);
+    this.bi = new Int32Array(this.n); this.bj = new Int32Array(this.n);
+    this.lx = new Float32Array(this.n); this.lz = new Float32Array(this.n);
+    this.prevB = new Int32Array(this.n).fill(-99999);
+    let t = 0;
+    for (let bj = 0; bj < nbj; bj++) {
+      for (let bi = 0; bi < nbi; bi++) {
+        for (let slot = 0; slot < 9 && t < this.n; slot++, t++) {
+          this.bi[t] = bi; this.bj[t] = bj;
+          this.lx[t] = ((slot % 3) - 1) * SP_X;
+          this.lz[t] = (((slot / 3) | 0) - 1) * SP_X;
+        }
+      }
+    }
     const f = (fill: number | ((i: number) => number)): Float32Array => {
       const a = new Float32Array(this.n);
       for (let i = 0; i < this.n; i++) a[i] = typeof fill === 'function' ? fill(i) : fill;
       return a;
     };
-    // blocks of 3x3 towers with corridors of open air between block edges;
-    // corridors sit on multiples of CITY_P along both axes, camera rides x=0
-    this.x = f((i) => {
-      const s = (i / 9) | 0, slot = i % 9;
-      const bi = s % half;
-      const side = ((s / half) | 0) % 2 === 0 ? -1 : 1;
-      return side * (bi + 0.5) * CITY_P + ((slot % 3) - 1) * SP_X;
-    });
-    this.z = f((i) => {
-      const s = (i / 9) | 0;
-      const bz = (s / (half * 2)) | 0;
-      const slot = i % 9;
-      return 7 - CITY_P * (bz + 1.5) + (((slot / 3) | 0) - 1) * SP_X;
-    });
+    this.x = f(0); this.z = f(0);
     this.hT = f(() => 3 + Math.random() * 5);
     this.h = f((i) => this.hT[i]);
     this.scroll = f(() => Math.random() * 64);
@@ -183,35 +192,21 @@ export class Towers {
     scene.add(this.hull);
   }
 
-  get span(): number { return this.rows * CITY_P; }
-
-  /**
-   * Swing the whole city by d radians around (px, pz). The camera stays put:
-   * rotating the world around it is the turn. A quarter turn maps the block
-   * lattice onto itself, so the corridor the flight wanted is now ahead.
-   */
-  rotate(d: number, px: number, pz: number): void {
-    const c = Math.cos(d), s = Math.sin(d);
-    for (let i = 0; i < this.n; i++) {
-      const dx = this.x[i] - px, dz = this.z[i] - pz;
-      this.x[i] = px + dx * c - dz * s;
-      this.z[i] = pz + dx * s + dz * c;
-    }
-  }
-
-  /** u ∈ 0..1 picks a column; flashes the nearest tower in it. */
+  /** u ∈ 0..1 picks a lateral column of the view; flashes the nearest tower. */
   pulse(u: number): void { this.nearest(u, (i) => { this.flash[i] = 1; }); }
 
-  /** u ∈ 0..1 picks a column; burns the nearest tower red for `secs`. */
+  /** u ∈ 0..1 picks a lateral column; burns the nearest tower red for `secs`. */
   flag(u: number, secs: number): void { this.nearest(u, (i) => { this.redT[i] = Math.max(this.redT[i], secs); }); }
 
-  /** A file is being written: a far tower in the column nearest u rewrites itself. */
+  /** A file is being written: a far tower in the lateral column nearest u rewrites itself. */
   raise(u: number): void {
-    const xt = (u - 0.5) * this.cols * SP_X;
+    const lat = (u - 0.5) * this.cols * SP_X * 1.6;
     let best = -1, bd = Infinity;
     for (let i = 0; i < this.n; i++) {
-      if (this.z[i] > CAM_Z - this.span * 0.4) continue;
-      const d = Math.abs(this.x[i] - xt) - this.z[i] * 0.02;
+      const ahead = (this.x[i] - this.camX) * this.fx + (this.z[i] - this.camZ) * this.fz;
+      if (ahead < CITY_P * 2 || ahead > this.rows * CITY_P * 0.6) continue;
+      const side = (this.x[i] - this.camX) * -this.fz + (this.z[i] - this.camZ) * this.fx;
+      const d = Math.abs(side - lat) * 2 - ahead * 0.02;
       if (d < bd) { bd = d; best = i; }
     }
     if (best < 0) return;
@@ -220,10 +215,13 @@ export class Towers {
     this.aSeed.setX(best, Math.random());
   }
 
-  /** Pick a mid-depth tower, burn it red, and hand it to the camera to lock. */
+  /** Pick a mid-depth tower ahead, burn it red, and hand it to the camera to lock. */
   pickLock(): LockPick | null {
     const cand: number[] = [];
-    for (let i = 0; i < this.n; i++) if (this.z[i] < CAM_Z - CITY_P * 1.4 && this.z[i] > CAM_Z - this.span * 0.45 && this.redT[i] <= 0) cand.push(i);
+    for (let i = 0; i < this.n; i++) {
+      const ahead = (this.x[i] - this.camX) * this.fx + (this.z[i] - this.camZ) * this.fz;
+      if (ahead > CITY_P * 1.2 && ahead < this.rows * CITY_P * 0.5 && this.redT[i] <= 0) cand.push(i);
+    }
     if (!cand.length) for (let i = 0; i < this.n; i++) if (this.redT[i] <= 0) cand.push(i);
     if (!cand.length) return null;
     const i = cand[(Math.random() * cand.length) | 0];
@@ -231,36 +229,55 @@ export class Towers {
     return { x: this.x[i], y: this.h[i] * 0.6, z: this.z[i], index: i };
   }
 
-  /** Pick a far tower's corridor-facing side for a sign to hang on. */
+  /** Pick a far tower face that looks back down the street, for a sign to hang on. */
   pickFace(): FacePick | null {
     const cand: number[] = [];
-    for (let i = 0; i < this.n; i++) if (this.z[i] < CAM_Z - this.span * 0.4 && this.h[i] > 4) cand.push(i);
+    for (let i = 0; i < this.n; i++) {
+      const ahead = (this.x[i] - this.camX) * this.fx + (this.z[i] - this.camZ) * this.fz;
+      if (ahead > CITY_P * 1.5 && ahead < this.rows * CITY_P * 0.6 && this.h[i] > 4) cand.push(i);
+    }
     if (!cand.length) return null;
     const i = cand[(Math.random() * cand.length) | 0];
-    const side = this.x[i] > 0 ? -1 : 1;
-    return { x: this.x[i] + side * 0.55, y: this.h[i] * (0.5 + Math.random() * 0.3), z: this.z[i], side };
+    // the face turned back toward the flight: whichever axis points at the camera
+    const dx = this.camX - this.x[i], dz = this.camZ - this.z[i];
+    const along = Math.abs(dz * this.fz + dx * this.fx);
+    const across = Math.abs(dz * this.fx - dx * this.fz);
+    let nx = 0, nz = 0;
+    if (Math.abs(dz) > Math.abs(dx)) nz = dz > 0 ? 1 : -1; else nx = dx > 0 ? 1 : -1;
+    void along; void across;
+    return { x: this.x[i] + nx * 0.55, y: this.h[i] * (0.5 + Math.random() * 0.3), z: this.z[i] + nz * 0.55, nx, nz };
   }
 
   redCount(): number { let k = 0; for (let i = 0; i < this.n; i++) if (this.redT[i] > 0) k++; return k; }
+  get count(): number { return this.n; }
 
-  update(dt: number, speed: number, camPos: Vector3): void {
-    const span = this.span;
-    const zHi = CAM_Z + span * 0.5, zLo = CAM_Z - span * 0.5, hw = this.xSpan * 0.5;
+  /**
+   * Recompute every tower from its lattice slot, wrapped around the camera's
+   * block: the towers never move through the world; the camera does. A tower
+   * only changes when it wraps to the far side of the fog, where it re-seeds.
+   */
+  update(dt: number, camX: number, camZ: number, k: number): void {
+    this.camX = camX; this.camZ = camZ;
+    this.fx = k === 1 ? 1 : k === 3 ? -1 : 0;
+    this.fz = k === 0 ? 1 : k === 2 ? -1 : 0;
+    const nbi = Math.max(4, this.cols);
+    const nbj = Math.max(6, this.rows * 2);
+    const cbx = Math.floor(camX / CITY_P);
+    const cbz = Math.floor(camZ / CITY_P);
+    const hbi = nbi >> 1, hbz = nbj >> 1;
     for (let i = 0; i < this.n; i++) {
-      this.z[i] += speed * dt;
-      // the city is a torus around the camera: towers wrap past the far edge
-      // and behind, on both axes, so streets continue whichever way the
-      // flight has turned and the 90-degree swing always lands on a real corner
-      if (this.z[i] > zHi) {
-        this.z[i] -= span;
+      const ri = mod(this.bi[i] - cbx + hbi, nbi) - hbi;
+      const rj = mod(this.bj[i] - cbz + hbz, nbj) - hbz;
+      const b = (cbx + ri) * 73856093 ^ (cbz + rj) * 19349663;
+      if (b !== this.prevB[i]) {
+        // wrapped to a fresh far-side block: a new tower rises there
+        this.prevB[i] = b;
         this.hT[i] = 3 + Math.random() * 5;
         this.h[i] = this.hT[i];
         this.aSeed.setX(i, Math.random());
-      } else if (this.z[i] < zLo) {
-        this.z[i] += span;
       }
-      if (this.x[i] > hw) this.x[i] -= this.xSpan;
-      else if (this.x[i] < -hw) this.x[i] += this.xSpan;
+      this.x[i] = (cbx + ri + 0.5) * CITY_P + this.lx[i];
+      this.z[i] = (cbz + rj + 0.5) * CITY_P + this.lz[i];
       this.scroll[i] += this.scrollV[i] * dt;
       this.flash[i] *= Math.exp(-dt * 2.6);
       if (this.redT[i] > 0) this.redT[i] -= dt;
@@ -277,20 +294,25 @@ export class Towers {
     this.hull.instanceMatrix.needsUpdate = true;
     this.aSeed.needsUpdate = true;
     this.aScroll.needsUpdate = this.aFlash.needsUpdate = this.aRed.needsUpdate = this.aH.needsUpdate = true;
-    this.material.uniforms.uCamPos.value.copy(camPos);
+    this.material.uniforms.uCamPos.value.set(camX, 2.5, camZ);
   }
 
   private nearest(u: number, hit: (i: number) => void): void {
-    const xt = (u - 0.5) * this.cols * SP_X;
+    const lat = (u - 0.5) * this.cols * SP_X * 1.6;
     let best = -1, bd = Infinity;
     for (let i = 0; i < this.n; i++) {
-      if (this.z[i] > CAM_Z || this.z[i] < CAM_Z - this.span * 0.5) continue;
-      const d = Math.abs(this.x[i] - xt) * 2 - this.z[i];
+      const dx = this.x[i] - this.camX, dz = this.z[i] - this.camZ;
+      const ahead = dx * this.fx + dz * this.fz;
+      if (ahead < 2 || ahead > this.rows * CITY_P * 0.55) continue;
+      const side = dx * -this.fz + dz * this.fx;
+      const d = Math.abs(side - lat) * 2 - ahead * 0.02;
       if (d < bd) { bd = d; best = i; }
     }
     if (best >= 0) hit(best);
   }
 }
+
+function mod(a: number, n: number): number { return ((a % n) + n) % n; }
 
 function inst(name: string, arr: Float32Array, geo: BoxGeometry, dyn = false): InstancedBufferAttribute {
   const a = new InstancedBufferAttribute(arr, 1);

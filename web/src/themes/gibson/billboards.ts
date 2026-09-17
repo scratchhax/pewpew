@@ -2,21 +2,20 @@ import { AdditiveBlending, CanvasTexture, Color, Group, Mesh, MeshBasicMaterial,
 
 /**
  * The floating signs of the film: ACCESS GRANTED, ACCESS DENIED, PASSWORD
- * ACCEPTED, a cookie now and then, gliding over the tops of the towers.
- * Each text is drawn once to a cached canvas; signs scroll with the wall.
+ * ACCEPTED, hanging on a tower face that looks back down the street, pulsing
+ * to be read across the cavern. Each text is drawn once to a cached canvas;
+ * signs are nailed to the city at spawn and stay put - the flight sails past
+ * them and culls them once they're behind.
  */
 
-const CAM_Z = 7;
-const SP_Z = 2.4;
+export interface SignFace { x: number; y: number; z: number; nx: number; nz: number; }
 
 export class Billboards {
   private group = new Group();
-  private active: Array<{ mesh: Mesh; z: number; t: number }> = [];
+  private active: Array<{ mesh: Mesh; t: number }> = [];
   private cache = new Map<string, CanvasTexture>();
-  private rows: number;
 
-  constructor(scene: Scene, rows: number) {
-    this.rows = rows;
+  constructor(scene: Scene) {
     scene.add(this.group);
   }
 
@@ -46,8 +45,8 @@ export class Billboards {
     return tex;
   }
 
-  /** Spawn a sign on a far tower face (side facing the corridor); caller rate-limits hard. */
-  spawn(text: string, color = '#dff2ff', face?: { x: number; y: number; z: number; side: number } | null): void {
+  /** Hang a sign on a tower face (normal facing the street); caller rate-limits hard. */
+  spawn(text: string, color = '#dff2ff', face?: SignFace | null): void {
     if (this.active.length > 2) return;
     const tex = this.texture(text, color);
     const aspect = tex.image.width / tex.image.height;
@@ -58,36 +57,24 @@ export class Billboards {
     );
     if (face) {
       mesh.position.set(face.x, face.y, face.z);
-      mesh.rotation.y = face.side * Math.PI / 2;
+      mesh.rotation.y = Math.atan2(face.nx, face.nz);
     } else {
-      mesh.position.set((Math.random() - 0.5) * 14, 9 + Math.random() * 2, -this.rows * SP_Z - 4);
+      mesh.position.set(0, 9, 0);
     }
     this.group.add(mesh);
-    this.active.push({ mesh, z: mesh.position.z, t: Math.random() * 6 });
+    this.active.push({ mesh, t: Math.random() * 6 });
   }
 
-  /** Swing the signs with the city when the flight turns at an intersection. */
-  rotate(d: number, px: number, pz: number): void {
-    const c = Math.cos(d), s = Math.sin(d);
-    for (const b of this.active) {
-      const x = b.mesh.position.x, z = b.z;
-      b.mesh.position.x = px + (x - px) * c - (z - pz) * s;
-      b.z = pz + (x - px) * s + (z - pz) * c;
-      b.mesh.position.z = b.z;
-      b.mesh.rotation.y -= d;
-    }
-  }
-
-  update(dt: number, speed: number): void {
+  /** Keep the pulse; drop signs the flight has passed. */
+  update(dt: number, camX: number, camZ: number, fx: number, fz: number): void {
     for (let i = this.active.length - 1; i >= 0; i--) {
       const b = this.active[i];
-      b.z += speed * dt;
-      b.mesh.position.z = b.z;
-      // a slow breathing pulse so the sign reads across the cavern
       b.t += dt;
+      // a slow breathing pulse so the sign reads across the cavern
       const k = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(b.t * 3.2));
       (b.mesh.material as MeshBasicMaterial).opacity = k;
-      if (b.z > CAM_Z + 1) {
+      const dx = b.mesh.position.x - camX, dz = b.mesh.position.z - camZ;
+      if (dx * fx + dz * fz > 8 || dx * dx + dz * dz > 90 * 90) {
         this.group.remove(b.mesh);
         b.mesh.geometry.dispose();
         (b.mesh.material as MeshBasicMaterial).dispose();
