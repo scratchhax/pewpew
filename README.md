@@ -791,25 +791,27 @@ drift** stops the camera.
 The storage wall from *Hackers*, rebuilt in 3D as a computer city: a lattice
 of tower blocks with streets in both directions, all standing still in true
 world coordinates while the camera flies the streets — gliding straight down
-most blocks and carving a full ninety-degree turn at about every other
-intersection, banking like a patrol car, exactly like the film's
-flythrough. The translucent monoliths are
-always standing, and their faces are covered in glowing cyan listings set in
-neat digital boxes — `STATUS`, `ERROR`, `REPORT`, `Security`, `R606`,
-`>OVERRIDE`, hex and binary — including the hostnames, addresses and domains
-your own traffic has passed by. The streets are wired like a circuit board,
-with energy pulses racing down the copper toward you, and ACCESS GRANTED /
-ACCESS DENIED signs hang on a tower face and pulse. When the wall gets busy
-it flies faster.
+most blocks and carving a long, sweeping ninety-degree arc at about every
+other intersection, banking like a patrol car, rising and falling as it
+goes, exactly like the film's flythrough. The translucent monoliths are
+always standing, and their faces are covered in glowing listings set in
+neat digital boxes — and those listings are your own log stream: the
+addresses, domains, hostnames and services from live traffic, each drawn in
+the color the comms log gives that kind of message (green allow, red block,
+orange threat, blue DNS, yellow DHCP, violet Wi-Fi), with hex and binary
+filling in around them. Long hostnames shrink to fit their box. The streets
+are wired like a circuit board, with energy pulses racing down the copper
+toward you, and ACCESS GRANTED / ACCESS DENIED signs hang on a tower face
+and pulse. When the wall gets busy it flies faster.
 
 | Event | On the wall |
 |-------|-------------|
-| allow | a pulse of light climbs the nearest face |
-| block | a tower burns red for a moment, and an **ACCESS DENIED** sign pulses on a face |
+| allow | a pulse of light climbs the nearest face, and the address joins the listings in green |
+| block | a tower burns red for a moment, an **ACCESS DENIED** sign pulses on a face, and the address joins the listings in red |
 | threat | a tower is flagged red and the camera swings around to lock onto it — reticle, `TRACKING · <attacker>` readout, the wall slows to a crawl, and the file is stamped **INTRUSION TRACED** as the lock releases |
-| dns | the domain joins the listings scrolling down every face |
-| dhcp | one far tower rewrites itself, with the device's hostname in its listings |
-| wifi | a join gets a **PASSWORD ACCEPTED** sign and a bright face pulse; a failure flashes one red |
+| dns | the domain joins the listings scrolling down every face, in blue |
+| dhcp | one far tower rewrites itself, with the device's hostname in its listings in yellow |
+| wifi | a join gets a **PASSWORD ACCEPTED** sign and a bright face pulse, with the access point in violet; a failure flashes one red |
 | system | nothing on the wall; the music hears it |
 
 Traffic weather is the load on the wall: **STANDBY**, **PAGING** in a storm and

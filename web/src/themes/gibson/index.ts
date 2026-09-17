@@ -101,8 +101,8 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
   // street lattice lines. At each intersection it goes straight about half
   // the time, and otherwise carves a quarter arc of radius TURN_R - which
   // fits inside the street width, so the flight can't clip a tower or leave
-  // the city - landing exactly on the crossing street's line. Straights ease
-  // their speed down through a turn; nothing ever stops.
+  // the city - landing exactly on the crossing street's line. The arc is
+  // long and flown at full speed: a sweeping glide, never a pivot.
   let cx = 0, cz = 40;
   let kHead = 2; // down the street x = 0, heading -z
   let decidedFor = -1;
@@ -170,11 +170,12 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
   function event(se: SceneEvent, replay: boolean): void {
     const ev = se.ev;
     const who = ev.src_ip ?? ev.dst_ip ?? null;
-    if (se.kind === 'allow' || se.kind === 'block' || se.kind === 'threat') atlas.addWord(who);
+    if (se.kind === 'allow' || se.kind === 'block' || se.kind === 'threat') atlas.addWord(who, se.kind);
     if (replay) return;
     switch (se.kind) {
       case 'allow': {
         audio.cueSong('allow', who ?? undefined);
+        atlas.addWord(ev.service_name ?? (ev.dst_port ? `:${ev.dst_port}` : null), 'allow');
         if (!settings.gPulses || !throttle.allow(`gb|alw|${ev.src_ip}|${ev.dst_ip}`, 0.4)) break;
         towers.pulse(uOf(who));
         audio.sfx('pulse', { pan: (Math.random() - 0.5) * 1.2 });
@@ -190,7 +191,7 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
       }
       case 'threat': {
         audio.cueSong('threat', who ?? undefined);
-        atlas.addWord(who);
+        atlas.addWord(ev.service_name ?? null, 'threat');
         towers.flag(uOf(who), 8);
         if (settings.gLock && throttle.allow(`gb|thr|${who}`, 12)) startLock(who);
         break;
@@ -198,7 +199,8 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
       case 'dns': {
         audio.cueSong('dns', ev.src_ip ?? undefined);
         if (!settings.gLookups || !ev.dns_query || !throttle.allow(`gb|dns|${ev.dns_query}`, 3)) break;
-        atlas.addWord(ev.dns_query);
+        atlas.addWord(ev.dns_query, 'dns');
+        atlas.addWord(ev.dns_answer ?? null, 'dns');
         towers.pulse(uOf(ev.dns_query));
         break;
       }
@@ -206,7 +208,7 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
         if (!throttle.allow(`gb|dhcp|${ev.syslog_host}|${ev.hostname}`, 2)) break;
         audio.cueSong('dhcp');
         const name = ev.hostname || (ev.mac_address ? `dev-${ev.mac_address.replace(/:/g, '').slice(-4).toUpperCase()}` : ev.src_ip ?? 'device');
-        atlas.addWord(name);
+        atlas.addWord(name, 'dhcp');
         if (settings.gWrites) towers.raise(uOf(name));
         audio.sfx('write', { pan: (Math.random() - 0.5) });
         break;
@@ -216,10 +218,12 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
         audio.cueSong('wifi');
         if (se.wifi === 'joined') {
           audio.sfx('granted');
+          atlas.addWord(ev.syslog_host, 'wifi');
           banner('PASSWORD ACCEPTED', '#dff2ff', 'grant', 70, 50);
           towers.pulse(uOf(ev.mac_address ?? ev.src_ip));
         } else if (se.wifi === 'bad') {
           audio.sfx('denied', { pan: 0.3 });
+          atlas.addWord(ev.mac_address ? `DEV ${ev.mac_address.slice(-5)}` : ev.syslog_host, 'wifi');
           towers.flag(uOf(ev.mac_address), 4);
         }
         break;
@@ -245,10 +249,12 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
     if (lockOn && performance.now() > lockUntil) endLock();
     flyT += dtReal;
     const rate = state.rate30s / 30;
-    const v = (0.9 + Math.min(2.5, rate * 0.06) + heat * 0.9) * settings.gScrollSpeed * (lockOn ? 0.3 : arc ? 0.7 : 1);
+    const v = (0.9 + Math.min(2.5, rate * 0.06) + heat * 0.9) * settings.gScrollSpeed * (lockOn ? 0.3 : 1);
     fly(dtReal, v);
 
-    const camY = lockOn ? 3.0 : 2.4 + Math.sin(flyT * 0.067) * 0.35 + f.wanderY * 0.0004;
+    // the swell: a slow rising and falling through the streets, two periods
+    // so the bob never marches to a metronome
+    const camY = lockOn ? 3.0 : 2.4 + Math.sin(flyT * 0.11) * 0.55 + Math.sin(flyT * 0.043) * 0.35 + f.wanderY * 0.0004;
     if (lockOn) {
       lookWant.copy(lockTarget);
       const sp = lockTarget.clone().project(world.camera);
@@ -265,7 +271,7 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
     world.camera.position.set(cx + f.wanderX * 0.001, camY, cz);
     world.camera.lookAt(look);
     // bank through the arc, easing in and out like a patrol car
-    const rollWant = arc && !lockOn ? -arc.d * Math.sin((arc.p / (Math.PI / 2)) * Math.PI) * 0.07 : 0;
+    const rollWant = arc && !lockOn ? -arc.d * Math.sin((arc.p / (Math.PI / 2)) * Math.PI) * 0.09 : 0;
     roll += (rollWant - roll) * Math.min(1, dtReal * 4);
     if (roll !== 0) world.camera.rotateZ(roll);
 
