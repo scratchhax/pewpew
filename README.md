@@ -21,6 +21,10 @@ your own traffic. Pick a scene per screen:
   translucent monolith blocks lined in glowing cyan, patrolled at street
   level with sweeping ninety-degree corners, until the camera swings around
   to lock onto a red file and trace the intruder
+- **FRAGNET**: your network is *Hell* — a first-person, chunky-pixel patrol of
+  a procedural maze in the classic corridor-shooter mold, where intruders are
+  demons you frag on sight, allowed traffic is ammunition, and five traces
+  grind the exit elevator open for the next level
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -38,6 +42,8 @@ and never touches the network itself.
 | ![aquarium](docs/aquarium.png) | ![aquarium shark](docs/aquarium-shark.png) |
 | **The Gibson** | **The Gibson: target lock** |
 | ![the gibson](docs/gibson.png) | ![gibson target lock](docs/gibson-lock.png) |
+| **FRAGNET** | **FRAGNET: demon fragged** |
+| ![fragnet](docs/fragnet.png) | ![fragnet demon fragged](docs/fragnet-fight.png) |
 
 | Midnight Run | Packet Rush | Last Outpost |
 |---|---|---|
@@ -51,6 +57,7 @@ traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew
 [Mainframe](https://scratchhax.github.io/pewpew/?theme=mainframe) ·
 [Aquarium](https://scratchhax.github.io/pewpew/?theme=aquarium) ·
 [The Gibson](https://scratchhax.github.io/pewpew/?theme=gibson) ·
+[FRAGNET](https://scratchhax.github.io/pewpew/?theme=fragnet) ·
 Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 
 ## Contents
@@ -59,7 +66,7 @@ Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - [Highlights](#highlights)
 - [Setup](#setup): [Relay](#1-start-the-relay) · [Viewer](#2-build-the-viewer) · [UniFi logging](#3-send-unifi-logs-to-the-relay) · [Check it's working](#4-check-its-working) · [`relay.yaml`](#relayrelayyaml)
 - [Using pewpew](#using-pewpew): [Keys](#keys) · [Switching scenes](#switching-scenes) · [Log inspector](#log-inspector) · [Settings](#settings-f1)
-- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson)
+- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [FRAGNET](#fragnet)
 - [Sound](#sound)
 - [Performance and quality](#performance-and-quality)
 - [URL parameters](#url-parameters)
@@ -822,6 +829,45 @@ ship with the scene. In F1 → Scene, each event's effect can be turned off,
 **Target lock (threat)** turns the camera lock off, and **Scroll speed** scales
 the pace of the patrol.
 
+### FRAGNET
+
+![fragnet](docs/fragnet.png)
+
+Your network is Hell. FRAGNET is a love letter to the original corridor
+shooter, rendered in the browser at a chunky 200-odd pixels tall and stretched
+over the screen with nearest filtering — real pixels, depth fog, ceiling lamps
+and all. The camera is the marine's eyes, on an endless first-person patrol of
+a procedurally generated maze of rooms and corridors. Blast doors grind open
+when you walk up to them, secret walls hide on DHCP leases, and the HUD is a
+status bar with your health, ammo, frag count, the level tag and a pixel face
+that goes through its moods. The marine is the network stack with a shotgun,
+and every log line is an action in the corridor:
+
+![fragnet demon fragged](docs/fragnet-fight.png)
+
+| Event | In the maze |
+|-------|-------------|
+| allow | the marine's shotgun cracks and ammo ticks up; occasionally a health vial or ammo crate materialises down the hall for him to walk over |
+| block | a blast door slams shut and seals red somewhere in the maze |
+| threat | a demon tears into the corridor ahead; the marine halts, turns and pumps shots into it until it bursts in a spray of gibs, stamping **FRAGGED** |
+| dns | the domain lights up on a glowing wall plate in a nearby room |
+| dhcp | a secret wall section collapses open with the device's hostname on it |
+| wifi | a join spins a teleporter column up in cyan; a bad auth zaps the maze red |
+| system | a distant thunderclap flashes the corridor white |
+
+The marine takes damage when demons get close or land fireballs — the screen
+pulses red, his face bloodies, and health slowly regenerates. **HELL** weather
+is the load on the wire: **BLOOD MOON** in a storm and **APEX WORSTED** in a
+hurricane, where the fog reddens, the ceiling lamps flicker and demons
+growl in the dark. Trace your **traces per level** (five by default) and the
+exit elevator grinds open: ride it out and the maze rerolls as **E1M2**,
+**E1M3**, deeper into Hell, with a title card on each level.
+
+The maze, the wall and floor textures, the demons, the shotgun and the status
+face are all generated in code; no game assets ship with the scene. In
+F1 → Scene you can turn off each event's effect, hide the weapon, mute the
+gore, and scale the **patrol speed** and **traces per level**.
+
 ## Sound
 
 All sound is synthesized in the browser with the WebAudio API. Browsers only
@@ -1066,6 +1112,30 @@ The wall plays along:
 | system | nothing; the band carries it |
 
 Server hum and static hiss underneath, louder in heavy traffic.
+
+### FRAGNET's soundtrack
+
+Three styles take turns, every 6 minutes by default:
+
+| Style | Sound |
+|-------|-------|
+| Riff city | 150 bpm thrash: galloping low saw, crashy hats, a scream of a lead when the marine is shooting |
+| Machine god | 132 bpm industrial EBM: gated reese stabs, a marching snare |
+| Grave drip | 76 bpm doom crawl: one grinding note, dripping caverns |
+
+The corridor plays along:
+
+| Event | Sound |
+|-------|-------|
+| allow | the style's lead on traffic, and the shotgun crack |
+| block | a blast door grinding shut |
+| threat | a demon's pain growl, then a wet pop and a hit with a chord when it fraggs |
+| dns | a blip in key as the domain lights up on a plate |
+| dhcp | the secret-reveal sting as the wall opens |
+| wifi | a rising teleporter sweep for a join, a zap for a failure |
+| system | a distant thunderclap |
+
+Boiler hum and a low hell rumble underneath, louder in heavy traffic.
 
 ### Background tracks
 
