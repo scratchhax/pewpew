@@ -1,4 +1,4 @@
-import { Color, Mesh, PlaneGeometry, ShaderMaterial, Vector3 } from 'three';
+import { Color, Mesh, PlaneGeometry, ShaderMaterial, Vector2, Vector3 } from 'three';
 
 /**
  * The floor of the storage cavern: a black plane wired like a circuit board
@@ -19,13 +19,18 @@ const VERT = /* glsl */`
 
 const FRAG = /* glsl */`
   precision highp float;
-  uniform float uScroll, uTime, uFogD, uPulse;
+  uniform float uScroll, uTime, uFogD, uPulse, uRot;
+  uniform vec2 uPiv;
   uniform vec3 uColor, uCamPos;
   varying vec3 vWorld;
   float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
   void main() {
-    // pattern coords fixed to the floor: features ride toward the camera
-    vec2 P = vec2(vWorld.x, vWorld.z - uScroll);
+    // the board belongs to the city: pattern coords ride with the ground and
+    // swing around the intersection pivot with it when the flight turns
+    vec2 q = vec2(vWorld.x, vWorld.z) - uPiv;
+    float cr = cos(uRot), sr = sin(uRot);
+    vec2 r = vec2(q.x * cr + q.y * sr, -q.x * sr + q.y * cr);
+    vec2 P = vec2(r.x, r.y - uScroll);
     float w = 0.045;
     float LW = 2.6;
     float SEG = 17.0;
@@ -83,6 +88,8 @@ export class Ground {
         uTime: { value: 0 },
         uFogD: { value: 0.044 },
         uPulse: { value: 1 },
+        uRot: { value: 0 },
+        uPiv: { value: new Vector2(0, 7) },
         uColor: { value: new Color(0x3fd9ff) },
         uCamPos: { value: new Vector3(0, 2.4, 7) },
       },
@@ -94,6 +101,11 @@ export class Ground {
     this.mesh.rotation.x = -Math.PI / 2;
     this.mesh.position.set(0, 0, -45 + 7);
     scene.add(this.mesh);
+  }
+
+  /** Swing the board with the city during a turn (cumulative radians). */
+  setRot(r: number): void {
+    this.material.uniforms.uRot.value = r;
   }
 
   /** speed: wall scroll units/sec; pulse: music glow; fog: distance fade. */
