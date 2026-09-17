@@ -18,8 +18,10 @@ import type { TextAtlas } from './textatlas';
 const SP_X = 2.6;
 /** the city's block period: street + block + street, same on both axes */
 export const CITY_P = 13;
-/** the flight turns on arcs of this radius - it fits inside the street width */
-export const TURN_R = 3;
+/** the flight turns on long arcs of this radius - a sweeping corner, and it
+ *  still fits in the street: the arc dips only r(√2-1) ≈ 2.7 toward a corner
+ *  while tower faces stand 3.4 out */
+export const TURN_R = 6.5;
 
 const VERT = /* glsl */`
   attribute float aSeed;
@@ -42,7 +44,7 @@ const FRAG = /* glsl */`
   precision highp float;
   uniform sampler2D uAtlas;
   uniform float uCols, uRows, uPitch, uFogD, uPulse;
-  uniform vec3 uCamPos, uFill, uEdge, uText, uRed, uTextRed;
+  uniform vec3 uCamPos, uFill, uEdge, uRed, uTextRed;
   varying vec3 vLocal, vWorld, vN;
   varying float vSeed, vScroll, vFlash, vRed, vH;
   float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -68,11 +70,13 @@ const FRAG = /* glsl */`
     float cx = floor(mod(hs * 997.0, uCols));
     float cy = floor(mod(hs * 39187.0, uRows));
     vec2 tuv = vec2((cx + 0.04 + u * 0.92) / uCols, (cy + 0.05 + f * 0.9) / uRows);
+    // the word keeps the atlas color: the comms log's own palette, so the
+    // wall says allow/block/DNS in the same colors the log does
     vec3 tcol = texture2D(uAtlas, tuv).rgb;
     float tx = max(tcol.r, max(tcol.g, tcol.b)) * (1.0 - top);
     vec3 fill = mix(uFill, uRed * 0.22, vRed);
     vec3 edge = mix(uEdge, uRed, vRed);
-    vec3 textC = mix(uText, uTextRed, vRed);
+    vec3 textC = mix(tcol * 1.15, uTextRed, vRed);
     vec3 col = fill * 0.35;
     col += edge * frame * (0.5 + vFlash * 2.6);
     col += textC * tx * (1.6 + vFlash * 2.2) * uPulse;
@@ -119,7 +123,6 @@ export class Towers {
         uCamPos: { value: new Vector3(0, 2.5, 40) },
         uFill: { value: new Color(0x061016) },
         uEdge: { value: new Color(0x9fefff) },
-        uText: { value: new Color(0x53e0ff) },
         uRed: { value: new Color(0xff2e2e) },
         uTextRed: { value: new Color(0xffb8b8) },
       },

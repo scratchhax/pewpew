@@ -1,17 +1,16 @@
 import { CanvasTexture, NearestFilter, SRGBColorSpace } from 'three';
 
 /**
- * The listings on the tower faces, like the film's cyberspace: glowing cyan
- * words — STATUS, ERROR, REPORT, Security, R606, >OVERRIDE — each set inside
- * a thin digital box, with dim hex/binary log lines underneath, covering the
- * faces and scrolling slowly up or down. Words seen in live traffic
- * (hostnames, DNS queries, addresses) join the pool, so the wall quietly
- * fills with your own network. The whole atlas redraws every few seconds;
- * towers pick cells with per-face hashes, so no two faces match.
- *
- * The atlas is a grid of cells sized to match one line-strip on a tower face
- * (1 world unit wide : uPitch tall), so glyphs keep their aspect and read as
- * words in boxes, not stripes.
+ * The listings on the tower faces, like the film's cyberspace: glowing words
+ * set in thin digital boxes, scrolling slowly up or down the faces. The words
+ * are the network's own log stream - the addresses, domains, hostnames,
+ * services and devices from live traffic - each drawn in the color the comms
+ * log gives that kind of message: green allow, red block, orange threat,
+ * blue DNS, yellow DHCP, violet Wi-Fi. Long words shrink to fit their box,
+ * so a whole hostname reads on one line. Until the stream has filled the
+ * pool, a quiet hum of generic wall-words keeps the faces busy; the real log
+ * takes over from there. The atlas repaints a few cells at a time, so new
+ * words trickle in while the towers keep scrolling.
  */
 
 const COLS = 8;
@@ -19,18 +18,23 @@ const ROWS = 6;
 const CW = 128;
 const CH = 96;
 
-const TOKENS = [
-  'STATUS', 'REPORT', 'ERROR', 'Security', 'COMFRO', 'CONFOR', 'CEPORS',
-  'IDLEGRO', 'IDEEIBD', 'CH57', '7P57', 'R606', 'SARE', '4S67', '3816',
-  '4567', 'CH5T', '>OVERRIDE', '>DUMPSEG', '>VMERASE', 'log', 'mov', 'nop',
-  'QUE', 'PASSWORD', '11010011', '01101010', '10110x011', '0x1F8A', '20fx89c',
-  '5563', '1286', '35563', 'GARBAGE', 'GOD', 'ACCEPTED', '>>> ',
+/** the comms log's own palette (styles.css), so wall and log agree */
+export type WordKind = 'allow' | 'block' | 'threat' | 'dns' | 'dhcp' | 'wifi' | 'system';
+const KIND_COLOR: Record<WordKind, string> = {
+  allow: '#5ce6a4', block: '#ff6b6b', threat: '#ff9a45', dns: '#55b5ff',
+  dhcp: '#ffd84d', wifi: '#c08cff', system: '#7d99b3',
+};
+
+const AMBIENT: Array<[string, string]> = [
+  ['STATUS', '#5fe6ff'], ['REPORT', '#5fe6ff'], ['SECURITY', '#5fe6ff'],
+  ['R606', '#5fe6ff'], ['>OVERRIDE', '#9fefff'], ['>DUMPSEG', '#9fefff'],
+  ['LOG', '#5fe6ff'], ['NOP', '#5fe6ff'], ['QUE', '#5fe6ff'],
+  ['PASSWORD', '#dff2ff'], ['ACCEPTED', '#dff2ff'], ['GOD', '#e8fbff'],
+  ['01101010', '#3fa8c8'], ['0x1F8A', '#3fa8c8'], ['1286', '#3fa8c8'],
+  ['35563', '#3fa8c8'], ['SEG 77 OK', '#3fa8c8'], ['CRC 12K', '#3fa8c8'],
 ];
 
-const SUBS = [
-  '0x0F4A SEG OK', '10110 01101', '01101 00110', 'CRC FAIL 12K',
-  'SYS::LOG 771', 'MEM DUMP 64K', 'IO 0x3C RDY', 'PING 12MS', 'SEG 77 OK',
-];
+interface Word { t: string; c: string }
 
 export class TextAtlas {
   readonly texture: CanvasTexture;
@@ -38,7 +42,8 @@ export class TextAtlas {
   readonly rows = ROWS;
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private words: string[] = [];
+  private words: Word[] = [];
+  private seen = new Set<string>();
 
   constructor() {
     this.canvas = document.createElement('canvas');
@@ -53,14 +58,20 @@ export class TextAtlas {
     this.rebuild();
   }
 
-  /** A word from live traffic joins the listings. */
-  addWord(s: string | null | undefined): void {
+  /** A piece of the log stream joins the listings, in its log color. */
+  addWord(s: string | null | undefined, kind: WordKind = 'system'): void {
     if (!s) return;
-    const w = s.toUpperCase().replace(/\s+/g, ' ').slice(0, 14);
-    if (!w) return;
-    this.words.push(w);
-    if (this.words.length > 400) this.words.splice(0, 200);
+    const w = s.toUpperCase().replace(/[^0-9A-Z._:@-]+/g, ' ').trim().replace(/\s+/g, ' ').slice(0, 14);
+    if (!w || this.seen.has(w)) return;
+    this.seen.add(w);
+    this.words.push({ t: w, c: KIND_COLOR[kind] ?? '#5fe6ff' });
+    if (this.words.length > 400) {
+      const dropped = this.words.splice(0, 200);
+      for (const d of dropped) this.seen.delete(d.t);
+    }
   }
+
+  get streamSize(): number { return this.words.length; }
 
   private first = true;
 
@@ -79,34 +90,70 @@ export class TextAtlas {
     this.texture.needsUpdate = true;
   }
 
+  /** Prefer the live log once it has a decent pool; ambient hum before and between. */
+  private pick(): Word {
+    if (this.words.length >= 30 && Math.random() < 0.85) {
+      return this.words[(Math.random() * this.words.length) | 0];
+    }
+    if (this.words.length && Math.random() < 0.4) {
+      return this.words[(Math.random() * this.words.length) | 0];
+    }
+    const [t, c] = AMBIENT[(Math.random() * AMBIENT.length) | 0];
+    return { t, c };
+  }
+
   private drawCell(col: number, row: number): void {
     const c = this.ctx;
     const x = col * CW, y = row * CH;
     c.fillStyle = '#000';
     c.fillRect(x, y, CW, CH);
-    const pick = (): string =>
-      this.words.length && Math.random() < 0.34
-        ? this.words[(Math.random() * this.words.length) | 0]
-        : TOKENS[(Math.random() * TOKENS.length) | 0];
-    const box = (word: string, by: number): void => {
-      const size = word.length > 11 ? 15 : word.length > 8 ? 19 : 24;
-      c.font = `bold ${size}px "Courier New", monospace`;
-      const bw = c.measureText(word).width + 12;
-      if (bw > CW - 10) return;
-      const bh = size + 8;
-      const bx = x + 4 + Math.random() * (CW - 8 - bw);
-      c.strokeStyle = 'rgba(52, 200, 255, 0.4)';
-      c.lineWidth = 2;
-      c.strokeRect(bx, by, bw, bh);
-      c.fillStyle = word === 'GARBAGE' || word === 'GOD' ? '#e8fbff' : '#5fe6ff';
-      c.fillText(word, bx + 6, by + bh - 6);
-    };
-    box(pick(), y + 3 + Math.random() * 8);
-    if (Math.random() < 0.85) box(pick(), y + 38 + Math.random() * 8);
+    this.box(this.pick(), x, y + 3 + Math.random() * 8);
+    if (Math.random() < 0.85) this.box(this.pick(), x, y + 38 + Math.random() * 8);
     if (Math.random() < 0.8) {
+      // the small print: another line of the stream, dimmed
+      const w = this.pick();
       c.font = `bold 15px "Courier New", monospace`;
-      c.fillStyle = 'rgba(40, 165, 205, 0.7)';
-      c.fillText(SUBS[(Math.random() * SUBS.length) | 0], x + 7, y + CH - 8);
+      c.fillStyle = rgba(w.c, 0.5);
+      c.fillText(w.t, x + 7, y + CH - 8);
     }
   }
+
+  /** A word in a thin digital box, in its log color, shrunk to fit the cell. */
+  private box(w: Word, x: number, by: number): void {
+    const c = this.ctx;
+    const base = w.t.length > 11 ? 15 : w.t.length > 8 ? 19 : 24;
+    c.font = `bold ${base}px "Courier New", monospace`;
+    // long hostnames and domains shrink until they fit their box; nothing
+    // gets skipped, the wall is meant to read like a real log
+    let text = w.t;
+    let size = base;
+    for (;;) {
+      const mw = c.measureText(text).width;
+      if (mw <= CW - 16) break;
+      const shrink = Math.floor(size * (CW - 16) / mw);
+      if (shrink >= 11 && shrink < size) {
+        size = shrink;
+        c.font = `bold ${size}px "Courier New", monospace`;
+        continue;
+      }
+      text = text.slice(0, Math.max(2, text.length - 2));
+      if (text.length <= 2) return;
+    }
+    const bw = c.measureText(text).width + 12;
+    const bh = size + 8;
+    const bx = x + 4 + Math.random() * Math.max(0, CW - 8 - bw);
+    c.strokeStyle = rgba(w.c, 0.4);
+    c.lineWidth = 2;
+    c.strokeRect(bx, by, bw, bh);
+    c.shadowColor = w.c;
+    c.shadowBlur = 4;
+    c.fillStyle = w.c;
+    c.fillText(text, bx + 6, by + bh - 6);
+    c.shadowBlur = 0;
+  }
+}
+
+function rgba(hex: string, a: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
 }
