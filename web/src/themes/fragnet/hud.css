@@ -1,0 +1,114 @@
+/* FRAGNET: a corridor out of the old shooter - soot-black panels with rust
+   bevels, red LED digits, and a proper status bar along the bottom with the
+   marine's face in the middle. Loaded only with the fragnet theme. */
+body[data-theme="fragnet"] { background: #070302; }
+body[data-theme="fragnet"] #hud {
+  color: #ffd9a8;
+  font-family: 'Cascadia Mono', Consolas, 'Courier New', monospace;
+}
+body[data-theme="fragnet"] .panel {
+  position: relative;
+  padding: 9px 13px 11px;
+  clip-path: none;
+  filter: none;
+  border: 2px solid #6e4a2f;
+  border-radius: 0;
+  background: linear-gradient(180deg, rgba(16, 8, 4, 0.92), rgba(8, 4, 2, 0.88));
+  box-shadow: inset 0 0 0 1px #241209, inset 0 0 22px rgba(120, 40, 10, 0.2), 0 0 14px rgba(0, 0, 0, 0.6);
+}
+body[data-theme="fragnet"] .panel-head {
+  font-size: 9px; letter-spacing: 4px; color: #ff8b4a;
+  border-bottom: 1px solid rgba(160, 80, 30, 0.4);
+  padding-bottom: 5px; margin-bottom: 8px;
+  text-shadow: 0 0 8px rgba(255, 110, 40, 0.5);
+}
+body[data-theme="fragnet"] .corner { border-color: rgba(200, 100, 40, 0.55); filter: none; }
+body[data-theme="fragnet"] #weather { color: #ff6a2a; text-shadow: 0 0 8px rgba(255, 106, 42, 0.5); }
+
+body[data-theme="fragnet"] .bar {
+  height: 10px; clip-path: none;
+  background: rgba(20, 8, 4, 0.9);
+  border: 1px solid rgba(160, 80, 30, 0.35);
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.7);
+}
+body[data-theme="fragnet"] #threat-fill { background: linear-gradient(90deg, #ffb14a, #d8281c); background-size: auto; }
+body[data-theme="fragnet"] #energy-fill { background: linear-gradient(90deg, #7a5a2f, #ffd27a); background-size: auto; }
+body[data-theme="fragnet"] .bar-label { width: 52px; }
+
+body[data-theme="fragnet"] .stat-row { letter-spacing: 1.5px; border-bottom: 1px dotted rgba(160, 90, 40, 0.22); }
+body[data-theme="fragnet"] .stat-row:last-child { border-bottom: none; }
+body[data-theme="fragnet"] .stat-row b { color: #ffe7c4; }
+body[data-theme="fragnet"] .mw-row { color: #ff8f6f; }
+body[data-theme="fragnet"] .mw-bar { background: rgba(50, 10, 6, 0.55); }
+
+body[data-theme="fragnet"] #spec,
+body[data-theme="fragnet"] #scope { background: rgba(10, 5, 3, 0.75); border: 1px solid rgba(160, 80, 30, 0.25); }
+body[data-theme="fragnet"] #radar { background: rgba(10, 5, 3, 0.65); border: 1px solid rgba(160, 80, 30, 0.35); border-radius: 0; }
+body[data-theme="fragnet"] #rate { color: #ff8b4a; }
+
+body[data-theme="fragnet"] #terminal { font-size: 11px; }
+body[data-theme="fragnet"] #terminal-body div { text-shadow: 0 0 6px rgba(200, 70, 20, 0.35); }
+
+body[data-theme="fragnet"] #settings {
+  background: linear-gradient(180deg, rgba(12, 6, 3, 0.97), rgba(6, 3, 1, 0.97));
+  clip-path: none; border-radius: 0;
+  border: 2px solid #6e4a2f; filter: none; color: #ffe7c4;
+}
+body[data-theme="fragnet"] .set-tab { color: #ffd9a8; background: rgba(50, 24, 10, 0.6); border-color: rgba(160, 80, 30, 0.3); }
+body[data-theme="fragnet"] .set-tab.active { color: #140602; background: var(--accent); }
+
+/* ── the status bar and the big stamps ─────────────────────────────────── */
+#frg-overlay { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
+
+#frg-overlay .frg-bar {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+  display: flex; align-items: stretch; gap: 2px;
+  padding: 3px;
+  background: linear-gradient(180deg, #8a7c66, #55493a 30%, #3a3227);
+  border: 2px solid #241a10;
+  box-shadow: 0 0 0 1px #9c8c72 inset, 0 4px 22px rgba(0, 0, 0, 0.8);
+}
+#frg-overlay .frg-pad {
+  min-width: 74px; padding: 6px 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: #140b06;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.9);
+}
+#frg-overlay .frg-cap { font-size: 9px; letter-spacing: 3px; color: #9c8c72; }
+#frg-overlay .frg-pad b {
+  font-size: 30px; line-height: 1.05; color: #ff2a1f;
+  text-shadow: 0 0 10px rgba(255, 60, 30, 0.75), 0 0 2px rgba(255, 160, 120, 0.9);
+}
+#frg-overlay .frg-pad i { font-style: normal; font-size: 11px; color: #b04a30; }
+#frg-overlay .frg-lvl { justify-content: center; font-size: 15px; letter-spacing: 2px; color: #ffd27a; text-shadow: 0 0 8px rgba(255, 150, 60, 0.6); }
+#frg-overlay .frg-face {
+  background: #000; padding: 4px;
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 1);
+}
+#frg-overlay .frg-face canvas { width: 52px; height: 52px; image-rendering: pixelated; display: block; }
+
+#frg-overlay .frg-title {
+  position: absolute; left: 0; right: 0; top: 22%;
+  text-align: center; font-size: clamp(22px, 3.4vw, 44px); letter-spacing: 12px;
+  color: #ff8b4a; text-shadow: 0 0 18px rgba(255, 90, 30, 0.8), 0 3px 0 #2a0d04;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.55) 18%, rgba(0, 0, 0, 0.55) 82%, transparent);
+  padding: 18px 0; opacity: 0; transition: opacity 0.5s ease;
+}
+#frg-overlay .frg-title.on { opacity: 1; }
+
+#frg-overlay .frg-stamp {
+  position: absolute; left: 50%; top: 38%;
+  transform: translate(-50%, -50%) rotate(-6deg) scale(1.5);
+  font-size: clamp(30px, 5vw, 64px); font-weight: bold; font-style: italic; letter-spacing: 10px;
+  color: #ffb14a; text-shadow: 0 0 24px rgba(255, 80, 20, 0.9), 0 0 4px #fff0c0, 0 4px 0 rgba(60, 10, 0, 0.9);
+  border: 4px solid rgba(255, 120, 40, 0.8); padding: 8px 26px;
+  opacity: 0; transition: opacity 0.18s ease, transform 0.18s ease;
+}
+#frg-overlay .frg-stamp.on { opacity: 1; transform: translate(-50%, -50%) rotate(-6deg) scale(1); }
+
+#frg-overlay .frg-hurt {
+  position: absolute; inset: 0; opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(180, 16, 10, 0.55) 100%);
+}
+#frg-overlay .frg-flash { position: absolute; inset: 0; background: #fff4e0; opacity: 0; }
+#frg-overlay .frg-wipe { position: absolute; inset: 0; background: #000; opacity: 0; }
