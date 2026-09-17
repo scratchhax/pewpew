@@ -95,6 +95,7 @@ export class Towers {
   private aFlash!: InstancedBufferAttribute; private aRed!: InstancedBufferAttribute; private aH!: InstancedBufferAttribute;
   private m = new Matrix4();
   cols = 0; rows = 0;
+  private xSpan = 1;
 
   constructor(scene: Scene, atlas: TextAtlas) {
     this.material = new ShaderMaterial({
@@ -134,6 +135,7 @@ export class Towers {
     if (this.hull) scene.remove(this.hull);
     this.cols = cols; this.rows = rows;
     const half = Math.max(1, cols >> 1);
+    this.xSpan = half * 2 * CITY_P;
     this.n = half * 2 * rows * 9;
     const geo = new BoxGeometry(1, 1, 1);
     const f = (fill: number | ((i: number) => number)): Float32Array => {
@@ -208,7 +210,7 @@ export class Towers {
     const xt = (u - 0.5) * this.cols * SP_X;
     let best = -1, bd = Infinity;
     for (let i = 0; i < this.n; i++) {
-      if (this.z[i] > -this.span * 0.45) continue;
+      if (this.z[i] > CAM_Z - this.span * 0.4) continue;
       const d = Math.abs(this.x[i] - xt) - this.z[i] * 0.02;
       if (d < bd) { bd = d; best = i; }
     }
@@ -221,7 +223,7 @@ export class Towers {
   /** Pick a mid-depth tower, burn it red, and hand it to the camera to lock. */
   pickLock(): LockPick | null {
     const cand: number[] = [];
-    for (let i = 0; i < this.n; i++) if (this.z[i] < -this.span * 0.35 && this.z[i] > -this.span * 0.8 && this.redT[i] <= 0) cand.push(i);
+    for (let i = 0; i < this.n; i++) if (this.z[i] < CAM_Z - CITY_P * 1.4 && this.z[i] > CAM_Z - this.span * 0.45 && this.redT[i] <= 0) cand.push(i);
     if (!cand.length) for (let i = 0; i < this.n; i++) if (this.redT[i] <= 0) cand.push(i);
     if (!cand.length) return null;
     const i = cand[(Math.random() * cand.length) | 0];
@@ -232,7 +234,7 @@ export class Towers {
   /** Pick a far tower's corridor-facing side for a sign to hang on. */
   pickFace(): FacePick | null {
     const cand: number[] = [];
-    for (let i = 0; i < this.n; i++) if (this.z[i] < -this.span * 0.4 && this.h[i] > 4) cand.push(i);
+    for (let i = 0; i < this.n; i++) if (this.z[i] < CAM_Z - this.span * 0.4 && this.h[i] > 4) cand.push(i);
     if (!cand.length) return null;
     const i = cand[(Math.random() * cand.length) | 0];
     const side = this.x[i] > 0 ? -1 : 1;
@@ -243,14 +245,22 @@ export class Towers {
 
   update(dt: number, speed: number, camPos: Vector3): void {
     const span = this.span;
+    const zHi = CAM_Z + span * 0.5, zLo = CAM_Z - span * 0.5, hw = this.xSpan * 0.5;
     for (let i = 0; i < this.n; i++) {
       this.z[i] += speed * dt;
-      if (this.z[i] > CAM_Z + 2) {
+      // the city is a torus around the camera: towers wrap past the far edge
+      // and behind, on both axes, so streets continue whichever way the
+      // flight has turned and the 90-degree swing always lands on a real corner
+      if (this.z[i] > zHi) {
         this.z[i] -= span;
         this.hT[i] = 3 + Math.random() * 5;
         this.h[i] = this.hT[i];
         this.aSeed.setX(i, Math.random());
+      } else if (this.z[i] < zLo) {
+        this.z[i] += span;
       }
+      if (this.x[i] > hw) this.x[i] -= this.xSpan;
+      else if (this.x[i] < -hw) this.x[i] += this.xSpan;
       this.scroll[i] += this.scrollV[i] * dt;
       this.flash[i] *= Math.exp(-dt * 2.6);
       if (this.redT[i] > 0) this.redT[i] -= dt;
@@ -274,7 +284,7 @@ export class Towers {
     const xt = (u - 0.5) * this.cols * SP_X;
     let best = -1, bd = Infinity;
     for (let i = 0; i < this.n; i++) {
-      if (this.z[i] > CAM_Z || this.z[i] < -this.span) continue;
+      if (this.z[i] > CAM_Z || this.z[i] < CAM_Z - this.span * 0.5) continue;
       const d = Math.abs(this.x[i] - xt) * 2 - this.z[i];
       if (d < bd) { bd = d; best = i; }
     }
