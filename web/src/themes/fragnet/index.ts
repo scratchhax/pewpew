@@ -1,27 +1,28 @@
 import { Groove } from '../../sound/groove';
-import type { FogExp2 } from 'three';
 import type { SceneEvent } from '../../events';
 import type { RendererInit, Theme, ThemeHost, ThemeInstance, FrameInfo } from '../../theme';
 import { FRAGNET_BUDGETS, FRAGNET_CONTROLS, FRAGNET_DEFAULTS, FRAGNET_HUD } from './settings';
 import { fragnetScore } from './score';
-import { createWorld } from './world';
-import { Walls } from './walls';
+import { SoftRenderer } from './raycast';
 import { Actors, type Demon } from './sprites';
-import { Gun } from './gun';
+import { Gun2D } from './gun';
+import { Wad, extractTable, packToTable, type PackJSON, type TexTable } from './wad';
+import { buildFallbackTable, sprGlow, canvasToRgba } from './art';
 import { CS, EYE, genLevel, findPath, cellsNear, isFloor, type Level } from './levelgen';
 import { drawFace } from './art';
 import './hud.css';
 
 /**
  * FRAGNET: your network is Hell. A first-person patrol through a
- * procedural maze in the classic corridor-shooter look - chunky pixels,
- * blast doors, ceiling lamps, imps. The marine is the network stack with
- * a shotgun: allowed traffic fires his gun and feeds his ammo, an IDS
- * threat tears a demon into the corridor and he frags it on the spot
- * (FRAGGED), blocks slam blast doors red, DHCP opens a secret wall with
- * the device's name on it, DNS domains light up on plates, and Wi-Fi
- * joins spin teleporters up. Five traces and the exit elevator opens:
- * E1M2, E1M3, deeper into the maze.
+ * procedural maze in the classic corridor-shooter look - the corridors are
+ * cast column by column out of a WAD's textures and colour maps, the
+ * marine's shotgun kicks at the bottom of the screen, and imps lean round
+ * corners. The marine is the network stack with a shotgun: allowed traffic
+ * fires his gun and feeds his ammo, an IDS threat tears a demon into the
+ * corridor and he frags it on the spot (FRAGGED), blocks slam blast doors
+ * red, DHCP opens a secret wall with the device's name on it, DNS domains
+ * light up on plates, and Wi-Fi joins spin teleporters up. Five traces and
+ * the exit elevator opens: E1M2, E1M3, deeper into the maze.
  */
 export const fragnet: Theme<typeof FRAGNET_DEFAULTS> = {
   id: 'fragnet',
@@ -38,10 +39,51 @@ export default fragnet;
 
 async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererInit): Promise<ThemeInstance> {
   const { settings, state, throttle, audio } = host;
-  const world = createWorld(host.mount, init.powerPref === 'default' ? undefined : init.powerPref, init.resolution, settings.dPixRes);
-  const walls = new Walls();
-  const gun = new Gun(world.gunScene);
-  const actors = new Actors(world.scene, { onDamage, onPickup });
+
+  // ── the art source: uploaded WAD > bundled Freedoom pack > procedural ──
+  const canvas = document.createElement('canvas');
+  host.mount.appendChild(canvas);
+  const renderer = new SoftRenderer(canvas);
+  const actors = new Actors({ onDamage, onPickup, onAggro });
+  const gun = new Gun2D();
+  let artSource = 'code';
+
+  function applyTable(table: TexTable): void {
+    renderer.setTable(table);
+    actors.load(table);
+    gun.load(table.sprites.gun ?? null, table.palette);
+  }
+
+  async function loadArt(): Promise<void> {
+    try {
+      const r = await fetch('/api/wads', { cache: 'no-store' });
+      if (r.ok) {
+        const info = await r.json() as { active?: string | null };
+        if (info.active) {
+          const w = await fetch(`/wads/${encodeURIComponent(info.active)}`);
+          if (w.ok) {
+            const table = extractTable(new Wad(await w.arrayBuffer()));
+            applyTable(table);
+            artSource = info.active;
+            if (wadStatus) wadStatus.textContent = info.active;
+            return;
+          }
+        }
+      }
+    } catch { /* relay not there (static demo): try the pack */ }
+    try {
+      const r = await fetch('pack.json', { cache: 'no-store' });
+      if (r.ok) {
+        applyTable(packToTable(await r.json() as PackJSON));
+        artSource = 'freedoom';
+        if (wadStatus) wadStatus.textContent = 'freedoom';
+        return;
+      }
+    } catch { /* no pack either: last resort */ }
+    applyTable(buildFallbackTable());
+    artSource = 'code';
+    if (wadStatus) wadStatus.textContent = 'drawn in code';
+  }
 
   // ── DOM: status bar, stamps, wipes ──
   const overlay = document.createElement('div');
@@ -50,6 +92,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     <div class="frg-hurt"></div><div class="frg-flash"></div><div class="frg-wipe"></div>
     <div class="frg-title">E1M1: YOUR NETWORK</div>
     <div class="frg-stamp">FRAGGED</div>
+    <div class="frg-wad"><label><input type="file" accept=".wad">WAD art</label><span>loading…</span></div>
     <div class="frg-bar">
       <div class="frg-pad"><span class="frg-cap">HEALTH</span><b class="frg-health">100</b><i>%</i></div>
       <div class="frg-face"><canvas width="32" height="32"></canvas></div>
@@ -62,12 +105,42 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
   const hurtEl = el('.frg-hurt'), flashEl = el('.frg-flash'), wipeEl = el('.frg-wipe');
   const titleEl = el('.frg-title'), stampEl = el('.frg-stamp');
   const healthEl = el('.frg-health'), ammoEl = el('.frg-ammo'), fragsEl = el('.frg-frags'), lvlEl = el('.frg-lvl');
-  const faceCvs = overlay.querySelector('canvas') as HTMLCanvasElement;
+  const faceCvs = overlay.querySelector('.frg-face canvas') as HTMLCanvasElement;
+  const wadStatus = overlay.querySelector('.frg-wad span') as HTMLElement;
+  const wadInput = overlay.querySelector('.frg-wad input') as HTMLInputElement;
   let faceMood = -1;
+
+  wadInput.addEventListener('change', async () => {
+    const file = wadInput.files?.[0];
+    if (!file) return;
+    wadStatus.textContent = 'uploading…';
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const up = await fetch('/api/wads', { method: 'POST', body });
+      if (!up.ok) throw new Error(`relay said ${up.status}`);
+      const { name } = await up.json() as { name: string };
+      await fetch('/api/wads-active', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) });
+      wadStatus.textContent = 'swapping…';
+      const w = await fetch(`/wads/${encodeURIComponent(name)}`);
+      const table = extractTable(new Wad(await w.arrayBuffer()));
+      applyTable(table);
+      artSource = name;
+      wadStatus.textContent = name;
+    } catch (err) {
+      wadStatus.textContent = 'upload failed';
+      void err;
+    }
+  });
+  void loadArt();
+
+  // lamp and exit glows, built once
+  const lampGlow = canvasToRgba(sprGlow('#ffcf9a', 32));
+  const exitGlow = canvasToRgba(sprGlow('#ffd27a', 32));
 
   // ── the world and the marine ──
   let level: Level = genLevel(settings.dMapSize);
-  walls.build(world.scene, level);
+  renderer.setLevel(level);
   let camX = 0, camZ = 0, heading = 0;
   let health = 100, ammo = 23, frags = 0, fragsLevel = 0, levelNo = 1;
   let lastWord = 'YOUR NETWORK';
@@ -76,9 +149,18 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
   let path: Array<[number, number]> | null = null, pathI = 0;
   let lookT = 0, lookBase = 0;
   let engage: Demon | null = null, fireT = 0, engageT = 0;
-  let exitT = 0;
-  let bobPhase = 0, hurt = 0, flash = 0, faceHurtT = 0;
+  let exitT = 0, exitShown = false;
+  let bobPhase = 0, hurt = 0, flash = 0, muzzle = 0, faceHurtT = 0;
   let growlT = 3;
+
+  function seedDemons(): void {
+    const near = cellsNear(level, level.spawn[0], level.spawn[1], 5, 9);
+    for (let k = 0; k < Math.min(3, near.length); k++) {
+      const [x, y] = near[(Math.random() * near.length) | 0];
+      actors.spawnDemon(x * CS + CS / 2, y * CS + CS / 2, false);
+    }
+  }
+  seedDemons();
 
   function placeAtSpawn(): void {
     camX = level.spawn[0] * CS + CS / 2;
@@ -99,10 +181,11 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
   function nextLevel(): void {
     levelNo++;
     level = genLevel(settings.dMapSize);
-    walls.build(world.scene, level);
+    renderer.setLevel(level);
     actors.clear();
+    seedDemons();
     placeAtSpawn();
-    fragsLevel = 0;
+    fragsLevel = 0; exitShown = false;
     showTitle();
   }
 
@@ -113,19 +196,23 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     faceHurtT = 1.1;
     if (throttle.allow('fr|claw', 0.45)) audio.sfx('claw');
   }
-  function onPickup(kind: 'vial' | 'crate'): void {
-    if (kind === 'vial') health = Math.min(100, health + 25);
+  function onPickup(kind: 'health' | 'ammo'): void {
+    if (kind === 'health') health = Math.min(100, health + 25);
     else ammo += 8;
     audio.sfx('pickup');
+  }
+  function onAggro(): void {
+    if (throttle.allow('fr|growl', 1.2)) audio.sfx('growl');
   }
 
   function fireShot(): void {
     gun.fire();
+    muzzle = 1;
     ammo++;
     audio.sfx('shot', { pan: (Math.random() - 0.5) * 0.4 });
   }
 
-  function spawnDemonAhead(): void {
+  function spawnDemonAhead(): Demon | null {
     const cc: [number, number] = [(camX / CS) | 0, (camZ / CS) | 0];
     const dirX = Math.sin(heading), dirZ = Math.cos(heading);
     const near = cellsNear(level, cc[0], cc[1], 3, 7);
@@ -136,17 +223,16 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
       const dot = (wx * dirX + wz * dirZ) / len;
       if (dot > bd) { bd = dot; best = [x, y]; }
     }
-    if (!best) return;
-    engage = actors.spawnDemon(best[0] * CS + CS / 2, best[1] * CS + CS / 2);
-    phase = 'engage'; engageT = 0; fireT = 0.55;
-    audio.sfx('growl');
+    if (!best) return null;
+    const d = actors.spawnDemon(best[0] * CS + CS / 2, best[1] * CS + CS / 2);
+    d.aggro = true;
+    return d;
   }
 
   function sealDoor(): void {
-    const doors = walls.doors.filter((d) => d.cell.kind === 'normal');
+    const doors = level.doors.filter((d) => d.sealed <= 0);
     if (!doors.length) return;
-    const d = doors[(Math.random() * doors.length) | 0];
-    d.cell.sealed = 4;
+    doors[(Math.random() * doors.length) | 0].sealed = 4;
     audio.sfx('door');
   }
 
@@ -169,7 +255,8 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
       const hit = around.find(([dx, dy]) => !isFloor(level, cx + dx, cy + dy));
       if (!hit) continue;
       const [dx, dy] = hit;
-      walls.reveal(cx + dx, cy + dy);
+      level.grid[(cy + dy) * level.w + (cx + dx)] = 1;   // the wall was never there
+      renderer.setLevel(level);
       actors.spawnPlate(name, cx * CS + CS / 2, cy * CS + CS / 2, -dx, -dy);
       audio.sfx('secret');
       return;
@@ -189,7 +276,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
           const near = cellsNear(level, (camX / CS) | 0, (camZ / CS) | 0, 2, 6);
           if (near.length) {
             const [x, y] = near[(Math.random() * near.length) | 0];
-            actors.spawnPickup(x * CS + CS / 2, y * CS + CS / 2, Math.random() < 0.55 ? 'vial' : 'crate');
+            actors.spawnPickup(x * CS + CS / 2, y * CS + CS / 2, Math.random() < 0.55 ? 'health' : 'ammo');
           }
         }
         break;
@@ -203,7 +290,10 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
       case 'threat': {
         audio.cueSong('threat', ev.src_ip ?? undefined);
         if (!settings.dDemons) break;
-        if (actors.demonCount < 6 && throttle.allow(`fr|dem|${ev.src_ip}`, 6)) spawnDemonAhead();
+        if (actors.demonCount < 8 && throttle.allow(`fr|dem|${ev.src_ip}`, 6)) {
+          const d = spawnDemonAhead();
+          if (d) { engage = d; phase = 'engage'; engageT = 0; fireT = 0.55; }
+        }
         break;
       }
       case 'dns': {
@@ -257,16 +347,12 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     groove.update(dtReal, settings.dMusicVisuals ? audio.pulse() : null);
     const w = state.weather;
     heat += ((w === 'hurricane' ? 1 : w === 'storm' ? 0.45 : 0) - heat) * Math.min(1, dtReal * 0.25);
-    const pulse = settings.dMusicVisuals && groove.style ? 0.9 + groove.downbeat * 0.18 + groove.energy * 0.12 : 1;
-
-    // hell weather: the fog itself goes red
-    const fog = world.scene.fog as FogExp2;
-    fog.density = (0.19 + heat * 0.06) / pulse * 0.96;
-    fog.color.setHex(heat > 0.6 ? 0x1e0704 : heat > 0.2 ? 0x160604 : 0x0c0503);
     if (heat > 0.5 && (growlT -= dtReal) <= 0) { growlT = 4 + Math.random() * 6; audio.sfx('growl', { pan: (Math.random() - 0.5) * 1.6 }); }
 
+    // sealed doors cool off
+    for (const d of level.doors) if (d.sealed > 0) d.sealed = Math.max(0, d.sealed - dtReal);
+
     const speed = 1.7 * settings.dWalkSpeed * (phase === 'engage' ? 0 : 1);
-    const dirX = Math.sin(heading), dirZ = Math.cos(heading);
 
     if (phase === 'engage' && engage) {
       // stand and fire: turn, pump, until the demon is a stain
@@ -278,6 +364,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
       if (fireT <= 0) { fireT = 0.34; fireShot(); actors.hit(engage); }
       if (!actors.demons.includes(engage)) {
         frags++; fragsLevel++;
+        if (settings.dGore) actors.burst(engage.x, engage.z);
         audio.sfx('fragged');
         stampEl.classList.add('on');
         window.setTimeout(() => stampEl.classList.remove('on'), 2200);
@@ -292,7 +379,6 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
       if (!path) {
         path = findPath(level, (camX / CS) | 0, (camZ / CS) | 0, level.exit[0], level.exit[1]);
         pathI = 0;
-        walls.openExit(true);
         audio.sfx('door');
       }
       if (path && pathI < path.length) {
@@ -343,6 +429,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     health = Math.min(100, health + dtReal * 2.2);
     hurt = Math.max(0, hurt - dtReal * 2.2);
     flash = Math.max(0, flash - dtReal * 1.8);
+    muzzle = Math.max(0, muzzle - dtReal * 7);
     faceHurtT = Math.max(0, faceHurtT - dtReal);
 
     const nearDemon = actors.demons.some((d) => d.state === 'walk' && Math.hypot(d.x - camX, d.z - camZ) < 5);
@@ -358,25 +445,23 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     hurtEl.style.opacity = String(hurt * 0.5);
     flashEl.style.opacity = String(flash * 0.3);
 
-    // camera
+    // the corridor: cast, paste sprites, paint the gun over it all
     const bob = moving ? Math.sin(bobPhase) : 0;
-    world.camera.position.set(
-      camX + f.wanderX * 0.0006,
-      EYE + bob * 0.055,
-      camZ + f.wanderY * 0.0006,
-    );
-    world.camera.rotation.set(0.02 * (moving ? bob : 0), heading + Math.PI, moving ? bob * 0.012 : 0, 'YXZ');
-    world.camera.fov = 75 * (1 + heat * 0.04);
-    world.camera.updateProjectionMatrix();
+    renderer.bobPx = bob * 4;
+    const sprites = actors.collect();
+    for (const [lx, ly] of level.lamps) {
+      sprites.push({ x: lx * CS + CS / 2, z: ly * CS + CS / 2, rgba: lampGlow, scale: 0.55, zBase: 3.55, add: true, alpha: 0.75 });
+    }
+    if (fragsLevel >= settings.dFrags && !exitShown) { exitShown = true; }
+    if (exitShown) {
+      sprites.push({ x: level.exit[0] * CS + CS / 2, z: level.exit[1] * CS + CS / 2, rgba: exitGlow, scale: 0.9, zBase: 0.1, add: true, alpha: 0.7 + 0.25 * Math.sin(f.t * 4) });
+    }
+    renderer.render(camX, camZ, heading, sprites, f.t, heat, flash * 0.5 + muzzle * 0.7);
+    gun.draw(renderer.context, renderer.width, renderer.height);
 
-    walls.update(dt, camX, camZ, f.t, 0.5 + heat);
-    actors.update(dt, level, camX, camZ);
-    gun.setAspect(world.camera.aspect);
-    gun.update(dt, bobPhase, moving, settings.dMusicVisuals ? groove.energy : 0);
-    gun.setVisible(settings.dWeapon);
-
+    actors.update(dt, level, camX, camZ, (ax, az, bx, bz) => renderer.los(ax, az, bx, bz));
+    gun.update(dt, bobPhase, moving, settings.dWeapon);
     audio.setThreatActive(actors.demonCount > 0);
-    world.render();
   }
 
   function wrap(a: number): number {
@@ -386,29 +471,28 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
   }
 
   function applyBudgets(): void {
-    world.setPixRes(settings.dPixRes);
-    if ((level.w !== settings.dMapSize)) {
+    renderer.setPixRes(settings.dPixRes);
+    if (level.w !== settings.dMapSize) {
       level = genLevel(settings.dMapSize);
-      walls.build(world.scene, level);
+      renderer.setLevel(level);
       actors.clear();
+      seedDemons();
       placeAtSpawn();
     }
   }
   applyBudgets();
-  window.addEventListener('resize', () => world.resize(window.innerWidth, window.innerHeight));
-  world.resize(window.innerWidth, window.innerHeight);
+  window.addEventListener('resize', () => renderer.setPixRes(settings.dPixRes));
 
   return {
     event,
     frame,
     applyBudgets,
     settingsChanged() { applyBudgets(); },
-    setResolution(scale) { world.setPixelRatio(scale); },
-    stats: () => ({ level: `E1M${levelNo}`, frags, health: Math.round(health), ammo, demons: actors.demonCount }),
+    setResolution(scale) { renderer.setPixRes(settings.dPixRes * scale); },
+    stats: () => ({ level: `E1M${levelNo}`, frags, health: Math.round(health), ammo, demons: actors.demonCount, art: artSource }),
     diag: () => ({
-      renderer: world.renderer, scene: world.scene, camera: world.camera, gunScene: world.gunScene, gunCamera: world.gunCamera,
-      level, walls, actors, gun,
-      demon: () => spawnDemonAhead(),
+      renderer, level, actors, gun,
+      demon: () => { const d = spawnDemonAhead(); engage = d; if (d) { phase = 'engage'; engageT = 0; fireT = 0.55; } },
       frag: () => { if (engage) actors.hit(engage); },
       seal: sealDoor,
       plate: (t?: string) => plateDomain(t ?? 'EXAMPLE.COM'),

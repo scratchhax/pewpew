@@ -25,6 +25,7 @@ from aiohttp import WSMsgType, web
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import parsers
 from tracks import add_track_routes
+from wads import add_wad_routes
 
 logger = logging.getLogger("pewpew-relay")
 
@@ -44,6 +45,8 @@ DEFAULTS = {
     "default_theme": "scifi",      # viewer theme served at /
     "tracks_dir": "tracks",        # uploaded background tracks (relative to relay/)
     "max_track_mb": 60,
+    "wads_dir": "wads",            # uploaded FRAGNET art WADs (relative to relay/)
+    "max_wad_mb": 40,
 }
 
 THEME_NAME = r"[a-z0-9][a-z0-9-]*"
@@ -299,6 +302,7 @@ async def main():
     app.router.add_get("/ws", ws_handler)
 
     add_track_routes(app, cfg)
+    add_wad_routes(app, cfg)
 
     static = os.path.abspath(STATIC_DIR)
     index_file = os.path.join(static, "index.html")
