@@ -18,8 +18,8 @@ import './hud.css';
  * cast column by column out of a WAD's textures and colour maps, the
  * marine's shotgun kicks at the bottom of the screen, and imps lean round
  * corners. The marine is the network stack with a shotgun: allowed traffic
- * fires his gun and feeds his ammo, an IDS threat tears a demon into the
- * corridor and he frags it on the spot (FRAGGED), blocks slam blast doors
+ * feeds his ammo, an IDS threat tears a demon into the corridor and he
+ * tracks it down and frags it on the spot (FRAGGED), blocks slam blast doors
  * red, DHCP opens a secret wall with the device's name on it, DNS domains
  * light up on plates, and Wi-Fi joins spin teleporters up. Five traces and
  * the exit elevator opens: E1M2, E1M3, deeper into the maze.
@@ -205,11 +205,42 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     if (throttle.allow('fr|growl', 1.2)) audio.sfx('growl');
   }
 
-  function fireShot(): void {
+  /** Spend one shell; false when the gun runs dry until traffic feeds it. */
+  function fireShot(): boolean {
+    if (ammo <= 0) return false;
+    ammo--;
     gun.fire();
     muzzle = 1;
-    ammo++;
     audio.sfx('shot', { pan: (Math.random() - 0.5) * 0.4 });
+    return true;
+  }
+
+  /** A demon is shootable when it's alive, close, in the firing cone and in sight. */
+  function canShoot(d: Demon): boolean {
+    if (d.state === 'die' || d.state === 'corpse') return false;
+    const dx = d.x - camX, dz = d.z - camZ;
+    if (Math.hypot(dx, dz) > 11) return false;
+    if (Math.abs(wrap(Math.atan2(dx, dz) - heading)) > 0.18) return false;
+    return renderer.los(camX, camZ, d.x, d.z);
+  }
+
+  /** The nearest hostile demon the marine can currently see. */
+  function pickTarget(): Demon | null {
+    let best: Demon | null = null, bd = 12;
+    for (const d of actors.demons) {
+      if (!d.hostle || d.state === 'die' || d.state === 'corpse') continue;
+      const dist = Math.hypot(d.x - camX, d.z - camZ);
+      if (dist < bd && renderer.los(camX, camZ, d.x, d.z)) { bd = dist; best = d; }
+    }
+    return best;
+  }
+
+  /** Creep along the current heading, wall-clipped; negative backs off. */
+  function advance(v: number, d: number): void {
+    const step = v * d;
+    const nx = camX + Math.sin(heading) * step, nz = camZ + Math.cos(heading) * step;
+    if (isFloor(level, (nx / CS) | 0, (camZ / CS) | 0)) camX = nx;
+    if (isFloor(level, (camX / CS) | 0, (nz / CS) | 0)) camZ = nz;
   }
 
   function spawnDemonAhead(): Demon | null {
@@ -269,9 +300,10 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     switch (se.kind) {
       case 'allow': {
         audio.cueSong('allow', ev.src_ip ?? undefined);
+        // traffic is the ammo supply, not the trigger: the gun only speaks
+        // when there's a demon down the barrel
         if (!settings.dShots) break;
         ammo = Math.min(999, ammo + 1);
-        if (phase !== 'engage' && throttle.allow('fr|shot', 0.5)) fireShot();
         if (Math.random() < 0.14 && throttle.allow('fr|pick', 4)) {
           const near = cellsNear(level, (camX / CS) | 0, (camZ / CS) | 0, 2, 6);
           if (near.length) {
@@ -354,24 +386,39 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
 
     const speed = 1.7 * settings.dWalkSpeed * (phase === 'engage' ? 0 : 1);
 
+    // patrol interrupted: a hostile demon in sight drops everything
+    if (phase === 'walk' || phase === 'look') {
+      const t = pickTarget();
+      if (t) { engage = t; phase = 'engage'; engageT = 0; fireT = 0.4; }
+    }
+
     if (phase === 'engage' && engage) {
-      // stand and fire: turn, pump, until the demon is a stain
+      // track it, creep into range, and fire only when it's down the barrel
       const dx = engage.x - camX, dz = engage.z - camZ;
+      const dist = Math.hypot(dx, dz);
       const want = Math.atan2(dx, dz);
       heading += wrap(want - heading) * Math.min(1, dtReal * 7);
       engageT += dtReal;
       fireT -= dtReal;
-      if (fireT <= 0) { fireT = 0.34; fireShot(); actors.hit(engage); }
-      if (!actors.demons.includes(engage)) {
+      const inSight = renderer.los(camX, camZ, engage.x, engage.z);
+      if (inSight && dist > 2.2) advance(0.9 * settings.dWalkSpeed, dtReal);
+      else if (dist < 1.6) advance(-1.1, dtReal);
+      if (fireT <= 0) {
+        if (canShoot(engage) && fireShot()) { actors.hit(engage); fireT = 0.6; }
+        else fireT = 0.15;
+      }
+      const dead = !actors.demons.includes(engage) || engage.state === 'die' || engage.state === 'corpse';
+      if (dead) {
         frags++; fragsLevel++;
         if (settings.dGore) actors.burst(engage.x, engage.z);
         audio.sfx('fragged');
         stampEl.classList.add('on');
         window.setTimeout(() => stampEl.classList.remove('on'), 2200);
-        engage = null;
-        phase = fragsLevel >= settings.dFrags ? 'exit' : 'walk';
+        engage = pickTarget();
+        if (engage) { engageT = 0; fireT = 0.4; }
+        else phase = fragsLevel >= settings.dFrags ? 'exit' : 'walk';
         path = null;
-      } else if (engageT > 9) {
+      } else if (engageT > 12) {
         engage = null; phase = 'walk'; path = null;
       }
     } else if (phase === 'exit') {
@@ -492,6 +539,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     stats: () => ({ level: `E1M${levelNo}`, frags, health: Math.round(health), ammo, demons: actors.demonCount, art: artSource }),
     diag: () => ({
       renderer, level, actors, gun,
+      phase: () => phase,
       demon: () => { const d = spawnDemonAhead(); engage = d; if (d) { phase = 'engage'; engageT = 0; fireT = 0.55; } },
       frag: () => { if (engage) actors.hit(engage); },
       seal: sealDoor,

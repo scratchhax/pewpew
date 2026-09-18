@@ -852,7 +852,7 @@ corridor:
 
 | Event | In the maze |
 |-------|-------------|
-| allow | the marine's shotgun cracks and ammo ticks up; occasionally a health vial or ammo crate materialises down the hall for him to walk over |
+| allow | ammo ticks up into the belt — traffic is the supply, not the trigger; occasionally a health vial or ammo crate materialises down the hall for him to walk over |
 | block | a blast door slams shut and seals red somewhere in the maze |
 | threat | a demon tears into the corridor ahead; the marine halts, turns and pumps shots into it until it bursts in a spray of gibs, stamping **FRAGGED** |
 | dns | the domain lights up on a glowing wall plate in a nearby room |
