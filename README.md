@@ -861,12 +861,12 @@ corridor:
 | system | a distant thunderclap flashes the corridor white |
 
 The marine takes damage when demons get close or land fireballs — the screen
-pulses red, his face bloodies, and health slowly regenerates. **HELL** weather
-is the load on the wire: **BLOOD MOON** in a storm and **APEX WORSTED** in a
-hurricane, where the fog reddens, the ceiling lamps flicker, demons growl in
-the dark and the shambling ambient imps turn hostile one by one. Trace your
-**traces per level** (five by default) and the
-exit elevator grinds open: ride it out and the maze rerolls as **E1M2**,
+pulses red, his face bloodies, and health slowly regenerates. Every imp in the
+maze is out for you the moment it smells you: see an imp, shoot an imp.
+**HELL** weather is the load on the wire: **BLOOD MOON** in a storm and **APEX
+WORSTED** in a hurricane, where the fog reddens, the ceiling lamps flicker and
+demons growl in the dark. Trace your **traces per level** (five by default) and
+the exit elevator grinds open: ride it out and the maze rerolls as **E1M2**,
 **E1M3**, deeper into Hell, with a title card on each level.
 
 The maze geometry, its COLORMAP lighting, the lamp flicker and the status face

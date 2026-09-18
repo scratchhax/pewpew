@@ -157,7 +157,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     const near = cellsNear(level, level.spawn[0], level.spawn[1], 5, 9);
     for (let k = 0; k < Math.min(3, near.length); k++) {
       const [x, y] = near[(Math.random() * near.length) | 0];
-      actors.spawnDemon(x * CS + CS / 2, y * CS + CS / 2, false);
+      actors.spawnDemon(x * CS + CS / 2, y * CS + CS / 2);
     }
   }
   seedDemons();
@@ -224,11 +224,11 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     return renderer.los(camX, camZ, d.x, d.z);
   }
 
-  /** The nearest hostile demon the marine can currently see. */
+  /** The nearest demon the marine can currently see. */
   function pickTarget(): Demon | null {
     let best: Demon | null = null, bd = 12;
     for (const d of actors.demons) {
-      if (!d.hostle || d.state === 'die' || d.state === 'corpse') continue;
+      if (d.state === 'die' || d.state === 'corpse') continue;
       const dist = Math.hypot(d.x - camX, d.z - camZ);
       if (dist < bd && renderer.los(camX, camZ, d.x, d.z)) { bd = dist; best = d; }
     }
@@ -408,7 +408,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
 
     const speed = 1.7 * settings.dWalkSpeed * (phase === 'engage' ? 0 : 1);
 
-    // patrol interrupted: a hostile demon in sight drops everything
+    // patrol interrupted: a demon in sight drops everything — see an imp, shoot an imp
     if (phase === 'walk' || phase === 'look') {
       const t = pickTarget();
       if (t) { engage = t; phase = 'engage'; engageT = 0; fireT = 0.4; }
@@ -534,7 +534,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     renderer.render(camX, camZ, heading, sprites, f.t, heat, flash * 0.5 + muzzle * 0.7);
     gun.draw(renderer.context, renderer.width, renderer.height);
 
-    actors.update(dt, level, camX, camZ, (ax, az, bx, bz) => renderer.los(ax, az, bx, bz), heat > 0.5);
+    actors.update(dt, level, camX, camZ, (ax, az, bx, bz) => renderer.los(ax, az, bx, bz));
     gun.update(dt, bobPhase, moving, settings.dWeapon);
     audio.setThreatActive(actors.demonCount > 0);
   }
@@ -570,7 +570,6 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
       phase: () => phase,
       cam: () => [camX, camZ] as [number, number],
       demon: () => { const d = spawnDemonAhead(); engage = d; if (d) { phase = 'engage'; engageT = 0; fireT = 0.55; } },
-      rage: () => { for (const d of actors.demons) if (!d.hostle && Math.random() < 0.7) { d.hostle = true; d.aggro = true; } },
       frag: () => { if (engage) actors.hit(engage); },
       seal: () => sealDoor(true),
       plate: (t?: string) => plateDomain(t ?? 'EXAMPLE.COM'),

@@ -17,7 +17,7 @@ export type DemonState = 'idle' | 'walk' | 'pain' | 'die' | 'corpse';
 
 export interface Demon {
   x: number; z: number; hp: number; state: DemonState;
-  t: number; anim: number; fireT: number; aggro: boolean; hostle: boolean;
+  t: number; anim: number; fireT: number; aggro: boolean;
 }
 interface Gib { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number }
 interface Fire { x: number; z: number; vx: number; vz: number; t: number }
@@ -87,8 +87,8 @@ export class Actors {
 
   get demonCount(): number { return this.demons.filter((d) => d.state !== 'die' && d.state !== 'corpse').length; }
 
-  spawnDemon(x: number, z: number, hostile = true): Demon {
-    const d: Demon = { x, z, hp: hostile ? 3 : 2, state: 'idle', t: 0, anim: Math.random() * 4, fireT: 1 + Math.random(), aggro: false, hostle: hostile };
+  spawnDemon(x: number, z: number): Demon {
+    const d: Demon = { x, z, hp: 3, state: 'idle', t: 0, anim: Math.random() * 4, fireT: 1 + Math.random(), aggro: false };
     this.demons.push(d);
     return d;
   }
@@ -136,7 +136,7 @@ export class Actors {
     this.demons = []; this.gibs = []; this.fires = []; this.pickups = []; this.plates = []; this.teles = [];
   }
 
-  update(dt: number, level: Level, camX: number, camZ: number, los: (ax: number, az: number, bx: number, bz: number) => boolean, hot = false): void {
+  update(dt: number, level: Level, camX: number, camZ: number, los: (ax: number, az: number, bx: number, bz: number) => boolean): void {
     for (const d of this.demons) {
       d.anim += dt;
       if (d.state === 'die') { d.t += dt; if (d.t > DEATH.length * 0.12) { d.state = 'corpse'; d.t = 0; } continue; }
@@ -147,18 +147,13 @@ export class Actors {
         continue;
       }
       const dx = camX - d.x, dz = camZ - d.z, dist = Math.hypot(dx, dz);
-      // HELL weather drives the ambient demons mad, one by one
-      if (hot && !d.hostle && dist < 12 && los(d.x, d.z, camX, camZ) && Math.random() < dt * 0.08) {
-        d.hostle = true;
+      // every imp is out for you: it charges the moment it smells the marine
+      if (!d.aggro && dist < 9 && los(d.x, d.z, camX, camZ)) {
         d.aggro = true;
         this.hooks.onAggro();
       }
-      if (!d.aggro && d.hostle && dist < 9 && los(d.x, d.z, camX, camZ)) {
-        d.aggro = true;
-        this.hooks.onAggro();
-      }
-      // the crowd gives way: a passive demon near the marine slides aside
-      // so the corridor clears and the camera never sits in its chest
+      // the crowd gives way: an imp that hasn't smelled the marine yet slides
+      // aside so the corridor clears and the camera never sits in its chest
       if (!d.aggro && dist < 3.2) {
         const ux = dx / (dist || 1), uz = dz / (dist || 1);
         const bx = d.x - ux * 1.4 * dt, bz = d.z - uz * 1.4 * dt;
