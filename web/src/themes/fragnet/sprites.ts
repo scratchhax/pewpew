@@ -34,6 +34,16 @@ export interface ActorHooks {
 const WALK = ['A', 'B', 'C', 'D'];
 const PAIN = ['E', 'F'];
 const DEATH = ['H', 'I', 'J', 'K', 'L', 'M'];
+/** demon body radius in world units - keeps the billboard off the wall faces */
+const R = 0.35;
+
+/** true when a body of radius R centered at (x,z) fits entirely in open cells */
+function fits(level: Level, x: number, z: number): boolean {
+  return isFloor(level, ((x - R) / CS) | 0, ((z - R) / CS) | 0)
+    && isFloor(level, ((x + R) / CS) | 0, ((z - R) / CS) | 0)
+    && isFloor(level, ((x - R) / CS) | 0, ((z + R) / CS) | 0)
+    && isFloor(level, ((x + R) / CS) | 0, ((z + R) / CS) | 0);
+}
 
 function pick(frames: Record<string, SprFrame>, letters: string[]): SprFrame[] {
   const out = letters.map((L) => frames[L]).filter(Boolean) as SprFrame[];
@@ -126,7 +136,7 @@ export class Actors {
     this.demons = []; this.gibs = []; this.fires = []; this.pickups = []; this.plates = []; this.teles = [];
   }
 
-  update(dt: number, level: Level, camX: number, camZ: number, los: (ax: number, az: number, bx: number, bz: number) => boolean): void {
+  update(dt: number, level: Level, camX: number, camZ: number, los: (ax: number, az: number, bx: number, bz: number) => boolean, hot = false): void {
     for (const d of this.demons) {
       d.anim += dt;
       if (d.state === 'die') { d.t += dt; if (d.t > DEATH.length * 0.12) { d.state = 'corpse'; d.t = 0; } continue; }
@@ -137,25 +147,34 @@ export class Actors {
         continue;
       }
       const dx = camX - d.x, dz = camZ - d.z, dist = Math.hypot(dx, dz);
+      // HELL weather drives the ambient demons mad, one by one
+      if (hot && !d.hostle && dist < 12 && los(d.x, d.z, camX, camZ) && Math.random() < dt * 0.08) {
+        d.hostle = true;
+        d.aggro = true;
+        this.hooks.onAggro();
+      }
       if (!d.aggro && d.hostle && dist < 9 && los(d.x, d.z, camX, camZ)) {
         d.aggro = true;
         this.hooks.onAggro();
       }
+      // the crowd gives way: a passive demon near the marine slides aside
+      // so the corridor clears and the camera never sits in its chest
+      if (!d.aggro && dist < 3.2) {
+        const ux = dx / (dist || 1), uz = dz / (dist || 1);
+        const bx = d.x - ux * 1.4 * dt, bz = d.z - uz * 1.4 * dt;
+        if (fits(level, bx, d.z)) d.x = bx;
+        if (fits(level, d.x, bz)) d.z = bz;
+      }
       if (d.state === 'idle' && !d.aggro) {
-        // idle wander: shuffle a step in a random floor direction, but never
-        // right on top of the marine - ambient demons set the mood, they
-        // don't smother the camera
+        // idle wander: shuffle a step in a random floor direction
         d.t -= dt;
         if (d.t <= 0) {
           d.t = 0.6 + Math.random() * 1.2;
           const dirs: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
           const [sx, sz] = dirs[(Math.random() * 4) | 0];
           const nx = d.x + sx * 0.9, nz = d.z + sz * 0.9;
-          const nearCam = Math.hypot(nx - camX, nz - camZ) < 2.4;
-          if (!nearCam) {
-            if (isFloor(level, (nx / CS) | 0, (d.z / CS) | 0)) d.x = nx;
-            if (isFloor(level, (d.x / CS) | 0, (nz / CS) | 0)) d.z = nz;
-          }
+          if (fits(level, nx, d.z)) d.x = nx;
+          if (fits(level, d.x, nz)) d.z = nz;
         }
         continue;
       }
@@ -163,8 +182,8 @@ export class Actors {
       if (dist > 1.7) {
         const step = 0.95 * dt;
         const nx = d.x + (dx / dist) * step, nz = d.z + (dz / dist) * step;
-        if (isFloor(level, (nx / CS) | 0, (d.z / CS) | 0)) d.x = nx;
-        if (isFloor(level, (d.x / CS) | 0, (nz / CS) | 0)) d.z = nz;
+        if (fits(level, nx, d.z)) d.x = nx;
+        if (fits(level, d.x, nz)) d.z = nz;
       }
       d.fireT -= dt;
       if (d.fireT <= 0 && dist > 3 && dist < 12 && this.fbFrames.length) {
@@ -176,7 +195,7 @@ export class Actors {
     // corpses fade out eventually
     for (let i = this.demons.length - 1; i >= 0; i--) {
       const d = this.demons[i];
-      if (d.state === 'corpse' && d.t > 14) this.demons.splice(i, 1);
+      if (d.state === 'corpse' && d.t > 6) this.demons.splice(i, 1);
     }
 
     for (let i = this.fires.length - 1; i >= 0; i--) {

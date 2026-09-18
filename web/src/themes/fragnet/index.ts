@@ -150,7 +150,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
   let lookT = 0, lookBase = 0;
   let engage: Demon | null = null, fireT = 0, engageT = 0;
   let exitT = 0, exitShown = false;
-  let bobPhase = 0, hurt = 0, flash = 0, muzzle = 0, faceHurtT = 0;
+  let bobPhase = 0, hurt = 0, flash = 0, muzzle = 0, faceHurtT = 0, stuckT = 0;
   let growlT = 3;
 
   function seedDemons(): void {
@@ -239,20 +239,31 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
   function advance(v: number, d: number): void {
     const step = v * d;
     const nx = camX + Math.sin(heading) * step, nz = camZ + Math.cos(heading) * step;
-    if (isFloor(level, (nx / CS) | 0, (camZ / CS) | 0)) camX = nx;
-    if (isFloor(level, (camX / CS) | 0, (nz / CS) | 0)) camZ = nz;
+    if (isFloor(level, (nx / CS) | 0, (camZ / CS) | 0) && !demonInWay(nx, camZ)) camX = nx;
+    if (isFloor(level, (camX / CS) | 0, (nz / CS) | 0) && !demonInWay(camX, nz)) camZ = nz;
+  }
+
+  /** A live demon body blocks the marine from squeezing past it. */
+  function demonInWay(x: number, z: number): boolean {
+    for (const d of actors.demons) {
+      if (d.state === 'die' || d.state === 'corpse') continue;
+      if (Math.hypot(d.x - x, d.z - z) < 1.1) return true;
+    }
+    return false;
   }
 
   function spawnDemonAhead(): Demon | null {
     const cc: [number, number] = [(camX / CS) | 0, (camZ / CS) | 0];
     const dirX = Math.sin(heading), dirZ = Math.cos(heading);
     const near = cellsNear(level, cc[0], cc[1], 3, 7);
-    let best: [number, number] | null = null, bd = -2;
+    // prefer a cell we can actually see so the marine never fights a wall
+    let best: [number, number] | null = null, bs = -Infinity;
     for (const [x, y] of near) {
-      const wx = x * CS + CS / 2 - camX, wz = y * CS + CS / 2 - camZ;
-      const len = Math.hypot(wx, wz) || 1;
-      const dot = (wx * dirX + wz * dirZ) / len;
-      if (dot > bd) { bd = dot; best = [x, y]; }
+      const wx = x * CS + CS / 2, wz = y * CS + CS / 2;
+      const len = Math.hypot(wx - camX, wz - camZ) || 1;
+      const dot = ((wx - camX) * dirX + (wz - camZ) * dirZ) / len;
+      const score = dot + (renderer.los(camX, camZ, wx, wz) ? 2 : 0);
+      if (score > bs) { bs = score; best = [x, y]; }
     }
     if (!best) return null;
     const d = actors.spawnDemon(best[0] * CS + CS / 2, best[1] * CS + CS / 2);
@@ -260,10 +271,17 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     return d;
   }
 
-  function sealDoor(): void {
-    const doors = level.doors.filter((d) => d.sealed <= 0);
-    if (!doors.length) return;
-    doors[(Math.random() * doors.length) | 0].sealed = 4;
+  function sealDoor(force = false): void {
+    // "somewhere in the maze": never seal a door the marine can see, or the
+    // red steel pops into an open corridor right in front of him
+    const cand = level.doors.filter((d) => {
+      if (d.sealed > 0) return false;
+      if (force) return true;
+      const wx = d.x * CS + CS / 2, wz = d.y * CS + CS / 2;
+      return Math.hypot(wx - camX, wz - camZ) > 8 && !renderer.los(camX, camZ, wx, wz);
+    });
+    if (!cand.length) return;
+    cand[(Math.random() * cand.length) | 0].sealed = 4;
     audio.sfx('door');
   }
 
@@ -280,12 +298,16 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
 
   function openSecret(name: string): void {
     const near = cellsNear(level, (camX / CS) | 0, (camZ / CS) | 0, 3, 10);
-    for (let k = 0; k < 12 && near.length; k++) {
+    const around: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (let k = 0; k < 24 && near.length; k++) {
       const [cx, cy] = near[(Math.random() * near.length) | 0];
-      const around: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
       const hit = around.find(([dx, dy]) => !isFloor(level, cx + dx, cy + dy));
       if (!hit) continue;
       const [dx, dy] = hit;
+      // collapse it out of the marine's sight: a wall vanishing in front of
+      // him reads as a rendering glitch, the plate is the real feedback
+      const wx = (cx + dx) * CS + CS / 2, wz = (cy + dy) * CS + CS / 2;
+      if (Math.hypot(wx - camX, wz - camZ) < 7 || renderer.los(camX, camZ, wx, wz)) continue;
       level.grid[(cy + dy) * level.w + (cx + dx)] = 1;   // the wall was never there
       renderer.setLevel(level);
       actors.spawnPlate(name, cx * CS + CS / 2, cy * CS + CS / 2, -dx, -dy);
@@ -464,10 +486,16 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
       heading += wrap(want - heading) * Math.min(1, d * 6.5);
       const h2 = Math.sin(heading), h2z = Math.cos(heading);
       const step = Math.min(v * d, dist);
-      // never slide through a wall on a corner's diagonal
+      // never slide through a wall on a corner's diagonal, or through a demon
+      const px0 = camX, pz0 = camZ;
       const nx = camX + h2 * step, nz = camZ + h2z * step;
-      if (isFloor(level, (nx / CS) | 0, (camZ / CS) | 0)) camX = nx;
-      if (isFloor(level, (camX / CS) | 0, (nz / CS) | 0)) camZ = nz;
+      if (isFloor(level, (nx / CS) | 0, (camZ / CS) | 0) && !demonInWay(nx, camZ)) camX = nx;
+      if (isFloor(level, (camX / CS) | 0, (nz / CS) | 0) && !demonInWay(camX, nz)) camZ = nz;
+      // parked demon in the corridor: give up the route and look around
+      if (Math.hypot(camX - px0, camZ - pz0) < step * 0.25) {
+        stuckT += d;
+        if (stuckT > 1.1) { stuckT = 0; path = null; phase = 'look'; lookT = 1.2 + Math.random(); }
+      } else stuckT = 0;
     }
 
     // the marine: head bob, health regen, hurt and face
@@ -506,7 +534,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     renderer.render(camX, camZ, heading, sprites, f.t, heat, flash * 0.5 + muzzle * 0.7);
     gun.draw(renderer.context, renderer.width, renderer.height);
 
-    actors.update(dt, level, camX, camZ, (ax, az, bx, bz) => renderer.los(ax, az, bx, bz));
+    actors.update(dt, level, camX, camZ, (ax, az, bx, bz) => renderer.los(ax, az, bx, bz), heat > 0.5);
     gun.update(dt, bobPhase, moving, settings.dWeapon);
     audio.setThreatActive(actors.demonCount > 0);
   }
@@ -540,9 +568,11 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     diag: () => ({
       renderer, level, actors, gun,
       phase: () => phase,
+      cam: () => [camX, camZ] as [number, number],
       demon: () => { const d = spawnDemonAhead(); engage = d; if (d) { phase = 'engage'; engageT = 0; fireT = 0.55; } },
+      rage: () => { for (const d of actors.demons) if (!d.hostle && Math.random() < 0.7) { d.hostle = true; d.aggro = true; } },
       frag: () => { if (engage) actors.hit(engage); },
-      seal: sealDoor,
+      seal: () => sealDoor(true),
       plate: (t?: string) => plateDomain(t ?? 'EXAMPLE.COM'),
       secret: (t?: string) => openSecret(t ?? 'IOT-DEVICE'),
       title: (t?: string) => { lastWord = t ?? lastWord; showTitle(); },
