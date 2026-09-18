@@ -1,11 +1,115 @@
-import { CanvasTexture, NearestFilter, RepeatWrapping, SRGBColorSpace, Texture } from 'three';
+import type { SprFrame, TexTable } from './wad';
 
 /**
  * Every pixel FRAGNET shows, drawn in code: the wall and floor textures, the
  * demons and pickups, the marine's shotgun, the status-bar face. A gritty
  * 24-color palette leans rust, bone and hell-red; art is blocky on purpose,
  * sampled nearest, and seeded so the maze looks the same every load.
+ *
+ * When no pack and no uploaded WAD can be had (offline demo with a missing
+ * public/ dir, say), buildFallbackTable() quantises this canvas art into the
+ * same palette-indexed TexTable the software renderer paints from, so the
+ * scene degrades to its own art instead of refusing to exist.
  */
+
+/** Canvas -> packed little-endian RGBA words, 0 = transparent. */
+export function canvasToRgba(c: HTMLCanvasElement): { w: number; h: number; data: Uint32Array } {
+  const ctx = c.getContext('2d')!;
+  const img = ctx.getImageData(0, 0, c.width, c.height);
+  return { w: c.width, h: c.height, data: new Uint32Array(img.data.buffer.slice(0)) };
+}
+
+/** Quantise a canvas into palette indices; colours beyond `max` fall back to the nearest. */
+function quantize(c: HTMLCanvasElement, palette: Uint8Array, lookup: Map<number, number>): Uint8Array {
+  const ctx = c.getContext('2d')!;
+  const img = ctx.getImageData(0, 0, c.width, c.height);
+  const idx = new Uint8Array(c.width * c.height);
+  for (let i = 0; i < idx.length; i++) {
+    const a = img.data[i * 4 + 3];
+    if (a < 32) { idx[i] = 255; continue; }
+    const key = (img.data[i * 4] << 16) | (img.data[i * 4 + 1] << 8) | img.data[i * 4 + 2];
+    let hit = lookup.get(key);
+    if (hit === undefined) {
+      const r = img.data[i * 4], g = img.data[i * 4 + 1], b = img.data[i * 4 + 2];
+      let best = 0, bd = Infinity;
+      for (let p = 0; p < 256; p++) {
+        const dr = palette[p * 3] - r, dg = palette[p * 3 + 1] - g, db = palette[p * 3 + 2] - b;
+        const d = dr * dr + dg * dg + db * db;
+        if (d < bd) { bd = d; best = p; }
+      }
+      hit = best;
+      lookup.set(key, hit);
+    }
+    idx[i] = hit;
+  }
+  return idx;
+}
+
+function frameFrom(c: HTMLCanvasElement, palette: Uint8Array, lookup: Map<number, number>): SprFrame {
+  const idx = quantize(c, palette, lookup);
+  return { w: c.width, h: c.height, lo: c.width >> 1, to: c.height, idx };
+}
+
+/**
+ * The last-resort art source: a 256-colour palette harvested from this
+ * module's own canvases, COLORMAP approximated by thirty-four brightness
+ * ramps, everything else indexed from the same quantisation pass.
+ */
+export function buildFallbackTable(): TexTable {
+  const sources = [texTech(1), texTech(2), texBrick(1), texHell(1), texFloor(1), texCeil(1), sprDemon(0), sprFireball(), sprVial(), sprCrate(), sprGun()];
+  const palette = new Uint8Array(256 * 3);
+  const lookup = new Map<number, number>();
+  let next = 0;
+  for (const c of sources) {
+    const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 32) continue;
+      const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
+      if (lookup.has(key) || next >= 256) continue;
+      palette[next * 3] = d[i]; palette[next * 3 + 1] = d[i + 1]; palette[next * 3 + 2] = d[i + 2];
+      lookup.set(key, next++);
+    }
+  }
+  for (let p = next; p < 256; p++) { palette[p * 3] = 0; palette[p * 3 + 1] = 0; palette[p * 3 + 2] = 0; }
+  const cmap = new Uint8Array(34 * 256);
+  for (let t = 0; t < 34; t++) {
+    const k = 1 - t / 33;
+    for (let i = 0; i < 256; i++) {
+      const r = Math.round(palette[i * 3] * k), g = Math.round(palette[i * 3 + 1] * k), b = Math.round(palette[i * 3 + 2] * k);
+      let best = 0, bd = Infinity;
+      for (let p = 0; p < 256; p++) {
+        const dr = palette[p * 3] - r, dg = palette[p * 3 + 1] - g, db = palette[p * 3 + 2] - b;
+        const d = dr * dr + dg * dg + db * db;
+        if (d < bd) { bd = d; best = p; }
+      }
+      cmap[t * 256 + i] = best;
+    }
+  }
+  const flat = (c: HTMLCanvasElement): Uint8Array => quantize(c, palette, lookup);
+  const table: TexTable = {
+    palette, cmap,
+    flats: {
+      floor: flat(texFloor(3)), ceil: flat(texCeil(3)),
+      techFloor: flat(texFloor(5)), hellFloor: flat(texHell(5)), hellCeil: flat(texCeil(7)),
+      exitFloor: flat(texFloor(9)), exitCeil: flat(texCeil(9)),
+    },
+    walls: {
+      tech: { w: 64, h: 64, idx: flat(texTech(7)) },
+      brick: { w: 64, h: 64, idx: flat(texBrick(11)) },
+      hell: { w: 64, h: 64, idx: flat(texHell(13)) },
+      door: { w: 64, h: 64, idx: flat(texTech(21)) },
+    },
+    sprites: {
+      demon: { A: frameFrom(sprDemon(0), palette, lookup), B: frameFrom(sprDemon(1), palette, lookup) },
+      fireball: { A: frameFrom(sprFireball(), palette, lookup) },
+      health: { A: frameFrom(sprVial(), palette, lookup) },
+      ammo: { A: frameFrom(sprCrate(), palette, lookup) },
+      gun: { A: frameFrom(sprGun(), palette, lookup) },
+    },
+  };
+  return table;
+}
+
 
 export const FR = {
   ink: '#150e0a', soot: '#241a14', brown: '#5c3d26', umber: '#7c5330', bone: '#e6d7ab',
@@ -26,16 +130,6 @@ function canvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContex
 export function rng(seed: number): () => number {
   let s = seed >>> 0 || 1;
   return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 100000) / 100000; };
-}
-
-export function tex(c: HTMLCanvasElement, tile = false): Texture {
-  const t = new CanvasTexture(c);
-  t.magFilter = NearestFilter;
-  t.minFilter = NearestFilter;
-  t.generateMipmaps = false;
-  t.colorSpace = SRGBColorSpace;
-  if (tile) { t.wrapS = t.wrapT = RepeatWrapping; }
-  return t;
 }
 
 // ── walls, floor, ceiling ──────────────────────────────────────────────────

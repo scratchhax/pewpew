@@ -253,6 +253,8 @@ minutes to start logging after a settings change or a relay restart.
 | `drop_patterns` | UDM and AP chatter | regexes matched against raw lines and dropped before parsing (see `/drops`) |
 | `tracks_dir` | `tracks` | where uploaded background tracks are stored (relative to `relay/`, git-ignored) |
 | `max_track_mb` | `60` | largest background track the relay accepts |
+| `wads_dir` | `wads` | where the uploaded FRAGNET art WAD is stored (relative to `relay/`, git-ignored) |
+| `max_wad_mb` | `40` | largest WAD the relay accepts |
 
 The relay understands both the classic iptables-style firewall log and the CEF
 security events from gateways on the CyberSecure/Enhanced tier (IDS/IPS threats
@@ -834,14 +836,17 @@ the pace of the patrol.
 ![fragnet](docs/fragnet.png)
 
 Your network is Hell. FRAGNET is a love letter to the original corridor
-shooter, rendered in the browser at a chunky 200-odd pixels tall and stretched
-over the screen with nearest filtering — real pixels, depth fog, ceiling lamps
-and all. The camera is the marine's eyes, on an endless first-person patrol of
-a procedurally generated maze of rooms and corridors. Blast doors grind open
-when you walk up to them, secret walls hide on DHCP leases, and the HUD is a
-status bar with your health, ammo, frag count, the level tag and a pixel face
-that goes through its moods. The marine is the network stack with a shotgun,
-and every log line is an action in the corridor:
+shooter, built as a software renderer in the old tradition: the maze is cast
+column by column into a screen-pixel ImageData a few hundred pixels tall and
+stretched over the display with nearest filtering — textured walls, floors and
+ceilings from a WAD, lit through the original's COLORMAP light tables rather
+than any fog, ceiling lamps and all. The camera is the marine's eyes, on an
+endless first-person patrol of a procedurally generated maze of rooms and
+corridors. Blast doors grind open when you walk up to them, secret walls hide
+on DHCP leases, and the HUD is a status bar with your health, ammo, frag
+count, the level tag and a pixel face that goes through its moods. The marine
+is the network stack with a shotgun, and every log line is an action in the
+corridor:
 
 ![fragnet demon fragged](docs/fragnet-fight.png)
 
@@ -863,8 +868,14 @@ growl in the dark. Trace your **traces per level** (five by default) and the
 exit elevator grinds open: ride it out and the maze rerolls as **E1M2**,
 **E1M3**, deeper into Hell, with a title card on each level.
 
-The maze, the wall and floor textures, the demons, the shotgun and the status
-face are all generated in code; no game assets ship with the scene. In
+The maze geometry, its COLORMAP lighting, the lamp flicker and the status face
+are generated in code. The wall and floor textures, the imps, fireballs,
+pickups and the first-person shotgun come from **Freedoom** (BSD-licensed,
+free to ship) via a small asset pack built by `scripts/mkfragnetpack.mjs` —
+no id Software asset ships with the scene. If you legally own a DOOM WAD, use
+the **WAD art** control on the FRAGNET screen to upload your `DOOM.WAD` /
+`DOOM1.WAD` to the relay once: every viewer on the LAN then paints the maze
+from your WAD's textures and sprites, parsed live in the browser. In
 F1 → Scene you can turn off each event's effect, hide the weapon, mute the
 gore, and scale the **patrol speed** and **traces per level**.
 
@@ -1169,6 +1180,26 @@ curl -X DELETE http://<relay-host>:8080/api/tracks/mytrack.mp3         # delete
 A track assigned without analysis (for example, uploaded with curl) is analysed
 by the first screen that plays it. Background tracks need a relay, so they
 aren't available on the GitHub Pages demo.
+
+### FRAGNET WAD art
+
+By default FRAGNET paints its maze from a bundled **Freedoom** (BSD) asset
+pack. If you legally own a DOOM WAD, upload it once and every viewer on the
+LAN paints the maze from it instead — textures, sprites, the lot, parsed live
+in the browser. The easiest way is the **WAD art** control in the lower-left
+of the FRAGNET screen, or with curl:
+
+```bash
+curl -F file=@DOOM1.WAD http://<relay-host>:8080/api/wads   # upload (becomes active)
+curl http://<relay-host>:8080/api/wads                      # list + active
+curl -X PUT -H 'Content-Type: application/json' \
+  -d '{"name":null}' http://<relay-host>:8080/api/wads-active  # fall back to Freedoom
+```
+
+No id Software asset ships with pewpew; the WAD stays on your relay and only
+ever leaves it to the browsers already on your network. Like background
+tracks, uploaded WADs need a relay and aren't available on the GitHub Pages
+demo.
 
 ### Mixing
 
