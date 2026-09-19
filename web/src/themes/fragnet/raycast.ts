@@ -1,17 +1,17 @@
 import type { TexTable, SprFrame } from './wad';
 import { buildLUTs, redPalette, lightToTable } from './wad';
-import { CS, EYE, WALL_H, DOOR, WALL, type Level } from './levelgen';
+import { CS, EYE, WALL_H, DOOR, WALL, type CellStyle, type Level } from './levelgen';
 
 /**
- * The corridor painter: a software renderer in the old tradition. One
- * column at a time the maze is DDA-cast against the grid, walls, floors and
- * ceilings are textured straight from the WAD's index maps, and light is
- * whatever the COLORMAP says it is - no shaders, no fog pass, nothing
- * between the pixel and the palette. Sprites sort far-to-near and respect a
- * per-column z-buffer, so a demon leaning round a corner clips like it
- * should. Everything happens in an ImageData a few hundred pixels tall;
- * CSS does the stretching, nearest-neighbour, exactly like a CRT doing it
- * badly on purpose.
+ * The corridor painter: a software renderer in the old tradition, calibrated
+ * to the original's drawing laws. One column at a time the maze is DDA-cast
+ * against the grid into a fixed 320x200 buffer (or 640x400 in the game's own
+ * hi-res mode) and CSS letterboxes it at whole-pixel scale - no distance fog,
+ * no shaders: light is whatever COLORMAP says for the cell's sector, walls
+ * sample their texture once per screen column anchored at the floor line,
+ * and every sector brings its own texture variant, flats and light level.
+ * Sprites sort far-to-near and respect a per-column z-buffer, so a demon
+ * leaning round a corner clips like it should.
  */
 
 /** Raw RGBA sprite (plates, glows): packed little-endian words, 0 = clear. */
@@ -27,21 +27,7 @@ export interface Sprite {
   alpha?: number;                   // 0..1 for rgba sprites
 }
 
-interface CellStyle {
-  wall: number;                     // key into the table's wall roles
-  floorFlat: string; ceilFlat: string;
-  light: number;
-  flicker: boolean;
-}
-
-const ROOM_TECH: CellStyle = { wall: 0, floorFlat: 'techFloor', ceilFlat: 'ceil', light: 170, flicker: false };
-const ROOM_BRICK: CellStyle = { wall: 1, floorFlat: 'floor', ceilFlat: 'ceil', light: 150, flicker: false };
-const ROOM_HELL: CellStyle = { wall: 2, floorFlat: 'hellFloor', ceilFlat: 'hellCeil', light: 118, flicker: false };
-const CORRIDOR: CellStyle = { wall: 0, floorFlat: 'floor', ceilFlat: 'ceil', light: 132, flicker: false };
-const EXITROOM: CellStyle = { wall: 1, floorFlat: 'exitFloor', ceilFlat: 'exitCeil', light: 244, flicker: false };
-
-const WALL_KEYS = ['tech', 'brick', 'hell', 'door'];
-const FOG_START = 5.5, FOG_END = 17;
+const WALL_KEYS = ['tech', 'brick', 'hell', 'door', 'exit'];
 
 export class SoftRenderer {
   readonly canvas: HTMLCanvasElement;
@@ -62,8 +48,6 @@ export class SoftRenderer {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     canvas.style.display = 'block';
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
     canvas.style.imageRendering = 'pixelated';
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) throw new Error('no 2d context');
@@ -77,17 +61,14 @@ export class SoftRenderer {
     this.lutsRed = buildLUTs(redPalette(t.palette), t.cmap);
   }
 
-  /** Bake per-cell materials and lights for a level. */
+  /** Bake per-cell materials and lights: sectors come authored by the level. */
   setLevel(level: Level): void {
     this.level = level;
     const n = level.w * level.h;
-    const styles: CellStyle[] = new Array(n).fill(CORRIDOR);
-    for (let ri = 0; ri < level.rooms.length; ri++) {
-      const r = level.rooms[ri];
-      const isExit = r.cx === level.exit[0] && r.cy === level.exit[1];
-      const style = isExit ? EXITROOM : ri % 4 === 3 ? ROOM_HELL : ri % 2 === 0 ? ROOM_TECH : ROOM_BRICK;
+    const styles: CellStyle[] = new Array(n).fill(level.corridor);
+    for (const r of level.rooms) {
       for (let y = r.y; y < r.y + r.h; y++) {
-        for (let x = r.x; x < r.x + r.w; x++) styles[y * level.w + x] = style;
+        for (let x = r.x; x < r.x + r.w; x++) styles[y * level.w + x] = r.sector;
       }
     }
     for (const [lx, ly] of level.lamps) {
@@ -108,18 +89,30 @@ export class SoftRenderer {
   }
 
   setPixRes(heightPx: number): void {
-    const aspect = window.innerWidth / Math.max(1, window.innerHeight);
-    const h = Math.max(120, Math.round(heightPx));
-    const w = Math.max(160, Math.round(h * aspect));
-    if (w === this.W && h === this.H) return;
-    this.W = w; this.H = h;
-    this.canvas.width = w; this.canvas.height = h;
-    this.img = this.ctx.createImageData(w, h);
-    this.buf = new Uint32Array(this.img.data.buffer);
-    this.zbuf = new Float32Array(w);
+    // the game's two modes only: 320x200 classic, 640x400 hi-res
+    const h = Math.round(heightPx) >= 300 ? 400 : 200;
+    const w = h === 400 ? 640 : 320;
+    if (w !== this.W || h !== this.H) {
+      this.W = w; this.H = h;
+      this.canvas.width = w; this.canvas.height = h;
+      this.img = this.ctx.createImageData(w, h);
+      this.buf = new Uint32Array(this.img.data.buffer);
+      this.zbuf = new Float32Array(w);
+    }
+    this.layout();
   }
 
-  resize(_w: number, _h: number): void { /* resolution is dPixRes-driven; nothing else to do */ }
+  /** Letterbox the buffer on screen at whole-pixel scale, centered. */
+  private layout(): void {
+    if (!this.W || !this.H) return;
+    const fit = Math.min(window.innerWidth / this.W, window.innerHeight / this.H);
+    const s = fit >= 1 ? Math.floor(fit) : fit;
+    this.canvas.style.width = `${Math.round(this.W * s)}px`;
+    this.canvas.style.height = `${Math.round(this.H * s)}px`;
+    this.canvas.style.margin = `${Math.max(0, (window.innerHeight - this.H * s) / 2)}px auto`;
+  }
+
+  resize(_w: number, _h: number): void { this.layout(); }
 
   get context(): CanvasRenderingContext2D { return this.ctx; }
   get width(): number { return this.W; }
@@ -168,24 +161,26 @@ export class SoftRenderer {
       const wallTop = cy + (EYE - WALL_H) * ppu;
       const wallBot = cy + EYE * ppu;
 
-      // texture choice for the face
+      // texture choice for the face: the sector's variant, offset per sector
       let tex = table.walls.tech;
       let style: CellStyle | null = null;
       if (hit === 1) {
         // the floor cell we came from owns the face's material and light
         const fx = side === 0 ? mapX - stepX : mapX;
         const fz = side === 1 ? mapZ - stepZ : mapZ;
-        style = this.styles[fz * level.w + fx] ?? CORRIDOR;
-        tex = this.wallTex(table, WALL_KEYS[style.wall]);
+        style = this.styles[fz * level.w + fx] ?? level.corridor;
+        tex = this.wallTex(table, WALL_KEYS[style.role], style.texVar);
       } else if (hit === 3) {
-        tex = this.wallTex(table, 'door');
+        tex = this.wallTex(table, 'door', 0);
       }
       const colLuts = hit === 3 ? this.lutsRed : luts;
       const colLight = hit === 3 ? 236 : style ? this.effLight(style, dist, t, boost, 0, 0) : 90;
       const lut = colLuts[lightToTable(colLight)];
 
       // wall span
+      const offX = style ? style.offX : 0, offY = style ? style.offY : 0;
       let wallU = side === 0 ? (posCellZ + perp * rayZ) % 1 : (posCellX + perp * rayX) % 1;
+      wallU = (wallU + offX) % 1;
       if (wallU < 0) wallU += 1;
       let texX = (wallU * tex.w) | 0;
       if (side === 0 && rayX > 0) texX = tex.w - 1 - texX;
@@ -193,15 +188,15 @@ export class SoftRenderer {
       const y0 = Math.max(0, Math.ceil(wallTop)), y1 = Math.min(H - 1, Math.floor(wallBot));
       const vScale = (tex.h * WALL_H) / (CS * Math.max(1, wallBot - wallTop));
       for (let y = y0; y <= y1; y++) {
-        let texY = (((y - wallTop) * vScale) | 0) % tex.h;
+        let texY = (((y - wallTop) * vScale + offY * tex.h) | 0) % tex.h;
         if (texY < 0) texY += tex.h;
         buf[y * W + x] = lut[tex.idx[texY * tex.w + texX]];
       }
 
       // ceiling above and floor below, one flat per cell, lit by the cell
-      const floorStyle = style ?? CORRIDOR;
-      const fTex = table.flats[floorStyle.floorFlat] ?? table.flats.floor;
-      const cTex = table.flats[floorStyle.ceilFlat] ?? table.flats.ceil;
+      const floorStyle = style ?? level.corridor;
+      const fTex = this.flatTex(table, floorStyle.floorFlat, floorStyle.flatVar) ?? table.flats.floor;
+      const cTex = this.flatTex(table, floorStyle.ceilFlat, floorStyle.flatVar) ?? table.flats.ceil;
       if (fTex) {
         for (let y = y1 + 1; y < H; y++) {
           const d = (EYE * halfW) / (y - cy);
@@ -245,7 +240,7 @@ export class SoftRenderer {
       const cxS = halfW + (tX / tZ) * halfW;
       const x0 = Math.max(0, Math.ceil(cxS - sw / 2)), x1 = Math.min(W - 1, Math.floor(cxS + sw / 2));
       const y0 = Math.max(0, Math.ceil(top)), y1 = Math.min(H - 1, Math.floor(top + sh));
-      const cellStyle = this.styles[((s.z / CS) | 0) * level.w + ((s.x / CS) | 0)] ?? CORRIDOR;
+      const cellStyle = this.styles[((s.z / CS) | 0) * level.w + ((s.x / CS) | 0)] ?? level.corridor;
       const light = s.add ? 255 : this.effLight(cellStyle, tZ, t, boost, (s.x / CS) | 0, (s.z / CS) | 0);
       if (s.frame) {
         const f = s.frame;
@@ -298,20 +293,26 @@ export class SoftRenderer {
   /** Vertical eye bob in render pixels, set by the caller each frame. */
   bobPx = 0;
 
-  private wallTex(table: TexTable, key: string): { w: number; h: number; idx: Uint8Array } {
-    return table.walls[key] ?? table.walls.tech ?? { w: 64, h: 64, idx: new Uint8Array(64 * 64) };
+
+  private wallTex(table: TexTable, role: string, vari: number): { w: number; h: number; idx: Uint8Array } {
+    return table.walls[vari === 0 ? role : `${role}${vari + 1}`] ?? table.walls[role]
+      ?? table.walls.tech ?? { w: 64, h: 64, idx: new Uint8Array(64 * 64) };
+  }
+
+  private flatTex(table: TexTable, base: string, vari: number): Uint8Array | undefined {
+    return table.flats[vari === 0 ? base : `${base}${vari + 1}`] ?? table.flats[base];
   }
 
   private clampL(v: number): number { return v < 0 ? 0 : v > 31 ? 31 : v | 0; }
 
-  /** Distance falloff, lamp flicker and the muzzle-flash boost. */
+  /** DOOM lighting: the cell's sector light, lamp flicker, muzzle flash. No fog. */
   private effLight(style: CellStyle, distWorld: number, t: number, boost: number, cx: number, cz: number): number {
+    void distWorld;
     let l = style.light;
     if (style.flicker) {
       const h = Math.sin(cx * 127.1 + cz * 311.7) * 43758.5453;
       l *= 0.86 + 0.14 * Math.abs(Math.sin(t * (8 + (h - Math.floor(h)) * 6) + h));
     }
-    if (distWorld > FOG_START) l *= Math.max(0.1, 1 - (distWorld - FOG_START) / (FOG_END - FOG_START));
     return Math.min(255, l * (1 + boost));
   }
 

@@ -569,6 +569,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
       renderer, level, actors, gun,
       phase: () => phase,
       cam: () => [camX, camZ] as [number, number],
+      head: () => heading,
       demon: () => { const d = spawnDemonAhead(); engage = d; if (d) { phase = 'engage'; engageT = 0; fireT = 0.55; } },
       frag: () => { if (engage) actors.hit(engage); },
       seal: () => sealDoor(true),

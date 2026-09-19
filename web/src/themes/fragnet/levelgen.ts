@@ -9,10 +9,26 @@
 export const WALL = 0, FLOOR = 1, DOOR = 2;
 /** world units per cell */
 export const CS = 2;
-export const EYE = 1.32;
+/** eye height as a share of wall height - the game's is 32/128 */
+export const EYE = 1;
 export const WALL_H = 4;
 
-export interface Room { x: number; y: number; w: number; h: number; cx: number; cy: number }
+/**
+ * A DOOM sector: one wall texture variant, one flat pair, one light level,
+ * per-cell texture offsets. The renderer paints every face and floor from
+ * the sector of the cell it belongs to.
+ */
+export interface CellStyle {
+  role: number;                     // 0 tech, 1 brick, 2 hell (door/exit by key)
+  texVar: number;                   // texture variant within the role pool
+  floorFlat: string; ceilFlat: string;
+  flatVar: number;
+  light: number;                    // 0-255, straight through COLORMAP
+  flicker: boolean;
+  offX: number; offY: number;       // texture alignment in [0,1)
+}
+
+export interface Room { x: number; y: number; w: number; h: number; cx: number; cy: number; sector: CellStyle }
 export interface DoorCell { x: number; y: number; open: number; kind: 'normal' | 'exit'; sealed: number }
 export interface Level {
   w: number; h: number;
@@ -22,6 +38,7 @@ export interface Level {
   spawn: [number, number];
   exit: [number, number];
   lamps: [number, number][];
+  corridor: CellStyle;              // every floor cell outside a room
 }
 
 export const idxOf = (l: Level, x: number, y: number): number => y * l.w + x;
@@ -42,10 +59,21 @@ function tryLevel(size: number, rand: () => number): Level | null {
   const rooms: Room[] = [];
   const want = Math.max(5, Math.round(size / 3.4));
   for (let k = 0; k < want * 12 && rooms.length < want; k++) {
-    const rw = 3 + ((rand() * 4) | 0), rh = 3 + ((rand() * 4) | 0);
+    const rw = 4 + ((rand() * 5) | 0), rh = 4 + ((rand() * 5) | 0);
     const x = 1 + ((rand() * (w - rw - 2)) | 0), y = 1 + ((rand() * (h - rh - 2)) | 0);
     if (rooms.some((o) => x < o.x + o.w + 2 && x + rw + 2 > o.x && y < o.y + o.h + 2 && y + rh + 2 > o.y)) continue;
-    rooms.push({ x, y, w: rw, h: rh, cx: x + (rw >> 1), cy: y + (rh >> 1) });
+    // every room its own DOOM sector: role, texture variant, flats, light
+    const ri = rooms.length;
+    const role = ri % 4 === 3 ? 2 : ri % 2 === 0 ? 0 : 1;
+    const sector: CellStyle = {
+      role, texVar: (rand() * 3) | 0,
+      floorFlat: role === 2 ? 'hellFloor' : role === 0 ? 'techFloor' : 'floor',
+      ceilFlat: role === 2 ? 'hellCeil' : 'ceil',
+      flatVar: (rand() * 3) | 0,
+      light: rand() < 0.12 ? 90 + ((rand() * 40) | 0) : 156 + ((rand() * 60) | 0),
+      flicker: false, offX: rand(), offY: rand(),
+    };
+    rooms.push({ x, y, w: rw, h: rh, cx: x + (rw >> 1), cy: y + (rh >> 1), sector });
     for (let j = y; j < y + rh; j++) for (let i = x; i < x + rw; i++) grid[j * w + i] = FLOOR;
   }
   if (rooms.length < 4) return null;
@@ -64,7 +92,12 @@ function tryLevel(size: number, rand: () => number): Level | null {
     corridor(rooms[(rand() * rooms.length) | 0], rooms[(rand() * rooms.length) | 0]);
   }
 
-  const l: Level = { w, h, grid, rooms, doors: [], spawn: [rooms[0].cx, rooms[0].cy], exit: [0, 0], lamps: [] };
+  const corridorStyle: CellStyle = {
+    role: 0, texVar: (rand() * 3) | 0,
+    floorFlat: 'floor', ceilFlat: 'ceil', flatVar: (rand() * 3) | 0,
+    light: 150, flicker: false, offX: rand(), offY: 0,
+  };
+  const l: Level = { w, h, grid, rooms, doors: [], spawn: [rooms[0].cx, rooms[0].cy], exit: [0, 0], lamps: [], corridor: corridorStyle };
 
   // blast doors: corridor cells that pass between two rooms wall to wall
   for (let y = 1; y < h - 1; y++) {
@@ -85,6 +118,7 @@ function tryLevel(size: number, rand: () => number): Level | null {
     if (r !== rooms[0] && d > bd) { bd = d; best = r; }
   }
   l.exit = [best.cx, best.cy];
+  best.sector = { role: 1, texVar: 0, floorFlat: 'exitFloor', ceilFlat: 'exitCeil', flatVar: 0, light: 244, flicker: false, offX: 0, offY: 0 };
 
   // lamps: every so often, a floor cell gets a ceiling light
   let floors = 0;

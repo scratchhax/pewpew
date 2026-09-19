@@ -246,19 +246,19 @@ export class Actors {
     }
     for (const f of this.fires) {
       const fr = this.fbFrames.length ? this.fbFrames[((f.t * 12) | 0) % this.fbFrames.length] : null;
-      if (fr) out.push({ x: f.x, z: f.z, frame: fr, scale: 0.55, zBase: 0.95, add: true });
+      if (fr) out.push({ x: f.x, z: f.z, frame: fr, scale: 0.9, zBase: 1.2, add: true });
     }
     for (const g of this.gibs) {
       if (!this.gore) continue;
-      out.push({ x: g.x, z: g.z, rgba: this.gore, scale: 0.24, zBase: g.y, add: true, alpha: Math.max(0, Math.min(1, g.life)) });
+      out.push({ x: g.x, z: g.z, rgba: this.gore, scale: 0.3, zBase: g.y, add: true, alpha: Math.max(0, Math.min(1, g.life)) });
     }
     for (const p of this.pickups) {
       const fr = p.kind === 'health' ? this.healthFrame : this.ammoFrame;
       if (!fr) continue;
-      out.push({ x: p.x, z: p.z, frame: fr, scale: p.kind === 'health' ? 0.5 : 0.42, zBase: 0.08 + Math.sin(p.t * 2.4) * 0.07 });
+      out.push({ x: p.x, z: p.z, frame: fr, scale: p.kind === 'health' ? 0.35 : 0.3, zBase: 0.05 + Math.sin(p.t * 2.4) * 0.05 });
     }
     for (const pl of this.plates) {
-      out.push({ x: pl.x, z: pl.z, rgba: pl.rgba, scale: 0.42, zBase: 1.75, alpha: Math.min(1, pl.life / 4) });
+      out.push({ x: pl.x, z: pl.z, rgba: pl.rgba, scale: 0.42, zBase: 1.3, alpha: Math.min(1, pl.life / 4) });
     }
     for (const d of this.demons) {
       const frames = d.state === 'pain' ? this.painFrames : d.state === 'die' || d.state === 'corpse' ? this.deathFrames : this.walkFrames;
@@ -267,7 +267,7 @@ export class Actors {
       if (d.state === 'die') frame = frames[Math.min(frames.length - 1, ((d.t / 0.12) | 0) % frames.length)];
       else if (d.state === 'corpse') frame = frames[frames.length - 1];
       else frame = frames[((d.anim / 0.34) | 0) % frames.length];
-      out.push({ x: d.x, z: d.z, frame, scale: 1.55 });
+      out.push({ x: d.x, z: d.z, frame, scale: 2.5 });
     }
     return out;
   }

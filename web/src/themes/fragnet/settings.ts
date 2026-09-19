@@ -28,14 +28,14 @@ export const FRAGNET_DEFAULTS = {
 
   // scene budgets = the HIGH preset
   dMapSize: 32,         // maze edge in cells
-  dPixRes: 240,         // internal render height in pixels (DOOM was 200)
+  dPixRes: 200,         // 200 = 320x200 classic, 400 = 640x400 hi-res
 };
 
 export const FRAGNET_BUDGETS: Budgets = {
-  low: { dMapSize: 20, dPixRes: 180 },
-  medium: { dMapSize: 26, dPixRes: 216 },
-  high: { dMapSize: 32, dPixRes: 240 },
-  ultra: { dMapSize: 48, dPixRes: 360 },
+  low: { dMapSize: 20, dPixRes: 200 },
+  medium: { dMapSize: 26, dPixRes: 200 },
+  high: { dMapSize: 32, dPixRes: 200 },
+  ultra: { dMapSize: 48, dPixRes: 400 },
 };
 
 type Key = keyof typeof FRAGNET_DEFAULTS;
@@ -65,7 +65,7 @@ export const FRAGNET_CONTROLS = {
   ],
   budgets: [
     range('dMapSize', 'Maze size (cells)', 12, 56, 2),
-    range('dPixRes', 'Screen pixels (height)', 144, 480, 8),
+    { kind: 'select', key: 'dPixRes', label: 'Screen', options: [['200', '320×200 (classic)'], ['400', '640×400 (hi-res)']], numeric: true } as Control,
   ],
   color: [],
 };

@@ -197,13 +197,15 @@ export interface TexTable {
   sprites: Record<string, Record<string, SprFrame>>;  // role -> frame letter
 }
 
-/** Which lumps an IWAD must provide for this scene, by role. */
+/** Which lumps an IWAD must provide for this scene, by role. Roles collect
+ *  up to the first few candidates that exist as texture variants (`role2`,
+ *  `role3`, ...), so sectors can pick each room its own look. */
 export const WANT = {
-  flats: { floor: ['FLAT10', 'FLOOR4_8', 'FLOOR1'], ceil: ['FLAT1', 'CEIL3_3', 'CEIL5_1'],
-    hellFloor: ['FLAT8', 'LAVA3', 'NFlats'], hellCeil: ['FLAT5', 'LAVA1', 'ROCK1'],
+  flats: { floor: ['FLAT10', 'FLOOR4_8', 'FLOOR1', 'FLAT6'], ceil: ['FLAT1', 'CEIL3_3', 'CEIL5_1', 'CEIL4_3'],
+    hellFloor: ['FLAT8', 'LAVA3'], hellCeil: ['FLAT5', 'LAVA1', 'ROCK1'],
     techFloor: ['FLAT4', 'FLOOR0_1', 'FLOOR7_1'], exitFloor: ['FLOOR6_1', 'FLAT14', 'FLOOR4_6'],
     exitCeil: ['FLOOR6_2', 'FLAT20', 'CEIL4_2'] },
-  walls: { tech: ['TEKWALL1', 'TEKBLUE', 'COMP2', 'TEKWALL4'], brick: ['BRICK8', 'BRICK1', 'BRICK12', 'METAL1'],
+  walls: { tech: ['TEKWALL1', 'TEKBLUE', 'COMP2', 'TEKWALL4'], brick: ['BRICK8', 'BRICK1', 'BRICK12', 'METAL1', 'WALL2'],
     hell: ['SLADWALL', 'A-DROCK1', 'ROCK1', 'HELL5'], door: ['DOOR1', 'DOOR3', 'DOOR2'],
     exit: ['EXITDOOR', 'DOOR5', 'DOOR9', 'DOOR1'], exitSign: ['EXITSIGN', 'EXITSGN2'] },
   sprites: {
@@ -236,16 +238,20 @@ export function extractTable(wad: Wad): TexTable {
   const table: TexTable = { palette: paletteOf(wad), cmap: colormapOf(wad), flats: {}, walls: {}, sprites: {} };
   const flatKeys: Array<keyof typeof WANT.flats> = Object.keys(WANT.flats) as Array<keyof typeof WANT.flats>;
   for (const key of flatKeys) {
+    let v = 0;
     for (const cand of WANT.flats[key]) {
+      if (v >= 3) break;
       const f = decodeFlat(wad, cand);
-      if (f) { table.flats[key] = f; break; }
+      if (f) { table.flats[v === 0 ? key : `${key}${v + 1}`] = f; v++; }
     }
   }
   const wallKeys: Array<keyof typeof WANT.walls> = Object.keys(WANT.walls) as Array<keyof typeof WANT.walls>;
   for (const key of wallKeys) {
+    let v = 0;
     for (const cand of WANT.walls[key]) {
+      if (v >= 4) break;
       const t = decodeTexture(wad, cand);
-      if (t) { table.walls[key] = t; break; }
+      if (t) { table.walls[v === 0 ? key : `${key}${v + 1}`] = t; v++; }
     }
   }
   const roles: Array<keyof typeof WANT.sprites> = Object.keys(WANT.sprites) as Array<keyof typeof WANT.sprites>;
