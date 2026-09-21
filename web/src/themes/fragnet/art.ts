@@ -91,7 +91,7 @@ export function buildFallbackTable(): TexTable {
     flats: {
       floor: flat(texFloor(3)), ceil: flat(texCeil(3)),
       techFloor: flat(texFloor(5)), hellFloor: flat(texHell(5)), hellCeil: flat(texCeil(7)),
-      exitFloor: flat(texFloor(9)), exitCeil: flat(texCeil(9)),
+      exitFloor: flat(texFloor(9)), exitCeil: flat(texCeil(9)), lampCeil: flat(texCeil(13)),
     },
     walls: {
       tech: { w: 64, h: 64, idx: flat(texTech(7)) },

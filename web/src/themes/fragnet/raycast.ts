@@ -79,7 +79,13 @@ export class SoftRenderer {
           if (level.grid[i] === WALL) continue;
           const d = Math.max(Math.abs(x - lx), Math.abs(y - ly));
           if (d > 2) continue;
-          styles[i] = { ...styles[i], light: Math.max(styles[i].light, d === 0 ? 232 : 196), flicker: true };
+          const lit = d === 0;
+          styles[i] = {
+            ...styles[i],
+            light: Math.max(styles[i].light, lit ? 236 : 196),
+            flicker: true,
+            ...(lit ? { ceilFlat: 'lampCeil', flatVar: 0 } : null),
+          };
         }
       }
     }
@@ -177,18 +183,21 @@ export class SoftRenderer {
       const colLight = hit === 3 ? 236 : style ? this.effLight(style, dist, t, boost, 0, 0) : 90;
       const lut = colLuts[lightToTable(colLight)];
 
-      // wall span
+      // wall span, sampled at the game's native square-texel density: one
+      // texel is one map unit tall AND wide, so the full-height wall (four of
+      // our units = 128 map units) shows 128 texels and 64-tall textures tile
+      // twice; a cell face is two units = 64 texels across, exactly one 64-
+      // wide texture, doors tile up from the floor
       const offX = style ? style.offX : 0, offY = style ? style.offY : 0;
       let wallU = side === 0 ? (posCellZ + perp * rayZ) % 1 : (posCellX + perp * rayX) % 1;
-      wallU = (wallU + offX) % 1;
       if (wallU < 0) wallU += 1;
-      let texX = (wallU * tex.w) | 0;
+      let texX = ((wallU * 64 + offX * tex.w) | 0) % tex.w;
       if (side === 0 && rayX > 0) texX = tex.w - 1 - texX;
       if (side === 1 && rayZ < 0) texX = tex.w - 1 - texX;
       const y0 = Math.max(0, Math.ceil(wallTop)), y1 = Math.min(H - 1, Math.floor(wallBot));
-      const vScale = (tex.h * WALL_H) / (CS * Math.max(1, wallBot - wallTop));
+      const texYStep = 32 / ppu;   // texels per screen pixel, floor-anchored
       for (let y = y0; y <= y1; y++) {
-        let texY = (((y - wallTop) * vScale + offY * tex.h) | 0) % tex.h;
+        let texY = (((wallBot - y) * texYStep + offY * tex.h) | 0) % tex.h;
         if (texY < 0) texY += tex.h;
         buf[y * W + x] = lut[tex.idx[texY * tex.w + texX]];
       }

@@ -16,6 +16,7 @@ const SEQUENCE: Array<[keyof GunFrames, number]> = [['B', 0.1], ['C', 0.14], ['D
 
 export class Gun2D {
   private canvases = new Map<string, HTMLCanvasElement>();
+  private idleKey = 'A';
   private seq = -1;
   private seqT = 0;
   private bobPhase = 0;
@@ -25,6 +26,7 @@ export class Gun2D {
   load(frames: GunFrames | null, palette: Uint8Array): void {
     this.canvases.clear();
     if (!frames) return;
+    let bestArea = -1;
     for (const [key, f] of Object.entries(frames)) {
       if (!f) continue;
       const cvs = document.createElement('canvas');
@@ -35,15 +37,15 @@ export class Gun2D {
       for (let i = 0; i < f.w * f.h; i++) {
         const v = f.idx[i];
         if (v === 255) { data[i] = 0; continue; }
-        // a hair brighter than the corridor, so the gun never becomes a
-        // black hole against a dark wall the way DOOM's own art tends to
-        const r = Math.min(255, palette[v * 3] * 1.08 + 5) | 0;
-        const g = Math.min(255, palette[v * 3 + 1] * 1.08 + 5) | 0;
-        const b = Math.min(255, palette[v * 3 + 2] * 1.08 + 5) | 0;
-        data[i] = 0xff000000 | (b << 16) | (g << 8) | r;
+        // full bright, exactly like the game draws its weapon: the palette
+        // as-is, no LUT, no lift - the gun is the brightest thing on screen
+        data[i] = 0xff000000 | (palette[v * 3 + 2] << 16) | (palette[v * 3 + 1] << 8) | palette[v * 3];
       }
       ctx.putImageData(img, 0, 0);
       this.canvases.set(key, cvs);
+      // some WADs make the idle frame a muzzle-only stub; the ready pose is
+      // whichever frame actually shows the whole gun
+      if (f.w * f.h > bestArea) { bestArea = f.w * f.h; this.idleKey = key; }
     }
   }
 
@@ -71,15 +73,18 @@ export class Gun2D {
   /** Paint the gun into the internal-resolution buffer's canvas. */
   draw(ctx: CanvasRenderingContext2D, W: number, H: number): void {
     if (!this.visible || !this.canvases.size) return;
-    const key = this.seq >= 0 ? SEQUENCE[this.seq][0] : 'A';
-    const cvs = this.canvases.get(key) ?? this.canvases.get('A');
+    const key = this.seq >= 0 ? SEQUENCE[this.seq][0] : this.idleKey;
+    const cvs = this.canvases.get(key) ?? this.canvases.get(this.idleKey);
     if (!cvs) return;
-    const gh = H * 0.5;
-    const gw = gh * (cvs.width / cvs.height);
-    const bobX = Math.sin(this.bobPhase) * W * 0.01;
-    const bobY = Math.abs(Math.cos(this.bobPhase)) * H * 0.01;
-    const recoil = this.seq >= 0 ? H * 0.04 * (1 - this.seqT / SEQUENCE[this.seq][1]) : 0;
+    // the game's own placement: native pixel size on a 200-line screen,
+    // bottom edge flush with the screen bottom (hands and all), centered a
+    // hair right of middle
+    const s = H / 200;
+    const gw = cvs.width * s, gh = cvs.height * s;
+    const bobX = Math.sin(this.bobPhase) * 2 * s;
+    const bobY = Math.abs(Math.cos(this.bobPhase)) * 2 * s;
+    const recoil = this.seq >= 0 ? 6 * s * (1 - this.seqT / SEQUENCE[this.seq][1]) : 0;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(cvs, (W - gw) / 2 + bobX, H - gh * 0.86 + bobY + recoil, gw, gh);
+    ctx.drawImage(cvs, (W - gw) / 2 + W * 0.015 + bobX, H - gh + bobY + recoil, gw, gh);
   }
 }

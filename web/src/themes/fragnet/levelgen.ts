@@ -111,6 +111,26 @@ function tryLevel(size: number, rand: () => number): Level | null {
     }
   }
 
+  // wide halls: the game's corridors are two blocks across, so flare every
+  // corridor cell out one step. Doors keep their pinch (cells touching a
+  // door stay shut), rooms keep their footprint (interior cells never dilate)
+  const spine: Array<[number, number]> = [];
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      if (grid[y * w + x] !== FLOOR) continue;
+      if (rooms.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)) continue;
+      spine.push([x, y]);
+    }
+  }
+  for (const [x, y] of spine) {
+    for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]] as const) {
+      if (nx < 1 || ny < 1 || nx >= w - 1 || ny >= h - 1) continue;
+      if (grid[ny * w + nx] !== WALL) continue;
+      if (l.doors.some((d) => Math.abs(d.x - nx) + Math.abs(d.y - ny) === 1)) continue;
+      grid[ny * w + nx] = FLOOR;
+    }
+  }
+
   // exit: the room center farthest from spawn
   let best = rooms[rooms.length - 1], bd = -1;
   for (const r of rooms) {

@@ -18,8 +18,8 @@ import './hud.css';
  * cast column by column out of a WAD's textures and colour maps, the
  * marine's shotgun kicks at the bottom of the screen, and imps lean round
  * corners. The marine is the network stack with a shotgun: allowed traffic
- * feeds his ammo, an IDS threat tears a demon into the corridor and he
- * tracks it down and frags it on the spot (FRAGGED), blocks slam blast doors
+  * feeds his ammo, an IDS threat tears a demon into the corridor and he
+  * tracks it down and frags it on the spot, blocks slam blast doors
  * red, DHCP opens a secret wall with the device's name on it, DNS domains
  * light up on plates, and Wi-Fi joins spin teleporters up. Five traces and
  * the exit elevator opens: E1M2, E1M3, deeper into the maze.
@@ -91,7 +91,6 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
   overlay.innerHTML = `
     <div class="frg-hurt"></div><div class="frg-flash"></div><div class="frg-wipe"></div>
     <div class="frg-title">E1M1: YOUR NETWORK</div>
-    <div class="frg-stamp">FRAGGED</div>
     <div class="frg-wad"><label><input type="file" accept=".wad">WAD art</label><span>loading…</span></div>
     <div class="frg-bar">
       <div class="frg-pad"><span class="frg-cap">HEALTH</span><b class="frg-health">100</b><i>%</i></div>
@@ -103,7 +102,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
   document.body.appendChild(overlay);
   const el = (sel: string): HTMLElement => overlay.querySelector(sel) as HTMLElement;
   const hurtEl = el('.frg-hurt'), flashEl = el('.frg-flash'), wipeEl = el('.frg-wipe');
-  const titleEl = el('.frg-title'), stampEl = el('.frg-stamp');
+  const titleEl = el('.frg-title');
   const healthEl = el('.frg-health'), ammoEl = el('.frg-ammo'), fragsEl = el('.frg-frags'), lvlEl = el('.frg-lvl');
   const faceCvs = overlay.querySelector('.frg-face canvas') as HTMLCanvasElement;
   const wadStatus = overlay.querySelector('.frg-wad span') as HTMLElement;
@@ -134,8 +133,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
   });
   void loadArt();
 
-  // lamp and exit glows, built once
-  const lampGlow = canvasToRgba(sprGlow('#ffcf9a', 32));
+  // the exit's glow marker, built once - lamps are lit ceiling flats now
   const exitGlow = canvasToRgba(sprGlow('#ffd27a', 32));
 
   // ── the world and the marine ──
@@ -434,8 +432,6 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
         frags++; fragsLevel++;
         if (settings.dGore) actors.burst(engage.x, engage.z);
         audio.sfx('fragged');
-        stampEl.classList.add('on');
-        window.setTimeout(() => stampEl.classList.remove('on'), 2200);
         engage = pickTarget();
         if (engage) { engageT = 0; fireT = 0.4; }
         else phase = fragsLevel >= settings.dFrags ? 'exit' : 'walk';
@@ -524,9 +520,6 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     const bob = moving ? Math.sin(bobPhase) : 0;
     renderer.bobPx = bob * 4;
     const sprites = actors.collect();
-    for (const [lx, ly] of level.lamps) {
-      sprites.push({ x: lx * CS + CS / 2, z: ly * CS + CS / 2, rgba: lampGlow, scale: 0.55, zBase: 3.55, add: true, alpha: 0.75 });
-    }
     if (fragsLevel >= settings.dFrags && !exitShown) { exitShown = true; }
     if (exitShown) {
       sprites.push({ x: level.exit[0] * CS + CS / 2, z: level.exit[1] * CS + CS / 2, rgba: exitGlow, scale: 0.9, zBase: 0.1, add: true, alpha: 0.7 + 0.25 * Math.sin(f.t * 4) });
