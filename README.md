@@ -21,6 +21,9 @@ your own traffic. Pick a scene per screen:
   translucent monolith blocks lined in glowing cyan, patrolled at street
   level with sweeping ninety-degree corners, until the camera swings around
   to lock onto a red file and trace the intruder
+- **Mycelium**: a bioluminescent forest floor from above, where hosts are
+  nodules of light and permitted traffic grows a web of glowing hyphae that
+  keeps growing across days — even after you reload
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -38,6 +41,8 @@ and never touches the network itself.
 | ![aquarium](docs/aquarium.png) | ![aquarium shark](docs/aquarium-shark.png) |
 | **The Gibson** | **The Gibson: target lock** |
 | ![the gibson](docs/gibson.png) | ![gibson target lock](docs/gibson-lock.png) |
+| **Mycelium** | **Mycelium: a blight swarm crawls in** |
+| ![mycelium](docs/mycelium.png) | ![mycelium blight](docs/mycelium-blight.png) |
 
 | Midnight Run | Packet Rush | Last Outpost |
 |---|---|---|
@@ -51,6 +56,7 @@ traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew
 [Mainframe](https://scratchhax.github.io/pewpew/?theme=mainframe) ·
 [Aquarium](https://scratchhax.github.io/pewpew/?theme=aquarium) ·
 [The Gibson](https://scratchhax.github.io/pewpew/?theme=gibson) ·
+[Mycelium](https://scratchhax.github.io/pewpew/?theme=mycelium) ·
 Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 
 ## Contents
@@ -59,7 +65,7 @@ Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - [Highlights](#highlights)
 - [Setup](#setup): [Relay](#1-start-the-relay) · [Viewer](#2-build-the-viewer) · [UniFi logging](#3-send-unifi-logs-to-the-relay) · [Check it's working](#4-check-its-working) · [`relay.yaml`](#relayrelayyaml)
 - [Using pewpew](#using-pewpew): [Keys](#keys) · [Switching scenes](#switching-scenes) · [Log inspector](#log-inspector) · [Settings](#settings-f1)
-- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson)
+- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [Mycelium](#mycelium)
 - [Sound](#sound)
 - [Performance and quality](#performance-and-quality)
 - [URL parameters](#url-parameters)
@@ -95,7 +101,7 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
 
 ## Highlights
 
-- **Eight scenes, one relay.** Every screen picks its own scene, so the kiosk
+- **Nine scenes, one relay.** Every screen picks its own scene, so the kiosk
   in the hall and the laptop on your desk can show different worlds at the same
   time. Three are 2D (PixiJS) and five are full 3D (three.js); a screen only
   downloads the renderer its scene uses.
@@ -238,7 +244,7 @@ minutes to start logging after a settings change or a relay restart.
 |-----|---------|--------------|
 | `syslog_bind`, `syslog_port` | `0.0.0.0`, `5514` | where syslog (UDP) is received |
 | `http_host`, `http_port` | `0.0.0.0`, `8080` | the viewer, WebSocket and health endpoints |
-| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe` or `aquarium` (every scene is also at `/<id>/`) |
+| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson` or `mycelium` (every scene is also at `/<id>/`) |
 | `buffer_size` | `500` | recent events replayed to each newly opened browser |
 | `wan_interfaces` | `[ppp0]` | which gateway interfaces count as WAN, for inbound and outbound. Look at the `IN=`/`OUT=` fields of your firewall log lines; `eth8`–`eth10` are common on UDM and UDR |
 | `wan_ips`, `vpn_networks` | empty | optional WAN addresses and VPN networks, for direction and VPN badges |
@@ -282,7 +288,7 @@ different screens can show different scenes at once:
 | URL | Scene |
 |-----|-------|
 | `http://<relay-host>:8080/` | this screen's saved pick, or else the relay's `default_theme` |
-| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/` | that scene (unknown names are a 404) |
+| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/`, `/gibson/`, `/mycelium/` | that scene (unknown names are a 404) |
 | any URL + `?theme=racing` | that scene (handy on the Pages demo) |
 
 The viewer checks the URL path, then `?theme=`, then the screen's saved pick,
@@ -337,7 +343,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -345,7 +351,7 @@ panel's **Apply & reload**.
 
 ## Scenes
 
-All seven scenes draw the same events with the same colours. Each has its own
+All nine scenes draw the same events with the same colours. Each has its own
 HUD, sound and settings.
 
 ### Orbital Command
@@ -642,7 +648,7 @@ only make sense in the dark switch to thermal when the target is in daylight.
 | ![night vision](docs/spy-eye.png) | ![thermal](docs/spy-thermal.png) | ![daylight](docs/spy-day.png) |
 
 Everything is built in code: the planet and its city lights, the satellites,
-the eight scenes and every person in them. Nothing flashes: the enhance steps,
+the nine scenes and every person in them. Nothing flashes: the enhance steps,
 scan lines, boxes and stamp all ease in. In F1 → Scene, **Eye of god** turns
 the taskings off, **Eye: threats in a minute** sets the threat trigger, and
 **Eye: random sweep every (min)** sets how often a random sweep comes round
@@ -821,6 +827,40 @@ The listings, the traces and every tower are generated in code; no textures
 ship with the scene. In F1 → Scene, each event's effect can be turned off,
 **Target lock (threat)** turns the camera lock off, and **Scroll speed** scales
 the pace of the patrol.
+
+### Mycelium
+
+![mycelium](docs/mycelium.png)
+
+The network as a forest floor seen from close above, at night, drawn entirely
+in code: the loam is a gradient with grain and vignette, and everything alive
+is bioluminescent teal. Your hosts are nodules of light; the gateway is the
+root, a bright sun near the centre of the clearing. Permitted traffic feeds
+the web — a hypha between the host and the root thickens, brightens and runs
+light pulses along its length with every flow, and traffic out to the internet
+sends pale warm tendrils out past the edge of the known. Nothing about the
+internet grows a node: only your own hosts root here.
+
+| Event | On the floor |
+|-------|--------------|
+| allow | the hypha between host and root thickens toward white, and a light pulse runs it; two LAN hosts talking grow a hypha directly between them |
+| block | a scorch patch smoulders in where the flow died, with an ember flare, and heals away over twenty seconds |
+| threat | a crimson blight swarm crawls in from a screen edge toward the brightest host, and the web flares white and burns it off while the music swells |
+| dns | a pale mushroom pushes up nearby with the domain on its stem, glowing cream, and wilts after half a minute |
+| dhcp | a new host takes root with a warm ring and a rising glass tone, labelled with its hostname |
+| wifi | joins emit a drift of spore light from the access point's nodule; failures scatter dimly |
+| system | a grey ring breathes out from the gateway nodule |
+
+**The garden keeps growing.** The web is persisted to the browser, so the
+scene you see today is the one your network grew since the last visit — with
+time doing what it does: hyphae fade on a half-life you set (4 days by
+default), so neglected threads thin and the well-trodden ones stay bright.
+**Keep the garden** (F1 → Scene) turns this off.
+
+**The HUD is the organism's own field notes:** CLIMATE (the weather, from
+STILL to a storm), COLONY gauges (BLT blight, VIG vigour), FIELD NOTES,
+GREATEST HUBS and FIELD RECORDS, all in soft rounded glass with spore-dot
+corners.
 
 ## Sound
 
@@ -1067,6 +1107,26 @@ The wall plays along:
 
 Server hum and static hiss underneath, louder in heavy traffic.
 
+### Mycelium's soundtrack
+
+No beat grid: free ambient. A slow drone breathes through a four-chord cycle
+(Am F C G, gliding, one chord every forty-odd seconds) under an undergrowth
+bed of wind that deepens with the weather, and a sparse soloist rings bell
+sentences out of the current chord.
+
+| Event | Sound |
+|-------|-------|
+| allow | a soft low pluck in the pentatonic, panned to the host |
+| block | a muffled earth thud |
+| threat | two swelling semitones of dread as the blight arrives, a slow heartbeat while it crawls, and a bright crack with a bell when the web burns it off |
+| dns | a high glass bell |
+| dhcp | a warm glass for the new host taking root |
+| wifi | a short ping, high as spore light |
+| system | one low bell with long reverb |
+
+Bloom, sprout, scorch and heal each have their own small sound. Everything
+is deliberately sparse: a quiet network is mostly wind and drone.
+
 ### Background tracks
 
 Play your own music in any scene. In F1 → Audio → **Background track**, upload
@@ -1129,6 +1189,7 @@ two volumes of its own:
 | Mainframe | **Board sounds**, **Fans & buzz** |
 | Aquarium | **Tank sounds**, **Pump & water** |
 | The Gibson | **Access sounds**, **Hum & static** |
+| Mycelium | **Bells**, **Undergrowth & drone** |
 
 Each scene keeps its own choices.
 
@@ -1276,7 +1337,7 @@ been measured on a Pi yet.
 
 | Parameter | Effect |
 |-----------|--------|
-| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium` or `gibson` |
+| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson` or `mycelium` |
 | `?demo=1` | synthetic traffic, no relay needed |
 | `?showreel=1` | with the demo: a looping 60-second calm → build → hurricane → cooldown arc |
 | `?rate=40` | with the demo: about 40 events per second |

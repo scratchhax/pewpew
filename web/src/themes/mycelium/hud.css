@@ -1,0 +1,35 @@
+/* Mycelium: HUD panels as dark glass caps over the loam — soft irregular
+   edges like fungal growth, a faint teal rim-light, and the targeting
+   brackets replaced by glowing spore dots. Loaded only with this theme. */
+body[data-theme="mycelium"] #hud { color: #bde8da; }
+
+body[data-theme="mycelium"] #scanlines { opacity: 0.12; }
+
+body[data-theme="mycelium"] .panel {
+  background:
+    radial-gradient(130% 150% at 12% -10%, rgba(38,84,68,0.38), transparent 60%),
+    linear-gradient(165deg, rgba(8,22,18,0.74), rgba(4,10,9,0.55));
+  clip-path: none;
+  border: 1px solid rgba(95,240,207,0.20);
+  border-radius: 16px 26px 14px 20px / 22px 14px 24px 16px;
+  filter: drop-shadow(0 0 10px rgba(70,240,217,0.10));
+  padding: 9px 14px 11px;
+}
+
+body[data-theme="mycelium"] .panel-head {
+  color: #7fead0;
+  border-bottom: 1px solid rgba(95,240,207,0.16);
+  letter-spacing: 4px;
+}
+
+/* brackets become glowing spores at the corners */
+body[data-theme="mycelium"] .corner {
+  width: 9px; height: 9px; border: none;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(140,255,224,0.95) 0 30%, rgba(70,240,217,0.35) 55%, transparent 75%);
+  filter: blur(0.4px) drop-shadow(0 0 6px rgba(70,240,217,0.6));
+  opacity: 0.8;
+}
+
+body[data-theme="mycelium"] #weather { color: #7fffcf; }
+body[data-theme="mycelium"] .stat-row b { color: #8af0d4; }
