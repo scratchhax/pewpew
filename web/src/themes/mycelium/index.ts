@@ -222,7 +222,7 @@ async function create(host: ThemeHost<typeof MYCELIUM_DEFAULTS>,
       const root = gatewayNode();
       if (ext !== root) garden.boost(ext, root, amount * 0.8);
       garden.tendril(root, other, amount * 0.5);
-      garden.touch(ext, 0.16); garden.touch(root, 0.14);
+      garden.touch(ext, 0.16); garden.touch(root, 0.05);
       return true;
     }
     if (ext) garden.touch(ext, 0.12);

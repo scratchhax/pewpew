@@ -11,7 +11,8 @@ export interface MNode {
   id: string;            // internal IP
   label: string;         // hostname if DHCP ever named it, else the IP
   nx: number; ny: number;
-  w: number;             // activity 0..1 (decays toward dormant)
+  w: number;             // memory 0..0.4: faint and persistent (days)
+  live: number;          // transient activity 0..~0.9: seconds, not traffic volume
   born: number;          // sim seconds
   pulse: number;         // recent-event flash, decays fast, drawn by the view
 }
@@ -19,7 +20,8 @@ export interface MNode {
 export interface MEdge {
   a: string;             // node id
   b: string;             // node id, or '' for an outward tendril
-  w: number;             // thickness 0..1 (decays: neglect thins the web)
+  w: number;             // memory 0..0.45: faint and persistent (days)
+  live: number;          // transient flare: each flow lights the thread briefly
   bend: number;          // -1..1 organic curve offset (stable per edge)
   out: number;           // tendril heading (radians) when b === ''
 }
@@ -49,7 +51,7 @@ export class Garden {
   node(id: string, label?: string, t = 0): MNode {
     let n = this.nodes.get(id);
     if (!n) {
-      n = { id, label: label ?? id, nx: 0, ny: 0, w: 0.08, born: t, pulse: 0 };
+      n = { id, label: label ?? id, nx: 0, ny: 0, w: 0.06, live: 0, born: t, pulse: 0 };
       this.place(n);
       this.nodes.set(id, n);
       this.dirty = true; this.revision++;
@@ -59,16 +61,20 @@ export class Garden {
     return n;
   }
 
-  /** Grow a hypha between two hosts, or boost it: traffic feeds the web. */
+  /** Grow a hypha between two hosts, or boost it: traffic lights the thread. */
   boost(a: MNode, b: MNode, amount: number): MEdge {
     const key = pairKey(a.id, b.id);
     let e = this.edges.get(key);
     if (!e) {
-      e = { a: a.id, b: b.id, w: 0, bend: hash01(key) * 2 - 1, out: 0 };
+      e = { a: a.id, b: b.id, w: 0, live: 0, bend: hash01(key) * 2 - 1, out: 0 };
       this.edges.set(key, e);
       this.revision++;
     }
-    e.w = Math.min(1, e.w + amount);
+    // transient by law: every flow is a pulse of light, not bulk. A flow
+    // tops the flare to a fixed height (rate-independent — volume reads as
+    // pulses, never brightness); memory creeps up so used paths stay visible
+    e.live = Math.min(0.9, Math.max(e.live, 0.45) + amount * 0.5);
+    e.w = Math.min(0.5, e.w + amount * 0.24);
     this.dirty = true;
     return e;
   }
@@ -79,11 +85,12 @@ export class Garden {
     const key = stubKey(a.id, out);
     let e = this.edges.get(key);
     if (!e) {
-      e = { a: a.id, b: '', w: 0, bend: hash01(key) * 2 - 1, out };
+      e = { a: a.id, b: '', w: 0, live: 0, bend: hash01(key) * 2 - 1, out };
       this.edges.set(key, e);
       this.revision++;
     }
-    e.w = Math.min(1, e.w + amount);
+    e.live = Math.min(0.9, Math.max(e.live, 0.4) + amount * 0.4);
+    e.w = Math.min(0.35, e.w + amount * 0.12);
     this.dirty = true;
     return e;
   }
@@ -141,23 +148,25 @@ export class Garden {
     }
   }
 
-  /** Feed activity: the node lights up, its recent events flash. */
+  /** Feed activity: the node lights up briefly, its memory creeps up faintly. */
   touch(n: MNode, amount = 0.35): void {
-    n.w = Math.min(1, Math.max(n.w, 0.12) + amount * 0.25);
-    n.pulse = 1;
+    n.live = Math.min(0.85, Math.max(n.live, 0.35) + amount * 0.2);
+    n.w = Math.min(0.4, Math.max(n.w, 0.08) + amount * 0.015);
+    n.pulse = Math.max(n.pulse, 0.6 + amount * 0.4);
   }
 
-  /** Neglect is the paintbrush: everything slowly thins toward dormancy. */
+  /** Neglect is the paintbrush: flares die in seconds, memory thins over days. */
   decay(dt: number, halfDays: number): void {
     const k = Math.exp(-LN2 * dt / (Math.max(0.5, halfDays) * 86400));
+    const el = Math.exp(-LN2 * dt / 2.5);       // transient flare: 2.5 s half-life
     for (const e of this.edges.values()) {
-      e.w *= k;
-      if (e.w < 0.004) { this.edges.delete(this.edgeKeyOf(e)); this.dirty = true; this.revision++; }
+      e.w *= k; e.live *= el;
+      if (e.w < 0.004 && e.live < 0.01) { this.edges.delete(this.edgeKeyOf(e)); this.dirty = true; this.revision++; }
     }
     const nk = Math.exp(-LN2 * dt / (Math.max(0.5, halfDays) * 86400 * 1.6));
     for (const n of this.nodes.values()) {
-      n.w *= nk;
-      n.pulse = Math.max(0, n.pulse - dt * 1.4);
+      n.w *= nk; n.live *= el;
+      n.pulse = Math.max(0, n.pulse - dt * 3.2);
     }
     // trim to budget: evict the frailest hyphae, then the most dormant hosts
     if (this.edges.size > this.maxEdges) this.evictEdges();
@@ -239,7 +248,7 @@ export class Garden {
         if (typeof id !== 'string' || typeof nx !== 'number') continue;
         const n = this.nodes.get(id);
         if (n) { n.w = Math.max(n.w, w * k); continue; }
-        this.nodes.set(id, { id, label: label || id, nx: clamp01(nx), ny: clamp01(ny), w: w * k, born: 0, pulse: 0 });
+        this.nodes.set(id, { id, label: label || id, nx: clamp01(nx), ny: clamp01(ny), w: w * k, live: 0, born: 0, pulse: 0 });
       }
       for (const r of d.edges) {
         const [a, b, w, bend, out] = r as [string, string, number, number, number];
@@ -249,7 +258,7 @@ export class Garden {
         if (b !== '' && !this.nodes.has(b)) continue;
         const key = b === '' ? stubKey(a, out) : pairKey(a, b);
         if (this.edges.has(key)) continue;
-        this.edges.set(key, { a, b, w: w * k, bend, out });
+        this.edges.set(key, { a, b, w: w * k, live: 0, bend, out });
       }
       this.dirty = true; this.revision++;
       return true;

@@ -219,7 +219,9 @@ export class View {
       this.lastRev = garden.revision;
       this.lastDraw = t;
     }
-    this.hyphaG.alpha = 0.85 + 0.15 * Math.sin(t * 0.45);
+    // storm governor: when traffic floods, the base web dims and the light
+    // is carried by the travelling pulses instead
+    this.hyphaG.alpha = (0.85 + 0.15 * Math.sin(t * 0.45)) * (1 - this.weather * 0.3);
 
     this.syncNodes(garden, t);
     this.updatePulses(dt, garden);
@@ -230,7 +232,7 @@ export class View {
     this.updateRings(dt);
     this.updateMotes(dt);
 
-    const calm = 0.42 + 0.08 * Math.sin(t * 0.07);
+    const calm = 0.34 + 0.07 * Math.sin(t * 0.07);
     this.clearing.alpha = (calm + this.weather * 0.12) * this.glow;
     this.clearing.position.set(this.w / 2, this.h / 2);
     const cs = Math.min(this.w, this.h) * (1.5 + 0.06 * Math.sin(t * 0.05));
@@ -268,7 +270,10 @@ export class View {
     for (const e of garden.edges.values()) {
       const p = this.edgePts(e, garden);
       if (!p) continue;
-      const wgt = Math.pow(e.w, 0.75);
+      // memory keeps a faint thread; a flare only lifts it a little. Traffic
+      // volume reads as travelling pulses, never as bulk brightness — a
+      // flooded network is busy light over a calm web, not a white wall
+      const wgt = Math.min(0.65, e.w * 1.1 + e.live * 0.32);
       if (wgt <= 0.003) continue;
       if (e.b === '') {
         // outward tendril: a sampled polyline that fades into the dark
@@ -278,21 +283,21 @@ export class View {
           const fade = 1 - s / seg;
           g.moveTo(qbez(p[0], p[2], p[4], t0), qbez(p[1], p[3], p[5], t0))
             .lineTo(qbez(p[0], p[2], p[4], t1), qbez(p[1], p[3], p[5], t1))
-            .stroke({ color: WARM, width: (1.4 + 8 * wgt) * fade * u, alpha: (0.18 + 0.36 * wgt) * fade });
+            .stroke({ color: WARM, width: (1.2 + 5 * wgt) * fade * u, alpha: (0.07 + 0.18 * wgt) * fade });
         }
         continue;
       }
-      // wide bloom band, soft halo, bright thread, white-hot core on strong
-      // flows: the additive blend turns that stack into bioluminescence
+      // wide bloom band, soft halo, a bright thread, a white hint on the
+      // oldest paths: the additive blend turns that stack into bioluminescence
       g.moveTo(p[0], p[1]).quadraticCurveTo(p[2], p[3], p[4], p[5])
-        .stroke({ color: TEAL_DIM, width: (5 + 26 * wgt) * u, alpha: 0.05 + 0.16 * wgt });
+        .stroke({ color: TEAL_DIM, width: (3.5 + 12 * wgt) * u, alpha: 0.03 + 0.10 * wgt });
       g.moveTo(p[0], p[1]).quadraticCurveTo(p[2], p[3], p[4], p[5])
-        .stroke({ color: TEAL_DIM, width: (2.5 + 15 * wgt) * u, alpha: 0.18 + 0.34 * wgt });
+        .stroke({ color: TEAL_DIM, width: (1.5 + 9 * wgt) * u, alpha: 0.10 + 0.22 * wgt });
       g.moveTo(p[0], p[1]).quadraticCurveTo(p[2], p[3], p[4], p[5])
-        .stroke({ color: TEAL, width: (1 + 3.2 * wgt) * u, alpha: 0.42 + 0.55 * wgt });
-      if (wgt > 0.4) {
+        .stroke({ color: TEAL, width: (0.9 + 2.2 * wgt) * u, alpha: 0.34 + 0.34 * wgt });
+      if (wgt > 0.5) {
         g.moveTo(p[0], p[1]).quadraticCurveTo(p[2], p[3], p[4], p[5])
-          .stroke({ color: WHITE, width: 1.4 * u, alpha: (wgt - 0.4) * 1.2 });
+          .stroke({ color: WHITE, width: u, alpha: (wgt - 0.5) * 1.4 });
       }
     }
   }
@@ -324,16 +329,17 @@ export class View {
       const n = v.n;
       const x = n.nx * this.w, y = n.ny * this.h;
       const born = Math.min(1, (t - n.born) * 1.4 + 0.05);
-      const wgt = Math.min(0.82, Math.pow(n.w, 0.7));
-      const pulse = n.pulse * n.pulse;
+      // memory glows faintly; live activity flares — the root never bakes in
+      const wgt = Math.min(0.72, Math.pow(Math.min(1, n.w * 0.7 + n.live), 0.7));
+      const pulse = Math.min(1, n.pulse) * Math.min(1, n.pulse);
       const breathe = 1 + 0.07 * Math.sin(t * 1.3 + id.length * 2.7 + x * 0.01);
       v.glow.position.set(x, y);
-      v.glow.width = v.glow.height = (38 + 105 * wgt + 65 * pulse) * breathe * this.glow * born;
-      v.glow.alpha = Math.min(0.8, 0.24 + 0.38 * wgt + 0.3 * pulse) * this.glow * born;
-      const cSize = (7 + 9 * wgt + 7 * pulse) * this.unit * born;
+      v.glow.width = v.glow.height = (30 + 62 * wgt + 45 * pulse) * breathe * this.glow * born;
+      v.glow.alpha = Math.min(0.55, 0.2 + 0.3 * wgt + 0.2 * pulse) * this.glow * born;
+      const cSize = (6 + 7 * wgt + 5 * pulse) * this.unit * born;
       v.core.position.set(x, y);
       v.core.width = v.core.height = cSize;
-      v.core.alpha = (0.5 + 0.5 * Math.min(1, wgt * 1.4 + pulse)) * born;
+      v.core.alpha = Math.min(0.8, 0.45 + 0.45 * Math.min(1, wgt * 1.2 + pulse)) * born;
       v.label.position.set(x, y + 10 * this.unit + cSize * 0.4);
       // only significant hosts carry a name — the rest are pure light
       v.label.alpha = this.labels ? (n.w > 0.3 ? 0.12 + 0.4 * wgt : 0) * born : 0;
@@ -402,7 +408,7 @@ export class View {
         this.emit(b.x, b.y, WHITE, 26, 180 * this.unit, 0.9);
         this.emit(b.x, b.y, TEAL, 16, 110 * this.unit, 1.3);
         this.ringAt(b.x, b.y, TEAL, 160);
-        for (const e of garden.edges.values()) e.w = Math.min(1, e.w + 0.04);
+        for (const e of garden.edges.values()) e.live = Math.min(0.9, Math.max(e.live, 0.7));
         garden.revision++;
       }
       const fade = b.phase ? Math.max(0, 1 - (b.t - 7.5) / 1.6) : 1;
