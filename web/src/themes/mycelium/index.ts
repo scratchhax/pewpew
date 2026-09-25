@@ -61,7 +61,7 @@ async function create(host: ThemeHost<typeof MYCELIUM_DEFAULTS>,
   app.renderer.on('resize', () => resize());
 
   // the saved garden wakes up: decayed for the days it slept
-  if (settings.mPersist) garden.restore(settings.mFadeDays);
+  if (settings.mPersist) garden.restore(settings.mFadeMin);
 
   function applyBudgets(): void {
     view.setBudgets({ mSporeDrift: settings.mSporeDrift, mGlow: settings.mGlow,
@@ -248,7 +248,7 @@ async function create(host: ThemeHost<typeof MYCELIUM_DEFAULTS>,
     const { dt, t } = f;
     simT = t;
 
-    garden.decay(dt, settings.mFadeDays);
+    garden.decay(dt, settings.mFadeMin);
     if (settings.mPersist) garden.tick(t);
 
     view.setWeather(state.weather === 'hurricane' ? 1 : state.weather === 'storm' ? 0.5 : 0);

@@ -16,7 +16,7 @@ export const MYCELIUM_DEFAULTS = {
   mBlight: true,         // threat → blight swarm crawls in and burns off
   mLabels: true,         // device labels under the nodes
   mPersist: true,        // the garden survives reloads (localStorage)
-  mFadeDays: 4,          // hypha half-life in days: how fast neglect shows
+  mFadeMin: 20,          // hypha memory half-life in minutes: how fast neglect shows
   mGlow: 1,              // overall bioluminescence
   mSporeDrift: 1,        // ambient spores and fireflies
 
@@ -55,7 +55,7 @@ export const MYCELIUM_CONTROLS = {
     toggle('mLabels', 'Device labels'), toggle('mPersist', 'Keep the garden'),
   ],
   budgets: [
-    range('mFadeDays', 'Hypha half-life (days)', 1, 21, 1),
+    range('mFadeMin', 'Hypha half-life (minutes)', 5, 120, 5),
     range('mGlow', 'Bioluminescence', 0.2, 2, 0.05),
     range('mSporeDrift', 'Spore drift', 0, 2, 0.05),
     range('mMaxNodes', 'Hosts', 8, 60, 1),

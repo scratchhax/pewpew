@@ -31,6 +31,8 @@ export const stubKey = (a: string, out: number): string => `>${a}|${out.toFixed(
 
 const STORE = 'pewpew.mycelium.v1';
 const LN2 = Math.log(2);
+const GHOST_W = 0.05;   // the faintest an edge's memory ever fades
+const GHOST_N = 0.03;   // ... and a node's
 
 export class Garden {
   nodes = new Map<string, MNode>();
@@ -155,17 +157,19 @@ export class Garden {
     n.pulse = Math.max(n.pulse, 0.6 + amount * 0.4);
   }
 
-  /** Neglect is the paintbrush: flares die in seconds, memory thins over days. */
-  decay(dt: number, halfDays: number): void {
-    const k = Math.exp(-LN2 * dt / (Math.max(0.5, halfDays) * 86400));
+  /** Neglect is the paintbrush: flares die in seconds, memory fades to a
+   *  ghost trace on a minutes-scale half-life — old paths never vanish, they
+   *  just go quiet, so the map outlives the day but recency always reads. */
+  decay(dt: number, halfMin: number): void {
+    const k = Math.exp(-LN2 * dt / (Math.max(1, halfMin) * 60));
     const el = Math.exp(-LN2 * dt / 2.5);       // transient flare: 2.5 s half-life
     for (const e of this.edges.values()) {
-      e.w *= k; e.live *= el;
+      e.w = GHOST_W + (e.w - GHOST_W) * k; e.live *= el;
       if (e.w < 0.004 && e.live < 0.01) { this.edges.delete(this.edgeKeyOf(e)); this.dirty = true; this.revision++; }
     }
-    const nk = Math.exp(-LN2 * dt / (Math.max(0.5, halfDays) * 86400 * 1.6));
+    const nk = Math.exp(-LN2 * dt / (Math.max(1, halfMin) * 60 * 1.6));
     for (const n of this.nodes.values()) {
-      n.w *= nk; n.live *= el;
+      n.w = GHOST_N + (n.w - GHOST_N) * nk; n.live *= el;
       n.pulse = Math.max(0, n.pulse - dt * 3.2);
     }
     // trim to budget: evict the frailest hyphae, then the most dormant hosts
@@ -202,7 +206,7 @@ export class Garden {
         }
         if (!linked && (!worst || n.w < worst.w)) worst = n;
       }
-      if (!worst || worst.w > 0.02) break;
+      if (!worst || worst.w > GHOST_N + 0.015) break;   // only fully-dormant hosts go
       for (const e of [...this.edges.values()]) {
         if (e.a === worst.id || e.b === worst.id) this.edges.delete(this.edgeKeyOf(e));
       }
@@ -236,19 +240,20 @@ export class Garden {
     }
   }
 
-  restore(halfDays: number): boolean {
+  restore(halfMin: number): boolean {
     try {
       const raw = localStorage.getItem(STORE);
       if (!raw) return false;
       const d = JSON.parse(raw) as { v: number; t: number; nodes: unknown[][]; edges: unknown[][] };
       if (d.v !== 1 || !Array.isArray(d.nodes) || !Array.isArray(d.edges)) return false;
-      const k = Math.exp(-LN2 * Math.min(30 * 86400, Date.now() / 1000 - d.t) / (Math.max(0.5, halfDays) * 86400));
+      const k = Math.exp(-LN2 * Math.min(30 * 86400, Date.now() / 1000 - d.t) / (Math.max(1, halfMin) * 60));
+      const mem = (w: number, floor: number) => floor + (Math.max(floor, w) - floor) * k;
       for (const r of d.nodes) {
         const [id, label, nx, ny, w] = r as [string, string, number, number, number];
         if (typeof id !== 'string' || typeof nx !== 'number') continue;
         const n = this.nodes.get(id);
-        if (n) { n.w = Math.max(n.w, w * k); continue; }
-        this.nodes.set(id, { id, label: label || id, nx: clamp01(nx), ny: clamp01(ny), w: w * k, live: 0, born: 0, pulse: 0 });
+        if (n) { n.w = Math.max(n.w, mem(w, GHOST_N)); continue; }
+        this.nodes.set(id, { id, label: label || id, nx: clamp01(nx), ny: clamp01(ny), w: mem(w, GHOST_N), live: 0, born: 0, pulse: 0 });
       }
       for (const r of d.edges) {
         const [a, b, w, bend, out] = r as [string, string, number, number, number];
@@ -258,7 +263,7 @@ export class Garden {
         if (b !== '' && !this.nodes.has(b)) continue;
         const key = b === '' ? stubKey(a, out) : pairKey(a, b);
         if (this.edges.has(key)) continue;
-        this.edges.set(key, { a, b, w: w * k, live: 0, bend, out });
+        this.edges.set(key, { a, b, w: mem(w, GHOST_W), live: 0, bend, out });
       }
       this.dirty = true; this.revision++;
       return true;

@@ -22,8 +22,9 @@ your own traffic. Pick a scene per screen:
   level with sweeping ninety-degree corners, until the camera swings around
   to lock onto a red file and trace the intruder
 - **Mycelium**: a bioluminescent forest floor from above, where hosts are
-  nodules of light and permitted traffic grows a web of glowing hyphae that
-  keeps growing across days — even after you reload
+  nodules of light and permitted traffic grows a web of glowing hyphae —
+  recent paths blaze, old ones fade to ghost traces, and it's all still there
+  when you reload
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -852,10 +853,12 @@ internet grows a node: only your own hosts root here.
 | system | a grey ring breathes out from the gateway nodule |
 
 **The garden keeps growing.** The web is persisted to the browser, so the
-scene you see today is the one your network grew since the last visit — with
-time doing what it does: hyphae fade on a half-life you set (4 days by
-default), so neglected threads thin and the well-trodden ones stay bright.
-**Keep the garden** (F1 → Scene) turns this off.
+scene you see today is the one your network grew — with time doing what it
+does: every thread is a faint memory fading toward a ghost trace on a
+half-life you set in minutes (20 by default), while live traffic rides it as
+flares and travelling light that come and go in seconds. Neglected paths
+quiet down, well-trodden ones stay bold, and nothing ever bakes in. **Keep
+the garden** (F1 → Scene) turns persistence off.
 
 **The HUD is the organism's own field notes:** CLIMATE (the weather, from
 STILL to a storm), COLONY gauges (BLT blight, VIG vigour), FIELD NOTES,
