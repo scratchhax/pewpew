@@ -136,7 +136,7 @@ export class View {
     for (let i = 0; i < sim.E.length; i++) {
       const e = sim.E[i];
       if (e.dead) continue;
-      const a = Math.min(1, 0.05 + e.mem * 1.4);
+      const a = Math.min(1, Math.pow(e.mem, 1.4) * 1.6);
       const h = sim.V[e.b]?.hue ?? 1;
       buckets[h * B + Math.min(B - 1, (a * B) | 0)].push(i);
     }
@@ -144,7 +144,7 @@ export class View {
       for (let k = 0; k < B; k++) {
         const list = buckets[h * B + k];
         if (!list.length) continue;
-        const a = (k + 0.5) / B;
+        const a = Math.pow((k + 0.5) / B, 1.4);
         for (const i of list) { const e = sim.E[i]; g.moveTo(sim.V[e.a].x, sim.V[e.a].y).lineTo(sim.V[e.b].x, sim.V[e.b].y); }
         g.stroke({ color: HUES_DIM[h], width: 2.6 * u, alpha: 0.09 + a * 0.16 });
         g.moveTo(0, 0);
@@ -179,28 +179,35 @@ export class View {
       if (!pv) continue;
       const hue = HUES[tip.hue] ?? TEAL;
       const ph = tip.born * 6 + tip.x * 0.05;
-      const pts: number[] = [pv.x, pv.y];
-      for (let k = 0; k < tip.trail.length; k += 2) {
+      // collect the live polyline as proper [x,y] pairs
+      const pts: { x: number; y: number }[] = [{ x: pv.x, y: pv.y }];
+      for (let k = 0; k + 1 < tip.trail.length; k += 2) {
         const wx = tip.trail[k], wy = tip.trail[k + 1];
-        if (Math.hypot(wx - pts[pts.length - 2], wy - pts[pts.length - 1]) < 1.5) continue;
-        pts.push(wx, wy);
+        const last = pts[pts.length - 1];
+        if (Math.hypot(wx - last.x, wy - last.y) < 1.5) continue;
+        pts.push({ x: wx, y: wy });
       }
-      pts.push(tip.x, tip.y);
-      g.moveTo(pts[0], pts[1]);
-      for (let k = 1; k < pts.length - 3; k += 2) {
-        const dx = pts[k + 2] - pts[k - 2], dy = pts[k + 3] - pts[k + 1];
-        const dl = Math.hypot(dx, dy) || 1;
-        const w = Math.sin(t * 3.2 + ph + k * 0.9) * 2.2 * u;
-        g.lineTo(pts[k] - dy / dl * w, pts[k + 1] + dx / dl * w);
+      const last = pts[pts.length - 1];
+      if (Math.hypot(tip.x - last.x, tip.y - last.y) >= 0.5) pts.push({ x: tip.x, y: tip.y });
+      const tipPt = pts[pts.length - 1];
+      if (pts.length >= 2) {
+        g.moveTo(pts[0].x, pts[0].y);
+        for (let k = 1; k < pts.length - 1; k++) {
+          const prev = pts[k - 1], cur = pts[k], next = pts[k + 1];
+          const dx = next.x - prev.x, dy = next.y - prev.y;
+          const dl = Math.hypot(dx, dy) || 1;
+          const w = Math.sin(t * 3.2 + ph + k * 0.9) * 2.2 * u;
+          g.lineTo(cur.x - dy / dl * w, cur.y + dx / dl * w);
+        }
+        g.lineTo(tipPt.x, tipPt.y);
+        g.stroke({ color: hue, width: 1 * u, alpha: 0.18 });
       }
-      g.lineTo(tip.x, tip.y);
-      g.stroke({ color: hue, width: 1 * u, alpha: 0.26 });
       // a short feeler reaching ahead, swaying
       const fa = Math.sin(t * 4.5 + ph) * 0.55;
-      g.moveTo(tip.x, tip.y)
-        .lineTo(tip.x + Math.cos(tip.head + fa) * 7 * u, tip.y + Math.sin(tip.head + fa) * 7 * u)
+      g.moveTo(tipPt.x, tipPt.y)
+        .lineTo(tipPt.x + Math.cos(tip.head + fa) * 7 * u, tipPt.y + Math.sin(tip.head + fa) * 7 * u)
         .stroke({ color: hue, width: 0.8 * u, alpha: 0.16 });
-      g.circle(tip.x, tip.y, 1.4 * u).fill({ color: hue, alpha: 0.38 });
+      g.circle(tipPt.x, tipPt.y, 1.4 * u).fill({ color: hue, alpha: 0.3 });
     }
   }
 
@@ -211,10 +218,10 @@ export class View {
       this.lastDraw = t;
     }
     this.drawHot(sim, t);
-    // storm governor: flooded traffic dims the base mat; the pulses carry it
-    const gov = (0.85 + 0.15 * Math.sin(t * 0.45)) * (1 - this.weather * 0.3);
-    this.matG.alpha = gov * this.glow;
-    this.hotG.alpha = this.glow;
+    // the base mat is steady — no breathing strobe. Weather dims it;
+    // the hot layer carries the living shimmer instead
+    this.matG.alpha = (1 - this.weather * 0.25) * this.glow;
+    this.hotG.alpha = (0.9 + 0.1 * Math.sin(t * 0.45)) * this.glow;
 
     this.syncNodes(sim, t);
     this.syncPulses(sim);

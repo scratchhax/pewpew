@@ -62,7 +62,7 @@ export class Sim {
   w = 1; h = 1;
   private uf: number[] = [];
   private hash = new Map<string, number[]>();
-  private tGrow = 0; private tPrune = 14;
+  private tGrow = 0; private tPrune = 14; private tReach = 0;
   private dirty = false; private saveAt = 0;
   private deadE = 0;
   private edgeCache = new Map<number, number>();
@@ -209,7 +209,7 @@ export class Sim {
   // ── growth ────────────────────────────────────────────────────────────────
   private spawnTip(x: number, y: number, head: number, anchorV: number, homeV: number, force = false, hue = 1): void {
     if (this.tips.length > (force ? 90 : 40) * this.gscale || this.E.length >= this.maxSegs) return;
-    this.tips.push({ x, y, head, curv: (hash01(`c${x}|${y}|${this.tips.length}`) - 0.5) * 0.6,
+    this.tips.push({ x, y, head, curv: (hash01(`c${x}|${y}|${this.tips.length}`) - 0.5) * 0.32,
       vPrev: anchorV, age: 0, born: this.clock, homeV, seeking: true, hue, trail: [] });
   }
 
@@ -219,28 +219,13 @@ export class Sim {
       // hyphae grow in graceful arcs via a clamped curvature integrator;
       // chemotropism below adds real bends. Clamping is what keeps tips
       // from coiling into springs
-      t.curv += (Math.random() - 0.5) * 1.2 * dt; if (t.curv > 0.16) t.curv = 0.16; if (t.curv < -0.16) t.curv = -0.16;
+      t.curv += (Math.random() - 0.5) * 2.5 * dt; if (t.curv > 0.16) t.curv = 0.16; if (t.curv < -0.16) t.curv = -0.16;
+      // a filament may be gentle, but never dead straight — a long straight
+      // reads as a laser, not growth
+      if (t.curv > -0.05 && t.curv < 0.05) t.curv = 0.05 * (Math.random() < 0.5 ? -1 : 1);
       t.head += t.curv * 1.1 * dt;
-      // chemotropism: reach for OTHER hosts — but only from afar, and only
-      // until the first close pass. A tip that keeps steering at a nodule
-      // enters a stable orbit (springs!); a tip that seeks once draws a
-      // clean trunk and then wanders off for good
-      if (t.seeking) {
-        let bx = 0, by = 0, bd = 600 * 600, pull = false;
-        for (const n of this.nodes.values()) {
-          if (n.v === t.homeV) continue;
-          const dx = n.x - t.x, dy = n.y - t.y, d = dx * dx + dy * dy;
-          if (d < bd && d > 130 * 130) { bd = d; bx = dx; by = dy; pull = true; }
-          if (d < 130 * 130) t.seeking = false;
-        }
-        if (pull) {
-          const want = Math.atan2(by, bx);
-          let da = want - t.head; while (da > Math.PI) da -= 6.283; while (da < -Math.PI) da += 6.283;
-          t.head += da * 0.3 * dt;
-        }
-      }
       t.x += Math.cos(t.head) * TIP_SPEED * this.gscale * dt; t.y += Math.sin(t.head) * TIP_SPEED * this.gscale * dt;
-      if (t.x < 4 || t.y < 4 || t.x > this.w - 4 || t.y > this.h - 4 || t.age > 60 / Math.sqrt(this.gscale)) { this.tips.splice(i, 1); continue; }
+      if (t.x < 4 || t.y < 4 || t.x > this.w - 4 || t.y > this.h - 4 || t.age > 35 / Math.sqrt(this.gscale)) { this.tips.splice(i, 1); continue; }
       t.trail.push(t.x, t.y); if (t.trail.length > 10) t.trail.splice(0, t.trail.length - 10);
       const pv = this.V[t.vPrev];
       if (Math.hypot(t.x - pv.x, t.y - pv.y) >= SEG_LEN) {
@@ -328,8 +313,10 @@ export class Sim {
     if (a === b) return false;
     const p = this.bestPath(a.v, b.v);
     if (!p || p.length < 2) {
-      if (!quiet) {
-        // the network reaches out toward what it cannot yet feed
+      if (!quiet && this.tReach <= 0) {
+        // the network reaches out toward what it cannot yet feed — slowly,
+        // one explorer at a time, or the loam fills with aimed straights
+        this.tReach = 3;
         const head = Math.atan2(b.y - a.y, b.x - a.x) + (Math.random() - 0.5) * 0.8;
         this.spawnTip(a.x, a.y, head, a.v, a.v, false, this.V[a.v]?.hue ?? 1);
       }
@@ -382,7 +369,7 @@ export class Sim {
         return true;
       }
     }
-    if (!quiet) this.spawnTip(a.x, a.y, bearing, a.v, a.v, false, this.V[a.v]?.hue ?? 1);
+    if (!quiet && this.tReach <= 0) { this.tReach = 3; this.spawnTip(a.x, a.y, bearing, a.v, a.v, false, this.V[a.v]?.hue ?? 1); }
     return false;
   }
 
@@ -435,6 +422,7 @@ export class Sim {
   // ── frame ─────────────────────────────────────────────────────────────────
   step(dt: number, halfMin: number): void {
     this.clock += dt;
+    if (this.tReach > 0) this.tReach -= dt;
     this.growTips(dt);
 
     const fl = Math.exp(-dt * 2.6);
