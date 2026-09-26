@@ -142,7 +142,7 @@ export class Sim {
     const v = this.addV(pos.x, pos.y, GHOST, hue);
     n = { id: ip, label: label ?? ip, x: pos.x, y: pos.y, v, born: t, pulse: 0, hue };
     this.nodes.set(ip, n);
-    for (let k = 0; k < 3; k++) this.spawnTip(pos.x, pos.y, hash01(ip + k) * 6.283, v, v, true, hue);
+    this.spawnTip(pos.x, pos.y, hash01(ip) * 6.283, v, v, true, hue);
     this.dirty = true; this.revision++;
     return n;
   }
@@ -208,7 +208,7 @@ export class Sim {
 
   // ── growth ────────────────────────────────────────────────────────────────
   private spawnTip(x: number, y: number, head: number, anchorV: number, homeV: number, force = false, hue = 1): void {
-    if (this.tips.length > (force ? 130 : 40) * this.gscale || this.E.length >= this.maxSegs) return;
+    if (this.tips.length > (force ? 90 : 40) * this.gscale || this.E.length >= this.maxSegs) return;
     this.tips.push({ x, y, head, curv: (hash01(`c${x}|${y}|${this.tips.length}`) - 0.5) * 0.6,
       vPrev: anchorV, age: 0, born: this.clock, homeV, seeking: true, hue, trail: [] });
   }
@@ -261,7 +261,9 @@ export class Sim {
         let burned = false;
         for (const s of this.scorchs) if (s.t < 14 && Math.hypot(t.x - s.x, t.y - s.y) < s.r * 1.1) { burned = true; break; }
         if (burned) { this.tips.splice(i, 1); continue; }
-        const nv = this.addV(t.x, t.y, GHOST, t.hue); this.addE(t.vPrev, nv); t.vPrev = nv; t.trail.length = 0;
+        const nv = this.addV(t.x, t.y, GHOST, t.hue); this.addE(t.vPrev, nv); t.vPrev = nv;
+        // keep the last trail point so the drawn hair grows on continuously
+        if (t.trail.length > 2) t.trail.splice(0, t.trail.length - 2); else t.trail.length = 0;
         if (Math.random() < 0.02 && t.age > 1) {
           this.spawnTip(t.x, t.y, t.head + (Math.random() < 0.5 ? 1 : -1) * (0.5 + Math.random() * 0.7), t.vPrev, -1, false, t.hue);
         }

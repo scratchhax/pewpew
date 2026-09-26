@@ -178,7 +178,7 @@ export class View {
       const pv = sim.V[tip.vPrev];
       if (!pv) continue;
       const hue = HUES[tip.hue] ?? TEAL;
-      const ph = tip.born * 10 + tip.x * 0.05;
+      const ph = tip.born * 6 + tip.x * 0.05;
       const pts: number[] = [pv.x, pv.y];
       for (let k = 0; k < tip.trail.length; k += 2) {
         const wx = tip.trail[k], wy = tip.trail[k + 1];
@@ -188,19 +188,19 @@ export class View {
       pts.push(tip.x, tip.y);
       g.moveTo(pts[0], pts[1]);
       for (let k = 1; k < pts.length - 3; k += 2) {
-        const dx = pts[k + 2] - pts[k - 2], dy = pts[k + 4] - pts[k];
+        const dx = pts[k + 2] - pts[k - 2], dy = pts[k + 3] - pts[k + 1];
         const dl = Math.hypot(dx, dy) || 1;
-        const w = Math.sin(t * 6.5 + ph + k) * 1.7 * u;
+        const w = Math.sin(t * 3.2 + ph + k * 0.9) * 2.2 * u;
         g.lineTo(pts[k] - dy / dl * w, pts[k + 1] + dx / dl * w);
       }
       g.lineTo(tip.x, tip.y);
-      g.stroke({ color: hue, width: 1.3 * u, alpha: 0.8 });
+      g.stroke({ color: hue, width: 1 * u, alpha: 0.26 });
       // a short feeler reaching ahead, swaying
-      const fa = Math.sin(t * 9 + ph) * 0.55;
+      const fa = Math.sin(t * 4.5 + ph) * 0.55;
       g.moveTo(tip.x, tip.y)
-        .lineTo(tip.x + Math.cos(tip.head + fa) * 9 * u, tip.y + Math.sin(tip.head + fa) * 9 * u)
-        .stroke({ color: hue, width: 0.9 * u, alpha: 0.45 });
-      g.circle(tip.x, tip.y, 1.9 * u).fill({ color: WHITE, alpha: 0.85 });
+        .lineTo(tip.x + Math.cos(tip.head + fa) * 7 * u, tip.y + Math.sin(tip.head + fa) * 7 * u)
+        .stroke({ color: hue, width: 0.8 * u, alpha: 0.16 });
+      g.circle(tip.x, tip.y, 1.4 * u).fill({ color: hue, alpha: 0.38 });
     }
   }
 
