@@ -226,9 +226,12 @@ queries and the scene's DNS events (mushrooms with domains on their stems,
 DNS readouts, the dns protocol colour) would otherwise never appear. The
 relay speaks Pi-hole's FTL log format natively — just ship the log:
 
-1. In the Pi-hole admin, turn on DNS query logging (**Settings → DNS**, the
+1. Turn on query logging in the Pi-hole admin (**Settings → DNS**, the
    logging toggle that makes it write `pihole.log`).
-2. On the Pi-hole host, forward that file to the relay with rsyslog:
+2. Ship `pihole.log` to the relay over syslog — from wherever you can run
+   something, since the file itself is all that's needed:
+
+   *Bare-metal Pi-hole* — rsyslog on the Pi-hole itself:
 
    ```
    # /etc/rsyslog.d/99-pewpew.conf
@@ -237,8 +240,30 @@ relay speaks Pi-hole's FTL log format natively — just ship the log:
    action(type="omfwd" Target="<relay-ip>" Port="5514" Protocol="udp")
    ```
 
-   (Pi-hole 5.x keeps the file at `/var/log/pihole.log`.) Then
-   `sudo systemctl restart rsyslog`.
+   then `sudo systemctl restart rsyslog`. (Pi-hole 5.x keeps the file at
+   `/var/log/pihole.log`.)
+
+   *Pi-hole in Docker* — the container has no rsyslog; the log lives on the
+   **Docker host** instead. Find the host-side path in your compose file —
+   the volume ending in `/var/log/pihole` (typically `./pihole/log/pihole.log`)
+   — then either run the rsyslog snippet above **on the Docker host** with
+   `File=` set to that path, or add a no-dependencies forwarder to the
+   compose file:
+
+   ```yaml
+     log2pewpew:
+       image: alpine:3.20
+       network_mode: "host"
+       volumes:
+         - ./pihole/log:/var/log/pihole:ro    # same host path pihole uses
+       command: >
+         sh -c 'while :; do tail -n 0 -F /var/log/pihole/pihole.log |
+         while IFS= read -r line; do
+         printf "<13>%s pihole %s\n" "$$(date "+%b %e %T")" "$$line" |
+         nc -u -w 1 <relay-ip> 5514; done; done'
+   ```
+
+   (`<relay-ip>` = the machine running the pewpew relay, port **5514**.)
 
 Every query then fruits a mushroom labelled with its domain — **gravity-
 blocked trackers included**. If Pi-hole also runs your DHCP, its
