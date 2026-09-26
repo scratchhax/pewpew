@@ -27,7 +27,7 @@ export const MYCELIUM_DEFAULTS = {
 
   // scene budgets = the HIGH preset
   mMaxNodes: 40,
-  mMaxEdges: 220,
+  mMaxEdges: 9000,
   mMaxPulses: 380,
   mMaxBlooms: 10,
   mMaxParticles: 1200,
@@ -36,10 +36,10 @@ export const MYCELIUM_DEFAULTS = {
 export type MyceliumSettings = CoreSettings & typeof MYCELIUM_DEFAULTS;
 
 export const MYCELIUM_BUDGETS: Budgets = {
-  low: { mMaxNodes: 24, mMaxEdges: 110, mMaxPulses: 120, mMaxBlooms: 5, mMaxParticles: 350 },
-  medium: { mMaxNodes: 32, mMaxEdges: 160, mMaxPulses: 220, mMaxBlooms: 7, mMaxParticles: 700 },
-  high: { mMaxNodes: 40, mMaxEdges: 220, mMaxPulses: 380, mMaxBlooms: 10, mMaxParticles: 1200 },
-  ultra: { mMaxNodes: 60, mMaxEdges: 320, mMaxPulses: 700, mMaxBlooms: 16, mMaxParticles: 2200 },
+  low: { mMaxNodes: 24, mMaxEdges: 3000, mMaxPulses: 120, mMaxBlooms: 5, mMaxParticles: 350 },
+  medium: { mMaxNodes: 32, mMaxEdges: 5000, mMaxPulses: 220, mMaxBlooms: 7, mMaxParticles: 700 },
+  high: { mMaxNodes: 40, mMaxEdges: 8000, mMaxPulses: 380, mMaxBlooms: 10, mMaxParticles: 1200 },
+  ultra: { mMaxNodes: 60, mMaxEdges: 12000, mMaxPulses: 700, mMaxBlooms: 16, mMaxParticles: 2200 },
 };
 
 type Key = keyof typeof MYCELIUM_DEFAULTS;
@@ -59,7 +59,7 @@ export const MYCELIUM_CONTROLS = {
     range('mGlow', 'Bioluminescence', 0.2, 2, 0.05),
     range('mSporeDrift', 'Spore drift', 0, 2, 0.05),
     range('mMaxNodes', 'Hosts', 8, 60, 1),
-    range('mMaxEdges', 'Hyphae', 40, 320, 10),
+    range('mMaxEdges', 'Filaments', 1500, 15000, 500),
     range('mMaxPulses', 'Light pulses', 60, 700, 20),
     range('mMaxBlooms', 'Blooms', 3, 16, 1),
   ],

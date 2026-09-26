@@ -45,10 +45,11 @@ export function loadTextures(): MTextures {
       // organic blotch: a dark core with ragged edge and faint ash rim
       const blob = (x: number, y: number, r: number, a: number) => {
         const g = c.createRadialGradient(x, y, 0, x, y, r);
-        g.addColorStop(0, `rgba(10,5,3,${a})`);
-        g.addColorStop(0.62, `rgba(16,8,5,${a * 0.75})`);
-        g.addColorStop(0.88, `rgba(38,20,12,${a * 0.35})`);
-        g.addColorStop(1, 'rgba(38,20,12,0)');
+        g.addColorStop(0, `rgba(12,6,4,${a})`);
+        g.addColorStop(0.58, `rgba(18,9,5,${a * 0.8})`);
+        g.addColorStop(0.74, `rgba(96,38,12,${a * 0.5})`);
+        g.addColorStop(0.86, `rgba(255,110,40,${a * 0.42})`);
+        g.addColorStop(1, 'rgba(60,24,8,0)');
         c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
       };
       blob(s / 2, s / 2, s * 0.30, 0.92);

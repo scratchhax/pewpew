@@ -21,10 +21,10 @@ your own traffic. Pick a scene per screen:
   translucent monolith blocks lined in glowing cyan, patrolled at street
   level with sweeping ninety-degree corners, until the camera swings around
   to lock onto a red file and trace the intruder
-- **Mycelium**: a bioluminescent forest floor from above, where hosts are
-  nodules of light and permitted traffic grows a web of glowing hyphae —
-  recent paths blaze, old ones fade to ghost traces, and it's all still there
-  when you reload
+- **Mycelium**: a bioluminescent forest floor from above, where hosts put out
+  growing filaments that weave a mat across the loam — permitted traffic runs
+  through it as travelling light, habit decides the roads, mushrooms fruit at
+  busy junctions, and it's all still there when you reload
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -834,31 +834,37 @@ the pace of the patrol.
 ![mycelium](docs/mycelium.png)
 
 The network as a forest floor seen from close above, at night, drawn entirely
-in code: the loam is a gradient with grain and vignette, and everything alive
-is bioluminescent teal. Your hosts are nodules of light; the gateway is the
-root, a bright sun near the centre of the clearing. Permitted traffic feeds
-the web — a hypha between the host and the root thickens, brightens and runs
-light pulses along its length with every flow, and traffic out to the internet
-sends pale warm tendrils out past the edge of the known. Nothing about the
-internet grows a node: only your own hosts root here.
+in code — and the floor is alive before a single packet moves. From each host
+nodule, hyphae grow: fine filaments that wander the loam in gentle arcs,
+branch, and *fuse* with other networks where they cross (anastomosis),
+weaving a mat of loops and junctions that slowly colonises the whole screen.
+Traffic never builds the web — it feeds it. Permitted flows send a pulse of
+light that walks a real path across the existing mat, brightening the
+filaments it passes; habit makes well-used routes the paths of least
+resistance, so light keeps taking the roads your traffic already wears.
+Traffic out to the internet sends warm light running toward the edge of the
+known along whatever roads reach that way; where the mat hasn't arrived yet,
+growth reaches out instead.
 
 | Event | On the floor |
 |-------|--------------|
-| allow | the hypha between host and root thickens toward white, and a light pulse runs it; two LAN hosts talking grow a hypha directly between them |
-| block | a scorch patch smoulders in where the flow died, with an ember flare, and heals away over twenty seconds |
+| allow | a pulse of light runs the filament path between the two hosts; a route used often becomes the preferred road for next time. Where no path exists yet, a new hypha grows toward the unreachable host |
+| block | a scorch patch smoulders in — wounded ground filaments refuse to re-enter — with an ember flare, and heals away over twenty seconds |
 | threat | a crimson blight swarm crawls in from a screen edge toward the brightest host, and the web flares white and burns it off while the music swells |
-| dns | a pale mushroom pushes up nearby with the domain on its stem, glowing cream, and wilts after half a minute |
-| dhcp | a new host takes root with a warm ring and a rising glass tone, labelled with its hostname |
-| wifi | joins emit a drift of spore light from the access point's nodule; failures scatter dimly |
+| dns | a pale mushroom pushes up at the busiest nearby junction, with the domain on its stem, glowing cream, wilting after half a minute into a puff of spores that seed new growth where they land |
+| dhcp | a new host takes root with a warm ring and a rising glass tone, labelled with its hostname, and puts out its first filaments |
+| wifi | joins emit a drift of spore light from the access point; failures scatter dimly |
 | system | a grey ring breathes out from the gateway nodule |
 
-**The garden keeps growing.** The web is persisted to the browser, so the
-scene you see today is the one your network grew — with time doing what it
-does: every thread is a faint memory fading toward a ghost trace on a
-half-life you set in minutes (20 by default), while live traffic rides it as
-flares and travelling light that come and go in seconds. Neglected paths
-quiet down, well-trodden ones stay bold, and nothing ever bakes in. **Keep
-the garden** (F1 → Scene) turns persistence off.
+**The garden keeps growing.** The mat is persisted to the browser, so the
+scene you see today is the one your network grew. Time works on it in
+minutes: each filament's memory fades toward a faint ghost trace (half-life
+20 by default) that never vanishes — so the mat you established yesterday is
+still the ground traffic runs on — while live traffic rides it as flares and
+travelling light that come and go in seconds. Neglected ground slowly gives
+way to new exploration at the edges, well-trodden roads stay bold, and
+nothing ever bakes in. **Keep the garden** (F1 → Scene) turns persistence
+off.
 
 **The HUD is the organism's own field notes:** CLIMATE (the weather, from
 STILL to a storm), COLONY gauges (BLT blight, VIG vigour), FIELD NOTES,
