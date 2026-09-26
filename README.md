@@ -243,27 +243,25 @@ relay speaks Pi-hole's FTL log format natively — just ship the log:
    then `sudo systemctl restart rsyslog`. (Pi-hole 5.x keeps the file at
    `/var/log/pihole.log`.)
 
-   *Pi-hole in Docker* — the container has no rsyslog; the log lives on the
-   **Docker host** instead. Find the host-side path in your compose file —
-   the volume ending in `/var/log/pihole` (typically `./pihole/log/pihole.log`)
-   — then either run the rsyslog snippet above **on the Docker host** with
-   `File=` set to that path, or add a no-dependencies forwarder to the
-   compose file:
+   *Pi-hole in Docker (Unraid's official app, synology, compose, …)* — the
+   container keeps its own house; there may be no rsyslog in it and no
+   log path mapped out. Two ways, neither needs Pi-hole config changes:
 
-   ```yaml
-     log2pewpew:
-       image: alpine:3.20
-       network_mode: "host"
-       volumes:
-         - ./pihole/log:/var/log/pihole:ro    # same host path pihole uses
-       command: >
-         sh -c 'while :; do tail -n 0 -F /var/log/pihole/pihole.log |
-         while IFS= read -r line; do
-         printf "<13>%s pihole %s\n" "$$(date "+%b %e %T")" "$$line" |
-         nc -u -w 1 <relay-ip> 5514; done; done'
-   ```
+   - If the container maps `/var/log/pihole` to a host folder (Unraid:
+     check the app's Path Mappings, typically under
+     `/mnt/user/appdata/pihole/`), run the rsyslog snippet above **on the
+     Docker host** with `File=` set to the host-side `pihole.log`.
+   - If nothing is mapped, use [`deploy/pihole-sidecar.sh`](deploy/pihole-sidecar.sh)
+     — it tails the log *inside* the container (`docker exec`) and forwards
+     queries to the relay, re-attaching by itself if the container restarts:
 
-   (`<relay-ip>` = the machine running the pewpew relay, port **5514**.)
+     ```
+     nohup ./pihole-sidecar.sh <relay-ip> 5514 pihole &
+     ```
+
+     On Unraid, save it under `/boot/config/scripts/` and run it with the
+     **User Scripts** plugin (background mode). It needs `nc` (busybox's is
+     fine) and docker CLI access on the host.
 
 Every query then fruits a mushroom labelled with its domain — **gravity-
 blocked trackers included**. If Pi-hole also runs your DHCP, its
