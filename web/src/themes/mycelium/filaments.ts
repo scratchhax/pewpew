@@ -437,7 +437,7 @@ export class Sim {
     this.clock += dt;
     this.growTips(dt);
 
-    const fl = Math.exp(-dt * 0.9);
+    const fl = Math.exp(-dt * 2.6);
     const mm = Math.exp(-LN2 * dt / (Math.max(1, halfMin) * 60));
     for (const e of this.E) { e.flow *= fl; e.mem = Math.max(GHOST, e.mem * mm); }
     for (const v of this.V) v.flow *= fl;
@@ -499,7 +499,7 @@ export class Sim {
       }
       if (b.t > 7.4 && b.phase === 0) {
         b.phase = 1;
-        this.surge(0.85);
+        this.surge(0.5);
         this.flashes.push({ x: b.x, y: b.y, t: 0, life: 1.4, r: 190, c: [200, 255, 240] });
         // the network answers: pulses radiate from the gateway
         const gw = this.nodes.values().next().value;

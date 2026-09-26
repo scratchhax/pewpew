@@ -170,7 +170,7 @@ export class View {
       const e = sim.E[i];
       if (e.dead || e.flow < 0.18) continue;
       g.moveTo(sim.V[e.a].x, sim.V[e.a].y).lineTo(sim.V[e.b].x, sim.V[e.b].y)
-        .stroke({ color: WHITE, width: 1.2 * u, alpha: 0.12 + e.flow * 0.4 });
+        .stroke({ color: WHITE, width: 0.9 * u, alpha: 0.04 + e.flow * e.flow * 0.26 });
     }
     // the growing frontier: each tip's live segment is drawn every frame as
     // a smoothly extending ciliated hair — the mat visibly reaches and wiggles
@@ -289,8 +289,8 @@ export class View {
       s.visible = true;
       s.tint = p.col;
       s.position.set(p.hx, p.hy);
-      s.width = s.height = 13 * this.unit;
-      s.alpha = 0.9;
+      s.width = s.height = 10 * this.unit;
+      s.alpha = 0.7;
     }
   }
 
