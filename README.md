@@ -253,15 +253,25 @@ relay speaks Pi-hole's FTL log format natively — just ship the log:
      Docker host** with `File=` set to the host-side `pihole.log`.
    - If nothing is mapped, use [`deploy/pihole-sidecar.sh`](deploy/pihole-sidecar.sh)
      — it tails the log *inside* the container (`docker exec`) and forwards
-     queries to the relay, re-attaching by itself if the container restarts:
+     queries to the relay, re-attaching by itself if the container restarts.
+     It speaks UDP with plain bash (`/dev/udp`), so it needs **no `nc` and no
+     python** — only bash + docker:
 
      ```
      nohup ./pihole-sidecar.sh <relay-ip> 5514 pihole &
      ```
 
      On Unraid, save it under `/boot/config/scripts/` and run it with the
-     **User Scripts** plugin (background mode). It needs `nc` (busybox's is
-     fine) and docker CLI access on the host.
+     **User Scripts** plugin (background mode). Prefer not to run anything on
+     the Unraid box? Set `PIHOLE_SSH` and run it from any machine that can
+     ssh to the Docker host — the tail happens remotely over ssh (never
+     expose the docker socket):
+
+     ```
+     PIHOLE_SSH=root@unraid nohup ./pihole-sidecar.sh <relay-ip> 5514 pihole &
+     ```
+
+     (passwordless keys: `ssh-copy-id root@unraid`).
 
 Every query then fruits a mushroom labelled with its domain — **gravity-
 blocked trackers included**. If Pi-hole also runs your DHCP, its
