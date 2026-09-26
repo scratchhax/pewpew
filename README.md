@@ -844,7 +844,12 @@ filaments it passes; habit makes well-used routes the paths of least
 resistance, so light keeps taking the roads your traffic already wears.
 Traffic out to the internet sends warm light running toward the edge of the
 known along whatever roads reach that way; where the mat hasn't arrived yet,
-growth reaches out instead.
+growth reaches out instead. Each host's network grows in its own family of
+the palette — ice cyan, teal, spring green — so the fused mat reads as a
+tapestry, and the light itself is tinted by protocol: gold for https and
+wireguard, ice blue for ssh, pale violet for dns. Every growing tip is drawn
+as a live, swaying hair of light, so the frontier of the mat is always
+moving.
 
 | Event | On the floor |
 |-------|--------------|

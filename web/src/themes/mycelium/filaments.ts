@@ -16,21 +16,22 @@ export interface SimNode {
   v: number;             // root vertex in the mat
   born: number;          // sim seconds
   pulse: number;         // recent-event flash, drawn and decayed fast
+  hue: number;           // network colour family: 0 ice-cyan, 1 teal, 2 spring
 }
 
-interface Vtx { x: number; y: number; flow: number; mem: number; born: number }
+interface Vtx { x: number; y: number; flow: number; mem: number; born: number; hue: number }
 interface Seg { a: number; b: number; len: number; flow: number; mem: number; dead: boolean }
 
-export interface SimPulse { p: number[]; s: number; len: number; hx: number; hy: number; warm: boolean }
+export interface SimPulse { p: number[]; s: number; len: number; hx: number; hy: number; col: number }
 export interface SimShroom { x: number; y: number; t: number; life: number; lean: number; s: number; label: string }
 export interface SimSpore { x: number; y: number; vx: number; vy: number; t: number; land: number }
 export interface SimScorch { x: number; y: number; r: number; t: number }
 export interface SimBlight { x: number; y: number; tx: number; ty: number; t: number; phase: number; target: string }
 export interface SimFlash { x: number; y: number; t: number; life: number; r: number; c: [number, number, number] }
 
-interface Tip { x: number; y: number; head: number; curv: number; vPrev: number; age: number; born: number; homeV: number; seeking: boolean }
+export interface SimTip { x: number; y: number; head: number; curv: number; vPrev: number; age: number; born: number; homeV: number; seeking: boolean; hue: number; trail: number[] }
 
-const STORE = 'pewpew.mycelium.v2';
+const STORE = 'pewpew.mycelium.v3';
 const LN2 = Math.log(2);
 const SEG_LEN = 6;
 const FUSE_R = 7;
@@ -43,7 +44,7 @@ export class Sim {
   V: Vtx[] = [];
   E: Seg[] = [];
   adj: number[][] = [];
-  tips: Tip[] = [];
+  tips: SimTip[] = [];
   pulses: SimPulse[] = [];
   shrooms: SimShroom[] = [];
   spores: SimSpore[] = [];
@@ -66,15 +67,21 @@ export class Sim {
   private deadE = 0;
   private edgeCache = new Map<number, number>();
 
-  setSize(w: number, h: number): void { this.w = w; this.h = h; }
+  private gscale = 1;
+
+  setSize(w: number, h: number): void {
+    this.w = w; this.h = h;
+    // big screens are that much more loam to colonise: grow faster there
+    this.gscale = Math.min(1.8, Math.max(1, Math.hypot(w, h) / 1750));
+  }
 
   // ── graph plumbing ────────────────────────────────────────────────────────
   private key(x: number, y: number): string { return ((x / CELL) | 0) + ',' + ((y / CELL) | 0); }
   private hashPush(k: string, i: number): void { let a = this.hash.get(k); if (!a) { a = []; this.hash.set(k, a); } a.push(i); }
 
-  private addV(x: number, y: number, mem = GHOST): number {
+  private addV(x: number, y: number, mem = GHOST, hue = 1): number {
     const i = this.V.length;
-    this.V.push({ x, y, flow: 0, mem, born: this.clock });
+    this.V.push({ x, y, flow: 0, mem, born: this.clock, hue });
     this.adj.push([]); this.uf[i] = i; this.hashPush(this.key(x, y), i);
     return i;
   }
@@ -131,10 +138,11 @@ export class Sim {
     let n = this.nodes.get(ip);
     if (n) { if (label && n.label === n.id) n.label = label; return n; }
     const pos = this.place();
-    const v = this.addV(pos.x, pos.y);
-    n = { id: ip, label: label ?? ip, x: pos.x, y: pos.y, v, born: t, pulse: 0 };
+    const hue = (hash01(`hue|${ip}`) * 3) | 0;
+    const v = this.addV(pos.x, pos.y, GHOST, hue);
+    n = { id: ip, label: label ?? ip, x: pos.x, y: pos.y, v, born: t, pulse: 0, hue };
     this.nodes.set(ip, n);
-    for (let k = 0; k < 3; k++) this.spawnTip(pos.x, pos.y, hash01(ip + k) * 6.283, v, v, true);
+    for (let k = 0; k < 3; k++) this.spawnTip(pos.x, pos.y, hash01(ip + k) * 6.283, v, v, true, hue);
     this.dirty = true; this.revision++;
     return n;
   }
@@ -199,10 +207,10 @@ export class Sim {
   }
 
   // ── growth ────────────────────────────────────────────────────────────────
-  private spawnTip(x: number, y: number, head: number, anchorV: number, homeV: number, force = false): void {
-    if (this.tips.length > (force ? 130 : 40) || this.E.length >= this.maxSegs) return;
+  private spawnTip(x: number, y: number, head: number, anchorV: number, homeV: number, force = false, hue = 1): void {
+    if (this.tips.length > (force ? 130 : 40) * this.gscale || this.E.length >= this.maxSegs) return;
     this.tips.push({ x, y, head, curv: (hash01(`c${x}|${y}|${this.tips.length}`) - 0.5) * 0.6,
-      vPrev: anchorV, age: 0, born: this.clock, homeV, seeking: true });
+      vPrev: anchorV, age: 0, born: this.clock, homeV, seeking: true, hue, trail: [] });
   }
 
   private growTips(dt: number): void {
@@ -231,8 +239,9 @@ export class Sim {
           t.head += da * 0.3 * dt;
         }
       }
-      t.x += Math.cos(t.head) * TIP_SPEED * dt; t.y += Math.sin(t.head) * TIP_SPEED * dt;
-      if (t.x < 4 || t.y < 4 || t.x > this.w - 4 || t.y > this.h - 4 || t.age > 60) { this.tips.splice(i, 1); continue; }
+      t.x += Math.cos(t.head) * TIP_SPEED * this.gscale * dt; t.y += Math.sin(t.head) * TIP_SPEED * this.gscale * dt;
+      if (t.x < 4 || t.y < 4 || t.x > this.w - 4 || t.y > this.h - 4 || t.age > 60 / Math.sqrt(this.gscale)) { this.tips.splice(i, 1); continue; }
+      t.trail.push(t.x, t.y); if (t.trail.length > 10) t.trail.splice(0, t.trail.length - 10);
       const pv = this.V[t.vPrev];
       if (Math.hypot(t.x - pv.x, t.y - pv.y) >= SEG_LEN) {
         if (this.E.length >= this.maxSegs) { this.tips.splice(i, 1); continue; }
@@ -252,27 +261,27 @@ export class Sim {
         let burned = false;
         for (const s of this.scorchs) if (s.t < 14 && Math.hypot(t.x - s.x, t.y - s.y) < s.r * 1.1) { burned = true; break; }
         if (burned) { this.tips.splice(i, 1); continue; }
-        const nv = this.addV(t.x, t.y); this.addE(t.vPrev, nv); t.vPrev = nv;
+        const nv = this.addV(t.x, t.y, GHOST, t.hue); this.addE(t.vPrev, nv); t.vPrev = nv; t.trail.length = 0;
         if (Math.random() < 0.02 && t.age > 1) {
-          this.spawnTip(t.x, t.y, t.head + (Math.random() < 0.5 ? 1 : -1) * (0.5 + Math.random() * 0.7), t.vPrev, -1);
+          this.spawnTip(t.x, t.y, t.head + (Math.random() < 0.5 ? 1 : -1) * (0.5 + Math.random() * 0.7), t.vPrev, -1, false, t.hue);
         }
       }
     }
     // exploratory regrowth: from established junctions, and — critically —
     // from any host the mat has not reached yet, so no nodule stays an island
     this.tGrow -= dt;
-    if (this.tGrow <= 0 && this.tips.length < 70 && this.E.length < this.maxSegs * 0.98) {
+    if (this.tGrow <= 0 && this.tips.length < 70 * this.gscale && this.E.length < this.maxSegs * 0.98) {
       this.tGrow = 0.8;
       const dormant = [...this.nodes.values()].filter(n => !this.tips.some(t => t.homeV === n.v));
       if (dormant.length && Math.random() < 0.6) {
         const n = dormant[(Math.random() * dormant.length) | 0];
-        this.spawnTip(n.x, n.y, Math.random() * 6.283, n.v, n.v, true);
+        this.spawnTip(n.x, n.y, Math.random() * 6.283, n.v, n.v, true, n.hue);
       }
       const pool: number[] = [];
       for (let i = 0; i < this.V.length; i += 7) if (this.vdeg(i) >= 3) pool.push(i);
       if (pool.length) {
         const v = pool[(Math.random() * pool.length) | 0];
-        this.spawnTip(this.V[v].x, this.V[v].y, Math.random() * 6.283, v, -1);
+        this.spawnTip(this.V[v].x, this.V[v].y, Math.random() * 6.283, v, -1, false, this.V[v].hue);
       }
     }
   }
@@ -313,14 +322,14 @@ export class Sim {
   /** Run nutrient light between two hosts along existing filaments.
    *  Returns false if the mat does not connect them yet — and sends an
    *  exploratory tip toward the far host so next time it will. */
-  sendLight(a: SimNode, b: SimNode, warm = false, quiet = false): boolean {
+  sendLight(a: SimNode, b: SimNode, col = 0x5ff0cf, quiet = false): boolean {
     if (a === b) return false;
     const p = this.bestPath(a.v, b.v);
     if (!p || p.length < 2) {
       if (!quiet) {
         // the network reaches out toward what it cannot yet feed
         const head = Math.atan2(b.y - a.y, b.x - a.x) + (Math.random() - 0.5) * 0.8;
-        this.spawnTip(a.x, a.y, head, a.v, a.v);
+        this.spawnTip(a.x, a.y, head, a.v, a.v, false, this.V[a.v]?.hue ?? 1);
       }
       return false;
     }
@@ -336,12 +345,12 @@ export class Sim {
       const ei = this.edgeBetween(p[i - 1], p[i]);
       if (ei >= 0) len += this.E[ei].len;
     }
-    if (this.pulses.length < this.maxPulses) this.pulses.push({ p, s: 0, len, hx: a.x, hy: a.y, warm });
+    if (this.pulses.length < this.maxPulses) this.pulses.push({ p, s: 0, len, hx: a.x, hy: a.y, col });
     return true;
   }
 
   /** Light running out to the internet: toward a margin vertex on the remote's bearing. */
-  sendLightOut(a: SimNode, extIp: string, quiet = false): boolean {
+  sendLightOut(a: SimNode, extIp: string, col = 0xffdfae, quiet = false): boolean {
     const bearing = hash01(`bearing|${extIp}|${a.id}`) * 6.283;
     const myRoot = this.find(a.v);
     let best = -1, bd = -1;
@@ -366,12 +375,12 @@ export class Sim {
         if (!quiet) {
           let len = 0;
           for (let i = 1; i < p.length; i++) { const ei = this.edgeBetween(p[i - 1], p[i]); if (ei >= 0) len += this.E[ei].len; }
-          if (this.pulses.length < this.maxPulses) this.pulses.push({ p, s: 0, len, hx: a.x, hy: a.y, warm: true });
+          if (this.pulses.length < this.maxPulses) this.pulses.push({ p, s: 0, len, hx: a.x, hy: a.y, col });
         }
         return true;
       }
     }
-    if (!quiet) this.spawnTip(a.x, a.y, bearing, a.v, a.v);
+    if (!quiet) this.spawnTip(a.x, a.y, bearing, a.v, a.v, false, this.V[a.v]?.hue ?? 1);
     return false;
   }
 
@@ -460,8 +469,9 @@ export class Sim {
       if (s.t > s.land) {
         this.spores.splice(i, 1);
         if (this.E.length < this.maxSegs * 0.96 && Math.random() < 0.7) {
-          const v = this.addV(s.x, s.y);
-          this.spawnTip(s.x, s.y, Math.random() * 6.283, v, -1);
+          const hue = (hash01(`sh|${s.x}|${s.y}`) * 3) | 0;
+          const v = this.addV(s.x, s.y, GHOST, hue);
+          this.spawnTip(s.x, s.y, Math.random() * 6.283, v, -1, false, hue);
           this.flashes.push({ x: s.x, y: s.y, t: 0, life: 0.9, r: 10, c: [160, 255, 220] });
         }
       }
@@ -584,7 +594,7 @@ export class Sim {
     if (!this.dirty) return;
     try {
       const nodes = [...this.nodes.values()].map(n => [n.id, n.label, Math.round(n.x), Math.round(n.y)]);
-      const verts = this.V.map(v => [Math.round(v.x * 2) / 2, Math.round(v.y * 2) / 2, Math.round(v.mem * 100) / 100]);
+      const verts = this.V.map(v => [Math.round(v.x * 2) / 2, Math.round(v.y * 2) / 2, Math.round(v.mem * 100) / 100, v.hue]);
       const edges = this.E.filter(e => !e.dead).map(e => [e.a, e.b, Math.round(e.mem * 100) / 100]);
       localStorage.setItem(STORE, JSON.stringify({ v: 2, t: Date.now() / 1000, w: this.w, h: this.h, nodes, verts, edges }));
       this.dirty = false;
@@ -600,13 +610,13 @@ export class Sim {
       const raw = localStorage.getItem(STORE);
       if (!raw) return false;
       const d = JSON.parse(raw) as { v: number; t: number; w: number; h: number;
-        nodes: [string, string, number, number][]; verts: [number, number, number][]; edges: [number, number, number][] };
-      if (d.v !== 2 || !Array.isArray(d.verts) || !Array.isArray(d.edges)) return false;
+        nodes: [string, string, number, number][]; verts: [number, number, number, number][]; edges: [number, number, number][] };
+      if (d.v !== 3 || !Array.isArray(d.verts) || !Array.isArray(d.edges)) return false;
       // restore only if the saved world roughly matches this screen
       if (Math.abs(d.w - this.w) > this.w * 0.25 || Math.abs(d.h - this.h) > this.h * 0.25) return false;
       const k = Math.exp(-LN2 * Math.min(30 * 86400, Date.now() / 1000 - d.t) / (Math.max(1, halfMin) * 60));
       const mem = (m: number) => GHOST + (Math.max(GHOST, m) - GHOST) * k;
-      for (const [x, y, m] of d.verts) this.addV(x, y, mem(m));
+      for (const [x, y, m, h] of d.verts) this.addV(x, y, mem(m), h ?? 1);
       for (const [a, b, m] of d.edges) {
         if (a < 0 || b < 0 || a >= this.V.length || b >= this.V.length) continue;
         const ei = this.addE(a, b); this.E[ei].mem = mem(m);
@@ -622,7 +632,8 @@ export class Sim {
       for (const [id, label, x, y] of d.nodes) {
         if (this.nodes.has(id) || typeof id !== 'string') continue;
         const v = nearest(x, y);
-        this.nodes.set(id, { id, label: label || id, x: this.V[v].x, y: this.V[v].y, v, born: 0, pulse: 0 });
+        this.nodes.set(id, { id, label: label || id, x: this.V[v].x, y: this.V[v].y, v, born: 0, pulse: 0,
+          hue: (hash01(`hue|${id}`) * 3) | 0 });
       }
       this.dirty = true; this.revision++;
       return true;

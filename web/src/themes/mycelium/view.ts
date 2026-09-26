@@ -12,6 +12,10 @@ import type { Sim, SimBlight, SimFlash, SimNode, SimScorch, SimShroom } from './
  */
 
 const TEAL = 0x5ff0cf, TEAL_DIM = 0x2f9f88, WHITE = 0xdffff4;
+// three network colour families — ice cyan / teal / spring green — so a
+// fused mat reads as a tapestry instead of one flat teal
+const HUES = [0x49e6ff, 0x5ff0cf, 0x8cf29a];
+const HUES_DIM = [0x268fa6, 0x2f9f88, 0x4f9c60];
 const CREAM = 0xffd9a8, WARM = 0xffdfae, EMBER = 0xff5a2a, BLIGHT = 0xff2a55;
 
 interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number; sprite: Sprite; }
@@ -54,7 +58,6 @@ export class View {
   private sparks: Spark[] = [];
   private rings: Ring[] = [];
   private motes: Mote[] = [];
-  private lastRev = -1;
   private lastDraw = -9;
 
   private w = 1; private h = 1; private unit = 1;
@@ -94,7 +97,7 @@ export class View {
     this.bg.addChildAt(this.backdrop, 0);
     this.grain.width = w; this.grain.height = h;
     this.vigSprite.width = w; this.vigSprite.height = h;
-    this.lastRev = -1;
+    this.lastDraw = -9;
     this.reseedMotes();
   }
 
@@ -129,22 +132,25 @@ export class View {
     g.clear();
     const u = this.unit;
     const B = 6;
-    const buckets: number[][] = Array.from({ length: B }, () => []);
+    const buckets: number[][] = Array.from({ length: 3 * B }, () => []);
     for (let i = 0; i < sim.E.length; i++) {
       const e = sim.E[i];
       if (e.dead) continue;
       const a = Math.min(1, 0.05 + e.mem * 1.4);
-      buckets[Math.min(B - 1, (a * B) | 0)].push(i);
+      const h = sim.V[e.b]?.hue ?? 1;
+      buckets[h * B + Math.min(B - 1, (a * B) | 0)].push(i);
     }
-    for (let k = 0; k < B; k++) {
-      const list = buckets[k];
-      if (!list.length) continue;
-      const a = (k + 0.5) / B;
-      for (const i of list) { const e = sim.E[i]; g.moveTo(sim.V[e.a].x, sim.V[e.a].y).lineTo(sim.V[e.b].x, sim.V[e.b].y); }
-      g.stroke({ color: TEAL_DIM, width: 2.6 * u, alpha: 0.09 + a * 0.16 });
-      g.moveTo(0, 0);
-      for (const i of list) { const e = sim.E[i]; g.moveTo(sim.V[e.a].x, sim.V[e.a].y).lineTo(sim.V[e.b].x, sim.V[e.b].y); }
-      g.stroke({ color: TEAL, width: 1 * u, alpha: 0.12 + a * 0.34 });
+    for (let h = 0; h < 3; h++) {
+      for (let k = 0; k < B; k++) {
+        const list = buckets[h * B + k];
+        if (!list.length) continue;
+        const a = (k + 0.5) / B;
+        for (const i of list) { const e = sim.E[i]; g.moveTo(sim.V[e.a].x, sim.V[e.a].y).lineTo(sim.V[e.b].x, sim.V[e.b].y); }
+        g.stroke({ color: HUES_DIM[h], width: 2.6 * u, alpha: 0.09 + a * 0.16 });
+        g.moveTo(0, 0);
+        for (const i of list) { const e = sim.E[i]; g.moveTo(sim.V[e.a].x, sim.V[e.a].y).lineTo(sim.V[e.b].x, sim.V[e.b].y); }
+        g.stroke({ color: HUES[h], width: 1 * u, alpha: 0.12 + a * 0.34 });
+      }
     }
     // junction sparks where filaments fused
     const deg = sim.degrees();
@@ -152,11 +158,11 @@ export class View {
       if (deg[v] < 3) continue;
       const p = sim.V[v];
       const a = Math.min(0.34, 0.05 + (deg[v] - 2) * 0.045 + p.mem * 0.3);
-      g.circle(p.x, p.y, (1.6 + p.mem * 2.4) * u).fill({ color: 0x8cffdc, alpha: a });
+      g.circle(p.x, p.y, (1.6 + p.mem * 2.4) * u).fill({ color: HUES[p.hue] ?? 0x8cffdc, alpha: a });
     }
   }
 
-  private drawHot(sim: Sim): void {
+  private drawHot(sim: Sim, t: number): void {
     const g = this.hotG;
     g.clear();
     const u = this.unit;
@@ -166,16 +172,45 @@ export class View {
       g.moveTo(sim.V[e.a].x, sim.V[e.a].y).lineTo(sim.V[e.b].x, sim.V[e.b].y)
         .stroke({ color: WHITE, width: 1.2 * u, alpha: 0.12 + e.flow * 0.4 });
     }
+    // the growing frontier: each tip's live segment is drawn every frame as
+    // a smoothly extending ciliated hair — the mat visibly reaches and wiggles
+    for (const tip of sim.tips) {
+      const pv = sim.V[tip.vPrev];
+      if (!pv) continue;
+      const hue = HUES[tip.hue] ?? TEAL;
+      const ph = tip.born * 10 + tip.x * 0.05;
+      const pts: number[] = [pv.x, pv.y];
+      for (let k = 0; k < tip.trail.length; k += 2) {
+        const wx = tip.trail[k], wy = tip.trail[k + 1];
+        if (Math.hypot(wx - pts[pts.length - 2], wy - pts[pts.length - 1]) < 1.5) continue;
+        pts.push(wx, wy);
+      }
+      pts.push(tip.x, tip.y);
+      g.moveTo(pts[0], pts[1]);
+      for (let k = 1; k < pts.length - 3; k += 2) {
+        const dx = pts[k + 2] - pts[k - 2], dy = pts[k + 4] - pts[k];
+        const dl = Math.hypot(dx, dy) || 1;
+        const w = Math.sin(t * 6.5 + ph + k) * 1.7 * u;
+        g.lineTo(pts[k] - dy / dl * w, pts[k + 1] + dx / dl * w);
+      }
+      g.lineTo(tip.x, tip.y);
+      g.stroke({ color: hue, width: 1.3 * u, alpha: 0.8 });
+      // a short feeler reaching ahead, swaying
+      const fa = Math.sin(t * 9 + ph) * 0.55;
+      g.moveTo(tip.x, tip.y)
+        .lineTo(tip.x + Math.cos(tip.head + fa) * 9 * u, tip.y + Math.sin(tip.head + fa) * 9 * u)
+        .stroke({ color: hue, width: 0.9 * u, alpha: 0.45 });
+      g.circle(tip.x, tip.y, 1.9 * u).fill({ color: WHITE, alpha: 0.85 });
+    }
   }
 
   // ── frame ─────────────────────────────────────────────────────────────────
   update(dt: number, t: number, sim: Sim): void {
-    if (sim.revision !== this.lastRev || t - this.lastDraw > 0.6) {
+    if (t - this.lastDraw > 0.7) {
       this.drawMat(sim);
-      this.lastRev = sim.revision;
       this.lastDraw = t;
     }
-    this.drawHot(sim);
+    this.drawHot(sim, t);
     // storm governor: flooded traffic dims the base mat; the pulses carry it
     const gov = (0.85 + 0.15 * Math.sin(t * 0.45)) * (1 - this.weather * 0.3);
     this.matG.alpha = gov * this.glow;
@@ -205,7 +240,7 @@ export class View {
   private syncNodes(sim: Sim, t: number): void {
     for (const [id, n] of sim.nodes) {
       if (!this.nodeViews.has(id)) {
-        const glow = this.glowSprite(this.nodesL, TEAL, 0);
+        const glow = this.glowSprite(this.nodesL, HUES[n.hue] ?? TEAL, 0);
         const core = new Sprite(this.tex.glowCore);
         core.anchor.set(0.5); core.tint = WHITE; core.blendMode = 'add';
         const label = new Text({ text: n.label.toUpperCase(), style: labelStyle(9) });
@@ -252,7 +287,7 @@ export class View {
       const p = sim.pulses[i];
       if (!p) { s.visible = false; continue; }
       s.visible = true;
-      s.tint = p.warm ? WARM : TEAL;
+      s.tint = p.col;
       s.position.set(p.hx, p.hy);
       s.width = s.height = 13 * this.unit;
       s.alpha = 0.9;

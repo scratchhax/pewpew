@@ -196,13 +196,23 @@ async function create(host: ThemeHost<typeof MYCELIUM_DEFAULTS>,
     }
   }
 
+  /** The light of a flow carries its protocol's colour. */
+  function protoCol(ev: SceneEvent['ev']): number {
+    const p = (ev.protocol ?? '').toLowerCase();
+    if (p.includes('ssh')) return 0x8fc4ff;
+    if (p.includes('dns')) return 0xb9a0ff;
+    if (p.includes('wireguard') || p.includes('https')) return 0xffc86a;
+    if (p.includes('icmp')) return 0xff9a6a;
+    return 0xdffff4;
+  }
+
   /** Run nutrient light for one flow event. Returns whether light moved. */
   function grow(se: SceneEvent, replay: boolean): boolean {
     const ev = se.ev;
     const src = nodeFor(ev.src_ip);
     const dst = nodeFor(ev.dst_ip);
     if (src && dst && src !== dst) {
-      const ok = sim.sendLight(src, dst, false, replay || !settings.mHyphae);
+      const ok = sim.sendLight(src, dst, protoCol(ev), replay || !settings.mHyphae);
       sim.touchNode(src, replay ? 0.05 : 0.18);
       sim.touchNode(dst, replay ? 0.05 : 0.18);
       return ok;
@@ -211,7 +221,7 @@ async function create(host: ThemeHost<typeof MYCELIUM_DEFAULTS>,
     const other = src ? ev.dst_ip : ev.src_ip;
     if (ext && other && !isInternalIp(other)) {
       // traffic out to the internet runs along filaments toward the margin
-      const ok = sim.sendLightOut(ext, other, replay || !settings.mHyphae);
+      const ok = sim.sendLightOut(ext, other, 0xffdfae, replay || !settings.mHyphae);
       sim.touchNode(ext, replay ? 0.04 : 0.14);
       return ok;
     }
