@@ -52,6 +52,7 @@ export class Sim {
   blights: SimBlight[] = [];
   flashes: SimFlash[] = [];
   revision = 0;
+  structureRev = 0;
   clock = 0;
 
   maxSegs = 3200;
@@ -401,7 +402,7 @@ export class Sim {
       if (Math.hypot(mx - x, my - y) < r * 0.75) { e.dead = true; this.deadE++; }
     }
     this.edgeCache.clear();
-    this.dirty = true; this.revision++;
+    this.dirty = true; this.revision++; this.structureRev++;
   }
 
   blight(target: SimNode): void {
@@ -483,7 +484,7 @@ export class Sim {
       b.x += (b.tx - b.x) * Math.min(1, dt * 0.55); b.y += (b.ty - b.y) * Math.min(1, dt * 0.55);
       for (let k = 0; k < this.E.length; k++) {
         const e = this.E[k]; if (e.dead) continue;
-        if (Math.hypot(this.V[e.a].x - b.x, this.V[e.a].y - b.y) < 30) { e.dead = true; this.deadE++; }
+        if (Math.hypot(this.V[e.a].x - b.x, this.V[e.a].y - b.y) < 30) { e.dead = true; this.deadE++; this.structureRev++; }
       }
       if (b.t > 7.4 && b.phase === 0) {
         b.phase = 1;
@@ -511,7 +512,7 @@ export class Sim {
         if (!e.dead && e.mem < GHOST + 1e-3 && this.E.length > this.maxSegs * 0.9 &&
             this.clock - this.V[e.a].born > 60 && n < 300) { e.dead = true; this.deadE++; n++; }
       }
-      if (n) { this.edgeCache.clear(); this.dirty = true; this.revision++; }
+      if (n) { this.edgeCache.clear(); this.dirty = true; this.revision++; this.structureRev++; }
     }
     if (this.deadE > 280) this.compact();
     // dormant unlinked hosts drift off
@@ -528,7 +529,7 @@ export class Sim {
       if (!worst) break;
       for (const ei of this.adj[worst.v]) this.E[ei].dead = true;
       this.nodes.delete(worst.id);
-      this.edgeCache.clear(); this.dirty = true; this.revision++;
+      this.edgeCache.clear(); this.dirty = true; this.revision++; this.structureRev++;
       break;
     }
   }
@@ -576,7 +577,7 @@ export class Sim {
     for (const e of this.E) this.union(e.a, e.b);
     this.hash = new Map();
     for (let i = 0; i < this.V.length; i++) this.hashPush(this.key(this.V[i].x, this.V[i].y), i);
-    this.dirty = true; this.revision++;
+    this.dirty = true; this.revision++; this.structureRev++;
   }
 
   // ── persistence: the mat you left is the mat you return to ───────────────
@@ -625,7 +626,7 @@ export class Sim {
         this.nodes.set(id, { id, label: label || id, x: this.V[v].x, y: this.V[v].y, v, born: 0, pulse: 0,
           hue: (hash01(`hue|${id}`) * 3) | 0 });
       }
-      this.dirty = true; this.revision++;
+      this.dirty = true; this.revision++; this.structureRev++;
       return true;
     } catch { return false; }
   }

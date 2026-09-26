@@ -59,6 +59,8 @@ export class View {
   private rings: Ring[] = [];
   private motes: Mote[] = [];
   private lastDraw = -9;
+  private lastStruct = -1;
+  private matDrawnUpto = -1;
 
   private w = 1; private h = 1; private unit = 1;
 
@@ -130,6 +132,7 @@ export class View {
   private drawMat(sim: Sim): void {
     const g = this.matG;
     g.clear();
+    this.matDrawnUpto = sim.E.length;
     const u = this.unit;
     const B = 6;
     const buckets: number[][] = Array.from({ length: 3 * B }, () => []);
@@ -160,6 +163,28 @@ export class View {
       const a = Math.min(0.34, 0.05 + (deg[v] - 2) * 0.045 + p.mem * 0.3);
       g.circle(p.x, p.y, (1.6 + p.mem * 2.4) * u).fill({ color: HUES[p.hue] ?? 0x8cffdc, alpha: a });
     }
+  }
+
+  private appendMat(sim: Sim): void {
+    const g = this.matG;
+    const u = this.unit;
+    const byHue: number[][] = [[], [], []];
+    for (let i = this.matDrawnUpto; i < sim.E.length; i++) {
+      const e = sim.E[i];
+      if (e.dead) continue;
+      const h = sim.V[e.b]?.hue ?? 1;
+      const A = sim.V[e.a], B = sim.V[e.b];
+      byHue[h].push(A.x, A.y, B.x, B.y);
+    }
+    for (let h = 0; h < 3; h++) {
+      const list = byHue[h];
+      if (!list.length) continue;
+      for (let k = 0; k < list.length; k += 4) g.moveTo(list[k], list[k + 1]).lineTo(list[k + 2], list[k + 3]);
+      g.stroke({ color: HUES_DIM[h], width: 2.6 * u, alpha: 0.09 });
+      for (let k = 0; k < list.length; k += 4) g.moveTo(list[k], list[k + 1]).lineTo(list[k + 2], list[k + 3]);
+      g.stroke({ color: HUES[h], width: 1 * u, alpha: 0.12 });
+    }
+    this.matDrawnUpto = sim.E.length;
   }
 
   private drawHot(sim: Sim, t: number): void {
@@ -213,9 +238,15 @@ export class View {
 
   // ── frame ─────────────────────────────────────────────────────────────────
   update(dt: number, t: number, sim: Sim): void {
-    if (t - this.lastDraw > 0.7) {
+    // paint brand-new filaments the frame they appear, so the growing tip's
+    // trail is always attached to its head; repaint fully only when the
+    // structure changes (fusions dying, scorch, compaction) or periodically
+    if (sim.structureRev !== this.lastStruct || this.matDrawnUpto < 0 || t - this.lastDraw > 3.5) {
       this.drawMat(sim);
+      this.lastStruct = sim.structureRev;
       this.lastDraw = t;
+    } else if (sim.E.length > this.matDrawnUpto) {
+      this.appendMat(sim);
     }
     this.drawHot(sim, t);
     // the base mat is steady — no breathing strobe. Weather dims it;
