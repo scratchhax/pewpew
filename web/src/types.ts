@@ -28,6 +28,7 @@ export interface NetEvent {
   dns_type?: string;
   dns_query?: string;
   dns_answer?: string;
+  dns_blocked?: boolean;
 
   // dhcp
   dhcp_event?: string;

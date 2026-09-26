@@ -214,12 +214,35 @@ page is labelled **Integrations → System Logging / SIEM**; it's the same form.
 | dhcp | the gateway's DHCP server (dnsmasq) | **Debug Logs** |
 | wifi | access point association logs | **Debug Logs** |
 | system | CEF console events (client disconnected, config changes, device events) | Control Plane categories |
-| dns | DNS query logs (dnsmasq) | UniFi has no setting for DNS query logging, so expect few or none from a stock gateway. The demo shows them |
+| dns | DNS query logs (dnsmasq) | UniFi has no setting for DNS query logging, so expect few or none from a stock gateway — see **Pi-hole** below. The demo shows them |
 
 **Older UniFi Network (8.x and earlier)** has a single remote syslog setting
 under **Settings → System → Advanced**. Point it at the relay's IP and port
 5514, and enable logging on the rules you want to see under **Settings →
 Security → Firewall Rules**.
+
+**d. Pi-hole.** If a Pi-hole answers your DNS, the gateway never sees the
+queries and the scene's DNS events (mushrooms with domains on their stems,
+DNS readouts, the dns protocol colour) would otherwise never appear. The
+relay speaks Pi-hole's FTL log format natively — just ship the log:
+
+1. In the Pi-hole admin, turn on DNS query logging (**Settings → DNS**, the
+   logging toggle that makes it write `pihole.log`).
+2. On the Pi-hole host, forward that file to the relay with rsyslog:
+
+   ```
+   # /etc/rsyslog.d/99-pewpew.conf
+   module(load="imfile" PersistState="on")
+   input(type="imfile" File="/var/log/pihole/pihole.log" Tag="pihole:" Severity="informational")
+   action(type="omfwd" Target="<relay-ip>" Port="5514" Protocol="udp")
+   ```
+
+   (Pi-hole 5.x keeps the file at `/var/log/pihole.log`.) Then
+   `sudo systemctl restart rsyslog`.
+
+Every query then fruits a mushroom labelled with its domain — **gravity-
+blocked trackers included**. If Pi-hole also runs your DHCP, its
+`DHCPACK` lines ride the same pipe and sprouts work from it too.
 
 ### 4. Check it's working
 

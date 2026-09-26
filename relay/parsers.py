@@ -84,6 +84,14 @@ DNS_REPLY   = re.compile(r'reply\s+(\S+)\s+is\s+(.+)')
 DNS_FORWARD = re.compile(r'forwarded\s+(\S+)\s+to\s+([0-9a-fA-F:.]+)')
 DNS_CACHED  = re.compile(r'cached\s+(\S+)\s+is\s+(.+)')
 
+# ── DNS (Pi-hole FTL: pihole.log lines are "(client-ip)\tquery A domain") ────
+_PIHOLE_IP = r'\((\d{1,3}(?:\.\d{1,3}){3})\)'
+PIHOLE_QUERY = re.compile(_PIHOLE_IP + r'\s*query\s+([A-Z]+)\s+(\S+)')
+PIHOLE_BLOCK = re.compile(_PIHOLE_IP + r'\s*gravity blocked\s+(\S+)')
+PIHOLE_CACHE = re.compile(_PIHOLE_IP + r'\s*cache hit\s+([\w.\-*]+)/')
+PIHOLE_FWD   = re.compile(_PIHOLE_IP + r'\s*forwarded\s+([\w.\-*]+)\s+to\s+(\S+)')
+PIHOLE_IS    = re.compile(_PIHOLE_IP + r'\s*([\w.\-*]+)\s+is\s+(\S+)')
+
 # ── DHCP (dnsmasq-dhcp) ───────────────────────────────────────────────────────
 MAC_PATTERN = r'[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}'
 MAC_RE      = re.compile(MAC_PATTERN)
@@ -452,8 +460,43 @@ def parse_cef(body: str) -> dict:
 
 
 def parse_dns(body: str) -> dict:
-    """Parse a DNS (dnsmasq) log line."""
+    """Parse a DNS (dnsmasq or Pi-hole FTL) log line."""
     result = {'log_type': 'dns'}
+
+    m = PIHOLE_QUERY.search(body)
+    if m:
+        result['src_ip'] = m.group(1)
+        result['dns_type'] = m.group(2)
+        result['dns_query'] = m.group(3)
+        return result
+
+    m = PIHOLE_BLOCK.search(body)
+    if m:
+        result['src_ip'] = m.group(1)
+        result['dns_query'] = m.group(2)
+        result['dns_type'] = 'BLOCKED'
+        result['dns_blocked'] = True
+        return result
+
+    m = PIHOLE_CACHE.search(body)
+    if m:
+        result['src_ip'] = m.group(1)
+        result['dns_query'] = m.group(2)
+        return result
+
+    m = PIHOLE_FWD.search(body)
+    if m:
+        result['src_ip'] = m.group(1)
+        result['dns_query'] = m.group(2)
+        result['dst_ip'] = m.group(3)
+        return result
+
+    m = PIHOLE_IS.search(body)
+    if m:
+        result['src_ip'] = m.group(1)
+        result['dns_query'] = m.group(2)
+        result['dns_answer'] = m.group(3)
+        return result
 
     m = DNS_QUERY.search(body)
     if m:
@@ -664,6 +707,14 @@ def detect_log_type(body: str) -> str:
 
     if 'dnsmasq' in body and ('query[' in body or 'reply ' in body
                               or 'forwarded ' in body or 'cached ' in body):
+        return 'dns'
+    # dnsmasq lines relayed by rsyslog lose the tag but keep the shape
+    if 'query[' in body and ' from ' in body:
+        return 'dns'
+    # Pi-hole FTL: query / gravity-blocked lines, client in parentheses
+    if PIHOLE_QUERY.search(body) or PIHOLE_BLOCK.search(body) \
+            or PIHOLE_CACHE.search(body) or PIHOLE_FWD.search(body) \
+            or PIHOLE_IS.search(body):
         return 'dns'
 
     if 'stamgr' in body or 'hostapd' in body or 'stahtd' in body:
