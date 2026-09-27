@@ -1,4 +1,5 @@
 import { Application, Container, FillGradient, Graphics, Sprite, Text, TextStyle, TilingSprite } from 'pixi.js';
+import { hash01 } from '../../state';
 import type { MTextures } from './textures';
 import type { Sim, SimBlight, SimFlash, SimNode, SimScorch, SimShroom } from './filaments';
 
@@ -337,18 +338,21 @@ export class View {
       if (this.shroomViews.has(m)) continue;
       const c = new Container();
       c.position.set(m.x, m.y);
-      const glow = this.glowSprite(c, CREAM, 0.5);
+      const glow = this.glowSprite(c, m.col, m.blocked ? 0.3 : 0.5);
       glow.width = glow.height = 105 * this.unit;
       glow.y = -34 * this.unit;
-      const cap = new Sprite(this.tex.caps[(Math.random() * this.tex.caps.length) | 0]);
+      // the domain always fruits the same species: texture and posture are
+      // seeded from the label, colour from the sim (blocked reads funereal)
+      const cap = new Sprite(this.tex.caps[(hash01(m.label) * this.tex.caps.length) | 0]);
       cap.anchor.set(0.5, 1);
-      cap.tint = 0xffe9cf;
+      cap.tint = m.col;
+      cap.rotation = m.rot;
       const cs = 66 * this.unit;
       cap.width = cap.height = cs;
       const label = new Text({ text: m.label, style: labelStyle(8) });
       label.anchor.set(0.5, 0);
       label.position.set(0, 5 * this.unit);
-      label.tint = 0xffe8c8;
+      label.tint = m.blocked ? 0xd8c8f0 : 0xffe8c8;
       label.alpha = 0;
       c.addChild(glow, cap, label);
       this.bloomsL.addChild(c);
@@ -467,6 +471,7 @@ export class View {
       const p = sim.spores[i];
       if (!p) { s.visible = false; continue; }
       s.visible = true;
+      s.tint = p.col;
       s.position.set(p.x, p.y);
       s.alpha = 0.55 * (1 - p.t / (p.land + 1));
     }

@@ -86,11 +86,11 @@ async function create(host: ThemeHost<typeof MYCELIUM_DEFAULTS>,
     return sim.host(ip, label, simT);
   }
 
-  function bloomAt(n: SimNode, domain: string): void {
+  function bloomAt(n: SimNode, domain: string, blocked: boolean): void {
     const j = sim.junctionNear(n.x, n.y, 210 * Math.max(1, app.screen.width / 1200));
     const x = j ? j.x : n.x + (hash01(`${domain}|${n.id}`) * 2 - 1) * 46;
     const y = j ? j.y : n.y + (14 + hash01(`${n.id}|${domain}`) * 30);
-    sim.fruit(x, y, domain);
+    sim.fruit(x, y, domain, blocked);
     audio.sfx('bloom', { pan: ((x / app.screen.width) * 2 - 1) * 0.8 });
   }
 
@@ -117,7 +117,7 @@ async function create(host: ThemeHost<typeof MYCELIUM_DEFAULTS>,
         if (!domain || !settings.mBlooms) break;
         if (now() - lastBloom < 0.9 || !throttle.allow(`blm|${ev.src_ip}|${domain}`, 2.2)) break;
         lastBloom = now();
-        bloomAt(n, domain);
+        bloomAt(n, domain, ev.dns_blocked === true);
         break;
       }
 
@@ -265,7 +265,7 @@ async function create(host: ThemeHost<typeof MYCELIUM_DEFAULTS>,
     }),
     diag: () => ({
       app, sim, view,
-      bloom: (d?: string) => { const n = anyNode(); bloomAt(n, d ?? 'EXAMPLE.COM'); },
+      bloom: (d?: string, blocked?: boolean) => { const n = anyNode(); bloomAt(n, d ?? 'EXAMPLE.COM', blocked === true); },
       scorch: () => { const n = anyNode(); sim.scorch(n.x + 30, n.y + 20); },
       blight: () => { const n = anyNode(); sim.blight(n); threatUntil = now() + 9.6; },
       sprout: (name?: string) => {

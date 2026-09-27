@@ -913,7 +913,7 @@ moving.
 | allow | a pulse of light runs the filament path between the two hosts; a route used often becomes the preferred road for next time. Where no path exists yet, a new hypha grows toward the unreachable host |
 | block | a scorch patch smoulders in — wounded ground filaments refuse to re-enter — with an ember flare, and heals away over twenty seconds |
 | threat | a crimson blight swarm crawls in from a screen edge toward the brightest host, and the web flares white and burns it off while the music swells |
-| dns | a pale mushroom pushes up at the busiest nearby junction, with the domain on its stem, glowing cream, wilting after half a minute into a puff of spores that seed new growth where they land |
+| dns | a mushroom pushes up at the busiest nearby free spot — each domain always fruits the same species (dome, morel or parasol) in its own cream/honey/lilac shade; gravity-blocked lookups come up funereal violet-grey. Crowded clearings skip the fruiting rather than stack, and each mushroom wilts after half a minute into a puff of spores (the same colour) that seed new growth where they land |
 | dhcp | a new host takes root with a warm ring and a rising glass tone, labelled with its hostname, and puts out its first filaments |
 | wifi | joins emit a drift of spore light from the access point; failures scatter dimly |
 | system | a grey ring breathes out from the gateway nodule |

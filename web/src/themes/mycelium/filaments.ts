@@ -23,8 +23,8 @@ interface Vtx { x: number; y: number; flow: number; mem: number; born: number; h
 interface Seg { a: number; b: number; len: number; flow: number; mem: number; dead: boolean }
 
 export interface SimPulse { p: number[]; s: number; len: number; hx: number; hy: number; col: number }
-export interface SimShroom { x: number; y: number; t: number; life: number; lean: number; s: number; label: string }
-export interface SimSpore { x: number; y: number; vx: number; vy: number; t: number; land: number }
+export interface SimShroom { x: number; y: number; t: number; life: number; lean: number; s: number; label: string; col: number; rot: number; blocked: boolean }
+export interface SimSpore { x: number; y: number; vx: number; vy: number; t: number; land: number; col: number }
 export interface SimScorch { x: number; y: number; r: number; t: number }
 export interface SimBlight { x: number; y: number; tx: number; ty: number; t: number; phase: number; target: string }
 export interface SimFlash { x: number; y: number; t: number; life: number; r: number; c: [number, number, number] }
@@ -38,6 +38,17 @@ const FUSE_R = 7;
 const CELL = 28;
 const GHOST = 0.045;          // the faintest a filament's memory ever fades
 const TIP_SPEED = 24;         // px/s creep
+
+/** Cap palettes, picked at fruit time: allowed queries wear warm creams and
+ *  honeys; gravity-blocked ones a cool violet-grey, dimmer and funereal. */
+const SHROOM_ALLOWED = [0xffe9cf, 0xffd9a0, 0xf7dcff, 0xdff5df, 0xffe0b8];
+const SHROOM_BLOCKED = [0xb9a6d8, 0x9aa6c8, 0xcdb0e0];
+
+/** Nudge a palette colour a few shades along its own family, seeded. */
+function shade(hex: number, h: number): number {
+  const j = (c: number, amt: number) => Math.min(255, Math.max(0, Math.round(c + (h - 0.5) * amt)));
+  return (j((hex >> 16) & 255, 26) << 16) | (j((hex >> 8) & 255, 20) << 8) | j(hex & 255, 26);
+}
 
 export class Sim {
   nodes = new Map<string, SimNode>();
@@ -190,6 +201,8 @@ export class Sim {
         const p = this.V[v];
         const dd = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
         if (dd > maxR * maxR || dd < 30 * 30) continue;
+        // a junction already wearing a mushroom is spoken for
+        if (this.shrooms.some((m) => Math.abs(m.x - p.x) < 36 && Math.abs(m.y - p.y) < 36)) continue;
         const score = d * 2 + p.mem * 8 - Math.sqrt(dd) / 160;
         if (score > bestScore) { bestScore = score; best = v; }
       }
@@ -375,19 +388,48 @@ export class Sim {
   }
 
   // ── fruiting, spores ──────────────────────────────────────────────────────
-  fruit(x: number, y: number, label: string): void {
-    for (const m of this.shrooms) if (m.label === label && Math.hypot(m.x - x, m.y - y) < 170) return;
-    if (this.shrooms.length >= this.maxShrooms) {
-      const old = this.shrooms.shift(); if (old) this.puff(old.x, old.y, 12);
+  /**
+   * Raise a mushroom for a domain query. Preferred spot is a busy junction
+   * (junctionNear already skips claimed ones); if the exact spot is taken,
+   * probe a hash-seeded ring around it so a busy host fruits a clearing,
+   * never a totem pole. Same domain never doubles up within 170px.
+   */
+  fruit(x: number, y: number, label: string, blocked = false): void {
+    // clamp into the loam FIRST: an unclamped origin degenerates every ring
+    // probe below onto the same clamped edge line
+    x = Math.min(this.w * 0.94, Math.max(this.w * 0.06, x));
+    y = Math.min(this.h * 0.88, Math.max(this.h * 0.14, y));
+    const lab = label.toUpperCase().slice(0, 26);
+    for (const m of this.shrooms) if (m.label === lab && Math.hypot(m.x - x, m.y - y) < 170) return;
+    const clear = (px: number, py: number) => !this.shrooms.some((m) => Math.hypot(m.x - px, m.y - py) < 52);
+    if (!clear(x, y)) {
+      let placed = false;
+      for (let k = 0; k < 8; k++) {
+        const ang = hash01(`ring|${lab}|${k}`) * 6.283;
+        const rad = 42 + k * 16 + hash01(`ring2|${lab}`) * 12;
+        const px = Math.min(this.w * 0.94, Math.max(this.w * 0.06, x + Math.cos(ang) * rad));
+        const py = Math.min(this.h * 0.88, Math.max(this.h * 0.14, y + Math.sin(ang) * rad));
+        if (clear(px, py)) { x = px; y = py; placed = true; break; }
+      }
+      // no room in this clearing: skip the fruiting rather than stack one
+      if (!placed) return;
     }
-    this.shrooms.push({ x, y, t: 0, life: 24 + Math.random() * 16, lean: (Math.random() - 0.5) * 0.4,
-      s: 0.5 + Math.random() * 0.22, label: label.toUpperCase().slice(0, 26) });
+    if (this.shrooms.length >= this.maxShrooms) {
+      const old = this.shrooms.shift(); if (old) this.puff(old.x, old.y, 12, old.col);
+    }
+    const fam = blocked ? SHROOM_BLOCKED : SHROOM_ALLOWED;
+    this.shrooms.push({
+      x, y, t: 0, life: 24 + Math.random() * 16, lean: (Math.random() - 0.5) * 0.4,
+      s: 0.42 + hash01(`sz|${lab}`) * 0.58, label: lab,
+      col: shade(fam[(hash01(`col|${lab}|${blocked ? 1 : 0}`) * fam.length) | 0], hash01(`jit|${lab}`)),
+      rot: (hash01(`rot|${lab}`) - 0.5) * 0.12, blocked,
+    });
   }
 
-  puff(x: number, y: number, n: number): void {
+  puff(x: number, y: number, n: number, col = 0xffffff): void {
     for (let i = 0; i < n; i++) {
       this.spores.push({ x: x + (Math.random() - 0.5) * 8, y: y - 14,
-        vx: (Math.random() - 0.5) * 28, vy: -8 - Math.random() * 18, t: 0, land: 3.5 + Math.random() * 3.5 });
+        vx: (Math.random() - 0.5) * 28, vy: -8 - Math.random() * 18, t: 0, land: 3.5 + Math.random() * 3.5, col });
     }
   }
 
@@ -471,7 +513,7 @@ export class Sim {
     // mushrooms: grow, then puff spores at the end
     for (let i = this.shrooms.length - 1; i >= 0; i--) {
       const m = this.shrooms[i]; m.t += dt;
-      if (m.t > m.life) { this.puff(m.x, m.y, 26); this.shrooms.splice(i, 1); }
+      if (m.t > m.life) { this.puff(m.x, m.y, 26, m.col); this.shrooms.splice(i, 1); }
     }
 
     for (let i = this.scorchs.length - 1; i >= 0; i--) { this.scorchs[i].t += dt; if (this.scorchs[i].t > 18) this.scorchs.splice(i, 1); }
