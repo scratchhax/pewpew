@@ -332,8 +332,9 @@ included). `python3 relay/test_cef.py` self-checks the CEF parser, and
 ![scene picker](docs/scene-picker.png)
 
 Press **F2** for the scene picker. Click a card, use the arrow keys and Enter,
-or press 1–8; Esc closes it. The **Scene** dropdown at the top of the F1 panel
-does the same. The screen fades out and loads the new scene.
+or press the number on the card; if there are ever more than nine scenes,
+**0** flips between pages. Esc closes it. The **Scene** dropdown at the top of
+the F1 panel does the same. The screen fades out and loads the new scene.
 
 The pick is saved in that browser, so a kiosk pointed at the plain
 `http://<relay-host>:8080/` comes back to it after a reload or a reboot. You
