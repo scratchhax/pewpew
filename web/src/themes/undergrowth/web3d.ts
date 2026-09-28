@@ -7,23 +7,54 @@ import type { PerspectiveCamera, Scene } from 'three';
 import { hash01 } from '../../state';
 import type { Sim, SimPulse, SimShroom } from '../mycelium/filaments';
 
-/** World units per sim pixel: a 1920 px mat becomes ~96 world units wide. */
+/** The web's radius in world units: the whole mat wraps a sphere ~96 units across. */
+export const R = 48;
+/** World units per sim pixel: adjacent vertices are ~6 px apart, so their 3-D edge length is still ≈ len·S. */
 export const S = 0.05;
+const TAU = Math.PI * 2;
 
 /** The mat's colour families, same as seen from above: ice-cyan, teal, spring. */
 const HUES = [new Color(0x49e6ff), new Color(0x5ff0cf), new Color(0x8cf29a)];
 
-/** Stable, smooth height field over the loam (sim px space): the web undulates ±6 units. */
-/** A gentle height field (max slope ~12°) — steep enough to read as a living web, shallow enough that the camera's view never nears vertical. */
-export function elev(x: number, y: number): number {
-  return (Math.sin(x * 0.007 + 1.7) + Math.sin(y * 0.011 - 0.6) + Math.sin((x + y) * 0.004 + 2.3)) * 0.5;
+/**
+ * The radial band [0.36..0.98]·R a loam point sits in. Low frequency, so
+ * neighbouring vertices share a band and filaments stay coherent strands;
+ * periodic in x (the mat's left/right edges join on the sphere), so the seam
+ * is seamless. This is what gives the web its volume: a thick shell of
+ * layered strands, not a surface.
+ */
+function depth(x: number, y: number): number {
+  const d = 0.72
+    + 0.16 * Math.sin((2 * TAU * x) / 1920 + 1.2) * Math.sin(y * 0.004 - 0.8)
+    + 0.12 * Math.sin((4 * TAU * x) / 1920 - 0.5) * Math.cos(y * 0.003 + 2.1)
+    + 0.08 * Math.sin((2 * TAU * x) / 1920 + (TAU * y) / 1080 + 2.9) * Math.sin(y * 0.002 + 0.4);
+  return Math.min(0.98, Math.max(0.36, d));
 }
 
 const _v = new Vector3();
 const _v2 = new Vector3();
+
+/**
+ * Loam (sim px) → world: the mat wraps a spherical shell. x wraps the
+ * longitude (the mat's left and right edges join), y spans the latitude band
+ * 45°..135° (no pole crowding), and depth() pushes strands into a thick
+ * volume — so from anywhere inside the web, every direction leads somewhere.
+ */
 export function lift(x: number, y: number, out: Vector3): Vector3 {
-  out.set(x * S, elev(x, y), y * S);
+  const th = (x / 1920) * TAU;
+  const ph = Math.PI / 4 + (y / 1080) * (Math.PI / 2);
+  const r = R * depth(x, y);
+  out.set(
+    Math.sin(ph) * Math.cos(th) * r,
+    Math.cos(ph) * r,
+    Math.sin(ph) * Math.sin(th) * r,
+  );
   return out;
+}
+
+/** The outward (radial) direction at a loam point — "up" off the web. */
+export function radial(x: number, y: number, out: Vector3): Vector3 {
+  return out.copy(lift(x, y, out)).normalize();
 }
 
 // ── shared soft textures ────────────────────────────────────────────────────
@@ -167,8 +198,10 @@ class FilamentWeb {
       if (!a || !b) continue;
       const slot = n * 4;
       this.edgeSlot.set(ei, slot);
-      const ax = a.x * S, ay = elev(a.x, a.y), az = a.y * S;
-      const bx = b.x * S, by = elev(b.x, b.y), bz = b.y * S;
+      lift(a.x, a.y, _v);
+      const ax = _v.x, ay = _v.y, az = _v.z;
+      lift(b.x, b.y, _v);
+      const bx = _v.x, by = _v.y, bz = _v.z;
       let dx = bx - ax, dy = by - ay, dz = bz - az;
       const dl = Math.hypot(dx, dy, dz) || 1;
       dx /= dl; dy /= dl; dz /= dl;
@@ -429,9 +462,11 @@ class Spores {
     for (const s of sim.spores) {
       if (n >= size.length) break;
       lift(s.x, s.y, _v);
-      pos[n * 3] = _v.x;
-      pos[n * 3 + 1] = _v.y + 1.2 + Math.sin(s.t * 3 + s.x * 0.1) * 0.4;
-      pos[n * 3 + 2] = _v.z;
+      // a breath off the web, along its radial "up"
+      _v2.copy(_v).normalize().multiplyScalar(1.2 + Math.sin(s.t * 3 + s.x * 0.1) * 0.4);
+      pos[n * 3] = _v.x + _v2.x;
+      pos[n * 3 + 1] = _v.y + _v2.y;
+      pos[n * 3 + 2] = _v.z + _v2.z;
       c3.set(s.col);
       col[n * 3] = c3.r; col[n * 3 + 1] = c3.g; col[n * 3 + 2] = c3.b;
       size[n] = 0.34;
@@ -459,6 +494,8 @@ const CAP_PROFILES: number[][][] = [
 ];
 
 interface ShroomView { group: Group; glow: Sprite; }
+
+const SHROOM_UP = new Vector3(0, 1, 0);
 
 class Shrooms {
   private views = new Map<SimShroom, ShroomView>();
@@ -492,10 +529,12 @@ class Shrooms {
     glow.position.y = 2.2;
     const group = new Group();
     group.add(stem, cap, glow);
-    group.rotation.y = m.rot * 4 + hash01(`spin|${m.label}`) * 6.283;
-    group.rotation.x = m.lean * 0.3;
     lift(m.x, m.y, _v);
     group.position.copy(_v);
+    // grow off the web along its radial "up", then the species' own spin and lean
+    group.quaternion.setFromUnitVectors(SHROOM_UP, _v2.copy(_v).normalize());
+    group.rotateY(m.rot * 4 + hash01(`spin|${m.label}`) * 6.283);
+    group.rotateX(m.lean * 0.3);
     this.scene.add(group);
     return { group, glow };
   }
@@ -533,11 +572,12 @@ class Shrooms {
     }
   }
 
-  /** World-space anchor above a mushroom, for its label (null when gone). */
+  /** World-space anchor above a mushroom (radially out from the web), for its label (null when gone). */
   anchor(m: SimShroom, out: Vector3): Vector3 | null {
     if (!this.views.has(m)) return null;
     lift(m.x, m.y, out);
-    out.y += 3.7 * m.s;
+    _v2.copy(out).normalize().multiplyScalar(3.7 * m.s);
+    out.add(_v2);
     return out;
   }
 }
@@ -732,7 +772,12 @@ class Labels {
       for (const { n } of near.slice(0, 16)) {
         const key = `ho|${n.id}`;
         wanted.add(key);
-        this.ensure(key, n.label, false, (out) => { lift(n.x, n.y, out); out.y += 0.6; return out; });
+        this.ensure(key, n.label, false, (out) => {
+          lift(n.x, n.y, out);
+          const l = Math.hypot(out.x, out.y, out.z) || 1; // nudge radially off the web
+          out.x += (out.x / l) * 0.6; out.y += (out.y / l) * 0.6; out.z += (out.z / l) * 0.6;
+          return out;
+        });
       }
     }
     // project what is wanted, retire the rest

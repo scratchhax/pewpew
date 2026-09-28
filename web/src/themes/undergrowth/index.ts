@@ -12,8 +12,9 @@ import './hud.css';
 
 /**
  * Undergrowth: the Mycelium garden, seen from inside. The same living mat —
- * the same localStorage, the same half-life — lifted into a shallow 3D volume
- * in a dark subterranean void, and you are flying through it: a slow
+ * the same localStorage, the same half-life — wrapped into a spherical shell
+ * of layered strands in a dark subterranean void, so the web surrounds you
+ * in every direction, and you are flying through it: a slow
  * autopilot that rides the filaments toward whatever carries the most
  * traffic, passing pulses of light, mushroom groves at the junctions, a
  * scorch where a flow was stopped, and a blight that creeps the web before

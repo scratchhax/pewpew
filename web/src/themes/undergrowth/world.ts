@@ -122,7 +122,7 @@ function floorMist(): Mesh {
   });
   const m = new Mesh(new PlaneGeometry(1600, 1600, 1, 1), mat);
   m.rotation.x = -Math.PI / 2;
-  m.position.y = -35;
+  m.position.y = -66; // below the web sphere (its base sits at ~-47)
   m.renderOrder = -5;
   return m;
 }
@@ -138,7 +138,7 @@ function specks(): Points {
   const mat = new ShaderMaterial({
     uniforms: {
       uTime: { value: 0 }, uPx: { value: 1 }, uDrift: { value: [0, 0, 0] },
-      uBox: { value: [150, 70, 120] }, uCenter: { value: [0, 0, 0] },
+      uBox: { value: [150, 130, 150] }, uCenter: { value: [0, 0, 0] },
     },
     vertexShader: /* glsl */`
       uniform float uTime, uPx;

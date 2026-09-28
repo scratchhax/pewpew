@@ -1,7 +1,7 @@
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import type { PerspectiveCamera } from 'three';
 import type { Sim } from '../mycelium/filaments';
-import { elev, lift, S } from './web3d';
+import { lift, R, S } from './web3d';
 
 /**
  * The autopilot: a slow ride through the mat. It keeps a chain of vertices
@@ -31,6 +31,8 @@ export class Flycam {
   /** Relocation: the vertex we're gliding to when the local component is exhausted. */
   private travel = -1;
   private travelTarget = new Vector3();
+  private travelFrom = new Vector3(0, 1, 0);
+  private travelF = 0;
   private lastRelocateT = -1000;
   /** Every 45 s the ride drifts toward wherever the mat is busiest. */
   private nextDriftT = 45;
@@ -82,7 +84,7 @@ export class Flycam {
     let best = -1, bd = Infinity;
     for (let i = 0; i < this.sim.V.length; i++) {
       const v = this.sim.V[i];
-      this.tmp.set(v.x * S, elev(v.x, v.y), v.y * S);
+      lift(v.x, v.y, this.tmp);
       const d = distSq(this.tmp, p);
       if (d < bd) { bd = d; best = i; }
     }
@@ -118,7 +120,7 @@ export class Flycam {
       if (this.recent.has(next)) continue;
       let w = e.mem + 2 * e.flow + 0.15 * Math.random();
       const nv = this.sim.V[next];
-      this.tmp.set(nv.x * S, elev(nv.x, nv.y), nv.y * S).sub(this.pos).normalize();
+      lift(nv.x, nv.y, this.tmp).sub(this.pos).normalize();
       // persistence: strongly prefer continuing the way we're already heading,
       // so the ride turns like a forager, not a drunk
       w *= 1 + 2.5 * Math.max(0, this.tmp.dot(this.lastDir));
@@ -163,7 +165,7 @@ export class Flycam {
     this.addRecent(v);
     this.extendRoute(t);
     const a = this.sim.V[this.path[0]];
-    if (a) this.routeAnchor.set(a.x * S, elev(a.x, a.y), a.y * S);
+    if (a) lift(a.x, a.y, this.routeAnchor);
   }
 
   /** The top `k` components by size (then activity), with their busiest vertex. */
@@ -206,19 +208,28 @@ export class Flycam {
       if (c.size < 20) continue;
       const tv = this.sim.V[c.v];
       if (!tv) continue;
-      this.travelTarget.set(tv.x * S, elev(tv.x, tv.y), tv.y * S);
+      lift(tv.x, tv.y, this.travelTarget);
       if (this.travelTarget.distanceTo(this.pos) < 8) continue;
       this.lastRelocateT = t;
+      this.startTravel();
       this.travel = c.v;
       return true;
     }
     return false;
   }
 
-  /** Glide in a straight line to the relocation target, then settle back onto the web. */
+  private startTravel(): void {
+    this.travelF = 0;
+    // the glide arcs between the two shell directions at a fixed radius, so it
+    // never cuts through the hollow core
+    if (this.pos.lengthSq() < 1e-4) this.travelFrom.set(0, 1, 0);
+    else this.travelFrom.copy(this.pos).normalize();
+  }
+
+  /** Glide to the relocation target along a shell arc, then settle back onto the web. */
   private doTravel(dt: number, t: number): void {
     const d = this.travelTarget.distanceTo(this.pos);
-    if (d < 0.5) {
+    if (d < 0.5 || this.travelF >= 1) {
       this.pos.copy(this.travelTarget);
       this.travel = -1;
       this.newRoute(t);
@@ -226,15 +237,17 @@ export class Flycam {
       return;
     }
     this.curSpeed += (this.speed * 1.6 - this.curSpeed) * Math.min(1, dt * 2);
-    const step = Math.min(d, this.curSpeed * dt);
+    const dir1 = this.tmp.copy(this.travelTarget).normalize();
+    const angle = this.travelFrom.angleTo(dir1);
+    const arcLen = Math.max(1e-3, angle * 0.85 * R);
+    this.travelF = Math.min(1, this.travelF + (this.curSpeed * dt) / arcLen);
+    const s = Math.sin(angle);
+    const w0 = s > 1e-4 ? Math.sin((1 - this.travelF) * angle) / s : 1 - this.travelF;
+    const w1 = s > 1e-4 ? Math.sin(this.travelF * angle) / s : this.travelF;
+    this.tmp2.copy(this.travelFrom).multiplyScalar(w0).addScaledVector(dir1, w1).normalize().multiplyScalar(0.85 * R);
+    this.pos.copy(this.tmp2);
     this.tmp2.copy(this.travelTarget).sub(this.pos).normalize();
-    this.pos.addScaledVector(this.tmp2, step);
-    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.upFor(this.tmp2.x, this.tmp2.y, this.tmp2.z));
-    this.qLook.setFromRotationMatrix(this.m4);
-    this.slerpTo(this.qLook, Math.min(1, dt * 5));
-    this.tmp2.set(0, 0, -1).applyQuaternion(this.quat);
-    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.upFor(this.tmp2.x, this.tmp2.y, this.tmp2.z));
-    this.quat.setFromRotationMatrix(this.m4);
+    this.orientTo(this.tmp2, dt);
     this.lastDir.copy(this.travelTarget).sub(this.pos).normalize();
     this.cam.position.copy(this.pos);
     this.cam.quaternion.copy(this.quat);
@@ -251,9 +264,11 @@ export class Flycam {
       // the sim renumbers vertices when it compacts — if the route's start
       // vertex is no longer where it was, every index in the route is stale
       const a = this.sim.V[this.path[0]];
-      if (!a ||
-          Math.abs(a.x * S - this.routeAnchor.x) + Math.abs(elev(a.x, a.y) - this.routeAnchor.y) + Math.abs(a.y * S - this.routeAnchor.z) > 0.5) {
+      if (!a) {
         this.newRoute(t);
+      } else {
+        lift(a.x, a.y, this.tmp);
+        if (this.tmp.distanceTo(this.routeAnchor) > 0.5) this.newRoute(t);
       }
     }
     let total = this.cum[this.cum.length - 1];
@@ -281,8 +296,9 @@ export class Flycam {
       if (c && c.size >= 60) {
         const tv = this.sim.V[c.v];
         if (tv) {
-          this.travelTarget.set(tv.x * S, elev(tv.x, tv.y), tv.y * S);
+          lift(tv.x, tv.y, this.travelTarget);
           if (this.travelTarget.distanceTo(this.pos) > 10) {
+            this.startTravel();
             this.travel = c.v;
             return;
           }
@@ -309,12 +325,12 @@ export class Flycam {
       for (let i = 1; i < this.cum.length; i++) this.cum[i] -= dropped;
     }
     const a0 = this.sim.V[this.path[0]];
-    if (a0) this.routeAnchor.set(a0.x * S, elev(a0.x, a0.y), a0.y * S);
+    if (a0) lift(a0.x, a0.y, this.routeAnchor);
 
     const p = this.pointAt(this.dist);
     if (!p) { if (this.relocate(t)) return; this.newRoute(t); return; }
     total = this.cum[this.cum.length - 1];
-    const ahead = this.pointAt(Math.min(total, this.dist + 36));
+    const ahead = this.pointAt(Math.min(total, this.dist + 48));
     if (!ahead) { if (this.relocate(t)) return; this.newRoute(t); return; }
 
     // the anti-burn-in wander only — no sway, no roll, ever
@@ -322,32 +338,35 @@ export class Flycam {
     p.y += wanderY * 0.002;
     this.pos.copy(p);
 
-    // orientation: ease toward the path ahead, then re-snap upright for the
-    // resulting forward — the slerp can pass through rolled intermediates on
-    // 3-D turns, but the camera itself must never carry any roll. The up
-    // vector is guarded: lookAt with a near-parallel up is unstable and flips
-    // wildly.
+    // orientation: ease toward the path ahead — world up, level ride; when
+    // the view runs near-vertical the heading is held (see orientTo).
     this.tmp2.copy(ahead).sub(this.pos);
     if (this.tmp2.lengthSq() < 1e-4) this.tmp2.copy(this.lastDir);
-    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.upFor(this.tmp2.x, this.tmp2.y, this.tmp2.z));
-    this.qLook.setFromRotationMatrix(this.m4);
-    this.slerpTo(this.qLook, Math.min(1, dt * 5));
-    this.tmp2.set(0, 0, -1).applyQuaternion(this.quat);
-    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.upFor(this.tmp2.x, this.tmp2.y, this.tmp2.z));
-    this.quat.setFromRotationMatrix(this.m4);
+    this.orientTo(this.tmp2, dt);
 
     this.lastDir.copy(this.tmp2.copy(ahead).sub(this.pos).normalize());
     this.cam.position.copy(this.pos);
     this.cam.quaternion.copy(this.quat);
   }
 
-  /** World up for a lookAt, unless the view direction is near-vertical — then a horizontal up perpendicular to it (a fixed up parallel to the view makes lookAt flip unpredictably). */
-  private upFor(dx: number, dy: number, dz: number): Vector3 {
-    const l = Math.hypot(dx, dy, dz);
-    if (l > 1e-6 && Math.abs(dy) / l < 0.95) return this.up.set(0, 1, 0);
-    this.up.set(-dz, 0, dx);
-    if (this.up.lengthSq() < 1e-6) this.up.set(1, 0, 0);
-    return this.up.normalize();
+  /**
+   * Ease the heading toward `dir`. World up everywhere (the ride stays
+   * level like a flight over a landscape, no planet-walk inversion); when
+   * the view runs near-parallel to the up vector the up is ambiguous, so
+   * the heading is HELD (returned false) instead of snapping to some
+   * fallback — that is what makes the horizon stay continuous.
+   */
+  private orientTo(dir: Vector3, dt: number): boolean {
+    if (Math.abs(dir.y) / (dir.length() || 1) > 0.95) return false;
+    this.m4.lookAt(this.pos, this.tmp.copy(this.pos).add(dir), this.up);
+    this.qLook.setFromRotationMatrix(this.m4);
+    this.slerpTo(this.qLook, Math.min(1, dt * 3));
+    // re-snap upright for the resulting forward: the slerp can pass through
+    // rolled intermediates on 3-D turns, but the camera never carries roll
+    this.tmp2.set(0, 0, -1).applyQuaternion(this.quat);
+    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.up);
+    this.quat.setFromRotationMatrix(this.m4);
+    return true;
   }
 
   /** Slerp toward `q`, always via the short arc (negate if the dot says long way). */
@@ -373,21 +392,16 @@ export class Flycam {
     return lift(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, this.tmp2).clone();
   }
 
-  /** A slow in-place look-around while there's nothing worth riding (an empty mat, or small components still growing). */
+  /** A slow in-place look-around while there's nothing worth riding (an empty mat, or small components still growing) — it pans the whole sphere, up and down as well as around. */
   private hover(dt: number): void {
     this.orbitT += dt;
     const a = this.orbitT * 0.12;
     this.tmp2.set(
-      this.pos.x + Math.cos(a) * 24,
-      this.pos.y + Math.sin(a * 0.6 + 1) * 2.5,
-      this.pos.z + Math.sin(a) * 24,
+      Math.cos(a) * 24,
+      Math.sin(a * 0.53 + 1) * 12,
+      Math.sin(a) * 24,
     );
-    this.m4.lookAt(this.pos, this.tmp2, this.upFor(this.tmp2.x - this.pos.x, this.tmp2.y - this.pos.y, this.tmp2.z - this.pos.z));
-    this.qLook.setFromRotationMatrix(this.m4);
-    this.slerpTo(this.qLook, Math.min(1, dt * 1.5));
-    this.tmp2.set(0, 0, -1).applyQuaternion(this.quat);
-    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.upFor(this.tmp2.x, this.tmp2.y, this.tmp2.z));
-    this.quat.setFromRotationMatrix(this.m4);
+    this.orientTo(this.tmp2, dt);
     this.cam.position.copy(this.pos);
     this.cam.quaternion.copy(this.quat);
   }
