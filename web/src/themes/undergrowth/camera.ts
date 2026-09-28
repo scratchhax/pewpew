@@ -4,9 +4,9 @@ import type { Sim } from '../mycelium/filaments';
 import { lift, R, S } from './web3d';
 
 /** Max heading change per second: big retargets become slow pans, not snaps. */
-const TURN_RATE = (26 * Math.PI) / 180;
-/** Max velocity-turn per second: the camera is a vehicle — its direction NEVER changes abruptly. */
-const POS_TURN = (45 * Math.PI) / 180;
+const TURN_RATE = (22 * Math.PI) / 180;
+/** Max velocity-turn per second: the camera is a zero-g vehicle — direction NEVER changes abruptly. */
+const POS_TURN = (28 * Math.PI) / 180;
 
 /**
  * The autopilot: a slow ride through the mat. It keeps a chain of vertices
@@ -42,6 +42,8 @@ export class Flycam {
   /** Where the camera is actually heading — velocity direction, turn-limited. */
   private velDir = new Vector3();
   private tmp3 = new Vector3();
+  /** When the current route was (re)rooted — the vehicle coasts through a re-root. */
+  private routeT = -1000;
   /** Every 45 s the ride drifts toward wherever the mat is busiest. */
   private nextDriftT = 45;
   /** The route's start vertex, in world space — if it moves, the sim renumbered its vertices and the route is stale. */
@@ -161,6 +163,7 @@ export class Flycam {
 
   /** (Re)start a route from the nearest vertex to the camera. */
   private newRoute(t: number): void {
+    this.routeT = t;
     this.path = [];
     this.cum = [0];
     this.dist = 0;
@@ -242,14 +245,14 @@ export class Flycam {
    * as the whole scene repainting.)
    */
   private doTravel(dt: number, t: number): void {
-    if (this.pos.distanceTo(this.travelTarget) < 1.2) {
-      this.pos.copy(this.travelTarget);
+    if (this.pos.distanceTo(this.travelTarget) < 0.3) {
+      this.pos.copy(this.travelTarget); // imperceptible settle, not a jump
       this.travel = -1;
       this.newRoute(t);
       this.cam.position.copy(this.pos);
       return;
     }
-    this.curSpeed += (this.speed * 1.6 - this.curSpeed) * Math.min(1, dt * 2);
+    this.curSpeed += (this.speed * 1.3 - this.curSpeed) * Math.min(1, dt * 2);
     // Progress along the arc is measured by where we ACTUALLY are (the
     // projected angle), never by time: the turn-limited vehicle enters the
     // arc gradually, and if the parameter ran on time it would hit 1 while
@@ -408,7 +411,13 @@ export class Flycam {
     if (lag > 10) this.dist -= (lag - 10) * 0.6;
     this.tmp.subVectors(chase, this.pos);
     if (this.tmp.lengthSq() < 1e-6) this.tmp.copy(this.lastDir);
-    this.steer(dt, this.tmp.normalize());
+    this.tmp.normalize();
+    // Coast through a re-root: the desired direction blends in from the
+    // current velocity over the first two seconds, so a rail that snaps to a
+    // new junction never swings the drift
+    const rb = Math.min(1, (t - this.routeT) / 2);
+    if (rb < 1 && this.velDir.lengthSq() > 1e-6) this.tmp.lerp(this.velDir, 1 - rb).normalize();
+    this.steer(dt, this.tmp);
     this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
 
     // the anti-burn-in wander only — no sway, no roll, ever
@@ -493,7 +502,11 @@ export class Flycam {
   /** A slow in-place look-around while there's nothing worth riding (an empty mat, or small components still growing) — it pans the whole sphere, up and down as well as around. */
   private hover(dt: number): void {
     this.orbitT += dt;
-    this.velDir.set(0, 0, 0); // parked — next ride starts from the view direction
+    // zero-g: there is no brakes — bleed the speed off and drift to a stop
+    this.curSpeed += (0 - this.curSpeed) * Math.min(1, dt * 1.2);
+    if (this.curSpeed > 0.02 && this.velDir.lengthSq() > 1e-6) {
+      this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
+    }
     const a = this.orbitT * 0.12;
     this.tmp2.set(
       Math.cos(a) * 24,
