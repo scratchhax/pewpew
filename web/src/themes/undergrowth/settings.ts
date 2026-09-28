@@ -20,7 +20,7 @@ export const UNDERGROWTH_DEFAULTS = {
   uFocus: true,         // the camera drifts toward fresh blooms and blights
   uPersist: true,       // the garden survives reloads (shared with the Mycelium scene)
 
-  uCamSpeed: 12,        // flight speed through the mat, world units/s
+  uCamSpeed: 5,         // flight speed through the mat, world units/s (a crossing of the mat in ~20 s)
   uGlow: 1,             // overall bioluminescence
   uSporeDrift: 1,       // ambient spores and dust
 
@@ -61,7 +61,7 @@ export const UNDERGROWTH_CONTROLS = {
     toggle('uLabels', 'Labels'), toggle('uFocus', 'Follow events'), toggle('uPersist', 'Keep the garden'),
   ],
   budgets: [
-    range('uCamSpeed', 'Flight speed', 4, 30, 1),
+    range('uCamSpeed', 'Flight speed', 2, 30, 0.5),
     range('uGlow', 'Bioluminescence', 0.2, 2, 0.05),
     range('uSporeDrift', 'Spore drift', 0, 2, 0.05),
     range('uFadeMin', 'Hypha half-life (minutes)', 5, 120, 5),

@@ -37,6 +37,8 @@ const VW = 1920, VH = 1080;
 
 async function create(host: ThemeHost<typeof UNDERGROWTH_DEFAULTS>, init: RendererInit): Promise<ThemeInstance> {
   const { settings, state, throttle, audio } = host;
+  // one-time migration: 12 was the old default, so a stored 12 is "never touched"
+  if (settings.uCamSpeed === 12) settings.uCamSpeed = UNDERGROWTH_DEFAULTS.uCamSpeed;
 
   const world = createWorld(host.mount, init.antialias, init.powerPref === 'default' ? undefined : init.powerPref, init.resolution);
   const overlay = document.createElement('div');

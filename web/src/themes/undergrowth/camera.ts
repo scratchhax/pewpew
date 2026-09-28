@@ -22,7 +22,7 @@ export class Flycam {
   private recentQueue: number[] = [];
   /** Consecutive backtracks — two in a row means the walk is trapped in a tangle (a 2-vertex metronome). */
   private uturns = 0;
-  private speed = 12;
+  private speed = 5;
   private curSpeed = 0;
   private focusV = -1;
   private focusUntil = 0;
