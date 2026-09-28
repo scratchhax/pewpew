@@ -269,7 +269,7 @@ async function create(host: ThemeHost<typeof UNDERGROWTH_DEFAULTS>, init: Render
     }),
     diag: () => ({
       sim,
-      cam: () => ({ pos: [cam.pos.x, cam.pos.y, cam.pos.z], speed: cam.speedNow }),
+      cam: () => ({ pos: [cam.pos.x, cam.pos.y, cam.pos.z], quat: [cam.quat.x, cam.quat.y, cam.quat.z, cam.quat.w], speed: cam.speedNow }),
       flyTo: (ip: string) => {
         const n = sim.host(ip, ip, now());
         cam.teleport(n.x, n.y);

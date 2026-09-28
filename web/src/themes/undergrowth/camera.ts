@@ -27,11 +27,9 @@ export class Flycam {
   private up = new Vector3(0, 1, 0);
   private m4 = new Matrix4();
   private qLook = new Quaternion();
-  private qPrev = new Quaternion();
   private qNeg = new Quaternion();
   private tmp = new Vector3();
   private tmp2 = new Vector3();
-  private bank = 0;
 
   constructor(private sim: Sim, private cam: PerspectiveCamera, start = new Vector3(0, 0, 0)) {
     this.pos.copy(start);
@@ -160,28 +158,22 @@ export class Flycam {
     const ahead = this.pointAt(Math.min(total, this.dist + 18));
     if (!ahead) { this.newRoute(t); return; }
 
-    // breathing sway + the anti-burn-in wander
-    this.orbitT += dt;
-    p.x += Math.sin(this.orbitT * 0.9) * 0.15 + wanderX * 0.002;
-    p.y += Math.sin(this.orbitT * 0.63 + 1.3) * 0.12 + wanderY * 0.002;
-    p.z += Math.cos(this.orbitT * 0.77 + 0.4) * 0.15;
+    // the anti-burn-in wander only — no sway, no roll, ever
+    p.x += wanderX * 0.002;
+    p.y += wanderY * 0.002;
     this.pos.copy(p);
 
-    // orientation: look along the path ahead, eased; bank into turns
+    // orientation: ease toward the path ahead, then re-snap upright for the
+    // resulting forward — the slerp can pass through rolled intermediates on
+    // 3-D turns, but the camera itself must never carry any roll
     this.tmp2.copy(ahead).sub(this.pos);
     if (this.tmp2.lengthSq() < 1e-4) this.tmp2.copy(this.lastDir);
     this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.up);
     this.qLook.setFromRotationMatrix(this.m4);
-    this.slerpTo(this.qLook, Math.min(1, dt * 2.6));
-
-    const rate = dt > 0 ? this.quat.angleTo(this.qPrev) / dt : 0;
-    this.bank += (Math.max(-0.12, Math.min(0.12, rate * 0.25)) - this.bank) * Math.min(1, dt * 3);
-    this.qPrev.copy(this.quat);
-    if (Math.abs(this.bank) > 1e-4) {
-      this.tmp.set(0, 0, -1).applyQuaternion(this.quat);
-      this.qNeg.setFromAxisAngle(this.tmp, this.bank);
-      this.quat.premultiply(this.qNeg);
-    }
+    this.slerpTo(this.qLook, Math.min(1, dt * 5));
+    this.tmp2.set(0, 0, -1).applyQuaternion(this.quat);
+    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.up);
+    this.quat.setFromRotationMatrix(this.m4);
 
     this.lastDir.copy(this.tmp2.copy(ahead).sub(this.pos).normalize());
     this.cam.position.copy(this.pos);
@@ -221,6 +213,9 @@ export class Flycam {
     this.m4.lookAt(this.pos, this.tmp2, this.up);
     this.qLook.setFromRotationMatrix(this.m4);
     this.slerpTo(this.qLook, Math.min(1, dt * 1.2));
+    this.tmp2.set(0, 0, -1).applyQuaternion(this.quat);
+    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.up);
+    this.quat.setFromRotationMatrix(this.m4);
     this.cam.position.copy(this.pos);
     this.cam.quaternion.copy(this.quat);
   }
