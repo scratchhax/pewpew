@@ -66,7 +66,7 @@ Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - [Highlights](#highlights)
 - [Setup](#setup): [Relay](#1-start-the-relay) · [Viewer](#2-build-the-viewer) · [UniFi logging](#3-send-unifi-logs-to-the-relay) · [Check it's working](#4-check-its-working) · [`relay.yaml`](#relayrelayyaml)
 - [Using pewpew](#using-pewpew): [Keys](#keys) · [Switching scenes](#switching-scenes) · [Log inspector](#log-inspector) · [Settings](#settings-f1)
-- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [Mycelium](#mycelium)
+- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [Mycelium](#mycelium) · [Undergrowth](#undergrowth)
 - [Sound](#sound)
 - [Performance and quality](#performance-and-quality)
 - [URL parameters](#url-parameters)
@@ -301,7 +301,7 @@ minutes to start logging after a settings change or a relay restart.
 |-----|---------|--------------|
 | `syslog_bind`, `syslog_port` | `0.0.0.0`, `5514` | where syslog (UDP) is received |
 | `http_host`, `http_port` | `0.0.0.0`, `8080` | the viewer, WebSocket and health endpoints |
-| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson` or `mycelium` (every scene is also at `/<id>/`) |
+| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium` or `undergrowth` (every scene is also at `/<id>/`) |
 | `buffer_size` | `500` | recent events replayed to each newly opened browser |
 | `wan_interfaces` | `[ppp0]` | which gateway interfaces count as WAN, for inbound and outbound. Look at the `IN=`/`OUT=` fields of your firewall log lines; `eth8`–`eth10` are common on UDM and UDR |
 | `wan_ips`, `vpn_networks` | empty | optional WAN addresses and VPN networks, for direction and VPN badges |
@@ -346,7 +346,7 @@ different screens can show different scenes at once:
 | URL | Scene |
 |-----|-------|
 | `http://<relay-host>:8080/` | this screen's saved pick, or else the relay's `default_theme` |
-| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/`, `/gibson/`, `/mycelium/` | that scene (unknown names are a 404) |
+| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/`, `/gibson/`, `/mycelium/`, `/undergrowth/` | that scene (unknown names are a 404) |
 | any URL + `?theme=racing` | that scene (handy on the Pages demo) |
 
 The viewer checks the URL path, then `?theme=`, then the screen's saved pick,
@@ -401,7 +401,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, flight speed, bioluminescence, spore drift, and hypha half-life |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -933,6 +933,39 @@ STILL to a storm), COLONY gauges (BLT blight, VIG vigour), FIELD NOTES,
 GREATEST HUBS and FIELD RECORDS, all in soft rounded glass with spore-dot
 corners.
 
+### Undergrowth
+
+![undergrowth](docs/undergrowth.png)
+
+The same garden, seen from inside. Undergrowth lifts the Mycelium mat — the
+very same one, the same browser storage, the same half-life — into a shallow
+3D volume in a dark subterranean void, with a faint floor mist far below to
+tell you the loam is down there, and puts a camera in the web: a slow
+hands-free autopilot that rides the filaments, choosing each new thread by
+what it carries, banking into junctions, breathing as it goes. You are
+travelling through your network's mycelium, not watching it.
+
+Threads are drawn in world space, so they thin as they recede; pulses of
+light run them with short trails, and when one flies past the camera a soft
+whoosh pans to the side it passes on. The camera drifts toward whatever just
+happened — a fresh bloom, an incoming blight — for a few seconds, so the ride
+keeps showing you the news.
+
+| Event | On the ride |
+|-------|------------|
+| allow | a pulse of light runs the thread between the two hosts; when its path crosses close to the camera you hear it pass |
+| block | a dark scorch scar smoulders in the air where the flow ran, rimmed in ember, then heals away |
+| threat | a violet blight fog crawls in along the web toward the busiest host, and the web answers with a widening burn-off ring |
+| dns | a mushroom rises at the junction — the same three species and the same per-domain shades as seen from above, violet-grey when blocked — with the domain floating above it, and the ride bends toward it |
+| dhcp | a nodule pops into the web with a teal ripple and a rising glass tone |
+| wifi | spore light drifts off the gateway nodule |
+| system | a teal ripple breathes out from the gateway |
+
+**It is the same living mat.** Fly the Undergrowth and the Mycelium garden
+from above share one organism: the mushrooms you pass on the ride are the
+mushrooms on the floor, the half-life fading is the same fading, and
+**Keep the garden** is one switch for both.
+
 ## Sound
 
 All sound is synthesized in the browser with the WebAudio API. Browsers only
@@ -1261,6 +1294,7 @@ two volumes of its own:
 | Aquarium | **Tank sounds**, **Pump & water** |
 | The Gibson | **Access sounds**, **Hum & static** |
 | Mycelium | **Bells**, **Undergrowth & drone** |
+| Undergrowth | **Mycelium's score** (shared garden) **+ pulse whoosh** |
 
 Each scene keeps its own choices.
 
@@ -1408,7 +1442,7 @@ been measured on a Pi yet.
 
 | Parameter | Effect |
 |-----------|--------|
-| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson` or `mycelium` |
+| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium` or `undergrowth` |
 | `?demo=1` | synthetic traffic, no relay needed |
 | `?showreel=1` | with the demo: a looping 60-second calm → build → hurricane → cooldown arc |
 | `?rate=40` | with the demo: about 40 events per second |

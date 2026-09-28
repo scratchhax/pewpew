@@ -1,0 +1,54 @@
+/* Undergrowth: the HUD as a field kit strapped to the flythrough — the same
+   fungal glass as the garden seen from above, but darker, and a little
+   warmer, because you are closer to the earth. Loaded only with this theme. */
+body[data-theme="undergrowth"] { background: #04080a; }
+body[data-theme="undergrowth"] #hud { color: #b6e2cc; }
+
+body[data-theme="undergrowth"] #scanlines { opacity: 0.10; }
+
+body[data-theme="undergrowth"] .panel {
+  background:
+    radial-gradient(130% 150% at 12% -10%, rgba(44,88,62,0.34), transparent 60%),
+    linear-gradient(165deg, rgba(7,18,14,0.72), rgba(3,8,7,0.52));
+  clip-path: none;
+  border: 1px solid rgba(126,240,196,0.18);
+  border-radius: 16px 26px 14px 20px / 22px 14px 24px 16px;
+  filter: drop-shadow(0 0 10px rgba(70,240,217,0.08));
+  padding: 9px 14px 11px;
+}
+
+body[data-theme="undergrowth"] .panel-head {
+  color: #86ecd0;
+  border-bottom: 1px solid rgba(126,240,196,0.14);
+  letter-spacing: 4px;
+}
+
+/* the corners stay spores, but dimmer: the HUD recedes from the ride */
+body[data-theme="undergrowth"] .corner {
+  width: 9px; height: 9px; border: none;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(140,255,224,0.85) 0 30%, rgba(70,240,217,0.30) 55%, transparent 75%);
+  filter: blur(0.4px) drop-shadow(0 0 6px rgba(70,240,217,0.5));
+  opacity: 0.6;
+}
+
+body[data-theme="undergrowth"] #weather { color: #86ffcf; }
+body[data-theme="undergrowth"] .stat-row b { color: #8af0d4; }
+
+/* names that follow mushrooms and hosts through the web */
+#ug-host { position: fixed; inset: 0; pointer-events: none; z-index: 8; overflow: hidden; }
+.ug-label {
+  position: absolute; left: 0; top: 0; white-space: nowrap;
+  font: 600 12px/1.2 'Segoe UI', system-ui, sans-serif; letter-spacing: 0.5px;
+  padding: 2px 8px; border-radius: 10px;
+  background: rgba(4, 14, 11, 0.42); border: 1px solid rgba(140, 255, 224, 0.18);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  opacity: 0; transition: opacity 0.9s ease;
+  will-change: transform;
+}
+.ug-label.blocked {
+  color: #cdb0e0;
+  border-color: rgba(185, 166, 216, 0.35);
+  background: rgba(14, 10, 22, 0.45);
+}
+.ug-label.on { opacity: 0.9; }
