@@ -1,6 +1,6 @@
 import {
   AdditiveBlending, BufferAttribute, BufferGeometry, CanvasTexture, Color, DynamicDrawUsage, Group, InstancedMesh,
-  LatheGeometry, Matrix4, Mesh, MeshBasicMaterial, NormalBlending, Object3D, Points, ShaderMaterial, Sphere,
+  LatheGeometry, Line, LineBasicMaterial, Matrix4, Mesh, MeshBasicMaterial, NormalBlending, Object3D, Points, ShaderMaterial, Sphere,
   SphereGeometry, Sprite, SpriteMaterial, Vector2, Vector3,
 } from 'three';
 import type { PerspectiveCamera, Scene } from 'three';
@@ -493,9 +493,12 @@ const CAP_PROFILES: number[][][] = [
   [[0, 0.95], [0.5, 0.9], [1.0, 0.74], [1.5, 0.48], [1.85, 0.26], [1.9, 0.12], [1.55, 0.08]],
 ];
 
-interface ShroomView { group: Group; glow: Sprite; }
+interface Tendril { line: Line; ax: number; az: number; r: number; seed: number; len: number; rimY: number; }
+
+interface ShroomView { group: Group; glow: Sprite; tendrils: Tendril[]; tmat: LineBasicMaterial; }
 
 const SHROOM_UP = new Vector3(0, 1, 0);
+const TENDRIL_PTS = 9;
 
 class Shrooms {
   private views = new Map<SimShroom, ShroomView>();
@@ -529,6 +532,31 @@ class Shrooms {
     glow.position.y = 2.2;
     const group = new Group();
     group.add(stem, cap, glow);
+    // jellyfish tendrils: glowing filaments hanging off the cap rim, swaying
+    const tmat = new LineBasicMaterial({
+      color: m.col, transparent: true, opacity: 0.4,
+      blending: AdditiveBlending, depthWrite: false,
+    });
+    const tendrils: Tendril[] = [];
+    let rimR = 0, rimY = 0;
+    for (const p of pts) if (p.x > rimR) { rimR = p.x; rimY = 2.1 + p.y; }
+    const tn = 4 + Math.floor(hash01(`tent|${m.label}`) * 3);
+    for (let i = 0; i < tn; i++) {
+      const geo = new BufferGeometry();
+      geo.setAttribute('position', new BufferAttribute(new Float32Array(TENDRIL_PTS * 3), 3).setUsage(DynamicDrawUsage));
+      const line = new Line(geo, tmat);
+      line.frustumCulled = false;
+      group.add(line);
+      const a = (i / tn) * TAU + hash01(`ta|${m.label}|${i}`) * 1.5;
+      tendrils.push({
+        line,
+        ax: Math.cos(a), az: Math.sin(a),
+        r: rimR * (0.5 + hash01(`tr|${m.label}|${i}`) * 0.45),
+        seed: hash01(`ts|${m.label}|${i}`) * 10,
+        len: 2.8 + hash01(`tl|${m.label}|${i}`) * 2.6,
+        rimY,
+      });
+    }
     lift(m.x, m.y, _v);
     group.position.copy(_v);
     // grow off the web along its radial "up", then the species' own spin and lean
@@ -536,17 +564,21 @@ class Shrooms {
     group.rotateY(m.rot * 4 + hash01(`spin|${m.label}`) * 6.283);
     group.rotateX(m.lean * 0.3);
     this.scene.add(group);
-    return { group, glow };
+    return { group, glow, tendrils, tmat };
   }
 
   update(sim: Sim): void {
+    const now = performance.now() / 1000;
     for (const [m, v] of [...this.views]) {
       if (!sim.shrooms.includes(m)) {
         this.scene.remove(v.group);
         for (const o of [...v.group.children]) {
           const mesh = o as Mesh;
           if (mesh.isMesh) mesh.geometry.dispose();
+          const line = o as Line;
+          if ((line as unknown as { isLine?: boolean }).isLine) line.geometry.dispose();
         }
+        v.tmat.dispose();
         v.glow.material.dispose();
         this.views.delete(m);
         continue;
@@ -566,6 +598,18 @@ class Shrooms {
       v.group.scale.set(sx, sx * sy, sx);
       lift(m.x, m.y, _v);
       v.group.position.copy(_v);
+      // the tendrils sway: pinned at the rim, looser toward the tip
+      for (const td of v.tendrils) {
+        const arr = td.line.geometry.attributes.position.array as Float32Array;
+        for (let j = 0; j < TENDRIL_PTS; j++) {
+          const f = j / (TENDRIL_PTS - 1);
+          const amp = (0.25 + td.len * 0.15) * f;
+          arr[j * 3] = td.ax * td.r + Math.sin(now * 0.7 + td.seed + f * 2.6) * amp;
+          arr[j * 3 + 1] = td.rimY - td.len * Math.pow(f, 1.2);
+          arr[j * 3 + 2] = td.az * td.r + Math.cos(now * 0.55 + td.seed * 1.3 + f * 2.2) * amp * 0.8;
+        }
+        td.line.geometry.attributes.position.needsUpdate = true;
+      }
     }
     for (const m of sim.shrooms) {
       if (!this.views.has(m)) this.views.set(m, this.make(m));

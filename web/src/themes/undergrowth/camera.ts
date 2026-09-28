@@ -3,6 +3,9 @@ import type { PerspectiveCamera } from 'three';
 import type { Sim } from '../mycelium/filaments';
 import { lift, R, S } from './web3d';
 
+/** Max heading change per second: big retargets become slow pans, not snaps. */
+const TURN_RATE = (26 * Math.PI) / 180;
+
 /**
  * The autopilot: a slow ride through the mat. It keeps a chain of vertices
  * (a "route"), travels it at the user's speed, and at every junction chooses
@@ -360,7 +363,15 @@ export class Flycam {
     if (Math.abs(dir.y) / (dir.length() || 1) > 0.95) return false;
     this.m4.lookAt(this.pos, this.tmp.copy(this.pos).add(dir), this.up);
     this.qLook.setFromRotationMatrix(this.m4);
-    this.slerpTo(this.qLook, Math.min(1, dt * 3));
+    // ease small corrections, but CAP the turn rate: a retarget to a patch
+    // over there blends in as a slow pan instead of snapping
+    let k = Math.min(1, dt * 3);
+    const ang = this.quat.angleTo(this.qLook);
+    if (ang > 1e-4) {
+      const maxStep = TURN_RATE * dt;
+      if (ang > maxStep) k = Math.min(k, maxStep / ang);
+    }
+    this.slerpTo(this.qLook, k);
     // re-snap upright for the resulting forward: the slerp can pass through
     // rolled intermediates on 3-D turns, but the camera never carries roll
     this.tmp2.set(0, 0, -1).applyQuaternion(this.quat);
