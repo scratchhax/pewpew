@@ -14,8 +14,9 @@ export const S = 0.05;
 const HUES = [new Color(0x49e6ff), new Color(0x5ff0cf), new Color(0x8cf29a)];
 
 /** Stable, smooth height field over the loam (sim px space): the web undulates ±6 units. */
+/** A gentle height field (max slope ~12°) — steep enough to read as a living web, shallow enough that the camera's view never nears vertical. */
 export function elev(x: number, y: number): number {
-  return (Math.sin(x * 0.011 + 1.7) + Math.sin(y * 0.017 - 0.6) + Math.sin((x + y) * 0.006 + 2.3)) * 2.2;
+  return (Math.sin(x * 0.007 + 1.7) + Math.sin(y * 0.011 - 0.6) + Math.sin((x + y) * 0.004 + 2.3)) * 0.5;
 }
 
 const _v = new Vector3();

@@ -17,13 +17,25 @@ export class Flycam {
   private path: number[] = [];
   private cum: number[] = [0];
   private dist = 0;
-  private prevV = -1;
+  /** The last 18 route vertices — revisiting one sooner than that makes a tight loop that whips the heading. */
+  private recent = new Set<number>();
+  private recentQueue: number[] = [];
+  /** Consecutive backtracks — two in a row means the walk is trapped in a tangle (a 2-vertex metronome). */
+  private uturns = 0;
   private speed = 12;
   private curSpeed = 0;
   private focusV = -1;
   private focusUntil = 0;
   private orbitT = 0;
   private lastDir = new Vector3(0, 0, -1);
+  /** Relocation: the vertex we're gliding to when the local component is exhausted. */
+  private travel = -1;
+  private travelTarget = new Vector3();
+  private lastRelocateT = -1000;
+  /** Every 45 s the ride drifts toward wherever the mat is busiest. */
+  private nextDriftT = 45;
+  /** The route's start vertex, in world space — if it moves, the sim renumbered its vertices and the route is stale. */
+  private routeAnchor = new Vector3(1e9, 0, 0);
   private up = new Vector3(0, 1, 0);
   private m4 = new Matrix4();
   private qLook = new Quaternion();
@@ -40,6 +52,11 @@ export class Flycam {
   /** The speed the camera is actually going right now (for the diag overlay). */
   get speedNow(): number { return this.curSpeed; }
 
+  /** Route state (for the diag overlay). */
+  get routeInfo(): { route: number; total: number; dist: number; travel: number } {
+    return { route: this.path.length, total: this.cum[this.cum.length - 1], dist: this.dist, travel: this.travel };
+  }
+
   /** Drift toward a mat vertex (a fresh bloom, a blight) for ~8 s. */
   setFocus(v: number, t: number): void {
     this.focusV = v;
@@ -54,6 +71,7 @@ export class Flycam {
 
   /** Jump to a loam point in sim px and re-root the route here (diag flyTo). */
   teleport(x: number, y: number): void {
+    this.travel = -1;
     lift(x, y, this.pos);
     this.pos.y += 4;
     this.newRoute(0);
@@ -72,50 +90,63 @@ export class Flycam {
   }
 
   private edgeBetween(a: number, b: number): number {
-    for (const ei of this.sim.adj[a]) {
+    const adj = this.sim.adj[a];
+    if (!adj) return -1;
+    for (const ei of adj) {
       const e = this.sim.E[ei];
+      if (!e) continue;
       if (!e.dead && (e.a === b || e.b === b)) return ei;
     }
     return -1;
   }
 
-  /** Choose the next vertex from `v` (avoiding `avoid`), by what the filament carries. */
-  private chooseNext(v: number, avoid: number, t: number): number {
-    const opts = this.sim.adj[v];
-    if (!opts.length) return -1;
-    for (const pass of [0, 1]) {
-      let best = -1, bestW = -1;
-      for (const ei of opts) {
-        const e = this.sim.E[ei];
-        if (e.dead) continue;
-        const next = e.a === v ? e.b : e.a;
-        if (pass === 0 ? next === avoid : next !== avoid) continue;
-        let w = e.mem + 2 * e.flow + 0.15 * Math.random();
-        const nv = this.sim.V[next];
-        this.tmp.set(nv.x * S, elev(nv.x, nv.y), nv.y * S).sub(this.pos).normalize();
-        if (this.tmp.dot(this.lastDir) > 0) w *= 1.5;
-        if (this.focusUntil > t && next === this.focusV) w *= 3.2;
-        if (w > bestW) { bestW = w; best = next; }
-      }
-      if (best >= 0) return best;
-    }
-    return -1;
+  private addRecent(v: number): void {
+    if (this.recentQueue.length >= 18) this.recent.delete(this.recentQueue.shift()!);
+    this.recent.add(v);
+    this.recentQueue.push(v);
   }
 
-  /** Grow the route from its current end. */
-  private extendRoute(t: number): void {
+  /** Choose the next vertex from `v` (never one used in the last 18 steps), by what the filament carries. When everything fresh is blocked, backtrack to where we came from — a controlled U-turn at a dead end keeps the walk (and the ride) alive. */
+  private chooseNext(v: number, t: number): number {
+    const opts = this.sim.adj[v];
+    if (!opts?.length) return -1;
+    let best = -1, bestW = -1;
+    for (const ei of opts) {
+      const e = this.sim.E[ei];
+      if (e.dead) continue;
+      const next = e.a === v ? e.b : e.a;
+      if (this.recent.has(next)) continue;
+      let w = e.mem + 2 * e.flow + 0.15 * Math.random();
+      const nv = this.sim.V[next];
+      this.tmp.set(nv.x * S, elev(nv.x, nv.y), nv.y * S).sub(this.pos).normalize();
+      // persistence: strongly prefer continuing the way we're already heading,
+      // so the ride turns like a forager, not a drunk
+      w *= 1 + 2.5 * Math.max(0, this.tmp.dot(this.lastDir));
+      if (this.focusUntil > t && next === this.focusV) w *= 3.2;
+      if (w > bestW) { bestW = w; best = next; }
+    }
+    if (best >= 0) { this.uturns = 0; return best; }
+    const prev = this.recentQueue[this.recentQueue.length - 2];
+    if (prev === undefined) return -1;
+    if (this.edgeBetween(v, prev) < 0) return -1;
+    if (++this.uturns >= 2) return -1; // trapped — let the ride relocate instead of oscillating
+    return prev;
+  }
+
+  /** Grow the route from its current end. Returns true when the component is exhausted (every neighbour already visited). */
+  private extendRoute(t: number): boolean {
     let guard = 0;
     while (this.cum[this.cum.length - 1] - this.dist < 240 && guard++ < 400) {
       const v = this.path[this.path.length - 1];
-      const next = this.chooseNext(v, this.prevV, t);
-      if (next < 0) return;
+      const next = this.chooseNext(v, t);
+      if (next < 0) return true;
       const e = this.sim.E[this.edgeBetween(v, next)];
-      if (!e) return;
+      if (!e) return true;
       this.path.push(next);
+      this.addRecent(next);
       this.cum.push(this.cum[this.cum.length - 1] + e.len * S);
-      this.prevV = v;
-      if (this.path.length > 600) break;
     }
+    return false;
   }
 
   /** (Re)start a route from the nearest vertex to the camera. */
@@ -123,25 +154,142 @@ export class Flycam {
     this.path = [];
     this.cum = [0];
     this.dist = 0;
-    this.prevV = -1;
+    this.recent.clear();
+    this.recentQueue = [];
+    this.uturns = 0;
     const v = this.nearestV(this.pos);
     if (v < 0) return;
     this.path.push(v);
+    this.addRecent(v);
     this.extendRoute(t);
+    const a = this.sim.V[this.path[0]];
+    if (a) this.routeAnchor.set(a.x * S, elev(a.x, a.y), a.y * S);
+  }
+
+  /** The top `k` components by size (then activity), with their busiest vertex. */
+  private bestComps(k: number): { v: number; size: number; act: number }[] {
+    const sim = this.sim;
+    const n = sim.V.length;
+    if (!n) return [];
+    const seen = new Uint8Array(n);
+    const out: { v: number; size: number; act: number }[] = [];
+    for (let i = 0; i < n; i++) {
+      if (seen[i]) continue;
+      const stack = [i];
+      seen[i] = 1;
+      let size = 0, act = 0, bestIn = i, bestInAct = -1;
+      while (stack.length) {
+        const v = stack.pop()!;
+        size++;
+        let va = 0;
+        for (const ei of sim.adj[v]) {
+          const e = sim.E[ei];
+          if (e.dead) continue;
+          va += e.flow + e.mem;
+          act += e.flow + e.mem;
+          const o = e.a === v ? e.b : e.a;
+          if (!seen[o]) { seen[o] = 1; stack.push(o); }
+        }
+        if (va > bestInAct) { bestInAct = va; bestIn = v; }
+      }
+      out.push({ v: bestIn, size, act });
+    }
+    out.sort((a, b) => b.size - a.size || b.act - a.act);
+    return out.slice(0, k);
+  }
+
+  /** Glide to an active patch — the busiest one that's actually somewhere else (the cooldown keeps this from ping-ponging). */
+  private relocate(t: number): boolean {
+    if (t - this.lastRelocateT < 2) return false;
+    const comps = this.bestComps(3).slice().sort((a, b) => b.act - a.act);
+    for (const c of comps) {
+      if (c.size < 20) continue;
+      const tv = this.sim.V[c.v];
+      if (!tv) continue;
+      this.travelTarget.set(tv.x * S, elev(tv.x, tv.y), tv.y * S);
+      if (this.travelTarget.distanceTo(this.pos) < 8) continue;
+      this.lastRelocateT = t;
+      this.travel = c.v;
+      return true;
+    }
+    return false;
+  }
+
+  /** Glide in a straight line to the relocation target, then settle back onto the web. */
+  private doTravel(dt: number, t: number): void {
+    const d = this.travelTarget.distanceTo(this.pos);
+    if (d < 0.5) {
+      this.pos.copy(this.travelTarget);
+      this.travel = -1;
+      this.newRoute(t);
+      this.cam.position.copy(this.pos);
+      return;
+    }
+    this.curSpeed += (this.speed * 1.6 - this.curSpeed) * Math.min(1, dt * 2);
+    const step = Math.min(d, this.curSpeed * dt);
+    this.tmp2.copy(this.travelTarget).sub(this.pos).normalize();
+    this.pos.addScaledVector(this.tmp2, step);
+    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.upFor(this.tmp2.x, this.tmp2.y, this.tmp2.z));
+    this.qLook.setFromRotationMatrix(this.m4);
+    this.slerpTo(this.qLook, Math.min(1, dt * 5));
+    this.tmp2.set(0, 0, -1).applyQuaternion(this.quat);
+    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.upFor(this.tmp2.x, this.tmp2.y, this.tmp2.z));
+    this.quat.setFromRotationMatrix(this.m4);
+    this.lastDir.copy(this.travelTarget).sub(this.pos).normalize();
+    this.cam.position.copy(this.pos);
+    this.cam.quaternion.copy(this.quat);
   }
 
   // ── frame ─────────────────────────────────────────────────────────────────
   update(dt: number, t: number, wanderX: number, wanderY: number): void {
     const sim = this.sim;
-    if (sim.V.length < 2) { this.orbit(dt); return; }
+    if (this.travel >= 0) { this.doTravel(dt, t); return; }
+    if (sim.V.length < 2) { this.hover(dt); return; }
 
     if (this.path.length < 2) this.newRoute(t);
+    else {
+      // the sim renumbers vertices when it compacts — if the route's start
+      // vertex is no longer where it was, every index in the route is stale
+      const a = this.sim.V[this.path[0]];
+      if (!a ||
+          Math.abs(a.x * S - this.routeAnchor.x) + Math.abs(elev(a.x, a.y) - this.routeAnchor.y) + Math.abs(a.y * S - this.routeAnchor.z) > 0.5) {
+        this.newRoute(t);
+      }
+    }
     let total = this.cum[this.cum.length - 1];
-    if (total <= 0) { this.orbit(dt); return; }
+    if (total <= 0) {
+      if (this.relocate(t)) return;
+      this.hover(dt);
+      return;
+    }
 
     if (total - this.dist < 240) {
-      this.extendRoute(t);
+      const exhausted = this.extendRoute(t);
       total = this.cum[this.cum.length - 1];
+      if (exhausted && this.dist >= total - 1) {
+        // the route is over and we're at its end — move on, or hover and look
+        // around until the mat grows something worth riding
+        if (this.relocate(t)) return;
+        this.hover(dt);
+        return;
+      }
+    }
+    // every 45 s, drift toward wherever the mat is busiest
+    if (t > this.nextDriftT) {
+      this.nextDriftT = t + 45;
+      const c = this.bestComps(1)[0];
+      if (c && c.size >= 60) {
+        const tv = this.sim.V[c.v];
+        if (tv) {
+          this.travelTarget.set(tv.x * S, elev(tv.x, tv.y), tv.y * S);
+          if (this.travelTarget.distanceTo(this.pos) > 10) {
+            this.travel = c.v;
+            return;
+          }
+          this.newRoute(t);
+          return;
+        }
+      }
     }
     // the route ran out at a dead end: re-root from here
     if (this.dist >= total - 0.01 && this.cum.length < 4) {
@@ -152,11 +300,22 @@ export class Flycam {
     // advance
     this.curSpeed += (this.speed - this.curSpeed) * Math.min(1, dt * 1.2);
     this.dist += this.curSpeed * dt;
+    // prune the trail behind us so the route (and the pointAt scan) stay small
+    while (this.path.length > 2 && this.dist > 30) {
+      const dropped = this.cum[1];
+      this.path.shift();
+      this.cum.shift();
+      this.dist -= dropped;
+      for (let i = 1; i < this.cum.length; i++) this.cum[i] -= dropped;
+    }
+    const a0 = this.sim.V[this.path[0]];
+    if (a0) this.routeAnchor.set(a0.x * S, elev(a0.x, a0.y), a0.y * S);
 
     const p = this.pointAt(this.dist);
-    if (!p) { this.newRoute(t); return; }
-    const ahead = this.pointAt(Math.min(total, this.dist + 18));
-    if (!ahead) { this.newRoute(t); return; }
+    if (!p) { if (this.relocate(t)) return; this.newRoute(t); return; }
+    total = this.cum[this.cum.length - 1];
+    const ahead = this.pointAt(Math.min(total, this.dist + 36));
+    if (!ahead) { if (this.relocate(t)) return; this.newRoute(t); return; }
 
     // the anti-burn-in wander only — no sway, no roll, ever
     p.x += wanderX * 0.002;
@@ -165,19 +324,30 @@ export class Flycam {
 
     // orientation: ease toward the path ahead, then re-snap upright for the
     // resulting forward — the slerp can pass through rolled intermediates on
-    // 3-D turns, but the camera itself must never carry any roll
+    // 3-D turns, but the camera itself must never carry any roll. The up
+    // vector is guarded: lookAt with a near-parallel up is unstable and flips
+    // wildly.
     this.tmp2.copy(ahead).sub(this.pos);
     if (this.tmp2.lengthSq() < 1e-4) this.tmp2.copy(this.lastDir);
-    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.up);
+    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.upFor(this.tmp2.x, this.tmp2.y, this.tmp2.z));
     this.qLook.setFromRotationMatrix(this.m4);
     this.slerpTo(this.qLook, Math.min(1, dt * 5));
     this.tmp2.set(0, 0, -1).applyQuaternion(this.quat);
-    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.up);
+    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.upFor(this.tmp2.x, this.tmp2.y, this.tmp2.z));
     this.quat.setFromRotationMatrix(this.m4);
 
     this.lastDir.copy(this.tmp2.copy(ahead).sub(this.pos).normalize());
     this.cam.position.copy(this.pos);
     this.cam.quaternion.copy(this.quat);
+  }
+
+  /** World up for a lookAt, unless the view direction is near-vertical — then a horizontal up perpendicular to it (a fixed up parallel to the view makes lookAt flip unpredictably). */
+  private upFor(dx: number, dy: number, dz: number): Vector3 {
+    const l = Math.hypot(dx, dy, dz);
+    if (l > 1e-6 && Math.abs(dy) / l < 0.95) return this.up.set(0, 1, 0);
+    this.up.set(-dz, 0, dx);
+    if (this.up.lengthSq() < 1e-6) this.up.set(1, 0, 0);
+    return this.up.normalize();
   }
 
   /** Slerp toward `q`, always via the short arc (negate if the dot says long way). */
@@ -203,18 +373,20 @@ export class Flycam {
     return lift(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, this.tmp2).clone();
   }
 
-  private orbit(dt: number): void {
-    // no mat yet: a slow circle over the loam's centre
+  /** A slow in-place look-around while there's nothing worth riding (an empty mat, or small components still growing). */
+  private hover(dt: number): void {
     this.orbitT += dt;
-    const cx = 48, cz = 27; // a 1920×1080 mat's centre in world units
-    const r = 40;
-    this.pos.set(cx + Math.cos(this.orbitT * 0.1) * r, 6 + Math.sin(this.orbitT * 0.07) * 2, cz + Math.sin(this.orbitT * 0.1) * r);
-    this.tmp2.set(cx, 0, cz);
-    this.m4.lookAt(this.pos, this.tmp2, this.up);
+    const a = this.orbitT * 0.12;
+    this.tmp2.set(
+      this.pos.x + Math.cos(a) * 24,
+      this.pos.y + Math.sin(a * 0.6 + 1) * 2.5,
+      this.pos.z + Math.sin(a) * 24,
+    );
+    this.m4.lookAt(this.pos, this.tmp2, this.upFor(this.tmp2.x - this.pos.x, this.tmp2.y - this.pos.y, this.tmp2.z - this.pos.z));
     this.qLook.setFromRotationMatrix(this.m4);
-    this.slerpTo(this.qLook, Math.min(1, dt * 1.2));
+    this.slerpTo(this.qLook, Math.min(1, dt * 1.5));
     this.tmp2.set(0, 0, -1).applyQuaternion(this.quat);
-    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.up);
+    this.m4.lookAt(this.pos, this.tmp2.add(this.pos), this.upFor(this.tmp2.x, this.tmp2.y, this.tmp2.z));
     this.quat.setFromRotationMatrix(this.m4);
     this.cam.position.copy(this.pos);
     this.cam.quaternion.copy(this.quat);
