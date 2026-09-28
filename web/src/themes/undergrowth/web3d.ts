@@ -493,12 +493,9 @@ const CAP_PROFILES: number[][][] = [
   [[0, 0.95], [0.5, 0.9], [1.0, 0.74], [1.5, 0.48], [1.85, 0.26], [1.9, 0.12], [1.55, 0.08]],
 ];
 
-interface Tendril { line: Line; ax: number; az: number; r: number; seed: number; len: number; rimY: number; }
-
-interface ShroomView { group: Group; glow: Sprite; tendrils: Tendril[]; tmat: LineBasicMaterial; }
+interface ShroomView { group: Group; glow: Sprite; }
 
 const SHROOM_UP = new Vector3(0, 1, 0);
-const TENDRIL_PTS = 9;
 
 class Shrooms {
   private views = new Map<SimShroom, ShroomView>();
@@ -532,31 +529,6 @@ class Shrooms {
     glow.position.y = 2.2;
     const group = new Group();
     group.add(stem, cap, glow);
-    // jellyfish tendrils: glowing filaments hanging off the cap rim, swaying
-    const tmat = new LineBasicMaterial({
-      color: m.col, transparent: true, opacity: 0.4,
-      blending: AdditiveBlending, depthWrite: false,
-    });
-    const tendrils: Tendril[] = [];
-    let rimR = 0, rimY = 0;
-    for (const p of pts) if (p.x > rimR) { rimR = p.x; rimY = 2.1 + p.y; }
-    const tn = 4 + Math.floor(hash01(`tent|${m.label}`) * 3);
-    for (let i = 0; i < tn; i++) {
-      const geo = new BufferGeometry();
-      geo.setAttribute('position', new BufferAttribute(new Float32Array(TENDRIL_PTS * 3), 3).setUsage(DynamicDrawUsage));
-      const line = new Line(geo, tmat);
-      line.frustumCulled = false;
-      group.add(line);
-      const a = (i / tn) * TAU + hash01(`ta|${m.label}|${i}`) * 1.5;
-      tendrils.push({
-        line,
-        ax: Math.cos(a), az: Math.sin(a),
-        r: rimR * (0.5 + hash01(`tr|${m.label}|${i}`) * 0.45),
-        seed: hash01(`ts|${m.label}|${i}`) * 10,
-        len: 2.8 + hash01(`tl|${m.label}|${i}`) * 2.6,
-        rimY,
-      });
-    }
     lift(m.x, m.y, _v);
     group.position.copy(_v);
     // grow off the web along its radial "up", then the species' own spin and lean
@@ -564,21 +536,17 @@ class Shrooms {
     group.rotateY(m.rot * 4 + hash01(`spin|${m.label}`) * 6.283);
     group.rotateX(m.lean * 0.3);
     this.scene.add(group);
-    return { group, glow, tendrils, tmat };
+    return { group, glow };
   }
 
   update(sim: Sim): void {
-    const now = performance.now() / 1000;
     for (const [m, v] of [...this.views]) {
       if (!sim.shrooms.includes(m)) {
         this.scene.remove(v.group);
         for (const o of [...v.group.children]) {
           const mesh = o as Mesh;
           if (mesh.isMesh) mesh.geometry.dispose();
-          const line = o as Line;
-          if ((line as unknown as { isLine?: boolean }).isLine) line.geometry.dispose();
         }
-        v.tmat.dispose();
         v.glow.material.dispose();
         this.views.delete(m);
         continue;
@@ -598,18 +566,6 @@ class Shrooms {
       v.group.scale.set(sx, sx * sy, sx);
       lift(m.x, m.y, _v);
       v.group.position.copy(_v);
-      // the tendrils sway: pinned at the rim, looser toward the tip
-      for (const td of v.tendrils) {
-        const arr = td.line.geometry.attributes.position.array as Float32Array;
-        for (let j = 0; j < TENDRIL_PTS; j++) {
-          const f = j / (TENDRIL_PTS - 1);
-          const amp = (0.25 + td.len * 0.15) * f;
-          arr[j * 3] = td.ax * td.r + Math.sin(now * 0.7 + td.seed + f * 2.6) * amp;
-          arr[j * 3 + 1] = td.rimY - td.len * Math.pow(f, 1.2);
-          arr[j * 3 + 2] = td.az * td.r + Math.cos(now * 0.55 + td.seed * 1.3 + f * 2.2) * amp * 0.8;
-        }
-        td.line.geometry.attributes.position.needsUpdate = true;
-      }
     }
     for (const m of sim.shrooms) {
       if (!this.views.has(m)) this.views.set(m, this.make(m));
@@ -623,6 +579,106 @@ class Shrooms {
     _v2.copy(out).normalize().multiplyScalar(3.7 * m.s);
     out.add(_v2);
     return out;
+  }
+}
+
+// ── jellyfish tendrils on the busy junctions ────────────────────────────────
+const TENDRIL_PTS = 9;
+const MAX_TENDRIL_NODES = 26;
+
+interface TendrilNode {
+  g: Group;
+  lines: { line: Line; ax: number; az: number; seed: number; len: number }[];
+  mat: LineBasicMaterial;
+  alpha: number;
+}
+
+/**
+ * The web's busiest junctions grow a skirt of glowing tendrils that hang off
+ * the web into the void and sway — jellyfish among the filaments. Chosen by
+ * degree (a real junction, not a strand) and a per-node hash, so the same
+ * kinds of places always get them; they fade in and out with the node's
+ * life, and survive the sim's index-compaction because they're keyed by
+ * position, not by index.
+ */
+class NodeTendrils {
+  private views = new Map<string, TendrilNode>();
+
+  constructor(private scene: Scene) {}
+
+  update(sim: Sim): void {
+    const now = performance.now() / 1000;
+    const live = new Set<string>();
+
+    for (let i = 0; i < sim.V.length; i++) {
+      const v = sim.V[i];
+      let deg = 0;
+      for (const ei of sim.adj[i]) if (!sim.E[ei].dead) deg++;
+      if (deg < 4) continue;
+      const key = `${v.x | 0}|${v.y | 0}`;
+      if (hash01(`nt|${key}`) >= 0.12) continue;
+      if (!this.views.has(key) && this.views.size >= MAX_TENDRIL_NODES) continue;
+      live.add(key);
+      const view = this.views.get(key) ?? this.spawn(key, v, v.hue);
+      if (!view) continue;
+      // sway: pinned at the node, looser toward the tip, hanging down the radial
+      for (const td of view.lines) {
+        const arr = td.line.geometry.attributes.position.array as Float32Array;
+        for (let j = 0; j < TENDRIL_PTS; j++) {
+          const f = j / (TENDRIL_PTS - 1);
+          const amp = (0.2 + td.len * 0.14) * f;
+          arr[j * 3] = td.ax * 0.22 + Math.sin(now * 0.6 + td.seed + f * 2.6) * amp;
+          arr[j * 3 + 1] = -td.len * Math.pow(f, 1.15);
+          arr[j * 3 + 2] = td.az * 0.22 + Math.cos(now * 0.5 + td.seed * 1.3 + f * 2.2) * amp * 0.8;
+        }
+        td.line.geometry.attributes.position.needsUpdate = true;
+      }
+    }
+
+    for (const [key, view] of [...this.views]) {
+      view.alpha += ((live.has(key) ? 1 : -1) * 1.4) * (1 / 60);
+      view.alpha = Math.min(1, Math.max(0, view.alpha));
+      view.mat.opacity = 0.34 * view.alpha;
+      if (view.alpha <= 0 && !live.has(key)) {
+        this.scene.remove(view.g);
+        for (const l of view.lines) l.line.geometry.dispose();
+        view.mat.dispose();
+        this.views.delete(key);
+      }
+    }
+  }
+
+  private spawn(key: string, v: { x: number; y: number }, hue: number): TendrilNode | undefined {
+    lift(v.x, v.y, _v);
+    if (_v.lengthSq() < 1e-6) return undefined;
+    const g = new Group();
+    g.position.copy(_v);
+    // local +Y = radially out of the web; the tendrils hang down into the void
+    g.quaternion.setFromUnitVectors(SHROOM_UP, _v2.copy(_v).normalize());
+    const col = HUES[Math.max(0, Math.min(2, Math.floor(hue * 3)))];
+    const mat = new LineBasicMaterial({
+      color: col, transparent: true, opacity: 0,
+      blending: AdditiveBlending, depthWrite: false,
+    });
+    const lines: TendrilNode['lines'] = [];
+    const tn = 3 + Math.floor(hash01(`ntn|${key}`) * 3);
+    for (let i = 0; i < tn; i++) {
+      const geo = new BufferGeometry();
+      geo.setAttribute('position', new BufferAttribute(new Float32Array(TENDRIL_PTS * 3), 3).setUsage(DynamicDrawUsage));
+      const line = new Line(geo, mat);
+      line.frustumCulled = false;
+      g.add(line);
+      const a = (i / tn) * TAU + hash01(`na|${key}|${i}`) * 1.5;
+      lines.push({
+        line, ax: Math.cos(a), az: Math.sin(a),
+        seed: hash01(`ns|${key}|${i}`) * 10,
+        len: 2.2 + hash01(`nl|${key}|${i}`) * 3.0,
+      });
+    }
+    this.scene.add(g);
+    const view: TendrilNode = { g, lines, mat, alpha: 0 };
+    this.views.set(key, view);
+    return view;
   }
 }
 
@@ -861,6 +917,7 @@ export class UndergrowthView {
   private pulses: Pulses;
   private spores: Spores;
   private shrooms: Shrooms;
+  private tendrils: NodeTendrils;
   private bills: Billboards;
   private labels: Labels;
   private cam: PerspectiveCamera;
@@ -871,6 +928,7 @@ export class UndergrowthView {
     this.pulses = new Pulses(scene, budgets.pulses);
     this.spores = new Spores(scene, 400);
     this.shrooms = new Shrooms(scene);
+    this.tendrils = new NodeTendrils(scene);
     this.bills = new Billboards(scene);
     this.labels = new Labels(overlay);
     this.labels.shroomAnchor = (m, out) => this.shrooms.anchor(m, out);
@@ -885,6 +943,7 @@ export class UndergrowthView {
     const passed = this.pulses.update(sim);
     this.spores.update(sim);
     this.shrooms.update(sim);
+    this.tendrils.update(sim);
     this.bills.update(sim, t);
     this.labels.setCam(this.cam);
     this.labels.update(sim, { hosts: opts.hosts });

@@ -5,6 +5,8 @@ import { lift, R, S } from './web3d';
 
 /** Max heading change per second: big retargets become slow pans, not snaps. */
 const TURN_RATE = (26 * Math.PI) / 180;
+/** Max velocity-turn per second: the camera is a vehicle — its direction NEVER changes abruptly. */
+const POS_TURN = (45 * Math.PI) / 180;
 
 /**
  * The autopilot: a slow ride through the mat. It keeps a chain of vertices
@@ -37,6 +39,9 @@ export class Flycam {
   private travelFrom = new Vector3(0, 1, 0);
   private travelF = 0;
   private lastRelocateT = -1000;
+  /** Where the camera is actually heading — velocity direction, turn-limited. */
+  private velDir = new Vector3();
+  private tmp3 = new Vector3();
   /** Every 45 s the ride drifts toward wherever the mat is busiest. */
   private nextDriftT = 45;
   /** The route's start vertex, in world space — if it moves, the sim renumbered its vertices and the route is stale. */
@@ -229,10 +234,15 @@ export class Flycam {
     else this.travelFrom.copy(this.pos).normalize();
   }
 
-  /** Glide to the relocation target along a shell arc, then settle back onto the web. */
+  /**
+   * Glide to the relocation target along a shell arc — but as a VEHICLE: the
+   * camera steers toward a point down the arc and its velocity is turn-rate
+   * limited, so the path eases onto the shell from wherever it is. (Placing
+   * the camera ON the arc each frame teleports it at travel start and reads
+   * as the whole scene repainting.)
+   */
   private doTravel(dt: number, t: number): void {
-    const d = this.travelTarget.distanceTo(this.pos);
-    if (d < 0.5 || this.travelF >= 1) {
+    if (this.pos.distanceTo(this.travelTarget) < 1.2) {
       this.pos.copy(this.travelTarget);
       this.travel = -1;
       this.newRoute(t);
@@ -240,20 +250,75 @@ export class Flycam {
       return;
     }
     this.curSpeed += (this.speed * 1.6 - this.curSpeed) * Math.min(1, dt * 2);
-    const dir1 = this.tmp.copy(this.travelTarget).normalize();
-    const angle = this.travelFrom.angleTo(dir1);
-    const arcLen = Math.max(1e-3, angle * 0.85 * R);
-    this.travelF = Math.min(1, this.travelF + (this.curSpeed * dt) / arcLen);
-    const s = Math.sin(angle);
-    const w0 = s > 1e-4 ? Math.sin((1 - this.travelF) * angle) / s : 1 - this.travelF;
-    const w1 = s > 1e-4 ? Math.sin(this.travelF * angle) / s : this.travelF;
-    this.tmp2.copy(this.travelFrom).multiplyScalar(w0).addScaledVector(dir1, w1).normalize().multiplyScalar(0.85 * R);
-    this.pos.copy(this.tmp2);
-    this.tmp2.copy(this.travelTarget).sub(this.pos).normalize();
+    // Progress along the arc is measured by where we ACTUALLY are (the
+    // projected angle), never by time: the turn-limited vehicle enters the
+    // arc gradually, and if the parameter ran on time it would hit 1 while
+    // we're still mid-flight — leaving "aim straight at the target", a chord
+    // that dives through the hollow core and reads as the world repainting.
+    const dirp = this.tmp3.copy(this.pos);
+    if (dirp.lengthSq() < 1e-3) {
+      this.pos.copy(this.travelTarget);
+      this.travel = -1;
+      this.newRoute(t);
+      return;
+    }
+    dirp.normalize();
+    const aTot = this.travelFrom.angleTo(this.tmp2.copy(this.travelTarget).normalize());
+    const aNow = this.travelFrom.angleTo(dirp);
+    this.travelF = Math.min(1, aTot > 1e-4 ? Math.max(this.travelF, aNow / aTot) : 1);
+    // aim a little way down the arc; once it's done, aim straight at the target
+    const F = Math.min(1, this.travelF + 0.05);
+    this.arcPoint(F, this.tmp2);
+    this.tmp.subVectors(this.tmp2, this.pos);
+    if (this.travelF >= 1) this.tmp.subVectors(this.travelTarget, this.pos);
+    if (this.tmp.lengthSq() < 1e-6) {
+      this.pos.copy(this.travelTarget);
+      this.travel = -1;
+      this.newRoute(t);
+      return;
+    }
+    this.tmp2.copy(this.tmp).normalize();
+    this.steer(dt, this.tmp2);
+    this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
+    // The radius leash: a turn-limited vehicle can overshoot the arc and pop
+    // out through the web (the void on the other side) or sag in below it
+    // (empty core). Stay in the shell while cruising; ease the leash near the
+    // end so the glide can settle onto the target's own depth band.
+    const rr = this.pos.length();
+    const relaxed = this.travelF > 0.75;
+    const rHi = relaxed ? 1.15 * R : 0.92 * R;
+    const rLo = relaxed ? 0.3 * R : 0.5 * R;
+    if (rr > 1e-3) {
+      if (rr > rHi) this.pos.multiplyScalar(rHi / rr);
+      else if (rr < rLo) this.pos.multiplyScalar(rLo / rr);
+    }
     this.orientTo(this.tmp2, dt);
-    this.lastDir.copy(this.travelTarget).sub(this.pos).normalize();
+    this.lastDir.copy(this.tmp2);
     this.cam.position.copy(this.pos);
     this.cam.quaternion.copy(this.quat);
+  }
+
+  /** A point at parameter f (0..1) along the shell arc from travelFrom to the target direction. */
+  private arcPoint(f: number, out: Vector3): void {
+    const dir1 = this.tmp3.copy(this.travelTarget).normalize();
+    const rg = 0.85 * R;
+    const d = Math.max(-1, Math.min(1, this.travelFrom.dot(dir1)));
+    if (d < -0.999) {
+      // Antipodal endpoints: the short arc is ANY great circle through them.
+      // Pick one deterministically — the naive linear blend collapses through
+      // the origin, which reads as the camera (and the whole view) lurching
+      // down into the core and back out.
+      const ax = this.tmp.set(Math.abs(this.travelFrom.x) > 0.9 ? 0 : 1, Math.abs(this.travelFrom.x) > 0.9 ? 1 : 0, 0);
+      out.crossVectors(this.travelFrom, ax).normalize().multiplyScalar(Math.sin(f * Math.PI));
+      out.addScaledVector(this.travelFrom, Math.cos(f * Math.PI));
+      out.normalize().multiplyScalar(rg);
+      return;
+    }
+    const angle = Math.acos(d);
+    const s = Math.sin(angle);
+    const w0 = s > 1e-4 ? Math.sin((1 - f) * angle) / s : 1 - f;
+    const w1 = s > 1e-4 ? Math.sin(f * angle) / s : f;
+    out.copy(this.travelFrom).multiplyScalar(w0).addScaledVector(dir1, w1).normalize().multiplyScalar(rg);
   }
 
   // ── frame ─────────────────────────────────────────────────────────────────
@@ -333,13 +398,22 @@ export class Flycam {
     const p = this.pointAt(this.dist);
     if (!p) { if (this.relocate(t)) return; this.newRoute(t); return; }
     total = this.cum[this.cum.length - 1];
+    const chase = this.pointAt(Math.min(total, this.dist + 14));
     const ahead = this.pointAt(Math.min(total, this.dist + 48));
-    if (!ahead) { if (this.relocate(t)) return; this.newRoute(t); return; }
+    if (!chase || !ahead) { if (this.relocate(t)) return; this.newRoute(t); return; }
+
+    // the rail runs at the ride speed; the camera is a vehicle chasing a point
+    // down the rail — junction corners get rounded off, never taken
+    const lag = p.distanceTo(this.pos);
+    if (lag > 10) this.dist -= (lag - 10) * 0.6;
+    this.tmp.subVectors(chase, this.pos);
+    if (this.tmp.lengthSq() < 1e-6) this.tmp.copy(this.lastDir);
+    this.steer(dt, this.tmp.normalize());
+    this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
 
     // the anti-burn-in wander only — no sway, no roll, ever
-    p.x += wanderX * 0.002;
-    p.y += wanderY * 0.002;
-    this.pos.copy(p);
+    this.pos.x += wanderX * 0.002;
+    this.pos.y += wanderY * 0.002;
 
     // orientation: ease toward the path ahead — world up, level ride; when
     // the view runs near-vertical the heading is held (see orientTo).
@@ -380,6 +454,19 @@ export class Flycam {
     return true;
   }
 
+  /**
+   * Turn the velocity toward `desired`, capped at POS_TURN per second — the
+   * vehicle's rule: the direction of travel NEVER changes abruptly.
+   */
+  private steer(dt: number, desired: Vector3): void {
+    if (this.velDir.lengthSq() < 1e-6) this.velDir.copy(desired);
+    else {
+      const ang = this.velDir.angleTo(desired);
+      if (ang > 1e-4) this.velDir.lerp(desired, Math.min(1, (POS_TURN * dt) / ang)).normalize();
+    }
+    this.velDir.normalize();
+  }
+
   /** Slerp toward `q`, always via the short arc (negate if the dot says long way). */
   private slerpTo(q: Quaternion, k: number): void {
     if (this.quat.dot(q) < 0) {
@@ -406,6 +493,7 @@ export class Flycam {
   /** A slow in-place look-around while there's nothing worth riding (an empty mat, or small components still growing) — it pans the whole sphere, up and down as well as around. */
   private hover(dt: number): void {
     this.orbitT += dt;
+    this.velDir.set(0, 0, 0); // parked — next ride starts from the view direction
     const a = this.orbitT * 0.12;
     this.tmp2.set(
       Math.cos(a) * 24,
