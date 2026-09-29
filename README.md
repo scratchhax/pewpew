@@ -44,10 +44,12 @@ and never touches the network itself.
 | ![the gibson](docs/gibson.png) | ![gibson target lock](docs/gibson-lock.png) |
 | **Mycelium** | **Mycelium: a blight swarm crawls in** |
 | ![mycelium](docs/mycelium.png) | ![mycelium blight](docs/mycelium-blight.png) |
+| **Undergrowth** | **Undergrowth: deep in the shell** |
+| ![undergrowth](docs/undergrowth.png) | ![undergrowth from closer in](docs/undergrowth-jelly.png) |
 
-| Midnight Run | Packet Rush | Last Outpost |
-|---|---|---|
-| ![midnight run in motion](docs/racing.gif) | ![packet rush in motion](docs/rush.gif) | ![last outpost in motion](docs/zombie.gif) |
+| Midnight Run | Packet Rush | Last Outpost | Undergrowth |
+|---|---|---|---|
+| ![midnight run in motion](docs/racing.gif) | ![packet rush in motion](docs/rush.gif) | ![last outpost in motion](docs/zombie.gif) | ![undergrowth in motion](docs/undergrowth.gif) |
 
 **[Try the browser demo](https://scratchhax.github.io/pewpew/)** (synthetic
 traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew/?theme=zombie) ·
@@ -937,13 +939,25 @@ corners.
 
 ![undergrowth](docs/undergrowth.png)
 
-The same garden, seen from inside. Undergrowth lifts the Mycelium mat — the
-very same one, the same browser storage, the same half-life — into a shallow
-3D volume in a dark subterranean void, with a faint floor mist far below to
-tell you the loam is down there, and puts a camera in the web: a slow
-hands-free autopilot that rides the filaments, choosing each new thread by
-what it carries, banking into junctions, breathing as it goes. You are
-travelling through your network's mycelium, not watching it.
+The same garden, seen from inside. Undergrowth wraps the Mycelium mat — the
+very same one, the same browser storage, the same half-life — into a hollow
+sphere: a thick shell of layered strands with no edge and no horizon, turning
+in a dark subterranean void with a faint floor mist far below to tell you the
+loam is down there. You fly inside the web itself with a hands-free
+autopilot that floats like a thing in zero gravity rather than flying like a
+drone: velocity-limited turns that always blend in, thrust easing off to bank
+around toward a new target, a drift to a stop when the ride runs out instead
+of a brake check. The view never volunteers to stare at empty space — it is
+continuously pulled toward whatever nearby is glowing — and when the web
+exhausts, the camera glides over to the busiest patch that's somewhere else,
+bending around the hollow core rather than through it.
+
+The web has its creatures now: busy junctions sprout skirts of glowing
+tendrils that sway in the current, jellyfish with light for a bell, and the
+DNS mushrooms trail filaments off their caps like ghost fungus. The mat is
+one continuous planet-sized surface — its depth band makes ridges where the
+strands run thick and shallows where they thin, and flying in any direction
+eventually brings you back to where you started.
 
 Threads are drawn in world space, so they thin as they recede; pulses of
 light run them with short trails, and when one flies past the camera a soft
