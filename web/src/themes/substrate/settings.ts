@@ -28,7 +28,7 @@ export const SUBSTRATE_DEFAULTS = {
   // scene budgets = the HIGH preset (the Theme contract requires this)
   cDensity: 200,         // concurrent cracks
   cGrains: 64,           // grains per wash — the texture of the pigment
-  cSteps: 0.6,           // crack advances per frame (fractional: see the note)
+  cSteps: 0.75,          // crack advances per 1/60s (fractional: see the note)
   cGridScale: 1,         // lattice cells per CSS pixel
   cMaxGrains: 48000,     // grains drawn in any one frame
 };
@@ -36,16 +36,19 @@ export const SUBSTRATE_DEFAULTS = {
 export type SubstrateSettings = CoreSettings & typeof SUBSTRATE_DEFAULTS;
 
 /**
- * A crack advances 0.42 of a cell per step, so `cSteps` is deliberately below
+ * A crack advances 0.42 of a cell per step, and `cSteps` counts steps per
+ * 1/60s of REAL time rather than per frame, so a slow screen takes bigger
+ * steps and finishes the same picture in the same two minutes. It is still
+ * deliberately below
  * one on most tiers: the picture is meant to take a couple of minutes, and a
  * whole step every frame would have every crack across the plate inside ten
  * seconds, before any lattice exists for it to stop against.
  */
 export const SUBSTRATE_BUDGETS: Budgets = {
-  low: { cDensity: 60, cGrains: 16, cSteps: 0.35, cGridScale: 0.6, cMaxGrains: 8000 },
-  medium: { cDensity: 120, cGrains: 28, cSteps: 0.45, cGridScale: 0.8, cMaxGrains: 20000 },
-  high: { cDensity: 200, cGrains: 64, cSteps: 0.6, cGridScale: 1, cMaxGrains: 48000 },
-  ultra: { cDensity: 320, cGrains: 96, cSteps: 0.9, cGridScale: 1.25, cMaxGrains: 90000 },
+  low: { cDensity: 110, cGrains: 16, cSteps: 0.49, cGridScale: 0.6, cMaxGrains: 8000 },
+  medium: { cDensity: 160, cGrains: 28, cSteps: 0.6, cGridScale: 0.8, cMaxGrains: 20000 },
+  high: { cDensity: 200, cGrains: 64, cSteps: 0.75, cGridScale: 1, cMaxGrains: 48000 },
+  ultra: { cDensity: 360, cGrains: 96, cSteps: 0.65, cGridScale: 1.25, cMaxGrains: 90000 },
 };
 
 type Key = keyof typeof SUBSTRATE_DEFAULTS;

@@ -408,7 +408,14 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
       // Busier networks draw faster. The rate is fractional and carried in an
       // accumulator, so a tier that grows at 0.35 of a step per frame really
       // does advance every third frame rather than rounding up to one.
-      stepAcc += settings.cSteps * (0.7 + state.energy * 0.6);
+      // Growth is per SECOND, not per frame. The cycle is wall-clock, so a
+      // frame-based rate hands a slow screen a half-finished picture at the
+      // end of its two minutes: the Pi kiosk draws at a third of a gaming
+      // PC's rate and was getting a third of the drawing. `cSteps` is
+      // calibrated per 1/60s and scaled by real elapsed time, so every device
+      // finishes the same picture in the same two minutes and only the
+      // smoothness differs.
+      stepAcc += settings.cSteps * (f.dtReal * 60) * (0.7 + state.energy * 0.6);
       const steps = stepAcc | 0;
       if (steps > 0) {
         stepAcc -= steps;
