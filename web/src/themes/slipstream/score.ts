@@ -163,6 +163,11 @@ class SlipConductor extends Conductor {
       }
       case 'boost': this.s.chip(this.sfxBus, now, 440, 0.045 * g, 0.22, pan, 19); break;
       case 'pad': this.s.chip(this.sfxBus, now, 700, 0.04 * g, 0.16, pan, 12); break;
+      case 'pickup': {   // item box: coin-up double blip
+        this.s.chip(this.sfxBus, now, 990, 0.045 * g, 0.06, pan);
+        this.s.chip(this.sfxBus, now + 0.06, 1480, 0.05 * g, 0.16, pan);
+        break;
+      }
       case 'spin': {
         this.s.chip(this.sfxBus, now, 800, 0.04 * g, 0.3, pan, -14);
         this.s.noiseHit(this.sfxBus, now + 0.05, { type: 'bandpass', f: 1400, q: 2, g: 0.04 * g, a: 0.01, h: 0.1, r: 0.3, pan });

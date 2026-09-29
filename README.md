@@ -1179,14 +1179,25 @@ two handovers in a heartbeat.
 | wifi | a boost-pad straight lights up (a failed join sputters instead) |
 | system | yellow flag: the whole pack eases and the leader's gap evaporates |
 
+And the race supplies its own chaos: **two item gantries** per lap deal out
+mushrooms (a huge boost), bananas (drop one behind you and someone behind
+*you* spins) and green shells (fire at the car ahead), used almost at once so
+the pack is never polite for long. Your held item shows in a slot by the
+speedo. Every driver is a character, deterministic per host: race number on
+the wing, helmet pattern, and a floating name-and-position tag so you always
+know whose traffic you're watching.
+
 The camera rides the busiest host on the grid (it shifts with a flash when
 your traffic moves somewhere else), or the leader if you'd rather watch the
-race. Rubber-banding is the house law — nobody laps out of sight — and the
-corner minimap keeps the running order honest while speed chevrons build as
-the traffic floods. Three circuits wait: **Sunset Bowl**, wide and fast;
-**Corkscrew**, the technical loop; **Long Lap**, one brutal hairpin after a
-flat-out straight. Or leave the circuit on **Auto** and the hostname decides
-your home track, every LAN its own.
+race. The catch-up is the Mario Kart law — the wind you get scales with the
+gap and the leader eases off the throttle, so nobody rides away and overtakes
+happen every lap, however one-sided the traffic looks. The corner map is the
+circuit itself with the running order on it (the scene hides the generic
+radar panel for this one), and speed chevrons only build under a genuine
+boost. Three circuits wait: **Sunset Bowl**, tight and fast; **Corkscrew**,
+the technical loop; **Long Lap**, one brutal hairpin after a flat-out
+straight. Or leave the circuit on **Auto** and the hostname decides your home
+track, every LAN its own.
 
 Under the hood it's the cheapest pseudo-3D in the house: the ground is one
 multiply chain per pixel into a 270-line buffer (SNES is 224) that CSS

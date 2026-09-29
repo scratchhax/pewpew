@@ -5,7 +5,8 @@ import { slipScore, engineSpeed } from './score';
 import { Mode7 } from './mode7';
 import { buildTrack, type Track } from './track';
 import { Race, SEATS } from './race';
-import { board as boardSprite, ghost, kartFront, kartRear, kartSide, oil, shell } from './sprites';
+import { board as boardSprite, banana, ghost, itemBox, kartFront, kartRear, kartSide, label, mushroom, oil, shell } from './sprites';
+import type { ItemKind } from './race';
 import './hud.css';
 
 /**
@@ -49,6 +50,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     <div id="slip-count"></div>
     <div id="slip-order"><div class="pos"><b>P1</b><i>/8</i></div><div class="who">—</div></div>
     <div id="slip-kmh"><b>0</b> <span>km/h</span></div>
+    <div id="slip-item"><canvas width="34" height="34"></canvas></div>
     <div id="slip-map"><canvas width="118" height="118"></canvas><div class="cap">CIRCUIT</div></div>
     <div id="slip-caution">CAUTION — PACK EASING</div>
     <div id="slip-flash"></div>`;
@@ -56,38 +58,60 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
   const q = (s: string): HTMLElement => hud.querySelector(s) as HTMLElement;
   const countEl = q('#slip-count'), posEl = q('#slip-order .pos'), whoEl = q('#slip-order .who');
   const kmhEl = q('#slip-kmh b'), mapEl = q('#slip-map'), mapCv = q('#slip-map canvas') as HTMLCanvasElement;
+  const itemCv = q('#slip-item canvas') as HTMLCanvasElement, itemEl = q('#slip-item');
   const cautionEl = q('#slip-caution'), flashEl = q('#slip-flash');
   const mapCtx = mapCv.getContext('2d')!;
+  const itemCtx = itemCv.getContext('2d')!;
 
   let race: Race;
   const hooks = {
     onLap: (seat: number) => { if (seat === race.heroIdx && throttle.allow('lap', 2)) audio.sfx('lap', {}); },
-    onShellHit: () => audio.sfx('shellhit', {}),
+    onShellHit: (_seat: number, kind: 'red' | 'green') => { audio.sfx(kind === 'red' ? 'shellhit' : 'spin', { pan: (_seat - 3.5) * 0.2 }); },
+    onShellFire: (seat: number, kind: 'red' | 'green') => { if (seat === race.heroIdx || throttle.allow('shellfire', 1.2)) audio.sfx('shell', { pan: kind === 'red' ? 0 : (seat - 3.5) * 0.2 }); },
     onPadHit: (seat: number) => { if (seat === race.heroIdx) audio.sfx('boost', { pan: 0 }); else audio.sfx('pad', { pan: (seat - 3.5) * 0.2 }); },
     onSpin: (seat: number) => { if (seat === race.heroIdx || throttle.allow('spinother', 1.5)) audio.sfx('spin', { pan: (seat - 3.5) * 0.2 }); },
+    onPickup: (seat: number) => { if (seat === race.heroIdx) audio.sfx('pickup', {}); },
+    onUse: (seat: number, kind: ItemKind) => {
+      if (seat === race.heroIdx) audio.sfx(kind === 'mushroom' ? 'boost' : kind === 'shell' ? 'shell' : 'pit', { pan: 0 });
+    },
   };
   race = new Race(track, 0, hooks);
 
   // ── sprites ──
-  const shellSpr = shell();
+  const shellRed = shell('#d0262c', '#7a1216');
+  const shellGreen = shell('#2ea043', '#14532d');
+  const boxSpr = itemBox();
+  const bananaSpr = banana();
+  const mushroomSpr = mushroom();
   const oilSpr = oil();
-  const sprCache = new Map<string, { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement }>();
-  const karts = (hue: number): { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement } => {
-    const key = `${hue}`;
-    let e = sprCache.get(key);
+  const ksprCache = new Map<string, { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement }>();
+  const karts = (hue: number, ch: { pat: number; spoiler: number; num: number; acc: number }): { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement } => {
+    const key = `${hue}|${ch.num}|${ch.pat}${ch.spoiler}|${ch.acc}`;
+    let e = ksprCache.get(key);
     if (!e) {
-      e = { rear: kartRear(hue), front: kartFront(hue), side: kartSide(hue) };
-      if (sprCache.size > 40) sprCache.clear();
-      sprCache.set(key, e);
+      e = { rear: kartRear(hue, ch), front: kartFront(hue, ch), side: kartSide(hue, ch) };
+      if (ksprCache.size > 48) ksprCache.clear();
+      ksprCache.set(key, e);
     }
     return e;
   };
   const ghostCache = new Map<string, HTMLCanvasElement>();
-  const ghostRear = (hue: number): HTMLCanvasElement => {
-    const key = `${hue}`;
+  const ghostRear = (hue: number, ch: { pat: number; spoiler: number; num: number; acc: number }): HTMLCanvasElement => {
+    const key = `${hue}|${ch.num}|${ch.pat}${ch.spoiler}|${ch.acc}`;
     let g = ghostCache.get(key);
-    if (!g) { g = ghost(kartRear(hue)); ghostCache.set(key, g); }
+    if (!g) { g = ghost(kartRear(hue, ch)); ghostCache.set(key, g); }
     return g;
+  };
+  const labelCache = new Map<string, HTMLCanvasElement>();
+  const nameLabel = (name: string, rank: number, hue: number): HTMLCanvasElement => {
+    const key = `${name}|${rank}|${hue}`;
+    let l = labelCache.get(key);
+    if (!l) {
+      l = label(name, rank, hue);
+      if (labelCache.size > 120) labelCache.clear();
+      labelCache.set(key, l);
+    }
+    return l;
   };
   let boardSpr = boardSprite('PEWPEW LAN', 50);
   let boardDomain = '';
@@ -167,26 +191,24 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     clock = f.t;
     const dt = f.dt, dtr = f.dtReal;
 
-    // ── the lights ──
-    if (!go) {
-      countdown -= dtr;
-      if (countdown > 0.6) {
-        const label = String(Math.max(1, Math.min(3, Math.ceil(countdown - 0.6))));
-        if (label !== lastLabel) {
-          lastLabel = label;
-          countEl.textContent = label;
-          countEl.classList.add('on');
-          countEl.classList.remove('go');
-          audio.sfx('count', {});
-        }
-      } else if (countdown > -1.1) {
-        go = true;
-        countEl.textContent = 'GO!';
-        countEl.classList.add('on', 'go');
-        audio.sfx('go', {});
+    // ── the lights (countdown keeps ticking after GO so it can clear itself) ──
+    countdown -= dtr;
+    if (!go && countdown > 0.6) {
+      const label3 = String(Math.max(1, Math.min(3, Math.ceil(countdown - 0.6))));
+      if (label3 !== lastLabel) {
+        lastLabel = label3;
+        countEl.textContent = label3;
+        countEl.classList.add('on');
+        countEl.classList.remove('go');
+        audio.sfx('count', {});
       }
-      if (countdown <= -1.1) countEl.classList.remove('on');
+    } else if (!go && countdown <= 0.6) {
+      go = true;
+      countEl.textContent = 'GO!';
+      countEl.classList.add('on', 'go');
+      audio.sfx('go', {});
     }
+    if (go && countdown <= -1.1 && countEl.classList.contains('on')) countEl.classList.remove('on');
 
     if (go) race.step(dt, f.t, state.rate30s, settings.kPace);
 
@@ -219,14 +241,22 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
 
     // ── sprites, back to front ──
     const draws: Array<{ depth: number; run: () => void }> = [];
-    for (const o of race.oils) {
-      const p = m7.project(o.x, o.y, cam);
-      if (p) draws.push({ depth: p.depth, run: () => m7.drawSprite(oilSpr, o.x, o.y, cam, 3.4, Math.min(1, o.life / 2)) });
+    for (const hz of race.hazards) {
+      const p = m7.project(hz.x, hz.y, cam);
+      if (!p) continue;
+      const spr = hz.kind === 'oil' ? oilSpr : bananaSpr;
+      const ww = hz.kind === 'oil' ? 3.4 : 1.6;
+      draws.push({ depth: p.depth, run: () => m7.drawSprite(spr, hz.x, hz.y, cam, ww, Math.min(1, hz.life / 2)) });
+    }
+    for (const g of race.gantries) {
+      if (g.respawn > 0) continue;
+      const gp = track.offset(g.s, 0);
+      const p = m7.project(gp.x, gp.y, cam);
+      if (p) draws.push({ depth: p.depth, run: () => m7.drawSprite(boxSpr, gp.x, gp.y, cam, 2.6, 1, 1.5 + Math.sin(f.t * 3) * 0.12) });
     }
     const bpos = track.offset(track.boardS, -(track.width / 2 + 34));
-    if (m7.project(bpos.x, bpos.y, cam)) {
-      draws.push({ depth: m7.project(bpos.x, bpos.y, cam)!.depth, run: () => m7.drawSprite(boardSpr, bpos.x, bpos.y, cam, 8.4, 1, 1.4) });
-    }
+    const bpp = m7.project(bpos.x, bpos.y, cam);
+    if (bpp) draws.push({ depth: bpp.depth, run: () => m7.drawSprite(boardSpr, bpos.x, bpos.y, cam, 8.4, 1, 1.4) });
     for (const r of race.racers) {
       if (r.seat === heroIdx) continue;
       const p = race.kartPos(r.seat);
@@ -236,36 +266,42 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       const relAng = Math.atan2(Math.sin(toR - camHeading), Math.cos(toR - camHeading));
       const side = Math.abs(relAng) > 1.1;
       const facingBack = Math.cos(p.heading - camHeading) < -0.2;
-      const spr = r.ghost ? ghostRear(r.hue) : side ? karts(r.hue).side : facingBack ? karts(r.hue).front : karts(r.hue).rear;
+      const spr = r.ghost ? ghostRear(r.hue, r.char) : side ? karts(r.hue, r.char).side : facingBack ? karts(r.hue, r.char).front : karts(r.hue, r.char).rear;
       const alpha = r.ghost ? 0.42 : r.flash > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(r.flash * 20)) : 1;
       const lift = r.spin > 0 ? Math.abs(Math.sin(r.spin * 9)) * 0.25 : 0;
       draws.push({ depth: pr.depth, run: () => m7.drawSprite(spr, p.x, p.y, cam, 3.4, alpha, lift) });
+      // name + position tag floating over the helmet
+      if (pr.depth < 320) {
+        const rank = race.order.indexOf(r.seat) + 1;
+        const lbl = nameLabel(r.name, rank, r.hue);
+        const lw = lbl.width * 0.062;
+        draws.push({ depth: pr.depth - 0.02, run: () => m7.drawSprite(lbl, p.x, p.y, cam, lw, r.ghost ? 0.5 : 0.92, 2.5) });
+      }
       if (r.glow > 0 && pr.depth < 240) {
-        draws.push({ depth: pr.depth - 0.01, run: () => m7.drawSprite(glowSpr(), p.x, p.y, cam, 4.8, 0.4 * Math.min(1, r.glow)) });
+        draws.push({ depth: pr.depth - 0.03, run: () => m7.drawSprite(glowSpr(), p.x, p.y, cam, 4.8, 0.4 * Math.min(1, r.glow)) });
       }
     }
-    if (race.shell) {
-      const sp = track.offset(race.shell.s, race.shell.lat);
+    for (const sh of race.shells) {
+      const sp = track.offset(sh.s, sh.lat);
       const pr = m7.project(sp.x, sp.y, cam);
-      if (pr) {
-        draws.push({ depth: pr.depth, run: () => m7.drawSprite(shellSpr, sp.x, sp.y, cam, 2.4, 1, 0.35) });
-        if (pr.depth < 26 && throttle.allow('shellwhoosh', 1.1)) {
-          audio.sfx('shell', { pan: pr.sx > m7.W / 2 ? 0.6 : -0.6 });
-        }
+      if (!pr) continue;
+      draws.push({ depth: pr.depth, run: () => m7.drawSprite(sh.kind === 'red' ? shellRed : shellGreen, sp.x, sp.y, cam, 2.4, 1, 0.35) });
+      if (pr.depth < 26 && throttle.allow('shellwhoosh', 1.1)) {
+        audio.sfx('shell', { pan: pr.sx > m7.W / 2 ? 0.6 : -0.6 });
       }
     }
     draws.sort((a, b) => b.depth - a.depth);
     for (const d of draws) d.run();
 
     // ── your kart: the fixed anchor at the bottom of the board ──
-    const kartSpr = hero.ghost ? ghostRear(hero.hue) : karts(hero.hue).rear;
-    const kw = Math.max(28, Math.round(m7.W * (0.068 + speedFrac * 0.012)));
+    const kartSpr = hero.ghost ? ghostRear(hero.hue, hero.char) : karts(hero.hue, hero.char).rear;
+    const kw = Math.max(30, Math.round(m7.W * (0.08 + speedFrac * 0.012)));
     const kh = Math.round(kw * (kartSpr.height / kartSpr.width));
     const steer = Math.max(-1, Math.min(1, dh * 2.2)) * kw * 0.22;
     const bounce = speedFrac * 1.2 * Math.sin(f.t * 24);
     ctx.drawImage(kartSpr, Math.round(m7.W / 2 - kw / 2 + steer), Math.round(m7.H - kh - 2 + bounce), kw, kh);
 
-    const chev = settings.kChevrons ? Math.min(0.75, Math.max(0, (state.rate30s - 8) / 34) * 0.7 + speedFrac * 0.3) : 0;
+    const chev = settings.kChevrons ? Math.min(0.8, Math.max(0, hero.boost - 3.5) / 11) : 0;
     m7.drawChevrons(chev, f.t);
     engineSpeed(Math.min(1, speedFrac));
 
@@ -276,6 +312,24 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     whoEl.classList.toggle('ghost', hero.ghost);
     kmhEl.textContent = String(Math.round(hero.speed * 2.05));
     cautionEl.classList.toggle('on', race.caution > 0);
+    // item slot: what the hero is holding
+    itemCtx.clearRect(0, 0, 34, 34);
+    if (hero.item) {
+      const spr = hero.item === 'mushroom' ? mushroomSpr : hero.item === 'banana' ? bananaSpr : shellGreen;
+      itemCtx.imageSmoothingEnabled = false;
+      itemCtx.drawImage(spr, 3, 3, 28, 28);
+      itemEl.classList.add('lit');
+    } else {
+      itemCtx.strokeStyle = 'rgba(200, 196, 180, 0.25)';
+      itemCtx.lineWidth = 2;
+      itemCtx.strokeRect(3, 3, 28, 28);
+      itemCtx.fillStyle = 'rgba(200, 196, 180, 0.25)';
+      itemCtx.font = 'bold 16px monospace';
+      itemCtx.textAlign = 'center';
+      itemCtx.textBaseline = 'middle';
+      itemCtx.fillText('?', 17, 18);
+      itemEl.classList.remove('lit');
+    }
     mapEl.style.display = settings.kMinimap ? '' : 'none';
     if (settings.kMinimap && Math.round(f.t * 4) % 2 === 0) drawMap();
     if (race.lastDomain && race.lastDomain !== boardDomain) {
@@ -325,9 +379,12 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       W: m7.W, H: m7.H, rows: settings.kRows,
       hero: race.heroIdx, leader: race.leaderIdx,
       racers: race.racers.map((r) => ({ n: r.name, g: r.ghost ? 1 : 0, s: Math.round(r.s), sp: Math.round(r.speed), a: +r.act.toFixed(1) })),
-      shell: !!race.shell, caution: +race.caution.toFixed(1),
+      caution: +race.caution.toFixed(1),
       cam: { x: +camX.toFixed(1), y: +camY.toFixed(1), h: +camHeading.toFixed(2) },
       camOffTrack: +Math.hypot(camX - track.xs[track.nearest(camX, camY)], camY - track.ys[track.nearest(camX, camY)]).toFixed(1),
+      shells: race.shells.map((s) => s.kind), hazards: race.hazards.length,
+      pickedUp: race.pickedUp, used: race.used,
+      spreadLaps: +((race.racers[race.order[0]].dist - race.racers[race.order[race.order.length - 1]].dist) / track.total).toFixed(2),
       go,
     }),
   };

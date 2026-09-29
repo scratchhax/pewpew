@@ -49,7 +49,7 @@ function mulberry32(seed: number): () => number {
 /** The three circuits. */
 export const CIRCUITS: Record<string, Circuit> = {
   bowl: {
-    id: 'bowl', name: 'SUNSET BOWL', width: 116, padFr: [0.07, 0.55], boardFr: 0.28, speed: 1.12,
+    id: 'bowl', name: 'SUNSET BOWL', width: 72, padFr: [0.07, 0.55], boardFr: 0.28, speed: 1.12,
     pts: (() => {
       const pts: Array<[number, number]> = [];
       for (let i = 0; i < 12; i++) {
@@ -61,7 +61,7 @@ export const CIRCUITS: Record<string, Circuit> = {
     })(),
   },
   twisty: {
-    id: 'twisty', name: 'CORKSCREW', width: 74, padFr: [0.05, 0.4, 0.75], boardFr: 0.22, speed: 0.92,
+    id: 'twisty', name: 'CORKSCREW', width: 52, padFr: [0.05, 0.4, 0.75], boardFr: 0.22, speed: 0.92,
     pts: (() => {
       const pts: Array<[number, number]> = [];
       for (let i = 0; i < 18; i++) {
@@ -73,7 +73,7 @@ export const CIRCUITS: Record<string, Circuit> = {
     })(),
   },
   long: {
-    id: 'long', name: 'LONG LAP', width: 92, padFr: [0.12, 0.7], boardFr: 0.42, speed: 1.0,
+    id: 'long', name: 'LONG LAP', width: 60, padFr: [0.12, 0.7], boardFr: 0.42, speed: 1.0,
     pts: [
       [250, 300], [500, 220], [760, 260], [860, 420], [780, 560], [640, 516],
       [560, 620], [640, 760], [480, 846], [300, 760], [216, 560],
