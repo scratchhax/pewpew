@@ -15,8 +15,11 @@ default_theme: scifi
 buffer_size: 500
 
 # Interfaces that count as WAN on your gateway (used for direction derivation).
-# UDM: usually ppp0 (DSL) or eth9/eth10 depending on setup.
-wan_interfaces: [ppp0]
+# eth8 is the common one on a UDM or UDR with a copper WAN; eth9 and eth10
+# turn up too, and a DSL line is usually ppp0. If inbound and outbound look
+# swapped on screen, this is the setting to check: the IN= and OUT= fields of
+# your own firewall log lines name the interface.
+wan_interfaces: [eth8]
 
 # Optional: explicit WAN IP(s); auto-learned from WAN_LOCAL rules if empty
 wan_ips: []

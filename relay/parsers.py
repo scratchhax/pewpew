@@ -105,7 +105,7 @@ WIFI_EVENT  = re.compile(r'(\w+):\s+STA\s+([0-9a-f:]+)')
 WIFI_ASSOC  = re.compile(r'STA\s+([0-9a-f:]+)\s+.*?(associated|disassociated|deauthenticated|authenticated)')
 
 # Module-level config (set via configure())
-WAN_INTERFACES = {'ppp0'}
+WAN_INTERFACES = {'eth8'}
 WAN_LOCAL_RULE_MARKERS = ('WAN_LOCAL',)
 
 # VPN interface prefix → badge (mirrors upstream)
@@ -150,7 +150,7 @@ def configure(cfg: dict):
       vpn_networks:   {iface: {cidr: str, badge: str}}  (optional)
     """
     global WAN_INTERFACES, WAN_IPS, _wan_ip, VPN_CIDRS
-    WAN_INTERFACES = set(cfg.get('wan_interfaces') or ['ppp0'])
+    WAN_INTERFACES = set(cfg.get('wan_interfaces') or ['eth8'])
     WAN_IPS = set(cfg.get('wan_ips') or [])
     VPN_CIDRS = build_vpn_cidr_map(cfg.get('vpn_networks') or {})
     logger.info("Configured: WAN=%s WAN_IPS=%s VPN_CIDRS=%d",

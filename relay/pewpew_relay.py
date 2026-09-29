@@ -38,7 +38,7 @@ DEFAULTS = {
     "http_host": "0.0.0.0",
     "http_port": 8080,
     "buffer_size": 500,
-    "wan_interfaces": ["ppp0"],
+    "wan_interfaces": ["eth8"],
     "wan_ips": [],
     "vpn_networks": {},
     "drop_log_types": [],          # e.g. ["system"] to quiet noise
