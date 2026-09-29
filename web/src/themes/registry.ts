@@ -25,6 +25,7 @@ export const SCENES: Record<string, { title: string; blurb: string; accent: stri
   gibson: { title: 'The Gibson', blurb: 'The storage wall from the movie: translucent cyan monoliths lining the corridor, a DHCP lease rewrites one, and the camera locks onto red intruder files.', accent: '#5fd6ff' },
   mycelium: { title: 'Mycelium', blurb: 'Your network as a forest floor at night: permitted traffic grows a glowing web between hosts, DNS pushes up mushrooms wearing the domain, threats are a blight the web burns off.', accent: '#5ff0cf' },
   undergrowth: { title: 'Undergrowth', blurb: 'Fly through the living mat: your traffic as bioluminescent threads you travel between, mushroom groves at the junctions, and a blight that creeps the web before the web burns it off.', accent: '#8fe6b0' },
+  fragnet: { title: 'FRAGNET', blurb: 'Your network is Hell: a first-person patrol of a procedural maze where intruders are demons, allowed traffic is ammunition, and five traces open the exit.', accent: '#ff7a2a' },
   substrate: { title: 'Substrate', blurb: 'Your network draws on paper: every flow is a crack leaving the last one at right angles, hosts plant the seeds the plan grows from, and pigment washes the spaces between. A picture every couple of minutes, then a fresh one.', accent: '#b08050' },
 };
 /** Themes in picker order: the known scenes first (as the README lists them), then any others. */

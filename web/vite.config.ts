@@ -38,6 +38,7 @@ export default defineConfig(({ mode }) => ({
       '/ws': { target: 'ws://localhost:8080', ws: true },
       '/api': { target: 'http://localhost:8080' },
       '/tracks': { target: 'http://localhost:8080' },
+      '/wads': { target: 'http://localhost:8080' },
     },
   },
   build: {
