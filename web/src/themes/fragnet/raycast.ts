@@ -115,10 +115,25 @@ export class SoftRenderer {
     level.doors.forEach((d, i) => this.doorAt.set(d.y * level.w + d.x, i));
   }
 
-  setPixRes(heightPx: number): void {
-    // the game's two modes only: 320x200 classic, 640x400 hi-res
-    const h = Math.round(heightPx) >= 300 ? 400 : 200;
-    const w = h === 400 ? 640 : 320;
+  /**
+   * `target` is how chunky we want the picture, in rows — not a fixed buffer.
+   *
+   * It used to be exactly 320x200 or 640x400. Because the canvas is scaled by
+   * a whole number to keep pixels uniform, a fixed buffer only fills the
+   * screen when the window is an exact multiple of it: measured coverage was
+   * 63% at 1280x720, 77% at 1920x1080 and 63% at 3440x1440, pillarboxed
+   * everywhere, since 320x200 is 16:10 and almost no display is. Picking the
+   * scale first and sizing the buffer to the window fills it exactly at any
+   * aspect, and the plane in render() turns the extra width into more view
+   * rather than a stretched one.
+   */
+  setPixRes(target: number): void {
+    const winW = Math.max(160, window.innerWidth);
+    const winH = Math.max(120, window.innerHeight);
+    const rows = Math.max(120, Math.round(target) || 200);
+    const scale = Math.max(1, Math.round(winH / rows));
+    const h = Math.max(120, Math.floor(winH / scale));
+    const w = Math.max(160, Math.floor(winW / scale));
     if (w !== this.W || h !== this.H) {
       this.W = w; this.H = h;
       this.canvas.width = w; this.canvas.height = h;
@@ -129,13 +144,13 @@ export class SoftRenderer {
     this.layout();
   }
 
-  /** Letterbox the buffer on screen at whole-pixel scale, centered. */
+  /** Whole-pixel scale; the buffer was sized so this fills the window. */
   private layout(): void {
     if (!this.W || !this.H) return;
-    const fit = Math.min(window.innerWidth / this.W, window.innerHeight / this.H);
-    const s = fit >= 1 ? Math.floor(fit) : fit;
-    this.canvas.style.width = `${Math.round(this.W * s)}px`;
-    this.canvas.style.height = `${Math.round(this.H * s)}px`;
+    const s = Math.max(1, Math.min(Math.floor(window.innerWidth / this.W),
+                                   Math.floor(window.innerHeight / this.H)));
+    this.canvas.style.width = `${this.W * s}px`;
+    this.canvas.style.height = `${this.H * s}px`;
     this.canvas.style.margin = `${Math.max(0, (window.innerHeight - this.H * s) / 2)}px auto`;
   }
 
@@ -150,10 +165,16 @@ export class SoftRenderer {
     if (!table || !this.img || !this.level) return;
     const level = this.level;
     const dirX = Math.sin(heading), dirZ = Math.cos(heading);
-    const planeX = Math.cos(heading), planeZ = -Math.sin(heading);
+    // The camera plane carries the aspect, so a wider buffer shows more of
+    // the room instead of stretching what it already showed; and the vertical
+    // scale follows H rather than W, or widening would zoom in. 320x200 (1.6)
+    // is the aspect the scene was drawn for, and at it both of these reduce to
+    // exactly what they were before.
+    const aspect = (W / H) / 1.6;
+    const planeX = Math.cos(heading) * aspect, planeZ = -Math.sin(heading) * aspect;
     const halfW = W / 2;
     const cy = H / 2 + this.bobPx;
-    const pxPerUnit = (d: number): number => halfW / Math.max(0.02, d);
+    const pxPerUnit = (d: number): number => (0.8 * H) / Math.max(0.02, d);
     const red = heat > 0.5;
     const luts = red ? this.lutsRed : this.luts;
     const boost = flash * 0.9;
