@@ -25,6 +25,10 @@ your own traffic. Pick a scene per screen:
   growing filaments that weave a mat across the loam — permitted traffic runs
   through it as travelling light, habit decides the roads, mushrooms fruit at
   busy junctions, and it's all still there when you reload
+- **FRAGNET**: your network is *Hell* — a first-person, chunky-pixel patrol of
+  a procedural maze in the classic corridor-shooter mold, where intruders are
+  demons you frag on sight, allowed traffic is ammunition, and five traces
+  grind the exit elevator open for the next level
 - **Substrate**: your network draws on paper, in the manner of Jared Tarbell's
   old *Substrate* screensaver — every flow is a crack that leaves the last one
   at a right angle and stops dead where it meets another, hosts plant the
@@ -51,6 +55,8 @@ and never touches the network itself.
 | ![mycelium](docs/mycelium.png) | ![mycelium blight](docs/mycelium-blight.png) |
 | **Undergrowth** | **Undergrowth: deep in the shell** |
 | ![undergrowth](docs/undergrowth.png) | ![undergrowth from closer in](docs/undergrowth-jelly.png) |
+| **FRAGNET** | **FRAGNET: demon fragged** |
+| ![fragnet](docs/fragnet.png) | ![fragnet demon fragged](docs/fragnet-fight.png) |
 | **Substrate** | **Substrate: the plate part-drawn** |
 | ![substrate](docs/substrate.png) | ![substrate part-drawn](docs/substrate-early.png) |
 
@@ -67,6 +73,7 @@ traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew
 [Aquarium](https://scratchhax.github.io/pewpew/?theme=aquarium) ·
 [The Gibson](https://scratchhax.github.io/pewpew/?theme=gibson) ·
 [Mycelium](https://scratchhax.github.io/pewpew/?theme=mycelium) ·
+[FRAGNET](https://scratchhax.github.io/pewpew/?theme=fragnet) ·
 [Substrate](https://scratchhax.github.io/pewpew/?theme=substrate) ·
 Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 
@@ -76,7 +83,7 @@ Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - [Highlights](#highlights)
 - [Setup](#setup): [Relay](#1-start-the-relay) · [Viewer](#2-build-the-viewer) · [UniFi logging](#3-send-unifi-logs-to-the-relay) · [Check it's working](#4-check-its-working) · [`relay.yaml`](#relayrelayyaml)
 - [Using pewpew](#using-pewpew): [Keys](#keys) · [Switching scenes](#switching-scenes) · [Log inspector](#log-inspector) · [Settings](#settings-f1)
-- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [Mycelium](#mycelium) · [Undergrowth](#undergrowth) · [Substrate](#substrate)
+- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [Mycelium](#mycelium) · [Undergrowth](#undergrowth) · [FRAGNET](#fragnet) · [Substrate](#substrate)
 - [Sound](#sound)
 - [Performance and quality](#performance-and-quality)
 - [URL parameters](#url-parameters)
@@ -112,10 +119,10 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
 
 ## Highlights
 
-- **Eleven scenes, one relay.** Every screen picks its own scene, so the kiosk
+- **Twelve scenes, one relay.** Every screen picks its own scene, so the kiosk
   in the hall and the laptop on your desk can show different worlds at the same
-  time. Five are 2D (PixiJS) and six are full 3D (three.js); a screen only
-  downloads the renderer its scene uses.
+  time. Five are 2D (PixiJS), six are full 3D (three.js) and one is a
+  software raycaster; a screen only downloads the renderer its scene uses.
 - **A readable picture.** Each event type has one fixed colour in every scene
   and in the log: block is red, allow green, DNS blue, DHCP yellow, Wi-Fi
   purple, threats amber and system grey. You can tell what's happening at a glance.
@@ -311,7 +318,7 @@ minutes to start logging after a settings change or a relay restart.
 |-----|---------|--------------|
 | `syslog_bind`, `syslog_port` | `0.0.0.0`, `5514` | where syslog (UDP) is received |
 | `http_host`, `http_port` | `0.0.0.0`, `8080` | the viewer, WebSocket and health endpoints |
-| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium`, `undergrowth` or `substrate` (every scene is also at `/<id>/`) |
+| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium`, `undergrowth`, `fragnet` or `substrate` (every scene is also at `/<id>/`) |
 | `buffer_size` | `500` | recent events replayed to each newly opened browser |
 | `wan_interfaces` | `[ppp0]` | which gateway interfaces count as WAN, for inbound and outbound. Look at the `IN=`/`OUT=` fields of your firewall log lines; `eth8`–`eth10` are common on UDM and UDR |
 | `wan_ips`, `vpn_networks` | empty | optional WAN addresses and VPN networks, for direction and VPN badges |
@@ -319,6 +326,8 @@ minutes to start logging after a settings change or a relay restart.
 | `drop_patterns` | UDM and AP chatter | regexes matched against raw lines and dropped before parsing (see `/drops`) |
 | `tracks_dir` | `tracks` | where uploaded background tracks are stored (relative to `relay/`, git-ignored) |
 | `max_track_mb` | `60` | largest background track the relay accepts |
+| `wads_dir` | `wads` | where the uploaded FRAGNET art WAD is stored (relative to `relay/`, git-ignored) |
+| `max_wad_mb` | `40` | largest WAD the relay accepts |
 
 The relay understands both the classic iptables-style firewall log and the CEF
 security events from gateways on the CyberSecure/Enhanced tier (IDS/IPS threats
@@ -356,7 +365,7 @@ different screens can show different scenes at once:
 | URL | Scene |
 |-----|-------|
 | `http://<relay-host>:8080/` | this screen's saved pick, or else the relay's `default_theme` |
-| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/`, `/gibson/`, `/mycelium/`, `/undergrowth/`, `/substrate/` | that scene (unknown names are a 404) |
+| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/`, `/gibson/`, `/mycelium/`, `/undergrowth/`, `/fragnet/`, `/substrate/` | that scene (unknown names are a 404) |
 | any URL + `?theme=racing` | that scene (handy on the Pages demo) |
 
 The viewer checks the URL path, then `?theme=`, then the screen's saved pick,
@@ -411,7 +420,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, flight speed, bioluminescence, spore drift, and hypha half-life. Substrate: allow cracks, block scars, threat fractures, DNS blooms, DHCP seeds, Wi-Fi drift, host seeding, the pigment wash, crack hairlines, naming the busiest district, a new paper each picture, plus seconds per picture, pigment strength and wander |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, flight speed, bioluminescence, spore drift, and hypha half-life. FRAGNET: each event's effect, the weapon, gore, patrol speed and traces per level. Substrate: allow cracks, block scars, threat fractures, DNS blooms, DHCP seeds, Wi-Fi drift, host seeding, the pigment wash, crack hairlines, naming the busiest district, a new paper each picture, plus seconds per picture, pigment strength and wander |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -419,7 +428,7 @@ panel's **Apply & reload**.
 
 ## Scenes
 
-All eleven scenes draw the same events with the same colours. Each has its own
+All twelve scenes draw the same events with the same colours. Each has its own
 HUD, sound and settings.
 
 ### Orbital Command
@@ -716,7 +725,7 @@ only make sense in the dark switch to thermal when the target is in daylight.
 | ![night vision](docs/spy-eye.png) | ![thermal](docs/spy-thermal.png) | ![daylight](docs/spy-day.png) |
 
 Everything is built in code: the planet and its city lights, the satellites,
-the eleven scenes and every person in them. Nothing flashes: the enhance steps,
+the twelve scenes and every person in them. Nothing flashes: the enhance steps,
 scan lines, boxes and stamp all ease in. In F1 → Scene, **Eye of god** turns
 the taskings off, **Eye: threats in a minute** sets the threat trigger, and
 **Eye: random sweep every (min)** sets how often a random sweep comes round
@@ -987,6 +996,76 @@ keeps showing you the news.
 from above share one organism: the mushrooms you pass on the ride are the
 mushrooms on the floor, the half-life fading is the same fading, and
 **Keep the garden** is one switch for both.
+
+### FRAGNET
+
+![fragnet](docs/fragnet.png)
+
+Your network is Hell. FRAGNET is a love letter to the original corridor
+shooter, built as a software renderer in the old tradition: the maze is cast
+column by column into a screen-pixel ImageData a few hundred pixels tall and
+stretched over the display with nearest filtering — textured walls, floors and
+ceilings from a WAD, lit through the original's COLORMAP light tables rather
+than any fog, ceiling lamps and all. The camera is the marine's eyes, on an
+endless first-person patrol of a procedurally generated maze of rooms and
+corridors. Blast doors grind open when you walk up to them, secret walls hide
+on DHCP leases, and the HUD is a status bar with your health, ammo, frag
+count, the level tag and a pixel face that goes through its moods. The marine
+is the network stack with a shotgun, and every log line is an action in the
+corridor:
+
+![fragnet demon fragged](docs/fragnet-fight.png)
+
+| Event | In the maze |
+|-------|-------------|
+| allow | ammo ticks up into the belt — traffic is the supply, not the trigger; occasionally a health vial or ammo crate materialises down the hall for him to walk over |
+| block | a blast door slams shut and seals red somewhere in the maze |
+| threat | a demon tears into the corridor ahead; the marine halts, turns and pumps shots into it until it bursts in a spray of gibs, stamping **FRAGGED** |
+| dns | the domain lights up on a glowing wall plate in a nearby room |
+| dhcp | a secret wall section collapses open with the device's hostname on it |
+| wifi | a join spins a teleporter column up in cyan; a bad auth zaps the maze red |
+| system | a distant thunderclap flashes the corridor white |
+
+The marine takes damage when demons get close or land fireballs — the screen
+pulses red, his face bloodies, and health slowly regenerates. Every imp in the
+maze is out for you the moment it smells you: see an imp, shoot an imp.
+**HELL** weather is the load on the wire: **BLOOD MOON** in a storm and **APEX
+WORSTED** in a hurricane, where the fog reddens, the ceiling lamps flicker and
+demons growl in the dark. Trace your **traces per level** (five by default) and
+the exit elevator grinds open: ride it out and the maze rerolls as **E1M2**,
+**E1M3**, deeper into Hell, with a title card on each level.
+
+The maze geometry, its COLORMAP lighting, the lamp flicker and the status face
+are generated in code. The wall and floor textures, the imps, fireballs,
+pickups and the first-person shotgun come from **Freedoom** (BSD-licensed,
+free to ship) via a small asset pack built by `scripts/mkfragnetpack.mjs` —
+no id Software asset ships with the scene. If you legally own a DOOM WAD, use
+the **WAD art** control on the FRAGNET screen to upload your `DOOM.WAD` /
+`DOOM1.WAD` to the relay once: every viewer on the LAN then paints the maze
+from your WAD's textures and sprites, parsed live in the browser. In
+F1 → Scene you can turn off each event's effect, hide the weapon, mute the
+gore, and scale the **patrol speed** and **traces per level**.
+
+### FRAGNET WAD art
+
+By default FRAGNET paints its maze from a bundled **Freedoom** (BSD) asset
+pack. If you legally own a DOOM WAD, upload it once and every viewer on the
+LAN paints the maze from it instead — textures, sprites, the lot, parsed live
+in the browser. The easiest way is the **WAD art** control in the lower-left
+of the FRAGNET screen, or with curl:
+
+```bash
+curl -F file=@DOOM1.WAD http://<relay-host>:8080/api/wads   # upload (becomes active)
+curl http://<relay-host>:8080/api/wads                      # list + active
+curl -X PUT -H 'Content-Type: application/json' \
+  -d '{"name":null}' http://<relay-host>:8080/api/wads-active  # fall back to Freedoom
+```
+
+No id Software asset ships with pewpew; the WAD stays on your relay and only
+ever leaves it to the browsers already on your network. Like background
+tracks, uploaded WADs need a relay and aren't available on the GitHub Pages
+demo.
+
 
 ### Substrate
 
@@ -1327,6 +1406,30 @@ sentences out of the current chord.
 Bloom, sprout, scorch and heal each have their own small sound. Everything
 is deliberately sparse: a quiet network is mostly wind and drone.
 
+### FRAGNET's soundtrack
+
+Three styles take turns, every 6 minutes by default:
+
+| Style | Sound |
+|-------|-------|
+| Riff city | 150 bpm thrash: galloping low saw, crashy hats, a scream of a lead when the marine is shooting |
+| Machine god | 132 bpm industrial EBM: gated reese stabs, a marching snare |
+| Grave drip | 76 bpm doom crawl: one grinding note, dripping caverns |
+
+The corridor plays along:
+
+| Event | Sound |
+|-------|-------|
+| allow | the style's lead on traffic, and the shotgun crack |
+| block | a blast door grinding shut |
+| threat | a demon's pain growl, then a wet pop and a hit with a chord when it fraggs |
+| dns | a blip in key as the domain lights up on a plate |
+| dhcp | the secret-reveal sting as the wall opens |
+| wifi | a rising teleporter sweep for a join, a zap for a failure |
+| system | a distant thunderclap |
+
+Boiler hum and a low hell rumble underneath, louder in heavy traffic.
+
 ### Background tracks
 
 Play your own music in any scene. In F1 → Audio → **Background track**, upload
@@ -1391,6 +1494,7 @@ two volumes of its own:
 | The Gibson | **Access sounds**, **Hum & static** |
 | Mycelium | **Bells**, **Undergrowth & drone** |
 | Undergrowth | **Mycelium's score** (shared garden) **+ pulse whoosh** |
+| FRAGNET | **Riff city**, **Machine god**, **Grave drip** |
 | Substrate | **Drawing** (nib on paper), **Room** (air & drone), **Notes** |
 
 Each scene keeps its own choices.
@@ -1539,7 +1643,7 @@ been measured on a Pi yet.
 
 | Parameter | Effect |
 |-----------|--------|
-| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium`, `undergrowth` or `substrate` |
+| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium`, `undergrowth`, `fragnet` or `substrate` |
 | `?demo=1` | synthetic traffic, no relay needed |
 | `?showreel=1` | with the demo: a looping 60-second calm → build → hurricane → cooldown arc |
 | `?rate=40` | with the demo: about 40 events per second |
