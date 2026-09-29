@@ -5,7 +5,7 @@ import { slipScore, engineSpeed } from './score';
 import { Mode7 } from './mode7';
 import { buildTrack, type Track } from './track';
 import { Race, SEATS } from './race';
-import { board as boardSprite, banana, flame, ghost, itemBox, kartFront, kartRear, kartSide, label, mushroom, oil, shell, VEH_W, type Character } from './sprites';
+import { board as boardSprite, banana, flame, ghost, itemBox, kartFront, kartRear, kartSide, label, mushroom, oil, shadow, shell, VEH_W, type Character } from './sprites';
 import type { ItemKind } from './race';
 import './hud.css';
 
@@ -85,6 +85,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
   const mushroomSpr = mushroom();
   const oilSpr = oil();
   const flameSpr = flame();
+  const shadowSpr = shadow();
   const ksprCache = new Map<string, { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement }>();
   const karts = (hue: number, ch: Character): { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement } => {
     const key = `${hue}|${ch.num}|${ch.pat}|${ch.acc}|${ch.veh}`;
@@ -270,6 +271,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       const spr = r.ghost ? ghostRear(r.hue, r.char) : side ? karts(r.hue, r.char).side : facingBack ? karts(r.hue, r.char).front : karts(r.hue, r.char).rear;
       const alpha = r.ghost ? 0.42 : r.flash > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(r.flash * 20)) : 1;
       const lift = r.spin > 0 ? Math.abs(Math.sin(r.spin * 9)) * 0.25 : 0;
+      draws.push({ depth: pr.depth + 0.02, run: () => m7.drawSprite(shadowSpr, p.x, p.y, cam, 4.0 * VEH_W[r.char.veh], r.ghost ? 0.3 : 1) });
       if (r.boost > 1 && !r.ghost && pr.depth < 280) {
         const fl = 1.3 * VEH_W[r.char.veh] * (((f.t * 26 + r.seat * 7) | 0) % 2 ? 1 : 0.8);
         const bx = p.x - Math.cos(p.heading) * 1.9, by = p.y - Math.sin(p.heading) * 1.9;

@@ -403,6 +403,16 @@ export function kartSide(hue: number, ch: Character): HTMLCanvasElement {
   return cv;
 }
 
+/** Ground shadow: SMK never lets a sprite float — every kart sits on one. */
+export function shadow(): HTMLCanvasElement {
+  const [cv, c] = sprite(28, 12);
+  c.fillStyle = 'rgba(5, 6, 10, 0.42)';
+  c.beginPath(); c.ellipse(14, 6, 13, 5, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = 'rgba(5, 6, 10, 0.30)';
+  c.beginPath(); c.ellipse(14, 6, 9, 3.4, 0, 0, Math.PI * 2); c.fill();
+  return cv;
+}
+
 /** Twin boost flames, flickering — every boosted racer announces itself. */
 export function flame(): HTMLCanvasElement {
   const [cv, c] = sprite(16, 12);
