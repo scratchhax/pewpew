@@ -5,6 +5,7 @@ import { hash01, isInternalIp } from '../../state';
 import { SUBSTRATE_DEFAULTS, SUBSTRATE_BUDGETS, SUBSTRATE_CONTROLS, SUBSTRATE_HUD } from './settings';
 import { Plate, type CrackKind, type Seed } from './crack';
 import { View } from './view';
+import { substrateScore } from './score';
 import './hud.css';
 
 /**
@@ -31,6 +32,7 @@ export const substrate: Theme<typeof SUBSTRATE_DEFAULTS> = {
   defaults: SUBSTRATE_DEFAULTS,
   budgets: SUBSTRATE_BUDGETS,
   controls: SUBSTRATE_CONTROLS,
+  score: substrateScore,
   create,
 };
 export default substrate;
@@ -114,6 +116,8 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
   let pictures = 0;
   /** Carries the fractional part of the growth rate between frames. */
   let stepAcc = 0;
+  /** Seconds until the next live-crack report to the score. */
+  let drawAt = 0;
 
   function restart(): void {
     plate.clear();
@@ -122,6 +126,7 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
     phase = 'grow';
     phaseT = 0;
     pictures++;
+    audio.sfx('fresh');
   }
 
   function resize(): void {
@@ -225,6 +230,18 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
     return phase === 'grow';
   }
 
+  /**
+   * Event sounds, but only while the plate is actually being drawn.
+   *
+   * Through the hold and the wash the room is supposed to go quiet — that
+   * silence is the ending. Cueing the score straight from the feed kept the
+   * plucks and music-box notes coming over a finished picture and flattened
+   * the whole arc; the HUD still logs everything either way.
+   */
+  function say(kind: Parameters<typeof audio.cueSong>[0], ip?: string): void {
+    if (growing()) audio.cueSong(kind, ip);
+  }
+
   function event(se: SceneEvent, replay: boolean): void {
     const ev = se.ev;
     // a host is worth knowing about even on replay: the plan should be right
@@ -237,7 +254,7 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
 
     switch (se.kind) {
       case 'allow': {
-        audio.cueSong('allow', ev.src_ip ?? undefined);
+        say('allow', ev.src_ip ?? undefined);
         moodKind = 'allow';
         if (!settings.cAllowCracks || !growing()) break;
         const from = src ?? dst;
@@ -255,7 +272,7 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
       }
 
       case 'block': {
-        audio.cueSong('block', ev.src_ip ?? undefined);
+        say('block', ev.src_ip ?? undefined);
         moodKind = 'block';
         if (!settings.cBlockScars || !growing()) break;
         const from = src ?? dst;
@@ -277,7 +294,7 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
       }
 
       case 'threat': {
-        audio.cueSong('threat', ev.src_ip ?? undefined);
+        say('threat', ev.src_ip ?? undefined);
         moodKind = 'threat';
         threatUntil = simT + 9;
         if (!settings.cThreatFracture || !growing()) break;
@@ -300,7 +317,7 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
       }
 
       case 'dns': {
-        audio.cueSong('dns', ev.src_ip ?? undefined);
+        say('dns', ev.src_ip ?? undefined);
         moodKind = 'dns';
         const domain = ev.dns_query ?? '';
         if (!settings.cBlooms || !growing() || !domain) break;
@@ -319,7 +336,7 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
       }
 
       case 'dhcp': {
-        audio.cueSong('dhcp');
+        say('dhcp');
         moodKind = 'dhcp';
         if (!growing()) break;
         const name = ev.hostname
@@ -334,7 +351,7 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
       }
 
       case 'wifi': {
-        audio.cueSong('wifi');
+        say('wifi');
         moodKind = 'wifi';
         if (!settings.cSpores || !growing()) break;
         const ap = sourceSeed(ev.syslog_host ?? undefined);
@@ -347,7 +364,7 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
       }
 
       case 'system': {
-        audio.cueSong('system');
+        say('system');
         if (!growing()) break;
         const s = sourceSeed(ev.syslog_host ?? undefined);
         if (!throttle.allow(`s|${ev.syslog_host}`, 2.5)) break;
@@ -421,15 +438,26 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
         stepAcc -= steps;
         plate.advance(Math.min(steps, 8));
       }
+      // the score follows the drawing: its nib rate is how many cracks are
+      // actually growing, reported about once a second rather than per frame
+      drawAt -= f.dtReal;
+      if (drawAt <= 0) {
+        drawAt = 1;
+        let live = 0;
+        for (const c of plate.cracks) if (c.alive) live++;
+        audio.sfx('draw', { count: live });
+      }
       if (phaseT >= settings.cCycleSec) {
         phase = 'hold';
         phaseT = 0;
+        audio.sfx('finish');
       }
     } else if (phase === 'hold') {
       // finished: the picture sits still so it can actually be looked at
       if (phaseT >= HOLD_S) {
         phase = 'fade';
         phaseT = 0;
+        audio.sfx('wash');
       }
     } else {
       // and washes away — eased both ends, never a cut or a flash

@@ -49,14 +49,12 @@ and never touches the network itself.
 | ![the gibson](docs/gibson.png) | ![gibson target lock](docs/gibson-lock.png) |
 | **Mycelium** | **Mycelium: a blight swarm crawls in** |
 | ![mycelium](docs/mycelium.png) | ![mycelium blight](docs/mycelium-blight.png) |
-| **Undergrowth** | **Undergrowth: deep in the shell** |
-| ![undergrowth](docs/undergrowth.png) | ![undergrowth from closer in](docs/undergrowth-jelly.png) |
 | **Substrate** | **Substrate: the plate part-drawn** |
 | ![substrate](docs/substrate.png) | ![substrate part-drawn](docs/substrate-early.png) |
 
-| Midnight Run | Packet Rush | Last Outpost | Undergrowth |
-|---|---|---|---|
-| ![midnight run in motion](docs/racing.gif) | ![packet rush in motion](docs/rush.gif) | ![last outpost in motion](docs/zombie.gif) | ![undergrowth in motion](docs/undergrowth.gif) |
+| Midnight Run | Packet Rush | Last Outpost |
+|---|---|---|
+| ![midnight run in motion](docs/racing.gif) | ![packet rush in motion](docs/rush.gif) | ![last outpost in motion](docs/zombie.gif) |
 
 **[Try the browser demo](https://scratchhax.github.io/pewpew/)** (synthetic
 traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew/?theme=zombie) ·
@@ -411,7 +409,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, flight speed, bioluminescence, spore drift, and hypha half-life |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, flight speed, bioluminescence, spore drift, and hypha half-life. Substrate: allow cracks, block scars, threat fractures, DNS blooms, DHCP seeds, Wi-Fi drift, host seeding, the pigment wash, crack hairlines, naming the busiest district, plus seconds per picture, pigment strength and wander |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -947,25 +945,13 @@ corners.
 
 ![undergrowth](docs/undergrowth.png)
 
-The same garden, seen from inside. Undergrowth wraps the Mycelium mat — the
-very same one, the same browser storage, the same half-life — into a hollow
-sphere: a thick shell of layered strands with no edge and no horizon, turning
-in a dark subterranean void with a faint floor mist far below to tell you the
-loam is down there. You fly inside the web itself with a hands-free
-autopilot that floats like a thing in zero gravity rather than flying like a
-drone: velocity-limited turns that always blend in, thrust easing off to bank
-around toward a new target, a drift to a stop when the ride runs out instead
-of a brake check. The view never volunteers to stare at empty space — it is
-continuously pulled toward whatever nearby is glowing — and when the web
-exhausts, the camera glides over to the busiest patch that's somewhere else,
-bending around the hollow core rather than through it.
-
-The web has its creatures now: busy junctions sprout skirts of glowing
-tendrils that sway in the current, jellyfish with light for a bell, and the
-DNS mushrooms trail filaments off their caps like ghost fungus. The mat is
-one continuous planet-sized surface — its depth band makes ridges where the
-strands run thick and shallows where they thin, and flying in any direction
-eventually brings you back to where you started.
+The same garden, seen from inside. Undergrowth lifts the Mycelium mat — the
+very same one, the same browser storage, the same half-life — into a shallow
+3D volume in a dark subterranean void, with a faint floor mist far below to
+tell you the loam is down there, and puts a camera in the web: a slow
+hands-free autopilot that rides the filaments, choosing each new thread by
+what it carries, banking into junctions, breathing as it goes. You are
+travelling through your network's mycelium, not watching it.
 
 Threads are drawn in world space, so they thin as they recede; pulses of
 light run them with short trails, and when one flies past the camera a soft
@@ -1036,6 +1022,21 @@ rim; where a quarter has just been opened you get a broad wash.
 **Seconds per picture** sets the cycle (two minutes by default). **Pigment
 strength** and **Wander** are the two knobs worth playing with, and **Plate
 darkness** turns the paper over into a dark plate — the HUD follows it.
+
+**Its sound is a quiet room with someone drawing in it.** No beat and no band:
+what carries the scene is the drawing itself, a susurrus of nib ticks whose
+rate follows how many cracks are actually growing, so the plate gets audibly
+busier as it fills. Under that is a room — a breath of air and a very low
+drone moving through four chords minutes apart. Events are small and close: a
+pencil tick for a permitted flow, the nib catching and tearing on a block, a
+struck low string for a fracture, a music-box note where DNS pools, a woody
+pluck when a lease plants a seed.
+
+It is the only score here with an ending, because it is the only scene with
+one. When the picture is finished the drawing stops, a low gong marks it, and
+the room is left with just air while the plate washes away — then a single
+sheet-laid tick starts the next one. **Drawing**, **Room** and **Notes** on the
+Audio tab set the three levels.
 
 ## Sound
 
@@ -1366,7 +1367,7 @@ two volumes of its own:
 | The Gibson | **Access sounds**, **Hum & static** |
 | Mycelium | **Bells**, **Undergrowth & drone** |
 | Undergrowth | **Mycelium's score** (shared garden) **+ pulse whoosh** |
-| Substrate | the **built-in band** — Substrate has no score of its own yet |
+| Substrate | **Drawing** (nib on paper), **Room** (air & drone), **Notes** |
 
 Each scene keeps its own choices.
 

@@ -25,6 +25,11 @@ export const SUBSTRATE_DEFAULTS = {
   cCurve: 1,             // how much the cracks wander, × the traffic-driven range
   cPaper: 0,             // 0 = warm paper, 1 = dark plate
 
+  // soundtrack
+  cNib: 0.8,             // the drawing itself: nib on paper
+  cRoom: 0.6,            // room air and the low drone under it
+  cChime: 0.7,           // the small notes events ring
+
   // scene budgets = the HIGH preset (the Theme contract requires this)
   cDensity: 200,         // concurrent cracks
   cGrains: 64,           // grains per wash — the texture of the pigment
@@ -75,6 +80,11 @@ export const SUBSTRATE_CONTROLS = {
     range('cMaxGrains', 'Grains per frame', 4000, 120000, 2000),
   ],
   color: [range('cPaper', 'Plate darkness', 0, 1, 0.05)],
+  audio: [
+    range('cNib', 'Drawing', 0, 1, 0.05),
+    range('cRoom', 'Room', 0, 1, 0.05),
+    range('cChime', 'Notes', 0, 1, 0.05),
+  ],
   colorHint: `Hue shift & intensity recolour the HUD accent. The pigment follows
     the colour law — allow green, block red, DNS blue, DHCP yellow, Wi-Fi violet,
     threat amber — shaded per host and per domain, so the picture is coloured by
