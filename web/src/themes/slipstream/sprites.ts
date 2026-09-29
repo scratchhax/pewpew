@@ -43,7 +43,7 @@ function palFor(hue: number, acc: number): Record<string, string> {
     K: '#0b0c10', T: '#3b3e46', R: '#a6adba',
     B: hsl(hue, 72, 42), L: hsl(hue, 80, 58), D: hsl(hue, 70, 26),
     W: hsl(hue, 80, 60), A: hsl(acc, 85, 55), a: hsl(acc, 85, 38),
-    P: '#efece1', S: hsl(acc, 50, 32),
+    P: '#efece1', S: hsl(acc, 68, 46),
     X: hsl(acc, 90, 62), x: hsl(acc, 80, 44),
     O: '#26282f', U: '#ff4040', Y: '#ffd86a',
     M: '#8b919e', m: '#4a4f5a',
