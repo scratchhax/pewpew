@@ -210,9 +210,11 @@ export class SoftRenderer {
       // twice; a cell face is two units = 64 texels across, exactly one 64-
       // wide texture, doors tile up from the floor
       const offX = style ? style.offX : 0, offY = style ? style.offY : 0;
-      let wallU = side === 0 ? (posCellZ + perp * rayZ) % 1 : (posCellX + perp * rayX) % 1;
-      if (wallU < 0) wallU += 1;
+      // continuous along the wall, not reset per cell: a cell face is 64 map
+      // units, so wider textures span several cells instead of being cropped
+      const wallU = side === 0 ? posCellZ + perp * rayZ : posCellX + perp * rayX;
       let texX = ((wallU * 64 + offX * tex.w) | 0) % tex.w;
+      if (texX < 0) texX += tex.w;
       if (side === 0 && rayX > 0) texX = tex.w - 1 - texX;
       if (side === 1 && rayZ < 0) texX = tex.w - 1 - texX;
       const y0 = Math.max(0, Math.ceil(wallTop)), y1 = Math.min(H - 1, Math.floor(wallBot));
