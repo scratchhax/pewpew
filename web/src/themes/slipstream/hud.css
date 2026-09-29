@@ -1,0 +1,62 @@
+/* SLIPSTREAM's own HUD furniture: start lights, position, corner map. */
+
+body[data-theme="slipstream"] #slip-count {
+  position: fixed; left: 50%; top: 34%; transform: translate(-50%, -50%);
+  font: 900 96px/1 ui-monospace, monospace; letter-spacing: 0.05em;
+  color: #ffd23f; text-shadow: 4px 4px 0 #000, 0 0 30px rgba(255, 210, 63, 0.45);
+  z-index: 40; pointer-events: none; display: none;
+}
+body[data-theme="slipstream"] #slip-count.on { display: block; }
+body[data-theme="slipstream"] #slip-count.red { color: #ff5a4a; text-shadow: 4px 4px 0 #000, 0 0 30px rgba(255, 90, 74, 0.5); }
+body[data-theme="slipstream"] #slip-count.go { color: #7dff6a; text-shadow: 4px 4px 0 #000, 0 0 34px rgba(125, 255, 106, 0.6); }
+
+body[data-theme="slipstream"] #slip-order {
+  position: fixed; left: 50%; top: 10px; transform: translateX(-50%);
+  z-index: 38; pointer-events: none; text-align: center;
+  font-family: ui-monospace, monospace;
+}
+body[data-theme="slipstream"] #slip-order .pos {
+  font: 900 34px/1 ui-monospace, monospace; color: #f4f1e4;
+  text-shadow: 3px 3px 0 #000;
+}
+body[data-theme="slipstream"] #slip-order .pos i { font-style: normal; font-size: 18px; color: #9aa2b5; }
+body[data-theme="slipstream"] #slip-order .who {
+  margin-top: 4px; font-size: 11px; letter-spacing: 0.14em; color: #ffd23f;
+  text-shadow: 2px 2px 0 #000; white-space: nowrap; overflow: hidden;
+  max-width: 42vw; text-overflow: ellipsis;
+}
+body[data-theme="slipstream"] #slip-order .who.ghost { color: #7f8698; }
+
+body[data-theme="slipstream"] #slip-kmh {
+  position: fixed; right: calc(env(safe-area-inset-right, 0px) + 50%); transform: translateX(50%);
+  bottom: 12px; z-index: 38; pointer-events: none; text-align: right;
+  font-family: ui-monospace, monospace; color: #eef0f5; text-shadow: 3px 3px 0 #000;
+}
+body[data-theme="slipstream"] #slip-kmh b { font: 900 42px/1 ui-monospace, monospace; }
+body[data-theme="slipstream"] #slip-kmh span { font-size: 12px; letter-spacing: 0.2em; color: #9aa2b5; }
+
+body[data-theme="slipstream"] #slip-map {
+  position: fixed; right: 14px; bottom: 14px; z-index: 38; pointer-events: none;
+  border: 2px solid rgba(255, 210, 63, 0.5); background: rgba(8, 10, 16, 0.66);
+  padding: 4px; image-rendering: pixelated;
+}
+body[data-theme="slipstream"] #slip-map canvas { image-rendering: pixelated; display: block; }
+body[data-theme="slipstream"] #slip-map .cap {
+  font: 700 9px/1.4 ui-monospace, monospace; letter-spacing: 0.22em; color: #ffd23f;
+}
+
+body[data-theme="slipstream"] #slip-caution {
+  position: fixed; left: 0; right: 0; top: 0; height: 34px; z-index: 37;
+  display: none; align-items: center; justify-content: center;
+  font: 900 14px/1 ui-monospace, monospace; letter-spacing: 0.4em; color: #101010;
+  background: repeating-linear-gradient(45deg, #ffd23f 0 14px, #14110a 14px 28px);
+  text-shadow: none; pointer-events: none;
+}
+body[data-theme="slipstream"] #slip-caution.on { display: flex; animation: slip-yel 0.8s steps(2) infinite; }
+@keyframes slip-yel { 50% { filter: brightness(0.6); } }
+
+body[data-theme="slipstream"] #slip-flash {
+  position: fixed; inset: 0; z-index: 36; pointer-events: none;
+  background: #fff; opacity: 0; transition: opacity 0.35s linear;
+}
+body[data-theme="slipstream"] #slip-flash.on { opacity: 0.8; transition: opacity 0.04s; }

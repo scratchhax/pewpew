@@ -34,6 +34,12 @@ your own traffic. Pick a scene per screen:
   at a right angle and stops dead where it meets another, hosts plant the
   seeds the whole plan grows out of, and pigment bleeds off each line into the
   spaces between. One picture every couple of minutes, then a fresh one
+- **Slipstream**: your network runs a grand prix on an old 16-bit flip board —
+  eight karts, one per host, and the whole circuit is a bitmap that spins and
+  scales under your kart. Traffic is the draft, DNS sprints, DHCP hands the
+  quiet karts to new drivers, blocks leave oil, Wi-Fi joins light the boost
+  pads, and when the IDS barks a red shell screams off the back of the pack
+  for the leader
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -59,10 +65,12 @@ and never touches the network itself.
 | ![fragnet](docs/fragnet.png) | ![fragnet demon fragged](docs/fragnet-fight.png) |
 | **Substrate** | **Substrate: the plate part-drawn** |
 | ![substrate](docs/substrate.png) | ![substrate part-drawn](docs/substrate-early.png) |
+| **Slipstream** | **Slipstream: the pack comes through the hairpin** |
+| ![slipstream](docs/slipstream.png) | ![slipstream in motion](docs/slipstream.gif) |
 
-| Midnight Run | Packet Rush | Last Outpost | Undergrowth |
-|---|---|---|---|
-| ![midnight run in motion](docs/racing.gif) | ![packet rush in motion](docs/rush.gif) | ![last outpost in motion](docs/zombie.gif) | ![undergrowth in motion](docs/undergrowth.gif) |
+| Midnight Run | Packet Rush | Last Outpost | Undergrowth | Slipstream |
+|---|---|---|---|---|
+| ![midnight run in motion](docs/racing.gif) | ![packet rush in motion](docs/rush.gif) | ![last outpost in motion](docs/zombie.gif) | ![undergrowth in motion](docs/undergrowth.gif) | ![slipstream in motion](docs/slipstream.gif) |
 
 **[Try the browser demo](https://scratchhax.github.io/pewpew/)** (synthetic
 traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew/?theme=zombie) ·
@@ -75,6 +83,7 @@ traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew
 [Mycelium](https://scratchhax.github.io/pewpew/?theme=mycelium) ·
 [FRAGNET](https://scratchhax.github.io/pewpew/?theme=fragnet) ·
 [Substrate](https://scratchhax.github.io/pewpew/?theme=substrate) ·
+[Slipstream](https://scratchhax.github.io/pewpew/?theme=slipstream) ·
 Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 
 ## Contents
@@ -83,7 +92,7 @@ Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - [Highlights](#highlights)
 - [Setup](#setup): [Relay](#1-start-the-relay) · [Viewer](#2-build-the-viewer) · [UniFi logging](#3-send-unifi-logs-to-the-relay) · [Check it's working](#4-check-its-working) · [`relay.yaml`](#relayrelayyaml)
 - [Using pewpew](#using-pewpew): [Keys](#keys) · [Switching scenes](#switching-scenes) · [Log inspector](#log-inspector) · [Settings](#settings-f1)
-- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [Mycelium](#mycelium) · [Undergrowth](#undergrowth) · [FRAGNET](#fragnet) · [Substrate](#substrate)
+- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [Mycelium](#mycelium) · [Undergrowth](#undergrowth) · [FRAGNET](#fragnet) · [Substrate](#substrate) · [Slipstream](#slipstream)
 - [Sound](#sound)
 - [Performance and quality](#performance-and-quality)
 - [URL parameters](#url-parameters)
@@ -119,10 +128,11 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
 
 ## Highlights
 
-- **Twelve scenes, one relay.** Every screen picks its own scene, so the kiosk
+- **Thirteen scenes, one relay.** Every screen picks its own scene, so the kiosk
   in the hall and the laptop on your desk can show different worlds at the same
-  time. Five are 2D (PixiJS), six are full 3D (three.js) and one is a
-  software raycaster; a screen only downloads the renderer its scene uses.
+  time. Five are 2D (PixiJS), six are full 3D (three.js), one is a
+  software raycaster and one is a software Mode 7 board; a screen only
+  downloads the renderer its scene uses.
 - **A readable picture.** Each event type has one fixed colour in every scene
   and in the log: block is red, allow green, DNS blue, DHCP yellow, Wi-Fi
   purple, threats amber and system grey. You can tell what's happening at a glance.
@@ -318,7 +328,7 @@ minutes to start logging after a settings change or a relay restart.
 |-----|---------|--------------|
 | `syslog_bind`, `syslog_port` | `0.0.0.0`, `5514` | where syslog (UDP) is received |
 | `http_host`, `http_port` | `0.0.0.0`, `8080` | the viewer, WebSocket and health endpoints |
-| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium`, `undergrowth`, `fragnet` or `substrate` (every scene is also at `/<id>/`) |
+| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium`, `undergrowth`, `fragnet`, `substrate` or `slipstream` (every scene is also at `/<id>/`) |
 | `buffer_size` | `500` | recent events replayed to each newly opened browser |
 | `wan_interfaces` | `[eth8]` | which gateway interfaces count as WAN, for inbound and outbound. `eth8` fits most UDM and UDR setups on copper; `eth9`/`eth10` also turn up, and a DSL line is usually `ppp0`. Look at the `IN=`/`OUT=` fields of your own firewall log lines |
 | `wan_ips`, `vpn_networks` | empty | optional WAN addresses and VPN networks, for direction and VPN badges |
@@ -365,7 +375,7 @@ different screens can show different scenes at once:
 | URL | Scene |
 |-----|-------|
 | `http://<relay-host>:8080/` | this screen's saved pick, or else the relay's `default_theme` |
-| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/`, `/gibson/`, `/mycelium/`, `/undergrowth/`, `/fragnet/`, `/substrate/` | that scene (unknown names are a 404) |
+| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/`, `/gibson/`, `/mycelium/`, `/undergrowth/`, `/fragnet/`, `/substrate/`, `/slipstream/` | that scene (unknown names are a 404) |
 | any URL + `?theme=racing` | that scene (handy on the Pages demo) |
 
 The viewer checks the URL path, then `?theme=`, then the screen's saved pick,
@@ -420,7 +430,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, flight speed, bioluminescence, spore drift, and hypha half-life. FRAGNET: each event's effect, the weapon, gore, patrol speed and traces per level. Substrate: allow cracks, block scars, threat fractures, DNS blooms, DHCP seeds, Wi-Fi drift, host seeding, the pigment wash, crack hairlines, naming the busiest district, a new paper each picture, plus seconds per picture, pigment strength and wander |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, flight speed, bioluminescence, spore drift, and hypha half-life. FRAGNET: each event's effect, the weapon, gore, patrol speed and traces per level. Substrate: allow cracks, block scars, threat fractures, DNS blooms, DHCP seeds, Wi-Fi drift, host seeding, the pigment wash, crack hairlines, naming the busiest district, a new paper each picture, plus seconds per picture, pigment strength and wander. Slipstream: the circuit (or a home track picked by hostname), whether the camera follows the busiest host or the leader, draft surges, sprint and sponsor board, pit takeovers, oil spins, red shells, boost pads, yellow cautions, speed chevrons, background wobble, corner minimap and race pace |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -1141,6 +1151,48 @@ the room is left with just air while the plate washes away — then a single
 sheet-laid tick starts the next one. **Drawing**, **Room** and **Notes** on the
 Audio tab set the three levels.
 
+### Slipstream
+
+![slipstream](docs/slipstream.png)
+
+Your network runs a grand prix on an old 16-bit flip board. The whole circuit
+is one bitmap and the board spins and scales it under your kart the way a
+Super Nintendo did — sky scrolling mountains on the horizon, red-and-white
+curbs, a low pixel sun — and this time the race is your traffic.
+
+**The grid is eight karts and always eight.** A seat belongs to a host, never
+to an event: the first time the relay sees a host it takes an empty seat and
+its name goes on the rear wing, and when a host falls off the lease it becomes
+a grey ghost that haunts its seat at midfield pace until a new driver takes
+over. DHCP and first-sight traffic bring drivers in from the pit lane — the
+quietest kart waves by and the new one joins at the back — but a chatty relay
+never churns the grid: only genuinely quiet karts get handed over, and never
+two handovers in a heartbeat.
+
+| Event | On track |
+|-------|----------|
+| allow | the racer drafts forward — traffic is pace, for it and for the whole pack |
+| dns | a sprint burst, and the domain lights up on the trackside sponsor board |
+| dhcp | a new driver takes a seat; the hostname swaps on the wing with a flash |
+| block | oil slick under that racer — it spins and drops through the pack |
+| threat | a red shell screams off the back of the pack for the leader; the offending racer gets a chase glow |
+| wifi | a boost-pad straight lights up (a failed join sputters instead) |
+| system | yellow flag: the whole pack eases and the leader's gap evaporates |
+
+The camera rides the busiest host on the grid (it shifts with a flash when
+your traffic moves somewhere else), or the leader if you'd rather watch the
+race. Rubber-banding is the house law — nobody laps out of sight — and the
+corner minimap keeps the running order honest while speed chevrons build as
+the traffic floods. Three circuits wait: **Sunset Bowl**, wide and fast;
+**Corkscrew**, the technical loop; **Long Lap**, one brutal hairpin after a
+flat-out straight. Or leave the circuit on **Auto** and the hostname decides
+your home track, every LAN its own.
+
+Under the hood it's the cheapest pseudo-3D in the house: the ground is one
+multiply chain per pixel into a 270-line buffer (SNES is 224) that CSS
+upscales with hard pixel edges — lighter per frame than FRAGNET's raycaster,
+and it holds 60 fps on a Raspberry Pi.
+
 ## Sound
 
 All sound is synthesized in the browser with the WebAudio API. Browsers only
@@ -1430,6 +1482,26 @@ The corridor plays along:
 
 Boiler hum and a low hell rumble underneath, louder in heavy traffic.
 
+### Slipstream's soundtrack
+
+**Chip race-pop, 168 bpm** — four-on-the-floor kick, chip bassline, a lead
+that runs the circuit like the karts do. Rotate brings **Sunset drift**, a
+slower organ-rock cruise for the golden hour. Underneath, a square-wave
+engine purr rides the hero kart's speed.
+
+| Event | Sound |
+|-------|-------|
+| allow | the style's lead on traffic |
+| block | a snare crack and a low splat |
+| threat | a two-tone siren, and the shell's scream flying past, panned to its side |
+| dns | a rising chip blip as the board lights |
+| dhcp | the pit-lane double-beep as a driver takes over |
+| wifi | a two-note connect blip |
+| system | a low tom under the yellow flag |
+
+The start lights beep 3‑2‑1 and a chord stabs the green; the lap chime rings
+only for your kart. **Race sounds** and **Engine purr** live on the Audio tab.
+
 ### Background tracks
 
 Play your own music in any scene. In F1 → Audio → **Background track**, upload
@@ -1494,6 +1566,7 @@ two volumes of its own:
 | The Gibson | **Access sounds**, **Hum & static** |
 | Mycelium | **Bells**, **Undergrowth & drone** |
 | Undergrowth | **Mycelium's score** (shared garden) **+ pulse whoosh** |
+| Slipstream | **Chip race-pop** (168 bpm) and **sunset organ rock**, + start lights, shells and lap chimes |
 | FRAGNET | **Riff city**, **Machine god**, **Grave drip** |
 | Substrate | **Drawing** (nib on paper), **Room** (air & drone), **Notes** |
 
@@ -1643,7 +1716,7 @@ been measured on a Pi yet.
 
 | Parameter | Effect |
 |-----------|--------|
-| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium`, `undergrowth`, `fragnet` or `substrate` |
+| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium`, `undergrowth`, `fragnet`, `substrate` or `slipstream` |
 | `?demo=1` | synthetic traffic, no relay needed |
 | `?showreel=1` | with the demo: a looping 60-second calm → build → hurricane → cooldown arc |
 | `?rate=40` | with the demo: about 40 events per second |
