@@ -29,6 +29,27 @@ export interface Sprite {
 
 const WALL_KEYS = ['tech', 'brick', 'hell', 'door', 'exit'];
 
+/**
+ * Which variants of each flat role are actually the same material.
+ *
+ * The extractor promotes every candidate lump it finds to a variant, but the
+ * candidate lists are fallbacks, so a role can end up offering three
+ * unrelated materials and a room picks one at random — which is how a lava
+ * ceiling, a blue lamp and a dirt floor ended up neighbours. Measured means
+ * from the bundled pack are in the commit that added this. Anything not
+ * listed falls back to variant 0.
+ */
+const FLAT_VARIANTS: Record<string, number[]> = {
+  floor: [0],            // 0 dirt, 1 grey — too far apart to mix
+  ceil: [0, 2],          // both greys; 1 is brown
+  hellFloor: [0, 1],     // both lava-ish, which is right for a floor
+  hellCeil: [0],         // 1 is LAVA1
+  techFloor: [0],        // 0 grey metal; 1 and 2 are browns
+  exitFloor: [0],        // the red one, kept as a deliberate landmark
+  exitCeil: [0, 1],      // 2 is blue
+  lampCeil: [2],         // the bright grey; 0 is near-black blue
+};
+
 export class SoftRenderer {
   readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
@@ -309,7 +330,9 @@ export class SoftRenderer {
   }
 
   private flatTex(table: TexTable, base: string, vari: number): Uint8Array | undefined {
-    return table.flats[vari === 0 ? base : `${base}${vari + 1}`] ?? table.flats[base];
+    const allowed = FLAT_VARIANTS[base];
+    const v = allowed && allowed.length ? allowed[vari % allowed.length] : 0;
+    return table.flats[v === 0 ? base : `${base}${v + 1}`] ?? table.flats[base];
   }
 
   private clampL(v: number): number { return v < 0 ? 0 : v > 31 ? 31 : v | 0; }
