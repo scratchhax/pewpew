@@ -4,9 +4,9 @@ import type { Sim } from '../mycelium/filaments';
 import { lift, R, S } from './web3d';
 
 /** Max heading change per second: big retargets become slow pans, not snaps. */
-const TURN_RATE = (26 * Math.PI) / 180;
-/** Max velocity-turn per second: the camera is a vehicle — its direction NEVER changes abruptly. */
-const POS_TURN = (45 * Math.PI) / 180;
+const TURN_RATE = (22 * Math.PI) / 180;
+/** Max velocity-turn per second: the camera is a zero-g vehicle — direction NEVER changes abruptly. */
+const POS_TURN = (28 * Math.PI) / 180;
 
 /**
  * The autopilot: a slow ride through the mat. It keeps a chain of vertices
@@ -36,12 +36,18 @@ export class Flycam {
   /** Relocation: the vertex we're gliding to when the local component is exhausted. */
   private travel = -1;
   private travelTarget = new Vector3();
-  private travelFrom = new Vector3(0, 1, 0);
-  private travelF = 0;
   private lastRelocateT = -1000;
   /** Where the camera is actually heading — velocity direction, turn-limited. */
   private velDir = new Vector3();
   private tmp3 = new Vector3();
+  private tmp4 = new Vector3();
+  /** When the current route was (re)rooted — the vehicle coasts through a re-root. */
+  private routeT = -1000;
+  /** Weighted direction toward nearby living structure — what the camera likes to look at. */
+  private pullDir = new Vector3();
+  /** The last two glide targets — never glide back where we just were. */
+  private lastTravelA = new Vector3(1e9, 0, 0);
+  private lastTravelB = new Vector3(1e9, 0, 0);
   /** Every 45 s the ride drifts toward wherever the mat is busiest. */
   private nextDriftT = 45;
   /** The route's start vertex, in world space — if it moves, the sim renumbered its vertices and the route is stale. */
@@ -63,8 +69,8 @@ export class Flycam {
   get speedNow(): number { return this.curSpeed; }
 
   /** Route state (for the diag overlay). */
-  get routeInfo(): { route: number; total: number; dist: number; travel: number } {
-    return { route: this.path.length, total: this.cum[this.cum.length - 1], dist: this.dist, travel: this.travel };
+  get routeInfo(): { route: number; total: number; dist: number; travel: number; tdist: number } {
+    return { route: this.path.length, total: this.cum[this.cum.length - 1], dist: this.dist, travel: this.travel, tdist: this.travel >= 0 ? this.pos.distanceTo(this.travelTarget) : -1 };
   }
 
   /** Drift toward a mat vertex (a fresh bloom, a blight) for ~8 s. */
@@ -161,6 +167,7 @@ export class Flycam {
 
   /** (Re)start a route from the nearest vertex to the camera. */
   private newRoute(t: number): void {
+    this.routeT = t;
     this.path = [];
     this.cum = [0];
     this.dist = 0;
@@ -208,122 +215,93 @@ export class Flycam {
     return out.slice(0, k);
   }
 
-  /** Glide to an active patch — the busiest one that's actually somewhere else (the cooldown keeps this from ping-ponging). */
+  /** Glide to an active patch — lively AND roughly ahead, so the ride never becomes endless backwards transit. */
   private relocate(t: number): boolean {
-    if (t - this.lastRelocateT < 2) return false;
-    const comps = this.bestComps(3).slice().sort((a, b) => b.act - a.act);
+    if (t - this.lastRelocateT < 4) return false;
+    const comps = this.bestComps(5).slice();
+    const velN = this.velDir.lengthSq() > 1e-6 ? this.tmp.copy(this.velDir).normalize() : null;
+    const cand: { v: number; p: Vector3; score: number }[] = [];
     for (const c of comps) {
       if (c.size < 20) continue;
       const tv = this.sim.V[c.v];
       if (!tv) continue;
-      lift(tv.x, tv.y, this.travelTarget);
-      if (this.travelTarget.distanceTo(this.pos) < 8) continue;
-      this.lastRelocateT = t;
-      this.startTravel();
-      this.travel = c.v;
-      return true;
+      lift(tv.x, tv.y, this.tmp3);
+      if (this.tmp3.distanceTo(this.pos) < 8) continue;
+      // never glide back to where we just came from — that ping-pong is what
+      // reads as the whole scene snapping back and forth
+      if (this.tmp3.distanceTo(this.lastTravelA) < 25) continue;
+      if (this.tmp3.distanceTo(this.lastTravelB) < 25) continue;
+      let fwd = 1;
+      if (velN) {
+        const dir = this.tmp2.copy(this.tmp3).sub(this.pos).normalize();
+        fwd = 0.3 + 0.7 * Math.max(0, velN.dot(dir));
+      }
+      cand.push({ v: c.v, p: this.tmp3.clone(), score: c.act * fwd });
     }
-    return false;
+    cand.sort((a, b) => b.score - a.score);
+    const best = cand[0];
+    if (!best) return false;
+    this.lastRelocateT = t;
+    this.travelTarget.copy(best.p);
+    this.startTravel();
+    this.travel = best.v;
+    return true;
   }
 
   private startTravel(): void {
-    this.travelF = 0;
-    // the glide arcs between the two shell directions at a fixed radius, so it
-    // never cuts through the hollow core
-    if (this.pos.lengthSq() < 1e-4) this.travelFrom.set(0, 1, 0);
-    else this.travelFrom.copy(this.pos).normalize();
+    this.lastTravelB.copy(this.lastTravelA);
+    this.lastTravelA.copy(this.travelTarget);
   }
 
   /**
-   * Glide to the relocation target along a shell arc — but as a VEHICLE: the
-   * camera steers toward a point down the arc and its velocity is turn-rate
-   * limited, so the path eases onto the shell from wherever it is. (Placing
-   * the camera ON the arc each frame teleports it at travel start and reads
-   * as the whole scene repainting.)
+   * Glide to the relocation target as a zero-g vehicle: steer at the target
+   * with a soft field around the hollow core — deep inside the shell we bias
+   * outward, outside it we bias inward. The path bends gracefully around the
+   * void with no arc state to get stuck in (every parameterized scheme tried
+   * here had a degenerate case; a steering field has none).
    */
   private doTravel(dt: number, t: number): void {
-    if (this.pos.distanceTo(this.travelTarget) < 1.2) {
-      this.pos.copy(this.travelTarget);
+    const d0 = this.pos.distanceTo(this.travelTarget);
+    if (d0 < 0.3) {
+      this.pos.copy(this.travelTarget); // imperceptible settle, not a jump
       this.travel = -1;
       this.newRoute(t);
       this.cam.position.copy(this.pos);
       return;
     }
-    this.curSpeed += (this.speed * 1.6 - this.curSpeed) * Math.min(1, dt * 2);
-    // Progress along the arc is measured by where we ACTUALLY are (the
-    // projected angle), never by time: the turn-limited vehicle enters the
-    // arc gradually, and if the parameter ran on time it would hit 1 while
-    // we're still mid-flight — leaving "aim straight at the target", a chord
-    // that dives through the hollow core and reads as the world repainting.
-    const dirp = this.tmp3.copy(this.pos);
-    if (dirp.lengthSq() < 1e-3) {
-      this.pos.copy(this.travelTarget);
-      this.travel = -1;
-      this.newRoute(t);
-      return;
+    this.curSpeed += (this.speed * 1.3 - this.curSpeed) * Math.min(1, dt * 2);
+    this.tmp.copy(this.travelTarget).sub(this.pos);
+    this.tmp.normalize();
+    // Zero-g cornering: a fast vehicle can't turn tight — cut thrust while
+    // the target is off to the side, pivot gently, power back up on the new
+    // heading. Turns shrink from 80-unit runaway loops to gentle banks.
+    if (this.velDir.lengthSq() > 1e-6) {
+      const off = this.velDir.angleTo(this.tmp);
+      const slow = off < 0.6 ? 1 : Math.max(0.25, 1 - (off - 0.6) * 1.2);
+      const tgt = this.speed * 1.3 * slow;
+      this.curSpeed += (tgt - this.curSpeed) * Math.min(1, dt * (tgt > this.curSpeed ? 2 : 4));
     }
-    dirp.normalize();
-    const aTot = this.travelFrom.angleTo(this.tmp2.copy(this.travelTarget).normalize());
-    const aNow = this.travelFrom.angleTo(dirp);
-    this.travelF = Math.min(1, aTot > 1e-4 ? Math.max(this.travelF, aNow / aTot) : 1);
-    // aim a little way down the arc; once it's done, aim straight at the target
-    const F = Math.min(1, this.travelF + 0.05);
-    this.arcPoint(F, this.tmp2);
-    this.tmp.subVectors(this.tmp2, this.pos);
-    if (this.travelF >= 1) this.tmp.subVectors(this.travelTarget, this.pos);
-    if (this.tmp.lengthSq() < 1e-6) {
-      this.pos.copy(this.travelTarget);
-      this.travel = -1;
-      this.newRoute(t);
-      return;
+    const r = this.pos.length();
+    const near = Math.min(1, d0 / 16); // the field fades off on final approach
+    if (r > 1e-3) {
+      const rad = this.tmp4.copy(this.pos).multiplyScalar(1 / r);
+      const deep = Math.min(1, Math.max(0, (0.62 * R - r) / (0.25 * R))) * near;
+      const high = Math.min(1, Math.max(0, (r - 0.95 * R) / (0.2 * R))) * near;
+      if (deep > 0) this.tmp.addScaledVector(rad, deep * 2.2).normalize();
+      else if (high > 0) this.tmp.addScaledVector(rad, -high * 1.4).normalize();
     }
-    this.tmp2.copy(this.tmp).normalize();
-    this.steer(dt, this.tmp2);
+    this.steer(dt, this.tmp);
     this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
-    // The radius leash: a turn-limited vehicle can overshoot the arc and pop
-    // out through the web (the void on the other side) or sag in below it
-    // (empty core). Stay in the shell while cruising; ease the leash near the
-    // end so the glide can settle onto the target's own depth band.
-    const rr = this.pos.length();
-    const relaxed = this.travelF > 0.75;
-    const rHi = relaxed ? 1.15 * R : 0.92 * R;
-    const rLo = relaxed ? 0.3 * R : 0.5 * R;
-    if (rr > 1e-3) {
-      if (rr > rHi) this.pos.multiplyScalar(rHi / rr);
-      else if (rr < rLo) this.pos.multiplyScalar(rLo / rr);
-    }
-    this.orientTo(this.tmp2, dt);
-    this.lastDir.copy(this.tmp2);
+    this.aim(this.tmp, dt);
+    this.lastDir.copy(this.tmp);
     this.cam.position.copy(this.pos);
     this.cam.quaternion.copy(this.quat);
-  }
-
-  /** A point at parameter f (0..1) along the shell arc from travelFrom to the target direction. */
-  private arcPoint(f: number, out: Vector3): void {
-    const dir1 = this.tmp3.copy(this.travelTarget).normalize();
-    const rg = 0.85 * R;
-    const d = Math.max(-1, Math.min(1, this.travelFrom.dot(dir1)));
-    if (d < -0.999) {
-      // Antipodal endpoints: the short arc is ANY great circle through them.
-      // Pick one deterministically — the naive linear blend collapses through
-      // the origin, which reads as the camera (and the whole view) lurching
-      // down into the core and back out.
-      const ax = this.tmp.set(Math.abs(this.travelFrom.x) > 0.9 ? 0 : 1, Math.abs(this.travelFrom.x) > 0.9 ? 1 : 0, 0);
-      out.crossVectors(this.travelFrom, ax).normalize().multiplyScalar(Math.sin(f * Math.PI));
-      out.addScaledVector(this.travelFrom, Math.cos(f * Math.PI));
-      out.normalize().multiplyScalar(rg);
-      return;
-    }
-    const angle = Math.acos(d);
-    const s = Math.sin(angle);
-    const w0 = s > 1e-4 ? Math.sin((1 - f) * angle) / s : 1 - f;
-    const w1 = s > 1e-4 ? Math.sin(f * angle) / s : f;
-    out.copy(this.travelFrom).multiplyScalar(w0).addScaledVector(dir1, w1).normalize().multiplyScalar(rg);
   }
 
   // ── frame ─────────────────────────────────────────────────────────────────
   update(dt: number, t: number, wanderX: number, wanderY: number): void {
     const sim = this.sim;
+    this.computePull(this.sim);
     if (this.travel >= 0) { this.doTravel(dt, t); return; }
     if (sim.V.length < 2) { this.hover(dt); return; }
 
@@ -408,22 +386,65 @@ export class Flycam {
     if (lag > 10) this.dist -= (lag - 10) * 0.6;
     this.tmp.subVectors(chase, this.pos);
     if (this.tmp.lengthSq() < 1e-6) this.tmp.copy(this.lastDir);
-    this.steer(dt, this.tmp.normalize());
+    this.tmp.normalize();
+    // Coast through a re-root: the desired direction blends in from the
+    // current velocity over the first two seconds, so a rail that snaps to a
+    // new junction never swings the drift
+    const rb = Math.min(1, (t - this.routeT) / 2);
+    if (rb < 1 && this.velDir.lengthSq() > 1e-6) this.tmp.lerp(this.velDir, 1 - rb).normalize();
+    this.steer(dt, this.tmp);
     this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
 
     // the anti-burn-in wander only — no sway, no roll, ever
     this.pos.x += wanderX * 0.002;
     this.pos.y += wanderY * 0.002;
 
-    // orientation: ease toward the path ahead — world up, level ride; when
-    // the view runs near-vertical the heading is held (see orientTo).
+    // orientation: ease toward the path ahead — pulled toward glowing
+    // structure the more the path misses it (the camera never stares at void)
     this.tmp2.copy(ahead).sub(this.pos);
     if (this.tmp2.lengthSq() < 1e-4) this.tmp2.copy(this.lastDir);
-    this.orientTo(this.tmp2, dt);
+    this.aim(this.tmp2, dt);
 
     this.lastDir.copy(this.tmp2.copy(ahead).sub(this.pos).normalize());
     this.cam.position.copy(this.pos);
     this.cam.quaternion.copy(this.quat);
+  }
+
+  /**
+   * Weighted direction toward nearby living structure — what glows pulls the
+   * eye. Accumulated every frame from vertex memory and fresh flow, with a
+   * distance falloff so close structure dominates.
+   */
+  private computePull(sim: Sim): void {
+    this.pullDir.set(0, 0, 0);
+    for (let i = 0; i < sim.V.length; i++) {
+      const v = sim.V[i];
+      const w = 0.04 + v.mem + v.flow * 1.6;
+      lift(v.x, v.y, this.tmp3);
+      this.tmp.subVectors(this.tmp3, this.pos);
+      const d2 = this.tmp.lengthSq();
+      if (d2 < 1e-3 || d2 > 7200) continue; // nearby-ish only
+      this.tmp.normalize();
+      this.pullDir.addScaledVector(this.tmp, w / (1 + d2 / 250));
+    }
+  }
+
+  /**
+   * Aim the view: along the path, but pulled toward nearby structure the
+   * more the path misses it — the camera never volunteers to stare at the
+   * void while something is glowing off to the side.
+   */
+  private aim(pathAhead: Vector3, dt: number): void {
+    const pa = this.tmp2.copy(pathAhead);
+    if (pa.lengthSq() < 1e-8) return;
+    pa.normalize();
+    const pl = this.pullDir.length();
+    if (pl > 1e-4) {
+      this.tmp3.copy(this.pullDir).divideScalar(pl);
+      const miss = Math.max(0, 1 - pa.dot(this.tmp3));
+      if (miss > 0.02) pa.addScaledVector(this.tmp3, 0.3 + 1.4 * miss).normalize();
+    }
+    this.orientTo(pa, dt);
   }
 
   /**
@@ -493,13 +514,27 @@ export class Flycam {
   /** A slow in-place look-around while there's nothing worth riding (an empty mat, or small components still growing) — it pans the whole sphere, up and down as well as around. */
   private hover(dt: number): void {
     this.orbitT += dt;
-    this.velDir.set(0, 0, 0); // parked — next ride starts from the view direction
+    // zero-g: there is no brakes — bleed the speed off and drift to a stop
+    this.curSpeed += (0 - this.curSpeed) * Math.min(1, dt * 1.2);
+    if (this.curSpeed > 0.02 && this.velDir.lengthSq() > 1e-6) {
+      this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
+    }
     const a = this.orbitT * 0.12;
-    this.tmp2.set(
-      Math.cos(a) * 24,
-      Math.sin(a * 0.53 + 1) * 12,
-      Math.sin(a) * 24,
-    );
+    if (this.pullDir.lengthSq() > 1e-6) {
+      // gaze at the busiest nearby structure with a slow sway — even parked,
+      // the camera looks at something alive
+      const pl = Math.sqrt(this.pullDir.lengthSq());
+      this.tmp2.copy(this.pullDir).divideScalar(pl);
+      this.tmp2.x += Math.sin(a * 1.9) * 0.3;
+      this.tmp2.y += Math.sin(a * 1.4 + 2) * 0.12;
+      this.tmp2.z += Math.cos(a * 1.7 + 1) * 0.3;
+    } else {
+      this.tmp2.set(
+        Math.cos(a) * 24,
+        Math.sin(a * 0.53 + 1) * 12,
+        Math.sin(a) * 24,
+      );
+    }
     this.orientTo(this.tmp2, dt);
     this.cam.position.copy(this.pos);
     this.cam.quaternion.copy(this.quat);
