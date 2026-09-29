@@ -5,7 +5,7 @@ import { slipScore, engineSpeed } from './score';
 import { Mode7 } from './mode7';
 import { buildTrack, type Track } from './track';
 import { Race, SEATS } from './race';
-import { board as boardSprite, banana, ghost, itemBox, kartFront, kartRear, kartSide, label, mushroom, oil, shell } from './sprites';
+import { board as boardSprite, banana, flame, ghost, itemBox, kartFront, kartRear, kartSide, label, mushroom, oil, shell, VEH_W, type Character } from './sprites';
 import type { ItemKind } from './race';
 import './hud.css';
 
@@ -84,9 +84,10 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
   const bananaSpr = banana();
   const mushroomSpr = mushroom();
   const oilSpr = oil();
+  const flameSpr = flame();
   const ksprCache = new Map<string, { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement }>();
-  const karts = (hue: number, ch: { pat: number; spoiler: number; num: number; acc: number }): { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement } => {
-    const key = `${hue}|${ch.num}|${ch.pat}${ch.spoiler}|${ch.acc}`;
+  const karts = (hue: number, ch: Character): { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement } => {
+    const key = `${hue}|${ch.num}|${ch.pat}|${ch.acc}|${ch.veh}`;
     let e = ksprCache.get(key);
     if (!e) {
       e = { rear: kartRear(hue, ch), front: kartFront(hue, ch), side: kartSide(hue, ch) };
@@ -96,8 +97,8 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     return e;
   };
   const ghostCache = new Map<string, HTMLCanvasElement>();
-  const ghostRear = (hue: number, ch: { pat: number; spoiler: number; num: number; acc: number }): HTMLCanvasElement => {
-    const key = `${hue}|${ch.num}|${ch.pat}${ch.spoiler}|${ch.acc}`;
+  const ghostRear = (hue: number, ch: Character): HTMLCanvasElement => {
+    const key = `${hue}|${ch.num}|${ch.pat}|${ch.acc}|${ch.veh}`;
     let g = ghostCache.get(key);
     if (!g) { g = ghost(kartRear(hue, ch)); ghostCache.set(key, g); }
     return g;
@@ -269,7 +270,12 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       const spr = r.ghost ? ghostRear(r.hue, r.char) : side ? karts(r.hue, r.char).side : facingBack ? karts(r.hue, r.char).front : karts(r.hue, r.char).rear;
       const alpha = r.ghost ? 0.42 : r.flash > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(r.flash * 20)) : 1;
       const lift = r.spin > 0 ? Math.abs(Math.sin(r.spin * 9)) * 0.25 : 0;
-      draws.push({ depth: pr.depth, run: () => m7.drawSprite(spr, p.x, p.y, cam, 3.4, alpha, lift) });
+      if (r.boost > 1 && !r.ghost && pr.depth < 280) {
+        const fl = 1.3 * VEH_W[r.char.veh] * (((f.t * 26 + r.seat * 7) | 0) % 2 ? 1 : 0.8);
+        const bx = p.x - Math.cos(p.heading) * 1.9, by = p.y - Math.sin(p.heading) * 1.9;
+        draws.push({ depth: pr.depth + 0.01, run: () => m7.drawSprite(flameSpr, bx, by, cam, fl, 0.9, 0.1) });
+      }
+      draws.push({ depth: pr.depth, run: () => m7.drawSprite(spr, p.x, p.y, cam, 3.9 * VEH_W[r.char.veh], alpha, lift) });
       // name + position tag floating over the helmet
       if (pr.depth < 320) {
         const rank = race.order.indexOf(r.seat) + 1;
@@ -295,10 +301,15 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
 
     // ── your kart: the fixed anchor at the bottom of the board ──
     const kartSpr = hero.ghost ? ghostRear(hero.hue, hero.char) : karts(hero.hue, hero.char).rear;
-    const kw = Math.max(30, Math.round(m7.W * (0.08 + speedFrac * 0.012)));
+    const kw = Math.max(30, Math.round(m7.W * (0.08 + speedFrac * 0.012))) * VEH_W[hero.char.veh];
     const kh = Math.round(kw * (kartSpr.height / kartSpr.width));
     const steer = Math.max(-1, Math.min(1, dh * 2.2)) * kw * 0.22;
     const bounce = speedFrac * 1.2 * Math.sin(f.t * 24);
+    if (hero.boost > 0.5) {
+      const flick = ((f.t * 24) | 0) % 2 ? 1 : 0.82;
+      const fw = kw * 0.62 * flick, fh = fw * (flameSpr.height / flameSpr.width);
+      ctx.drawImage(flameSpr, Math.round(m7.W / 2 - fw / 2 + steer), Math.round(m7.H - 3 - fh * 0.4 + bounce), fw, fh);
+    }
     ctx.drawImage(kartSpr, Math.round(m7.W / 2 - kw / 2 + steer), Math.round(m7.H - kh - 2 + bounce), kw, kh);
 
     const chev = settings.kChevrons ? Math.min(0.8, Math.max(0, hero.boost - 3.5) / 11) : 0;
