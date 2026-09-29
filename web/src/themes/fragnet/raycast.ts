@@ -229,8 +229,13 @@ export class SoftRenderer {
       // texel is one map unit tall AND wide, so the full-height wall (four of
       // our units = 128 map units) shows 128 texels and 64-tall textures tile
       // twice; a cell face is two units = 64 texels across, exactly one 64-
-      // wide texture, doors tile up from the floor
-      const offX = style ? style.offX : 0, offY = style ? style.offY : 0;
+      // wide texture, hung from the top of the wall the way the game pegs a
+      // one-sided line.
+      //
+      // offX only. A vertical roll would drag the texture's own top edge off
+      // the ceiling line, and levelgen's offY is a random fraction of the
+      // height, so no two sectors lined up.
+      const offX = style ? style.offX : 0;
       // continuous along the wall, not reset per cell: a cell face is 64 map
       // units, so wider textures span several cells instead of being cropped
       const wallU = side === 0 ? posCellZ + perp * rayZ : posCellX + perp * rayX;
@@ -239,39 +244,71 @@ export class SoftRenderer {
       if (side === 0 && rayX > 0) texX = tex.w - 1 - texX;
       if (side === 1 && rayZ < 0) texX = tex.w - 1 - texX;
       const y0 = Math.max(0, Math.ceil(wallTop)), y1 = Math.min(H - 1, Math.floor(wallBot));
-      const texYStep = 32 / ppu;   // texels per screen pixel, floor-anchored
+      // texels per screen pixel, measured DOWN from the top of the wall, which
+      // is where the game pegs a one-sided wall. It used to measure up from the
+      // floor, which both put texture row 0 on the ground and drew the image
+      // mirrored - and row 0 of the pack tech texture is a solid black
+      // band, so every tech wall ended in black and looked like it was hovering.
+      const texYStep = 32 / ppu;
       for (let y = y0; y <= y1; y++) {
-        let texY = (((wallBot - y) * texYStep + offY * tex.h) | 0) % tex.h;
+        let texY = (((y - wallTop) * texYStep) | 0) % tex.h;
         if (texY < 0) texY += tex.h;
         buf[y * W + x] = lut[tex.idx[texY * tex.w + texX]];
       }
 
-      // ceiling above and floor below, one flat per cell, lit by the cell
-      const floorStyle = style ?? level.corridor;
-      const fTex = this.flatTex(table, floorStyle.floorFlat, floorStyle.flatVar) ?? table.flats.floor;
-      const cTex = this.flatTex(table, floorStyle.ceilFlat, floorStyle.flatVar) ?? table.flats.ceil;
-      if (fTex) {
-        for (let y = y1 + 1; y < H; y++) {
-          const d = (EYE * halfW) / (y - cy);
-          const wx = camX + rayX * d, wz = camZ + rayZ * d;
-          const cxi = (wx / CS) | 0, czi = (wz / CS) | 0;
-          const st = this.styles[czi * level.w + cxi] ?? floorStyle;
-          const lt = this.clampL(lightToTable(this.effLight(st, d, t, boost, cxi, czi) * 0.92));
-          const px = ((((wx / CS) % 1) * 64) | 0) & 63, py = ((((wz / CS) % 1) * 64) | 0) & 63;
-          buf[y * W + x] = luts[lt][fTex[py * 64 + px]];
+      // Ceiling above and floor below. The flat belongs to the cell the
+      // pixel lands in - not to the sector that owns the far wall this
+      // column happened to hit, which is what it used to be: one flat for
+      // the whole column, so the ground under the marine turned to lava
+      // whenever a hell room sat at the end of the ray, and anything
+      // occluding the far wall left a floor-to-ceiling stripe of foreign
+      // flat that read as a pillar standing in an ordinary room. Resolve it
+      // per pixel, cached on the cell index, since a column only crosses a
+      // handful of cells.
+      //
+      // Depth uses the same constant as the walls (0.8*H, via pxPerUnit).
+      // It used to use halfW, which is the same number only at 320x200 - the
+      // buffer now follows the window, and at 640x360 the ground slid 11%
+      // against the bottom of the wall it meets.
+      const fallback = style ?? level.corridor;
+      const projY = 0.8 * H;
+      const maxI = level.w * level.h;
+      let cellI = -1;
+      let cellSt = fallback;
+      let flat: Uint8Array | undefined;
+
+      for (let y = y1 + 1; y < H; y++) {
+        const d = (EYE * projY) / (y - cy);
+        const wx = camX + rayX * d, wz = camZ + rayZ * d;
+        const cxi = Math.floor(wx / CS), czi = Math.floor(wz / CS);
+        const i = cxi >= 0 && czi >= 0 && cxi < level.w ? czi * level.w + cxi : -1;
+        if (i !== cellI) {
+          cellI = i;
+          cellSt = (i >= 0 && i < maxI ? this.styles[i] : null) ?? fallback;
+          flat = this.flatTex(table, cellSt.floorFlat, cellSt.flatVar) ?? table.flats.floor;
         }
+        if (!flat) continue;
+        const lt = this.clampL(lightToTable(this.effLight(cellSt, d, t, boost, cxi, czi) * 0.92));
+        const px = ((wx / CS - cxi) * 64) & 63, py = ((wz / CS - czi) * 64) & 63;
+        buf[y * W + x] = luts[lt][flat[py * 64 + px]];
       }
-      if (cTex) {
-        const ceilH = WALL_H - EYE;
-        for (let y = 0; y < y0; y++) {
-          const d = (ceilH * halfW) / (cy - y);
-          const wx = camX + rayX * d, wz = camZ + rayZ * d;
-          const cxi = (wx / CS) | 0, czi = (wz / CS) | 0;
-          const st = this.styles[czi * level.w + cxi] ?? floorStyle;
-          const lt = this.clampL(lightToTable(this.effLight(st, d, t, boost, cxi, czi) * 0.8));
-          const px = ((((wx / CS) % 1) * 64) | 0) & 63, py = ((((wz / CS) % 1) * 64) | 0) & 63;
-          buf[y * W + x] = luts[lt][cTex[py * 64 + px]];
+
+      cellI = -1;
+      const ceilH = WALL_H - EYE;
+      for (let y = 0; y < y0; y++) {
+        const d = (ceilH * projY) / (cy - y);
+        const wx = camX + rayX * d, wz = camZ + rayZ * d;
+        const cxi = Math.floor(wx / CS), czi = Math.floor(wz / CS);
+        const i = cxi >= 0 && czi >= 0 && cxi < level.w ? czi * level.w + cxi : -1;
+        if (i !== cellI) {
+          cellI = i;
+          cellSt = (i >= 0 && i < maxI ? this.styles[i] : null) ?? fallback;
+          flat = this.flatTex(table, cellSt.ceilFlat, cellSt.flatVar) ?? table.flats.ceil;
         }
+        if (!flat) continue;
+        const lt = this.clampL(lightToTable(this.effLight(cellSt, d, t, boost, cxi, czi) * 0.8));
+        const px = ((wx / CS - cxi) * 64) & 63, py = ((wz / CS - czi) * 64) & 63;
+        buf[y * W + x] = luts[lt][flat[py * 64 + px]];
       }
     }
 

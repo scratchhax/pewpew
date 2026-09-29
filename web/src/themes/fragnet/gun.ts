@@ -43,10 +43,13 @@ export class Gun2D {
       }
       ctx.putImageData(img, 0, 0);
       this.canvases.set(key, cvs);
-      // some WADs make the idle frame a muzzle-only stub; the ready pose is
-      // whichever frame actually shows the whole gun
+      // Fallback only. A is the ready pose by the game's own naming and
+      // SEQUENCE already treats B, C and D as the fire animation - those are
+      // tall because the weapon is drawn kicked up and back, so picking the
+      // largest frame picks a reload pose and the marine rests holding it.
       if (f.w * f.h > bestArea) { bestArea = f.w * f.h; this.idleKey = key; }
     }
+    if (this.canvases.has('A')) this.idleKey = 'A';
   }
 
   fire(): void {

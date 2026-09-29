@@ -46,14 +46,27 @@ export const isFloor = (l: Level, x: number, y: number): boolean =>
   x >= 0 && y >= 0 && x < l.w && y < l.h && l.grid[y * l.w + x] !== WALL;
 
 export function genLevel(size: number, rand: () => number = Math.random): Level {
-  for (let attempt = 0; attempt < 24; attempt++) {
-    const l = tryLevel(size, rand);
-    if (l && connected(l)) return l;
+  // `gap` is the clear space kept between rooms. Three cells leaves a lane a
+  // corridor can run down with a wall still standing on each side, which is
+  // what keeps rooms feeling like rooms; but a small map cannot place its
+  // rooms at all with that much slack, so fall back rather than fail. The
+  // previous version had a single unchecked last attempt and could hand back
+  // null, which setLevel then dereferenced.
+  const gaps = size >= 28 ? [3, 3, 2, 2, 1] : [2, 2, 2, 1, 1];
+  for (const gap of gaps) {
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const l = tryLevel(size, rand, gap);
+      if (l && connected(l)) return l;
+    }
   }
-  return tryLevel(size, rand)!;
+  for (let attempt = 0; attempt < 400; attempt++) {
+    const l = tryLevel(size, rand, 1);
+    if (l) return l;
+  }
+  return tryLevel(size, rand, 0)!;
 }
 
-function tryLevel(size: number, rand: () => number): Level | null {
+function tryLevel(size: number, rand: () => number, gap = 2): Level | null {
   const w = size | 0, h = size | 0;
   const grid = new Uint8Array(w * h); // all wall
   const rooms: Room[] = [];
@@ -61,7 +74,7 @@ function tryLevel(size: number, rand: () => number): Level | null {
   for (let k = 0; k < want * 12 && rooms.length < want; k++) {
     const rw = 4 + ((rand() * 5) | 0), rh = 4 + ((rand() * 5) | 0);
     const x = 1 + ((rand() * (w - rw - 2)) | 0), y = 1 + ((rand() * (h - rh - 2)) | 0);
-    if (rooms.some((o) => x < o.x + o.w + 2 && x + rw + 2 > o.x && y < o.y + o.h + 2 && y + rh + 2 > o.y)) continue;
+    if (rooms.some((o) => x < o.x + o.w + gap && x + rw + gap > o.x && y < o.y + o.h + gap && y + rh + gap > o.y)) continue;
     // every room its own DOOM sector: role, texture variant, flats, light
     const ri = rooms.length;
     const role = ri % 4 === 3 ? 2 : ri % 2 === 0 ? 0 : 1;
@@ -114,6 +127,22 @@ function tryLevel(size: number, rand: () => number): Level | null {
   // wide halls: the game's corridors are two blocks across, so flare every
   // corridor cell out one step. Doors keep their pinch (cells touching a
   // door stay shut), rooms keep their footprint (interior cells never dilate)
+  // and - just as important - keep their walls: the flare may not eat a
+  // room's one-cell wall ring. Without that, a corridor running down the side
+  // of a room dissolves the side, and the room's rectangle survives only as a
+  // sector boundary standing in open floor with nothing to explain why the
+  // flat changes there. Cells where a corridor actually enters a room were
+  // carved earlier and are already floor, so they stay, as the doorways.
+  const ring = new Uint8Array(w * h);
+  for (const r of rooms) {
+    for (let j = r.y - 1; j <= r.y + r.h; j++) {
+      for (let i = r.x - 1; i <= r.x + r.w; i++) {
+        if (i < 0 || j < 0 || i >= w || j >= h) continue;
+        if (i >= r.x && i < r.x + r.w && j >= r.y && j < r.y + r.h) continue;
+        ring[j * w + i] = 1;
+      }
+    }
+  }
   const spine: Array<[number, number]> = [];
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
@@ -126,6 +155,7 @@ function tryLevel(size: number, rand: () => number): Level | null {
     for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]] as const) {
       if (nx < 1 || ny < 1 || nx >= w - 1 || ny >= h - 1) continue;
       if (grid[ny * w + nx] !== WALL) continue;
+      if (ring[ny * w + nx]) continue;
       if (l.doors.some((d) => Math.abs(d.x - nx) + Math.abs(d.y - ny) === 1)) continue;
       grid[ny * w + nx] = FLOOR;
     }
