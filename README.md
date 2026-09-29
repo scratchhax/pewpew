@@ -320,7 +320,7 @@ minutes to start logging after a settings change or a relay restart.
 | `http_host`, `http_port` | `0.0.0.0`, `8080` | the viewer, WebSocket and health endpoints |
 | `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium`, `undergrowth`, `fragnet` or `substrate` (every scene is also at `/<id>/`) |
 | `buffer_size` | `500` | recent events replayed to each newly opened browser |
-| `wan_interfaces` | `[ppp0]` | which gateway interfaces count as WAN, for inbound and outbound. Look at the `IN=`/`OUT=` fields of your firewall log lines; `eth8`–`eth10` are common on UDM and UDR |
+| `wan_interfaces` | `[eth8]` | which gateway interfaces count as WAN, for inbound and outbound. `eth8` fits most UDM and UDR setups on copper; `eth9`/`eth10` also turn up, and a DSL line is usually `ppp0`. Look at the `IN=`/`OUT=` fields of your own firewall log lines |
 | `wan_ips`, `vpn_networks` | empty | optional WAN addresses and VPN networks, for direction and VPN badges |
 | `drop_log_types` | `[]` | log types to hide, e.g. `[system]` |
 | `drop_patterns` | UDM and AP chatter | regexes matched against raw lines and dropped before parsing (see `/drops`) |
@@ -1792,7 +1792,7 @@ Actions** first.
   category under Control Plane → Integrations.
 - **No DNS events:** expected on a stock UniFi gateway; see
   [where each event comes from](#3-send-unifi-logs-to-the-relay).
-- **Inbound and outbound look swapped:** set `wan_interfaces` in `relay.yaml`.
+- **Inbound and outbound look swapped:** set `wan_interfaces` in `relay.yaml`. It ships as `[eth8]`, which is right for most UDM and UDR gateways; a DSL line wants `[ppp0]`.
 - **Red connection dot, or DEMO DATA on screen:** the viewer isn't on the live
   feed. Open it from the relay's own address (`http://<relay-host>:8080/`)
   without `?demo=1`; the Pages demo and the dev server's `?demo=1` are always
