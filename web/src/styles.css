@@ -280,8 +280,12 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
 @keyframes spIn { from { opacity: 0; } to { opacity: 1; } }
 .sp-panel { width: min(980px, 94vw); padding: 22px 26px 16px; background: rgba(6, 10, 20, 0.94);
   clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px); }
-.sp-head { font-size: 15px; letter-spacing: 4px; color: var(--accent); margin-bottom: 16px; }
-.sp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.sp-head { font-size: 15px; letter-spacing: 4px; color: var(--accent); margin-bottom: 16px;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.sp-total { font-size: 10px; letter-spacing: 2px; opacity: 0.55; }
+/* auto-FILL, not auto-fit: a last page holding two cards keeps them the same
+   width as a full page instead of stretching them across the panel. */
+.sp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
 .sp-card { position: relative; text-align: left; font-family: inherit; color: inherit; cursor: pointer;
   display: flex; flex-direction: column; gap: 8px; padding: 18px 16px 20px; min-height: 150px;
   background: linear-gradient(160deg, color-mix(in srgb, var(--scene) 18%, #0a0f1c), #070a14);
@@ -293,6 +297,24 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
 .sp-title { font-size: 18px; font-weight: bold; letter-spacing: 2px; color: var(--scene); }
 .sp-blurb { font-size: 12px; line-height: 1.5; opacity: 0.8; }
 .sp-now { margin-top: auto; font-size: 10px; letter-spacing: 2px; color: var(--scene); }
-.sp-foot { margin-top: 14px; font-size: 10px; letter-spacing: 1px; opacity: 0.5; text-align: right; }
+.sp-foot { margin-top: 14px; display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; }
+.sp-keys { font-size: 10px; letter-spacing: 1px; opacity: 0.45; text-align: right; margin-left: auto; }
+
+/* The pager is the one control people have to find, so it reads as a control:
+   real buttons, a clear current page, and hit targets a kiosk remote can land on. */
+.sp-pager { display: flex; align-items: center; gap: 10px; }
+.sp-step { font-family: inherit; font-size: 18px; line-height: 1; cursor: pointer;
+  width: 34px; height: 30px; color: var(--accent); background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: background 0.2s, border-color 0.2s; }
+.sp-step:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); border-color: var(--accent); }
+.sp-dots { display: flex; align-items: center; gap: 7px; }
+.sp-dot { width: 10px; height: 10px; padding: 0; cursor: pointer; border-radius: 50%;
+  background: transparent; border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  transition: background 0.2s, transform 0.2s; }
+.sp-dot:hover { transform: scale(1.25); }
+.sp-dot.on { background: var(--accent); border-color: var(--accent); }
+.sp-count { font-size: 10px; letter-spacing: 2px; color: var(--accent); opacity: 0.8; }
 #scene-veil { position: fixed; inset: 0; z-index: 40; background: #000; opacity: 0; transition: opacity 0.4s ease-in; pointer-events: none; }
 #scene-picker[hidden] { display: none; }   /* the id rule above would otherwise override the hidden attribute */
