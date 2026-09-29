@@ -202,10 +202,13 @@ export interface TexTable {
  *  `role3`, ...), so sectors can pick each room its own look. */
 export const WANT = {
   flats: { floor: ['FLAT10', 'FLOOR4_8', 'FLOOR1', 'FLAT6'], ceil: ['FLAT1', 'CEIL3_3', 'CEIL5_1', 'CEIL4_3'],
-    hellFloor: ['FLAT8', 'LAVA3'], hellCeil: ['FLAT5', 'LAVA1', 'ROCK1'],
+    hellFloor: ['FLAT8', 'LAVA3'],
+    // no lava overhead: LAVA1 here is what put a burning ceiling over hell rooms
+    hellCeil: ['FLAT5', 'ROCK1'],
     techFloor: ['FLAT4', 'FLOOR0_1', 'FLOOR7_1'], exitFloor: ['FLOOR6_1', 'FLAT14', 'FLOOR4_6'],
     exitCeil: ['FLOOR6_2', 'FLAT20', 'CEIL4_2'],
-    lampCeil: ['FLAT14', 'CEIL5_2', 'FLAT20', 'CEIL4_3'] },
+    // a lit ceiling wants a bright lump; FLAT14 is a near-black blue
+    lampCeil: ['CEIL5_2', 'CEIL4_3', 'FLAT20'] },
   walls: { tech: ['TEKWALL1', 'TEKBLUE', 'COMP2', 'TEKWALL4'], brick: ['BRICK8', 'BRICK1', 'BRICK12', 'METAL1', 'WALL2'],
     hell: ['SLADWALL', 'A-DROCK1', 'ROCK1', 'HELL5'], door: ['DOOR1', 'DOOR3', 'DOOR2'],
     exit: ['EXITDOOR', 'DOOR5', 'DOOR9', 'DOOR1'], exitSign: ['EXITSIGN', 'EXITSGN2'] },

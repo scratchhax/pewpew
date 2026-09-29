@@ -34,10 +34,27 @@ export interface ActorHooks {
 const WALK = ['A', 'B', 'C', 'D'];
 const PAIN = ['E', 'F'];
 const DEATH = ['H', 'I', 'J', 'K', 'L', 'M'];
+/**
+ * The renderer draws a full-height wall as four world units of 32 texels each,
+ * so one world unit is 32 map units and a sprite's own pixel height is its
+ * size. Everything below is derived from that rather than guessed: an imp is
+ * 60 texels, which is 1.88 units, and the 2.5 it used to be hardcoded at stood
+ * it a third taller than the corridor. Frame heights also vary between walk
+ * frames (60, 61, 62, 63), so a fixed scale stretched each one to the same
+ * height and the imp pulsed as it walked.
+ */
+const TEXELS_PER_UNIT = 32;
+const worldH = (f: SprFrame): number => f.h / TEXELS_PER_UNIT;
+
 /** demon body radius in world units - keeps the billboard off the wall faces */
 const R = 0.35;
-/** Demons keep at least this far apart, so a spawn run never stacks. */
-const SEP = 0.85;
+/**
+ * How far apart two demons stay. This is a *visual* distance, not a physical
+ * one: an imp billboard is about 48 texels wide, which is one and a half
+ * world units, so anything closer than that leaves the sprites intersecting
+ * even though the bodies never touch.
+ */
+const SEP = 1.25;
 
 /** true when a body of radius R centered at (x,z) fits entirely in open cells */
 function fits(level: Level, x: number, z: number): boolean {
@@ -276,7 +293,7 @@ export class Actors {
     }
     for (const f of this.fires) {
       const fr = this.fbFrames.length ? this.fbFrames[((f.t * 12) | 0) % this.fbFrames.length] : null;
-      if (fr) out.push({ x: f.x, z: f.z, frame: fr, scale: 0.9, zBase: 1.2, add: true });
+      if (fr) out.push({ x: f.x, z: f.z, frame: fr, scale: worldH(fr), zBase: 1.2, add: true });
     }
     for (const g of this.gibs) {
       if (!this.gore) continue;
@@ -285,7 +302,7 @@ export class Actors {
     for (const p of this.pickups) {
       const fr = p.kind === 'health' ? this.healthFrame : this.ammoFrame;
       if (!fr) continue;
-      out.push({ x: p.x, z: p.z, frame: fr, scale: p.kind === 'health' ? 0.35 : 0.3, zBase: 0.05 + Math.sin(p.t * 2.4) * 0.05 });
+      out.push({ x: p.x, z: p.z, frame: fr, scale: worldH(fr), zBase: 0.05 + Math.sin(p.t * 2.4) * 0.05 });
     }
     for (const pl of this.plates) {
       out.push({ x: pl.x, z: pl.z, rgba: pl.rgba, scale: 0.42, zBase: 1.3, alpha: Math.min(1, pl.life / 4) });
@@ -297,7 +314,7 @@ export class Actors {
       if (d.state === 'die') frame = frames[Math.min(frames.length - 1, ((d.t / 0.12) | 0) % frames.length)];
       else if (d.state === 'corpse') frame = frames[frames.length - 1];
       else frame = frames[((d.anim / 0.34) | 0) % frames.length];
-      out.push({ x: d.x, z: d.z, frame, scale: 2.5 });
+      out.push({ x: d.x, z: d.z, frame, scale: worldH(frame) });
     }
     return out;
   }
