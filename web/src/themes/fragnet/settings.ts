@@ -28,13 +28,13 @@ export const FRAGNET_DEFAULTS = {
 
   // scene budgets = the HIGH preset
   dMapSize: 32,         // maze edge in cells
-  dPixRes: 200,         // 200 = 320x200 classic, 400 = 640x400 hi-res
+  dPixRes: 400,         // target rows; the buffer is sized to the window
 };
 
 export const FRAGNET_BUDGETS: Budgets = {
   low: { dMapSize: 20, dPixRes: 200 },
   medium: { dMapSize: 26, dPixRes: 200 },
-  high: { dMapSize: 32, dPixRes: 200 },
+  high: { dMapSize: 32, dPixRes: 400 },
   ultra: { dMapSize: 48, dPixRes: 400 },
 };
 
@@ -65,7 +65,7 @@ export const FRAGNET_CONTROLS = {
   ],
   budgets: [
     range('dMapSize', 'Maze size (cells)', 12, 56, 2),
-    { kind: 'select', key: 'dPixRes', label: 'Screen', options: [['200', '320×200 (classic)'], ['400', '640×400 (hi-res)']], numeric: true } as Control,
+    { kind: 'select', key: 'dPixRes', label: 'Screen', options: [['200', 'Chunky (classic)'], ['400', 'Sharp (hi-res)']], numeric: true } as Control,
   ],
   color: [],
 };
