@@ -4,7 +4,8 @@ import type { SceneEvent } from '../../events';
 import { hash01, isInternalIp } from '../../state';
 import { SUBSTRATE_DEFAULTS, SUBSTRATE_BUDGETS, SUBSTRATE_CONTROLS, SUBSTRATE_HUD } from './settings';
 import { Plate, type CrackKind, type Seed } from './crack';
-import { View } from './view';
+import { View, paperLook } from './view';
+import { BASE_PIGMENT, STUDIES, castPigments, type Study } from './palette';
 import { substrateScore } from './score';
 import './hud.css';
 
@@ -48,24 +49,8 @@ const LAW: Record<CrackKind | 'dns' | 'dhcp', number> = {
   system: 0x7d99b3,
 };
 
-/**
- * Each kind's pigment is a range rather than the single colour the law names,
- * running from a deep tone to a light one without ever leaving its own hue
- * family. Where an event lands in its range comes from the traffic — which
- * host, which domain — and that is what stops a plate from being one flat
- * colour: most of any real network is permitted traffic, and a picture painted
- * in exactly one green is a monotonous picture however correct it is. Block
- * still reads red, DNS still reads blue; there is just more than one of each.
- */
-const PIGMENT: Record<CrackKind | 'dns' | 'dhcp', [number, number]> = {
-  allow: [0x1f7d5c, 0xa6e87a],
-  block: [0xa32323, 0xff8f6b],
-  threat: [0xb85a08, 0xffb257],
-  dns: [0x1f5f9e, 0x86cdff],
-  dhcp: [0xa87c08, 0xffe487],
-  wifi: [0x5f3aa8, 0xd8b4ff],
-  system: [0x4a555f, 0xb0bcc6],
-};
+/** Pigment ranges and the per-picture studies live in ./palette. */
+type PigmentKind = keyof typeof BASE_PIGMENT;
 
 /** Ports that carry the bulk of ordinary traffic, and so draw boulevards. */
 const ARTERIAL = new Set([53, 80, 123, 443, 853, 8443]);
@@ -120,6 +105,11 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
   let drawAt = 0;
 
   function restart(): void {
+    // The study has already been chosen, at the start of the wash, and the
+    // background has been easing toward its paper all the way through it — so
+    // by the time we get here the sheet on screen is already the right colour
+    // and clearing the plate to it changes nothing visible.
+    applyPaper();
     plate.clear();
     view.clearPlate();
     view.setPictureAlpha(1);
@@ -140,11 +130,58 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
     view.setGrainSize(2.2 * Math.max(0.7, settings.cGridScale));
     restart();
   }
-  /** The plate darkness drives the HUD too, via a body attribute the CSS reads. */
-  function applyPaper(): void {
-    view.setPaper(settings.cPaper);
-    document.body.dataset.subPaper = settings.cPaper < 0.5 ? 'light' : 'dark';
+  // ── the sheet ─────────────────────────────────────────────────────────────
+  // Start somewhere random in the rotation so two screens side by side, or the
+  // same screen after a reload, are not drawing the same study in step.
+  let studyIdx = (Math.random() * STUDIES.length) | 0;
+  let study: Study = STUDIES[studyIdx];
+  let pigment = castPigments(study);
+  /** The paper actually on screen, and the two ends of the wash cross-fade. */
+  let paperNow = study.paper;
+  let washFrom = paperNow;
+  let washTo = paperNow;
+
+  /** The paper the current sheet calls for, rotation on or off. */
+  function sheetPaper(): number {
+    return settings.cRotate ? study.paper : paperLook(settings.cPaper).paper;
   }
+
+  /**
+   * Put the current sheet on: paper, ink, and the HUD, which follows via a body
+   * attribute the theme CSS reads. With rotation off this is the Plate darkness
+   * knob instead, so the manual control still means something.
+   */
+  function applyPaper(): void {
+    if (settings.cRotate) {
+      view.setLook({
+        paper: study.paper, line: study.ink,
+        lineAlpha: study.inkAlpha, additive: study.additive,
+      });
+      document.body.dataset.subPaper = study.dark ? 'dark' : 'light';
+    } else {
+      const look = paperLook(settings.cPaper);
+      view.setLook(look);
+      document.body.dataset.subPaper = settings.cPaper < 0.5 ? 'light' : 'dark';
+    }
+    paperNow = sheetPaper();
+  }
+
+  /** Blend two packed colours, for easing the sheet from one study to the next. */
+  function mixRgb(a: number, b: number, k: number): number {
+    const q = (s: number, e: number): number => ((s + (e - s) * k) | 0) & 0xff;
+    return (q((a >> 16) & 0xff, (b >> 16) & 0xff) << 16)
+         | (q((a >> 8) & 0xff, (b >> 8) & 0xff) << 8)
+         | q(a & 0xff, b & 0xff);
+  }
+
+  /** The next sheet in the rotation, chosen as a picture ends. */
+  function nextStudy(): void {
+    if (!settings.cRotate) return;
+    studyIdx = (studyIdx + 1) % STUDIES.length;
+    study = STUDIES[studyIdx];
+    pigment = castPigments(study);
+  }
+
   applyPaper();
   resize();
   app.renderer.on('resize', () => resize());
@@ -161,7 +198,7 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
   // ── the event law ─────────────────────────────────────────────────────────
 
   /** Rolling colour of the network, for the cracks that fill in quiet moments. */
-  let moodKind: keyof typeof PIGMENT = 'allow';
+  let moodKind: PigmentKind = 'allow';
   let threatUntil = 0;
   let simT = 0;
 
@@ -170,8 +207,8 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
    * tone of the same hue, so the picture has depth without ever lying about
    * what an event was.
    */
-  function tone(kind: keyof typeof PIGMENT, k: number): number {
-    const [lo, hi] = PIGMENT[kind];
+  function tone(kind: PigmentKind, k: number): number {
+    const [lo, hi] = pigment[kind];
     const t = k < 0 ? 0 : k > 1 ? 1 : k;
     const q = (s: number, e: number): number => ((s + (e - s) * t) | 0) & 0xff;
     return (q((lo >> 16) & 0xff, (hi >> 16) & 0xff) << 16)
@@ -458,11 +495,18 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
         phase = 'fade';
         phaseT = 0;
         audio.sfx('wash');
+        // choose the next sheet now, so the wash can ease onto its paper
+        // rather than the colour changing at the moment the plate clears
+        washFrom = paperNow;
+        nextStudy();
+        washTo = sheetPaper();
       }
     } else {
       // and washes away — eased both ends, never a cut or a flash
       const k = Math.min(1, phaseT / FADE_S);
-      view.setPictureAlpha(1 - k * k * (3 - 2 * k));
+      const e = k * k * (3 - 2 * k);
+      view.setPictureAlpha(1 - e);
+      view.setBg(mixRgb(washFrom, washTo, e));
       if (k >= 1) restart();
     }
 
@@ -506,6 +550,7 @@ async function create(host: ThemeHost<typeof SUBSTRATE_DEFAULTS>,
       let live = 0;
       for (const c of plate.cracks) if (c.alive) live++;
       return {
+        study: settings.cRotate ? study.name : 'fixed',
         cracks: `${live}/${plate.cracks.length}`,
         seeds: plate.seeds.size,
         grains: view.lastGrains,

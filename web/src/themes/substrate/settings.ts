@@ -23,7 +23,8 @@ export const SUBSTRATE_DEFAULTS = {
   cCycleSec: 120,        // seconds of growth before the picture is finished
   cInk: 1,               // pigment strength (sand alpha multiplier)
   cCurve: 1,             // how much the cracks wander, × the traffic-driven range
-  cPaper: 0,             // 0 = warm paper, 1 = dark plate
+  cRotate: true,         // a different paper and pigment cast per picture
+  cPaper: 0,             // 0 = warm paper, 1 = dark plate (when not rotating)
 
   // soundtrack
   cNib: 0.8,             // the drawing itself: nib on paper
@@ -41,6 +42,19 @@ export const SUBSTRATE_DEFAULTS = {
 export type SubstrateSettings = CoreSettings & typeof SUBSTRATE_DEFAULTS;
 
 /**
+ * The tiers stay close together on purpose, and LOW overrides the renderer's
+ * own `renderScale`.
+ *
+ * Every other scene is shading pixels or pushing geometry, so dropping
+ * resolution is the right lever for them. Substrate is not: per frame it walks
+ * a few hundred cells of Int32Array and stamps some soft dots into a texture
+ * that is never cleared, and none of that gets cheaper with fewer pixels.
+ * What resolution *does* buy here is the whole look — a hairline lattice and a
+ * graded wash — so the first cut of LOW (0.6 render scale over a 0.6-scale
+ * lattice, 16 grains a stroke) threw away the gradients to save work the scene
+ * was not doing. Theme budgets are spread over the renderer preset in
+ * `applyTier`, which lets a scene say so.
+ *
  * A crack advances 0.42 of a cell per step, and `cSteps` counts steps per
  * 1/60s of REAL time rather than per frame, so a slow screen takes bigger
  * steps and finishes the same picture in the same two minutes. It is still
@@ -50,8 +64,8 @@ export type SubstrateSettings = CoreSettings & typeof SUBSTRATE_DEFAULTS;
  * seconds, before any lattice exists for it to stop against.
  */
 export const SUBSTRATE_BUDGETS: Budgets = {
-  low: { cDensity: 110, cGrains: 16, cSteps: 0.49, cGridScale: 0.6, cMaxGrains: 8000 },
-  medium: { cDensity: 160, cGrains: 28, cSteps: 0.6, cGridScale: 0.8, cMaxGrains: 20000 },
+  low: { cDensity: 150, cGrains: 40, cSteps: 0.7, cGridScale: 0.85, cMaxGrains: 16000, renderScale: 0.85 },
+  medium: { cDensity: 175, cGrains: 52, cSteps: 0.72, cGridScale: 1, cMaxGrains: 28000, renderScale: 1 },
   high: { cDensity: 200, cGrains: 64, cSteps: 0.75, cGridScale: 1, cMaxGrains: 48000 },
   ultra: { cDensity: 360, cGrains: 96, cSteps: 0.65, cGridScale: 1.25, cMaxGrains: 90000 },
 };
@@ -79,7 +93,10 @@ export const SUBSTRATE_CONTROLS = {
     range('cGridScale', 'Lattice resolution', 0.5, 1.5, 0.05),
     range('cMaxGrains', 'Grains per frame', 4000, 120000, 2000),
   ],
-  color: [range('cPaper', 'Plate darkness', 0, 1, 0.05)],
+  color: [
+    toggle('cRotate', 'A new paper each picture'),
+    range('cPaper', 'Plate darkness', 0, 1, 0.05),
+  ],
   audio: [
     range('cNib', 'Drawing', 0, 1, 0.05),
     range('cRoom', 'Room', 0, 1, 0.05),

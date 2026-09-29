@@ -175,11 +175,12 @@ export class View {
     this.clearPlate();
   }
 
-  setPaper(t: number): void {
-    this.look = paperLook(t);
-    this.grains.blendMode = this.look.additive ? 'add' : 'normal';
+  /** Set the sheet: paper, ink and whether pigment stains or brightens. */
+  setLook(look: PaperLook): void {
+    this.look = look;
+    this.grains.blendMode = look.additive ? 'add' : 'normal';
     if (this.screenW) {
-      this.bg.clear().rect(0, 0, this.screenW, this.screenH).fill({ color: this.look.paper });
+      this.bg.clear().rect(0, 0, this.screenW, this.screenH).fill({ color: look.paper });
     }
   }
 
@@ -192,6 +193,12 @@ export class View {
     this.app.renderer.render({
       container: this.empty, target: this.ink, clear: true, clearColor: [0, 0, 0, 0],
     });
+  }
+
+  /** Repaint just the sheet behind the picture, for the wash cross-fade. */
+  setBg(color: number): void {
+    if (!this.screenW) return;
+    this.bg.clear().rect(0, 0, this.screenW, this.screenH).fill({ color });
   }
 
   /** How much of the picture is showing, 0..1 — the cycle fades this. */
