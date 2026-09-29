@@ -25,6 +25,11 @@ your own traffic. Pick a scene per screen:
   growing filaments that weave a mat across the loam — permitted traffic runs
   through it as travelling light, habit decides the roads, mushrooms fruit at
   busy junctions, and it's all still there when you reload
+- **Substrate**: your network draws on paper, in the manner of Jared Tarbell's
+  old *Substrate* screensaver — every flow is a crack that leaves the last one
+  at a right angle and stops dead where it meets another, hosts plant the
+  seeds the whole plan grows out of, and pigment bleeds off each line into the
+  spaces between. One picture every couple of minutes, then a fresh one
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -46,6 +51,8 @@ and never touches the network itself.
 | ![mycelium](docs/mycelium.png) | ![mycelium blight](docs/mycelium-blight.png) |
 | **Undergrowth** | **Undergrowth: deep in the shell** |
 | ![undergrowth](docs/undergrowth.png) | ![undergrowth from closer in](docs/undergrowth-jelly.png) |
+| **Substrate** | **Substrate: the plate part-drawn** |
+| ![substrate](docs/substrate.png) | ![substrate part-drawn](docs/substrate-early.png) |
 
 | Midnight Run | Packet Rush | Last Outpost | Undergrowth |
 |---|---|---|---|
@@ -60,6 +67,7 @@ traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew
 [Aquarium](https://scratchhax.github.io/pewpew/?theme=aquarium) ·
 [The Gibson](https://scratchhax.github.io/pewpew/?theme=gibson) ·
 [Mycelium](https://scratchhax.github.io/pewpew/?theme=mycelium) ·
+[Substrate](https://scratchhax.github.io/pewpew/?theme=substrate) ·
 Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 
 ## Contents
@@ -68,7 +76,7 @@ Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - [Highlights](#highlights)
 - [Setup](#setup): [Relay](#1-start-the-relay) · [Viewer](#2-build-the-viewer) · [UniFi logging](#3-send-unifi-logs-to-the-relay) · [Check it's working](#4-check-its-working) · [`relay.yaml`](#relayrelayyaml)
 - [Using pewpew](#using-pewpew): [Keys](#keys) · [Switching scenes](#switching-scenes) · [Log inspector](#log-inspector) · [Settings](#settings-f1)
-- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [Mycelium](#mycelium) · [Undergrowth](#undergrowth)
+- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [Mycelium](#mycelium) · [Undergrowth](#undergrowth) · [Substrate](#substrate)
 - [Sound](#sound)
 - [Performance and quality](#performance-and-quality)
 - [URL parameters](#url-parameters)
@@ -104,9 +112,9 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
 
 ## Highlights
 
-- **Nine scenes, one relay.** Every screen picks its own scene, so the kiosk
+- **Eleven scenes, one relay.** Every screen picks its own scene, so the kiosk
   in the hall and the laptop on your desk can show different worlds at the same
-  time. Three are 2D (PixiJS) and five are full 3D (three.js); a screen only
+  time. Five are 2D (PixiJS) and six are full 3D (three.js); a screen only
   downloads the renderer its scene uses.
 - **A readable picture.** Each event type has one fixed colour in every scene
   and in the log: block is red, allow green, DNS blue, DHCP yellow, Wi-Fi
@@ -303,7 +311,7 @@ minutes to start logging after a settings change or a relay restart.
 |-----|---------|--------------|
 | `syslog_bind`, `syslog_port` | `0.0.0.0`, `5514` | where syslog (UDP) is received |
 | `http_host`, `http_port` | `0.0.0.0`, `8080` | the viewer, WebSocket and health endpoints |
-| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium` or `undergrowth` (every scene is also at `/<id>/`) |
+| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium`, `undergrowth` or `substrate` (every scene is also at `/<id>/`) |
 | `buffer_size` | `500` | recent events replayed to each newly opened browser |
 | `wan_interfaces` | `[ppp0]` | which gateway interfaces count as WAN, for inbound and outbound. Look at the `IN=`/`OUT=` fields of your firewall log lines; `eth8`–`eth10` are common on UDM and UDR |
 | `wan_ips`, `vpn_networks` | empty | optional WAN addresses and VPN networks, for direction and VPN badges |
@@ -334,7 +342,7 @@ included). `python3 relay/test_cef.py` self-checks the CEF parser, and
 ![scene picker](docs/scene-picker.png)
 
 Press **F2** for the scene picker. Click a card, use the arrow keys and Enter,
-or press the number on the card; if there are ever more than nine scenes,
+or press the number on the card; there are more than nine scenes, so
 **0** flips between pages. Esc closes it. The **Scene** dropdown at the top of
 the F1 panel does the same. The screen fades out and loads the new scene.
 
@@ -348,7 +356,7 @@ different screens can show different scenes at once:
 | URL | Scene |
 |-----|-------|
 | `http://<relay-host>:8080/` | this screen's saved pick, or else the relay's `default_theme` |
-| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/`, `/gibson/`, `/mycelium/`, `/undergrowth/` | that scene (unknown names are a 404) |
+| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/`, `/gibson/`, `/mycelium/`, `/undergrowth/`, `/substrate/` | that scene (unknown names are a 404) |
 | any URL + `?theme=racing` | that scene (handy on the Pages demo) |
 
 The viewer checks the URL path, then `?theme=`, then the screen's saved pick,
@@ -403,7 +411,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, flight speed, bioluminescence, spore drift, and hypha half-life |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: zombies, hordes, supply runs, couriers, DNS radio, DHCP arrivals, AP buildings, day/night, rain, blood, screen shake, move with the music. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, flight speed, bioluminescence, spore drift, and hypha half-life. Substrate: allow cracks, block scars, threat fractures, DNS blooms, DHCP seeds, Wi-Fi drift, host seeding, the pigment wash, crack hairlines, naming the busiest district, a new paper each picture, plus seconds per picture, pigment strength and wander |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -411,7 +419,7 @@ panel's **Apply & reload**.
 
 ## Scenes
 
-All nine scenes draw the same events with the same colours. Each has its own
+All eleven scenes draw the same events with the same colours. Each has its own
 HUD, sound and settings.
 
 ### Orbital Command
@@ -708,7 +716,7 @@ only make sense in the dark switch to thermal when the target is in daylight.
 | ![night vision](docs/spy-eye.png) | ![thermal](docs/spy-thermal.png) | ![daylight](docs/spy-day.png) |
 
 Everything is built in code: the planet and its city lights, the satellites,
-the nine scenes and every person in them. Nothing flashes: the enhance steps,
+the eleven scenes and every person in them. Nothing flashes: the enhance steps,
 scan lines, boxes and stamp all ease in. In F1 → Scene, **Eye of god** turns
 the taskings off, **Eye: threats in a minute** sets the threat trigger, and
 **Eye: random sweep every (min)** sets how often a random sweep comes round
@@ -979,6 +987,80 @@ keeps showing you the news.
 from above share one organism: the mushrooms you pass on the ride are the
 mushrooms on the floor, the half-life fading is the same fading, and
 **Keep the garden** is one switch for both.
+
+### Substrate
+
+![substrate](docs/substrate.png)
+
+A drawing, made once and thrown away. Substrate is pewpew's take on Jared
+Tarbell's *Substrate* — the generative piece that became one of the great
+screensavers — and it is the only scene here with an ending: it fills a sheet
+of warm paper over a couple of minutes, holds the finished picture still long
+enough to be looked at, washes gently back to blank, and starts a different
+one.
+
+The rule underneath it is tiny. Every cell of the plate remembers the heading
+of the crack that claimed it, and nothing else exists. A new crack finds a
+cell that is already claimed and sets off at **ninety degrees** to whatever
+claimed it; it runs almost straight, claiming as it goes; and the moment it
+meets a cell held at a different angle it stops dead and another starts
+elsewhere. Nobody ever draws a rectangle — the blocks, the long avenues and
+the crowded quarters are all just cracks getting in each other's way.
+
+What makes it yours is that nothing grows unless the network does. **Every
+crack is one real event**, and it carries that event with it:
+
+| | |
+|---|---|
+| **where it starts** | hosts plant the seed cells the whole plan grows out of, and a seed's position is a hash of its IP — so the same LAN lays the plate out the same way every time, and a chatty device visibly builds out its own quarter |
+| **which way it turns** | outbound traffic turns one way off the crack it was born on, inbound the other, so the grain of the finished picture shows which way your network mostly talks |
+| **how straight it runs** | the ports that carry everything (443, 80, 53, 22) draw near-dead-straight boulevards; odd ports wander, each in its own way |
+| **its colour** | the colour law, but as a range rather than one flat tone — where an event lands in its range comes from the host or the domain, so a plate has depth without ever lying about what an event was |
+| **how restless the whole plate is** | sustained pressure widens every crack's wander, so a network under attack crazes instead of drawing streets |
+
+| Event | On the plate |
+|-------|--------------|
+| allow | a crack sets off from its host's district and runs until it meets another |
+| block | a short, agitated crack in red that leaves a **wall** behind it — later cracks die against it, so a firewall rule slowly becomes a boundary in the city |
+| threat | a fracture with no curvature at all, cutting clean across whatever has already been built |
+| dns | pigment pools at a junction, in a shade picked by the domain (violet-grey when the lookup was blocked) |
+| dhcp | a lease plants a **new seed**, a new origin for the lattice to grow from |
+| wifi | pigment drifts off the access point, going nowhere |
+| system | a faint grey drift at the gateway |
+
+The colour is Tarbell's sand painter: from each crack, a run of translucent
+grains is laid sideways into the open space beside it, densest and strongest
+against the line and fading out. Where two cracks nearly touch you get a tight
+rim; where a quarter has just been opened you get a broad wash.
+
+**Every picture gets its own sheet.** Six studies rotate — foolscap, blueprint,
+sepia, verdigris, rose madder, and a nocturne on near-black — each with its own
+paper, its own ink, and a cast that is rotated through every pigment on the
+plate. The colour law survives it, because the cast moves every pigment
+together: block is still the reddest thing on the sheet and DNS still the
+bluest, whichever study is up, and the HUD and the log keep the exact law
+colours so the reference never moves. The paper eases from one study to the
+next across the wash, so a picture never changes colour in a jump.
+
+**Seconds per picture** sets the cycle (two minutes by default). **Pigment
+strength** and **Wander** are the two knobs worth playing with. Turn **A new
+paper each picture** off and **Plate darkness** takes over instead, turning the
+sheet over to a dark plate by hand — the HUD follows it either way.
+
+**Its sound is a quiet room with someone drawing in it.** No beat and no band:
+what carries the scene is the drawing itself, a susurrus of nib ticks whose
+rate follows how many cracks are actually growing, so the plate gets audibly
+busier as it fills. Under that is a room — a breath of air and a very low
+drone moving through four chords minutes apart. Events are small and close: a
+pencil tick for a permitted flow, the nib catching and tearing on a block, a
+struck low string for a fracture, a music-box note where DNS pools, a woody
+pluck when a lease plants a seed.
+
+It is the only score here with an ending, because it is the only scene with
+one. When the picture is finished the drawing stops, a low gong marks it, and
+the room is left with just air while the plate washes away — then a single
+sheet-laid tick starts the next one. **Drawing**, **Room** and **Notes** on the
+Audio tab set the three levels.
 
 ## Sound
 
@@ -1309,6 +1391,7 @@ two volumes of its own:
 | The Gibson | **Access sounds**, **Hum & static** |
 | Mycelium | **Bells**, **Undergrowth & drone** |
 | Undergrowth | **Mycelium's score** (shared garden) **+ pulse whoosh** |
+| Substrate | **Drawing** (nib on paper), **Room** (air & drone), **Notes** |
 
 Each scene keeps its own choices.
 
@@ -1456,7 +1539,7 @@ been measured on a Pi yet.
 
 | Parameter | Effect |
 |-----------|--------|
-| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium` or `undergrowth` |
+| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium`, `undergrowth` or `substrate` |
 | `?demo=1` | synthetic traffic, no relay needed |
 | `?showreel=1` | with the demo: a looping 60-second calm → build → hurricane → cooldown arc |
 | `?rate=40` | with the demo: about 40 events per second |

@@ -1,0 +1,94 @@
+/* Substrate: the only scene that is bright by default, so the HUD is ink on
+   paper rather than glass in the dark. `data-sub-paper` is set by the theme
+   from the Plate darkness knob, so turning the plate dark takes the HUD with
+   it instead of leaving dark text on a dark field. Loaded only with this theme. */
+
+body[data-theme="substrate"] #sub-host {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 8;
+}
+
+body[data-theme="substrate"] .sub-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font: 10px/1 ui-monospace, monospace;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 1.6s ease;
+  transform-origin: 0 0;
+}
+
+/* ── ink on paper (the default plate) ─────────────────────────────────────── */
+
+body[data-theme="substrate"][data-sub-paper="light"] #hud { color: #3a3128; }
+
+body[data-theme="substrate"][data-sub-paper="light"] #scanlines { opacity: 0.05; }
+
+body[data-theme="substrate"][data-sub-paper="light"] .panel {
+  background: linear-gradient(165deg, rgba(250,246,238,0.82), rgba(236,229,216,0.7));
+  clip-path: none;
+  border: 1px solid rgba(58,49,40,0.22);
+  border-radius: 2px;
+  filter: drop-shadow(0 1px 3px rgba(58,49,40,0.14));
+  padding: 9px 14px 11px;
+}
+
+body[data-theme="substrate"][data-sub-paper="light"] .panel-head {
+  color: #6b5a45;
+  border-bottom: 1px solid rgba(58,49,40,0.18);
+  letter-spacing: 4px;
+}
+
+/* the targeting brackets become faint pencil ticks */
+body[data-theme="substrate"][data-sub-paper="light"] .corner {
+  width: 7px;
+  height: 7px;
+  border-color: rgba(58,49,40,0.35);
+  filter: none;
+  opacity: 0.7;
+}
+
+body[data-theme="substrate"][data-sub-paper="light"] #weather { color: #7a5c2e; }
+body[data-theme="substrate"][data-sub-paper="light"] .stat-row b { color: #4a3d2e; }
+body[data-theme="substrate"][data-sub-paper="light"] .sub-label { color: #4a3d2e; }
+
+/* the log keeps the colour law, but darkened enough to read on paper */
+body[data-theme="substrate"][data-sub-paper="light"] .log-block { color: #c4302f; text-shadow: none; }
+body[data-theme="substrate"][data-sub-paper="light"] .log-threat { color: #a85c05; text-shadow: none; }
+body[data-theme="substrate"][data-sub-paper="light"] .log-dns { color: #1f6fb0; text-shadow: none; }
+body[data-theme="substrate"][data-sub-paper="light"] .log-dhcp { color: #8a6a00; text-shadow: none; }
+body[data-theme="substrate"][data-sub-paper="light"] .log-wifi { color: #6b45a8; text-shadow: none; }
+body[data-theme="substrate"][data-sub-paper="light"] .log-system { color: #5c6670; text-shadow: none; }
+
+/* ── the dark plate ──────────────────────────────────────────────────────── */
+
+body[data-theme="substrate"][data-sub-paper="dark"] #hud { color: #d8cdbd; }
+
+body[data-theme="substrate"][data-sub-paper="dark"] .panel {
+  background: linear-gradient(165deg, rgba(14,13,16,0.76), rgba(6,6,8,0.58));
+  clip-path: none;
+  border: 1px solid rgba(216,205,189,0.18);
+  border-radius: 2px;
+  padding: 9px 14px 11px;
+}
+
+body[data-theme="substrate"][data-sub-paper="dark"] .panel-head {
+  color: #bfae94;
+  border-bottom: 1px solid rgba(216,205,189,0.16);
+  letter-spacing: 4px;
+}
+
+body[data-theme="substrate"][data-sub-paper="dark"] .corner {
+  width: 7px;
+  height: 7px;
+  border-color: rgba(216,205,189,0.3);
+  opacity: 0.8;
+}
+
+body[data-theme="substrate"][data-sub-paper="dark"] .sub-label { color: #cbbfa8; }
