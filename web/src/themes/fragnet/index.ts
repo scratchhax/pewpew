@@ -15,6 +15,11 @@ import { CS, EYE, genLevel, findPath, cellsNear, isFloor, type Level } from './l
 import { drawFace } from './art';
 import './hud.css';
 
+/** The marine's body radius, matching the one the demons collide with. */
+const CAM_R = 0.3;
+/** Keep a spawned demon this far inside its cell, so it never straddles a wall. */
+const SPAWN_PAD = 0.45;
+
 /**
  * FRAGNET: your network is Hell. A first-person patrol through a
  * procedural maze in the classic corridor-shooter look - the corridors are
@@ -158,7 +163,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
   let phase: Phase = 'walk';
   let path: Array<[number, number]> | null = null, pathI = 0;
   let lookT = 0, lookBase = 0;
-  let engage: Demon | null = null, fireT = 0, engageT = 0;
+  let engage: Demon | null = null, fireT = 0, engageT = 0, engageStuck = 0;
   let exitT = 0, exitShown = false;
   let bobPhase = 0, hurt = 0, flash = 0, muzzle = 0, faceHurtT = 0, stuckT = 0;
   let growlT = 3;
@@ -230,7 +235,7 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     if (d.state === 'die' || d.state === 'corpse') return false;
     const dx = d.x - camX, dz = d.z - camZ;
     if (Math.hypot(dx, dz) > 11) return false;
-    if (Math.abs(wrap(Math.atan2(dx, dz) - heading)) > 0.18) return false;
+    if (Math.abs(wrap(Math.atan2(dx, dz) - heading)) > 0.26) return false;
     return renderer.los(camX, camZ, d.x, d.z);
   }
 
@@ -245,12 +250,38 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     return best;
   }
 
+  /**
+   * The marine has a body, not a point.
+   *
+   * Movement used to test only the cell the camera's centre landed in, while
+   * the demons tested four corners at their radius. That let the marine slide
+   * flush against geometry until its centre sat exactly on a cell boundary,
+   * and once there every direction it wanted to go was into a wall — it parked
+   * on integer coordinates and never moved again. Same four-corner test as the
+   * demons, so it physically cannot reach that position.
+   */
+  function fitsCam(x: number, z: number): boolean {
+    return isFloor(level, ((x - CAM_R) / CS) | 0, ((z - CAM_R) / CS) | 0)
+      && isFloor(level, ((x + CAM_R) / CS) | 0, ((z - CAM_R) / CS) | 0)
+      && isFloor(level, ((x - CAM_R) / CS) | 0, ((z + CAM_R) / CS) | 0)
+      && isFloor(level, ((x + CAM_R) / CS) | 0, ((z + CAM_R) / CS) | 0);
+  }
+
   /** Creep along the current heading, wall-clipped; negative backs off. */
   function advance(v: number, d: number): void {
     const step = v * d;
     const nx = camX + Math.sin(heading) * step, nz = camZ + Math.cos(heading) * step;
-    if (isFloor(level, (nx / CS) | 0, (camZ / CS) | 0) && !demonInWay(nx, camZ)) camX = nx;
-    if (isFloor(level, (camX / CS) | 0, (nz / CS) | 0) && !demonInWay(camX, nz)) camZ = nz;
+    if (fitsCam(nx, camZ) && !demonInWay(nx, camZ)) camX = nx;
+    if (fitsCam(camX, nz) && !demonInWay(camX, nz)) camZ = nz;
+  }
+
+  /** Is a live demon already standing in this cell? */
+  function cellHasDemon(cx: number, cy: number): boolean {
+    for (const d of actors.demons) {
+      if (d.state === 'die' || d.state === 'corpse') continue;
+      if (((d.x / CS) | 0) === cx && ((d.z / CS) | 0) === cy) return true;
+    }
+    return false;
   }
 
   /** A live demon body blocks the marine from squeezing past it. */
@@ -269,6 +300,12 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     // prefer a cell we can actually see so the marine never fights a wall
     let best: [number, number] | null = null, bs = -Infinity;
     for (const [x, y] of near) {
+      // Never spawn into a cell that already holds one. The score is
+      // deterministic, so a marine that stops moving picks the same winning
+      // cell every time and the whole spawn run lands on identical
+      // coordinates — five imps at one point, reading as a single giant
+      // sprite and walling off the corridor.
+      if (cellHasDemon(x, y)) continue;
       const wx = x * CS + CS / 2, wz = y * CS + CS / 2;
       const len = Math.hypot(wx - camX, wz - camZ) || 1;
       const dot = ((wx - camX) * dirX + (wz - camZ) * dirZ) / len;
@@ -276,7 +313,10 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
       if (score > bs) { bs = score; best = [x, y]; }
     }
     if (!best) return null;
-    const d = actors.spawnDemon(best[0] * CS + CS / 2, best[1] * CS + CS / 2);
+    // and stand them somewhere in the cell rather than dead centre
+    const jx = (Math.random() - 0.5) * (CS - 2 * SPAWN_PAD);
+    const jz = (Math.random() - 0.5) * (CS - 2 * SPAWN_PAD);
+    const d = actors.spawnDemon(best[0] * CS + CS / 2 + jx, best[1] * CS + CS / 2 + jz);
     d.aggro = true;
     return d;
   }
@@ -429,27 +469,37 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
       const dx = engage.x - camX, dz = engage.z - camZ;
       const dist = Math.hypot(dx, dz);
       const want = Math.atan2(dx, dz);
-      heading += wrap(want - heading) * Math.min(1, dtReal * 7);
+      heading += wrap(want - heading) * Math.min(1, dtReal * 9);
       engageT += dtReal;
       fireT -= dtReal;
       const inSight = renderer.los(camX, camZ, engage.x, engage.z);
+      const ex0 = camX, ez0 = camZ;
       if (inSight && dist > 2.2) advance(0.9 * settings.dWalkSpeed, dtReal);
       else if (dist < 1.6) advance(-1.1, dtReal);
       if (fireT <= 0) {
-        if (canShoot(engage) && fireShot()) { actors.hit(engage); fireT = 0.6; }
+        if (canShoot(engage) && fireShot()) { actors.hit(engage); fireT = 0.6; engageStuck = 0; }
         else fireT = 0.15;
       }
+      // Engage used to have no unstick at all — patrol speed is forced to zero
+      // here, so a marine that could neither close nor line up simply stood
+      // there for the full twelve seconds, took another target and stood there
+      // again. Wedged and unable to shoot is a dead end; leave quickly.
+      if (Math.hypot(camX - ex0, camZ - ez0) < 0.004) engageStuck += dtReal;
+      else engageStuck = 0;
       const dead = !actors.demons.includes(engage) || engage.state === 'die' || engage.state === 'corpse';
       if (dead) {
         frags++; fragsLevel++;
         if (settings.dGore) actors.burst(engage.x, engage.z);
         audio.sfx('fragged');
         engage = pickTarget();
-        if (engage) { engageT = 0; fireT = 0.4; }
+        if (engage) { engageT = 0; fireT = 0.4; engageStuck = 0; }
         else phase = fragsLevel >= settings.dFrags ? 'exit' : 'walk';
         path = null;
-      } else if (engageT > 12) {
-        engage = null; phase = 'walk'; path = null;
+      } else if (engageT > 12 || engageStuck > 1.4) {
+        // look around first: it re-aims and then takes a fresh route, rather
+        // than walking straight back into whatever it was jammed against
+        engage = null; engageStuck = 0; path = null;
+        phase = 'look'; lookT = 1.1 + Math.random(); lookBase = heading;
       }
     } else if (phase === 'exit') {
       // the elevator's open: walk to it and ride out
@@ -497,8 +547,8 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
       // never slide through a wall on a corner's diagonal, or through a demon
       const px0 = camX, pz0 = camZ;
       const nx = camX + h2 * step, nz = camZ + h2z * step;
-      if (isFloor(level, (nx / CS) | 0, (camZ / CS) | 0) && !demonInWay(nx, camZ)) camX = nx;
-      if (isFloor(level, (camX / CS) | 0, (nz / CS) | 0) && !demonInWay(camX, nz)) camZ = nz;
+      if (fitsCam(nx, camZ) && !demonInWay(nx, camZ)) camX = nx;
+      if (fitsCam(camX, nz) && !demonInWay(camX, nz)) camZ = nz;
       // parked demon in the corridor: give up the route and look around
       if (Math.hypot(camX - px0, camZ - pz0) < step * 0.25) {
         stuckT += d;

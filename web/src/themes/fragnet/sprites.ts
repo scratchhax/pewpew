@@ -36,6 +36,8 @@ const PAIN = ['E', 'F'];
 const DEATH = ['H', 'I', 'J', 'K', 'L', 'M'];
 /** demon body radius in world units - keeps the billboard off the wall faces */
 const R = 0.35;
+/** Demons keep at least this far apart, so a spawn run never stacks. */
+const SEP = 0.85;
 
 /** true when a body of radius R centered at (x,z) fits entirely in open cells */
 function fits(level: Level, x: number, z: number): boolean {
@@ -187,6 +189,34 @@ export class Actors {
       }
       if (dist < 2.1) { this.hooks.onDamage(4); d.fireT = 1.2; }
     }
+    // Demons have bodies with respect to the marine but, until now, not with
+    // respect to each other — so several could occupy the same point and read
+    // as one oversized sprite while blocking the corridor between them. Push
+    // any overlapping pair apart, within the walls.
+    for (let i = 0; i < this.demons.length; i++) {
+      const a = this.demons[i];
+      if (a.state === 'die' || a.state === 'corpse') continue;
+      for (let j = i + 1; j < this.demons.length; j++) {
+        const b = this.demons[j];
+        if (b.state === 'die' || b.state === 'corpse') continue;
+        let dx = b.x - a.x, dz = b.z - a.z;
+        let sep = Math.hypot(dx, dz);
+        if (sep >= SEP) continue;
+        if (sep < 1e-4) {
+          // exactly coincident: nudge along a stable per-pair direction, or
+          // they stay welded together forever
+          const ang = (i * 2.399 + j * 0.777) % (Math.PI * 2);
+          dx = Math.cos(ang); dz = Math.sin(ang); sep = 1;
+        }
+        const push = (SEP - sep) * 0.5;
+        const ux = (dx / sep) * push, uz = (dz / sep) * push;
+        if (fits(level, a.x - ux, a.z)) a.x -= ux;
+        if (fits(level, a.x, a.z - uz)) a.z -= uz;
+        if (fits(level, b.x + ux, b.z)) b.x += ux;
+        if (fits(level, b.x, b.z + uz)) b.z += uz;
+      }
+    }
+
     // corpses fade out eventually
     for (let i = this.demons.length - 1; i >= 0; i--) {
       const d = this.demons[i];
