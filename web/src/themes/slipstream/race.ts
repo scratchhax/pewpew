@@ -317,6 +317,30 @@ export class Race {
       }
     }
 
+    // karts are solid: shove overlapping pairs apart across the lane, and
+    // the one that barged in from behind scrubbed a touch of speed for it
+    for (let i = 0; i < this.racers.length; i++) {
+      for (let j = i + 1; j < this.racers.length; j++) {
+        const a = this.racers[i], b = this.racers[j];
+        let ds = (b.s - a.s) % tr.total;
+        if (ds > tr.total / 2) ds -= tr.total;
+        if (ds < -tr.total / 2) ds += tr.total;
+        if (Math.abs(ds) > 3.6) continue;
+        const minLat = 4.0;
+        const dl = a.lat - b.lat;
+        if (Math.abs(dl) > minLat) continue;
+        const push = (minLat - Math.abs(dl)) * 0.5 + 0.02;
+        const dir = dl > 0 ? 1 : dl < 0 ? -1 : (a.seat < b.seat ? -1 : 1);
+        a.lat += dir * push; b.lat -= dir * push;
+        const lim = tr.width * 0.5 - 1;
+        a.lat = Math.max(-lim, Math.min(lim, a.lat));
+        b.lat = Math.max(-lim, Math.min(lim, b.lat));
+        if (Math.abs(dl) < minLat * 0.5) {
+          if (ds > 0) a.speed *= 1 - 0.3 * dt; else b.speed *= 1 - 0.3 * dt;
+        }
+      }
+    }
+
     // shells close on their mark
     for (let i = this.shells.length - 1; i >= 0; i--) {
       const sh = this.shells[i];

@@ -370,12 +370,44 @@ const SIDE: MapDef[] = [
 
 const RW = 32, SW = 40;
 
+/**
+ * Spinning rubber: bright tread bands marching down each tyre, phase-driven.
+ * Rects are the tyre faces per archetype in canvas coords [x0, x1, y0, y1].
+ */
+const WHEEL_BANDS: Array<Array<[number, number, number, number]>> = [
+  [[0, 5, 8, 13], [26, 31, 8, 13]],
+  [[0, 6, 9, 14], [25, 31, 9, 14]],
+  [[12, 19, 9, 13]],
+  [[0, 5, 9, 13], [26, 31, 9, 13]],
+  [[0, 6, 6, 14], [25, 31, 6, 14]],
+  [[0, 5, 6, 11], [26, 31, 6, 11]],
+];
+
+function wheelSpin(cv: HTMLCanvasElement, veh: number, wf: number): void {
+  if (!wf) return;
+  const c = cv.getContext('2d')!;
+  const img = c.getImageData(0, 0, cv.width, cv.height);
+  const d = img.data;
+  for (const [x0, x1, y0, y1] of WHEEL_BANDS[veh]) {
+    const h = y1 - y0 + 1;
+    const b1 = y0 + Math.floor((wf % 4) * h / 4) % h;
+    const b2 = y0 + (Math.floor((wf % 4) * h / 4) + Math.floor(h / 2)) % h;
+    for (const y of [b1, b2]) for (let x = x0 + 1; x < x1; x++) {
+      const i = (y * cv.width + x) * 4;
+      const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+      if (d[i + 3] > 0 && l < 95) { d[i] = 122; d[i + 1] = 129; d[i + 2] = 141; }   // tread glint
+    }
+  }
+  c.putImageData(img, 0, 0);
+}
+
 /** Rear view of the driver's machine, assembled from map + driver + number. */
-export function kartRear(hue: number, ch: Character): HTMLCanvasElement {
+export function kartRear(hue: number, ch: Character, wf = 0): HTMLCanvasElement {
   const def = REAR[ch.veh];
   const h = def.map.length + 2;
   const [cv, c] = sprite(RW, h);
   paint(c, def.map, palFor(hue, ch.acc), RW, 1);
+  wheelSpin(cv, ch.veh, wf);
   if (def.plate[1]) drawPlate(c, def.plate[0], def.plate[1] + 1, ch.num);
   drawHelmet(c, def.helmet[0], def.helmet[1] + 1, ch, true);
   outline(cv);

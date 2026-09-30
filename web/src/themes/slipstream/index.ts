@@ -87,12 +87,12 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
   const flameSpr = flame();
   const shadowSpr = shadow();
   const ksprCache = new Map<string, { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement }>();
-  const karts = (hue: number, ch: Character): { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement } => {
-    const key = `${hue}|${ch.num}|${ch.pat}|${ch.acc}|${ch.veh}`;
+  const karts = (hue: number, ch: Character, wf = 0): { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement } => {
+    const key = `${hue}|${ch.num}|${ch.pat}|${ch.acc}|${ch.veh}|${wf}`;
     let e = ksprCache.get(key);
     if (!e) {
-      e = { rear: kartRear(hue, ch), front: kartFront(hue, ch), side: kartSide(hue, ch) };
-      if (ksprCache.size > 48) ksprCache.clear();
+      e = { rear: kartRear(hue, ch, wf), front: kartFront(hue, ch), side: kartSide(hue, ch) };
+      if (ksprCache.size > 128) ksprCache.clear();
       ksprCache.set(key, e);
     }
     return e;
@@ -268,7 +268,8 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       const relAng = Math.atan2(Math.sin(toR - camHeading), Math.cos(toR - camHeading));
       const side = Math.abs(relAng) > 1.1;
       const facingBack = Math.cos(p.heading - camHeading) < -0.2;
-      const spr = r.ghost ? ghostRear(r.hue, r.char) : side ? karts(r.hue, r.char).side : facingBack ? karts(r.hue, r.char).front : karts(r.hue, r.char).rear;
+      const wf = r.ghost ? 0 : ((f.t * (16 + r.speed * 0.38)) | 0) % 4;
+      const spr = r.ghost ? ghostRear(r.hue, r.char) : side ? karts(r.hue, r.char).side : facingBack ? karts(r.hue, r.char).front : karts(r.hue, r.char, wf).rear;
       const alpha = r.ghost ? 0.42 : r.flash > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(r.flash * 20)) : 1;
       const lift = r.spin > 0 ? Math.abs(Math.sin(r.spin * 9)) * 0.25 : 0;
       draws.push({ depth: pr.depth + 0.02, run: () => m7.drawSprite(shadowSpr, p.x, p.y, cam, 4.0 * VEH_W[r.char.veh], r.ghost ? 0.3 : 1) });
@@ -301,18 +302,20 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     draws.sort((a, b) => b.depth - a.depth);
     for (const d of draws) d.run();
 
-    // ── your kart: the fixed anchor at the bottom of the board ──
-    const kartSpr = hero.ghost ? ghostRear(hero.hue, hero.char) : karts(hero.hue, hero.char).rear;
+    // ── your kart: the fixed anchor above the bottom of the board ──
+    const heroWf = ((f.t * (14 + speedFrac * 34)) | 0) % 4;
+    const kartSpr = hero.ghost ? ghostRear(hero.hue, hero.char) : karts(hero.hue, hero.char, heroWf).rear;
     const kw = Math.max(30, Math.round(m7.W * (0.08 + speedFrac * 0.012))) * VEH_W[hero.char.veh];
     const kh = Math.round(kw * (kartSpr.height / kartSpr.width));
     const steer = Math.max(-1, Math.min(1, dh * 2.2)) * kw * 0.22;
     const bounce = speedFrac * 1.2 * Math.sin(f.t * 24);
+    const kartY = Math.round(m7.H - kh - Math.max(7, Math.round(m7.H * 0.08)) + bounce);
     if (hero.boost > 0.5) {
       const flick = ((f.t * 24) | 0) % 2 ? 1 : 0.82;
       const fw = kw * 0.62 * flick, fh = fw * (flameSpr.height / flameSpr.width);
-      ctx.drawImage(flameSpr, Math.round(m7.W / 2 - fw / 2 + steer), Math.round(m7.H - 3 - fh * 0.4 + bounce), fw, fh);
+      ctx.drawImage(flameSpr, Math.round(m7.W / 2 - fw / 2 + steer), Math.round(kartY + kh - fh * 0.45), fw, fh);
     }
-    ctx.drawImage(kartSpr, Math.round(m7.W / 2 - kw / 2 + steer), Math.round(m7.H - kh - 2 + bounce), kw, kh);
+    ctx.drawImage(kartSpr, Math.round(m7.W / 2 - kw / 2 + steer), kartY, kw, kh);
 
     const chev = settings.kChevrons ? Math.min(0.8, Math.max(0, hero.boost - 3.5) / 11) : 0;
     m7.drawChevrons(chev, f.t);
@@ -391,7 +394,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     diag: () => ({
       W: m7.W, H: m7.H, rows: settings.kRows,
       hero: race.heroIdx, leader: race.leaderIdx,
-      racers: race.racers.map((r) => ({ n: r.name, g: r.ghost ? 1 : 0, s: Math.round(r.s), sp: Math.round(r.speed), a: +r.act.toFixed(1) })),
+      racers: race.racers.map((r) => ({ n: r.name, g: r.ghost ? 1 : 0, s: Math.round(r.s), lat: Math.round(r.lat), sp: Math.round(r.speed), a: +r.act.toFixed(1) })),
       caution: +race.caution.toFixed(1),
       cam: { x: +camX.toFixed(1), y: +camY.toFixed(1), h: +camHeading.toFixed(2) },
       camOffTrack: +Math.hypot(camX - track.xs[track.nearest(camX, camY)], camY - track.ys[track.nearest(camX, camY)]).toFixed(1),
