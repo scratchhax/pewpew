@@ -288,6 +288,12 @@ class FilamentWeb {
 }
 
 // ── host nodules: one instanced mesh ────────────────────────────────────────
+/** Stable 0..1 hash of a loam position — each node's permanent personality. */
+function loamHash(x: number, y: number, k: number): number {
+  const s = Math.sin((x + k * 137.31) * 12.9898 + (y - k * 61.17) * 78.233) * 43758.5453;
+  return s - Math.floor(s);
+}
+
 class Nodules {
   readonly mesh: InstancedMesh;
   private dummy = new Object3D();
@@ -306,17 +312,26 @@ class Nodules {
     this.mesh.count = 0;
   }
 
-  update(sim: Sim): void {
+  update(sim: Sim, t: number): void {
     let i = 0;
     for (const n of sim.nodes.values()) {
       if (i >= this.max) break;
       lift(n.x, n.y, _v);
       const mem = sim.memory(n);
+      // each orb keeps its own body, colour and breath — the hash is stable
+      // per loam position, so a host looks like the same creature every frame
+      const hS = loamHash(n.x, n.y, 1);
+      const hC = loamHash(n.x, n.y, 2);
+      const hB = loamHash(n.x, n.y, 3);
+      const sizeMul = 0.5 + 1.4 * hS * hS; // mostly small buds, a few big orbs
+      const breathe = 0.5 + 0.5 * Math.sin(t * (0.35 + hB * 0.6) + hB * TAU * 2);
       this.dummy.position.copy(_v);
-      this.dummy.scale.setScalar(0.5 + mem * 2.2 + n.pulse * 1.6);
+      this.dummy.scale.setScalar((0.5 + mem * 2.2 + n.pulse * 1.6) * sizeMul * (0.88 + 0.24 * breathe));
       this.dummy.updateMatrix();
       this.mesh.setMatrixAt(i, this.dummy.matrix);
-      this.col.copy(HUES[n.hue]).multiplyScalar(0.25 + mem * 1.1 + n.pulse * 1.4);
+      this.col.copy(HUES[n.hue]);
+      if (hC > 0.5) this.col.lerp(HUES[(n.hue + (hC > 0.85 ? 2 : 1)) % 3], (hC - 0.5) * 1.1);
+      this.col.multiplyScalar((0.26 + mem * 1.1 + n.pulse * 1.4) * (0.8 + 0.5 * breathe));
       this.mesh.setColorAt(i, this.col);
       i++;
     }
@@ -1056,7 +1071,7 @@ export class UndergrowthView {
   /** One frame. Returns pass-by count for the whoosh sfx (sign: -1 left, +1 right). */
   update(sim: Sim, t: number, opts: ViewOpts): number {
     this.web.update(sim, t, opts.glow);
-    this.nodules.update(sim);
+    this.nodules.update(sim, t);
     this.pulses.setCam(this.cam.position);
     const passed = this.pulses.update(sim);
     this.spores.update(sim);
