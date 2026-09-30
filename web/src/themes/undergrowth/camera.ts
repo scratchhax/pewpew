@@ -294,6 +294,10 @@ export class Flycam {
     if (this.travel >= 0) { this.doTravel(dt, t); return; }
     if (sim.V.length < 2) { this.hover(dt); return; }
 
+    // Rail bookkeeping — re-root, extend, relocate, drift as needed — but
+    // NONE of it may skip the ride. A swimmer has no brakes: when the rail
+    // runs out the camera keeps coasting its current heading while the next
+    // one eases in, so every direction change is an arc, never a stop.
     if (this.path.length < 2) this.newRoute(t);
     else {
       // the sim renumbers vertices when it compacts — if the route's start
@@ -307,25 +311,10 @@ export class Flycam {
       }
     }
     let total = this.cum[this.cum.length - 1];
-    if (total <= 0) {
-      if (this.relocate(t)) return;
-      this.hover(dt);
-      return;
-    }
-
-    if (total - this.dist < 240) {
-      const exhausted = this.extendRoute(t);
-      total = this.cum[this.cum.length - 1];
-      if (exhausted && this.dist >= total - 1) {
-        // the route is over and we're at its end — move on, or hover and look
-        // around until the mat grows something worth riding
-        if (this.relocate(t)) return;
-        this.hover(dt);
-        return;
-      }
-    }
+    if (total > 0 && total - this.dist < 240) this.extendRoute(t);
+    total = this.cum[this.cum.length - 1];
     // every 45 s, drift toward wherever the mat is busiest
-    if (t > this.nextDriftT) {
+    if (total > 0 && t > this.nextDriftT) {
       this.nextDriftT = t + 45;
       const c = this.bestComps(1)[0];
       if (c && c.size >= 60) {
@@ -334,57 +323,71 @@ export class Flycam {
           lift(tv.x, tv.y, this.travelTarget);
           if (this.travelTarget.distanceTo(this.pos) > 10) {
             this.startTravel();
-            this.travel = c.v;
-            return;
-          }
-          this.newRoute(t);
-          return;
+            this.travel = c.v; // the ride continues on this frame; the glide starts next
+          } else this.newRoute(t);
         }
       }
     }
     // the route ran out at a dead end: re-root from here
-    if (this.dist >= total - 0.01 && this.cum.length < 4) {
-      this.newRoute(t);
-      return;
-    }
+    if (total > 0 && this.dist >= total - 0.01 && this.cum.length < 4) this.newRoute(t);
 
-    // advance
-    this.dist += this.curSpeed * dt;
-    // prune the trail behind us so the route (and the pointAt scan) stay small
-    while (this.path.length > 2 && this.dist > 30) {
-      const dropped = this.cum[1];
-      this.path.shift();
-      this.cum.shift();
-      this.dist -= dropped;
-      for (let i = 1; i < this.cum.length; i++) this.cum[i] -= dropped;
-    }
-    const a0 = this.path[0];
-    vertexWorld(this.sim, a0, this.routeAnchor);
-
-    const p = this.pointAt(this.dist);
-    if (!p) { if (this.relocate(t)) return; this.newRoute(t); return; }
+    let chase: Vector3 | null = null;
+    let ahead: Vector3 | null = null;
     total = this.cum[this.cum.length - 1];
-    const chase = this.pointAt(Math.min(total, this.dist + 14));
-    const ahead = this.pointAt(Math.min(total, this.dist + 48));
-    if (!chase || !ahead) { if (this.relocate(t)) return; this.newRoute(t); return; }
+    if (total > 0) {
+      // advance
+      this.dist += this.curSpeed * dt;
+      // prune the trail behind us so the route (and the pointAt scan) stay small
+      while (this.path.length > 2 && this.dist > 30) {
+        const dropped = this.cum[1];
+        this.path.shift();
+        this.cum.shift();
+        this.dist -= dropped;
+        for (let i = 1; i < this.cum.length; i++) this.cum[i] -= dropped;
+      }
+      const a0 = this.path[0];
+      vertexWorld(this.sim, a0, this.routeAnchor);
 
-    // the rail runs at the ride speed; the camera is a vehicle chasing a point
-    // down the rail — junction corners get rounded off, never taken
-    const lag = p.distanceTo(this.pos);
-    if (lag > 10) this.dist -= (lag - 10) * 0.6;
-    this.tmp.subVectors(chase, this.pos);
-    if (this.tmp.lengthSq() < 1e-6) this.tmp.copy(this.lastDir);
-    this.tmp.normalize();
-    // Coast through a re-root: the desired direction blends in from the
-    // current velocity over the first two seconds, so a rail that snaps to a
-    // new junction never swings the drift
-    const rb = Math.min(1, (t - this.routeT) / 2);
-    if (rb < 1 && this.velDir.lengthSq() > 1e-6) this.tmp.lerp(this.velDir, 1 - rb).normalize();
-    // Zero-g cornering on the rails too (same law as doTravel): a junction
-    // switch or fresh rail that demands a heading way off the current one
-    // slows the PIVOT harder than it brakes — a wide sweeping arc, never a
-    // pivot in place at speed.
-    this.corner(dt, this.tmp, this.speed);
+      const p = this.pointAt(this.dist);
+      if (p) {
+        // the rail runs at the ride speed; the camera is a vehicle chasing a point
+        // down the rail — junction corners get rounded off, never taken
+        const lag = p.distanceTo(this.pos);
+        // eased, never a teleport: an instant correction can drive dist
+        // negative and thrash the rail (stop → jump → freeze, repeat)
+        if (lag > 10) this.dist = Math.max(0, this.dist - (lag - 10) * Math.min(1, dt * 3));
+        total = this.cum[this.cum.length - 1];
+        chase = this.pointAt(Math.min(total, this.dist + 14));
+        ahead = this.pointAt(Math.min(total, this.dist + 48));
+      }
+    }
+
+    if (!chase || !ahead) {
+      total = this.cum[this.cum.length - 1];
+      if (this.dist >= total - 1) {
+        // the route is spent: try the next component, or glide-and-look —
+        // but this frame still moves
+        if (!this.relocate(t)) { this.hover(dt); return; }
+      }
+      // coast straight while the rail regrows around the drift
+      this.tmp.copy(this.velDir);
+      this.curSpeed += (this.speed - this.curSpeed) * Math.min(1, dt * 1.5);
+      this.steer(dt, this.tmp);
+    } else {
+      this.tmp.subVectors(chase, this.pos);
+      if (this.tmp.lengthSq() < 1e-6) this.tmp.copy(this.lastDir);
+      this.tmp.normalize();
+      // Coast through a re-root: the desired direction blends in from the
+      // current velocity over the first two seconds, so a rail that snaps to a
+      // new junction never swings the drift
+      const rb = Math.min(1, (t - this.routeT) / 2);
+      if (rb < 1 && this.velDir.lengthSq() > 1e-6) this.tmp.lerp(this.velDir, 1 - rb).normalize();
+      // Zero-g cornering on the rails too (same law as doTravel): a junction
+      // switch or fresh rail that demands a heading way off the current one
+      // slows the PIVOT harder than it brakes — a wide sweeping arc, never a
+      // pivot in place at speed.
+      this.corner(dt, this.tmp, this.speed);
+    }
     this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
 
     // the anti-burn-in wander only — no sway, no roll, ever
@@ -393,11 +396,13 @@ export class Flycam {
 
     // orientation: ease toward the path ahead — pulled toward glowing
     // structure the more the path misses it (the camera never stares at void)
-    this.tmp2.copy(ahead).sub(this.pos);
+    if (ahead) this.tmp2.subVectors(ahead, this.pos);
+    else if (this.pullDir.lengthSq() > 1e-4) this.tmp2.copy(this.pullDir);
+    else this.tmp2.copy(this.velDir);
     if (this.tmp2.lengthSq() < 1e-4) this.tmp2.copy(this.lastDir);
     this.aim(this.tmp2, dt);
 
-    this.lastDir.copy(this.tmp2.copy(ahead).sub(this.pos).normalize());
+    this.lastDir.copy(this.velDir);
     this.cam.position.copy(this.pos);
     this.cam.quaternion.copy(this.quat);
   }
@@ -484,16 +489,17 @@ export class Flycam {
   }
 
   /**
-   * The cornering law, shared by rail-riding and gliding: past the gentle
-   * zone, the pivot slows HARDER than the brake — wide sweeping arcs, never
-   * a pivot in place. Eases curSpeed and steers with the matching multiplier.
+   * The cornering law, shared by rail-riding and gliding: a swimmer changes
+   * HEADING, not momentum — past the gentle zone the pivot slows dramatically
+   * while the speed barely dips, so direction changes are long wide arcs.
+   * (Braking hard through a turn reads as a stop-and-go jolt.)
    */
   private corner(dt: number, desired: Vector3, baseSpeed: number): void {
     const off = this.velDir.lengthSq() > 1e-6 ? this.velDir.angleTo(desired) : 0;
     const hard = Math.max(0, off - 0.5);
-    const turnMul = Math.max(0.3, 1 - hard * 0.8);
-    const speedMul = Math.max(0.72, 1 - hard * 0.45);
-    this.curSpeed += (baseSpeed * speedMul - this.curSpeed) * Math.min(1, dt * 2.5);
+    const turnMul = Math.max(0.25, 1 - hard * 0.85);
+    const speedMul = Math.max(0.85, 1 - hard * 0.3);
+    this.curSpeed += (baseSpeed * speedMul - this.curSpeed) * Math.min(1, dt * 1.5);
     this.steer(dt, desired, turnMul);
   }
 
@@ -520,17 +526,34 @@ export class Flycam {
     return this.tmp2.lerp(this.tmp3, f).clone();
   }
 
-  /** A slow in-place look-around while there's nothing worth riding (an empty mat, or small components still growing) — it pans the whole sphere, up and down as well as around. */
+  /** A slow look-around while there's nothing worth riding (an empty mat, or small components still growing) — a swimmer never stops: even looking around is done on a slow glide that curves toward whatever is alive. */
   private hover(dt: number): void {
     this.orbitT += dt;
-    // zero-g: there is no brakes — bleed the speed off and drift to a stop
-    this.curSpeed += (0 - this.curSpeed) * Math.min(1, dt * 1.2);
-    if (this.curSpeed > 0.02 && this.velDir.lengthSq() > 1e-6) {
+    // zero-g, no brakes: drift at a slow cruise, gently curving toward the
+    // busiest nearby structure — a full stop is the one motion a swimmer
+    // never makes
+    if (this.pullDir.lengthSq() > 1e-6) {
+      this.tmp3.copy(this.pullDir).normalize();
+      // stay near the shell while gliding: the same soft radial field the
+      // glide uses — deep inside bias out, outside bias in, curved not braked
+      const r = this.pos.length();
+      if (r > 1e-3) {
+        const rad = this.tmp4.copy(this.pos).multiplyScalar(1 / r);
+        const deep = Math.min(1, Math.max(0, (0.62 * R - r) / (0.25 * R)));
+        const high = Math.min(1, Math.max(0, (r - 0.95 * R) / (0.2 * R)));
+        if (deep > 0) this.tmp3.addScaledVector(rad, deep * 2.2).normalize();
+        else if (high > 0) this.tmp3.addScaledVector(rad, -high * 1.4).normalize();
+      }
+      this.corner(dt, this.tmp3, this.speed * 0.35);
+    } else {
+      this.curSpeed += (this.speed * 0.35 - this.curSpeed) * Math.min(1, dt * 1.2);
+    }
+    if (this.velDir.lengthSq() > 1e-6) {
       this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
     }
     const a = this.orbitT * 0.12;
     if (this.pullDir.lengthSq() > 1e-6) {
-      // gaze at the busiest nearby structure with a slow sway — even parked,
+      // gaze at the busiest nearby structure with a slow sway — even gliding,
       // the camera looks at something alive
       const pl = Math.sqrt(this.pullDir.lengthSq());
       this.tmp2.copy(this.pullDir).divideScalar(pl);
