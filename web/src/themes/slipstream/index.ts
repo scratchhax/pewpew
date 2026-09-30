@@ -335,10 +335,14 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     // else so a kart passes in front of a stand properly.
     const wave = (f.t * 2.4) | 0;
     const far = propFar(settings.kRows);
+    // the kiosk Pi runs the low tier: it keeps every other prop, which reads
+    // as the same crowd at that resolution for half the draw calls
+    const thin = settings.kRows < 200;
     for (const pr of track.props) {
       const pp = track.offset(pr.s, pr.lat);
       const p = m7.project(pp.x, pp.y, cam);
       if (!p || p.depth > far) continue;
+      if (thin && (pr.seed & 1)) continue;      // half the crowd on the cheap tiers
       const spr = propSpr(pr, wave + ((pr.seed >> 7) & 3));
       const h = PROP_H[pr.kind] ?? H_TREE;
       draws.push({ depth: p.depth, run: () => m7.drawSprite(spr, pp.x, pp.y, cam, h) });

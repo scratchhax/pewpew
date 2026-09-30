@@ -231,29 +231,47 @@ function layout(total: number, width: number, padFr: number[], boardFr: number, 
   const put = (s: number, side: number, off: number, kind: Prop['kind']) =>
     out.push({ s: ((s % total) + total) % total, lat: side * (edge + off), kind, seed: (rnd() * 1e9) | 0 });
 
-  // grandstands: the start line, and wherever a pad or the board is
-  const hot = [0, boardFr * total, ...padFr.map((f) => f * total), total * 0.5];
+  // The offsets are small on purpose. A prop `off` units beyond the kerb is
+  // only inside the frustum once it is roughly `off / tan(halfFov)` ahead, so
+  // anything parked far out to the side is either off the edge of the screen
+  // or too far away to read. The crowd stands at the barrier.
+  const OFF_FAN = 10, OFF_MARSHAL = 9, OFF_TYRES = 7, OFF_BALLOON = 13;
+  const OFF_STAND = 17, OFF_TREE_NEAR = 22, OFF_TREE_FAR = 52;
+
+  // grandstands at ten places round the lap, not five
+  const hot: number[] = [0, boardFr * total, total * 0.5, ...padFr.map((f) => f * total)];
+  for (let k = 0; k < 6; k++) hot.push((k / 6) * total + total * 0.08);
   for (const h of hot) {
     for (const side of [-1, 1]) {
-      if (rnd() < 0.35) continue;
-      put(h + (rnd() - 0.5) * 30, side, 30, 'stand');
-      // fans pressed against the fence in front of it
-      for (let k = 0; k < 7; k++) put(h - 34 + k * 10 + rnd() * 5, side, 13 + rnd() * 5, 'fan');
-      put(h + 46, side, 18, 'balloons');
+      if (rnd() < 0.2) continue;
+      put(h + (rnd() - 0.5) * 26, side, OFF_STAND + rnd() * 5, 'stand');
+      put(h + 40 + rnd() * 20, side, OFF_BALLOON, 'balloons');
     }
   }
-  // marshals and tyre stacks around the rest of the lap
-  for (let k = 0; k < 16; k++) {
-    const s = (k / 16) * total + rnd() * 40;
-    const side = rnd() < 0.5 ? -1 : 1;
-    put(s, side, 12 + rnd() * 4, rnd() < 0.45 ? 'marshal' : 'tyres');
+
+  // A continuous line of spectators at the fence, both sides, most of the way
+  // round: this is what stops the lap going quiet between the stands.
+  const step = 13;
+  for (let d = 0; d < total; d += step) {
+    for (const side of [-1, 1]) {
+      if (rnd() < 0.34) continue;                 // gaps, so it is not a wall
+      put(d + rnd() * step, side, OFF_FAN + rnd() * 5, 'fan');
+    }
   }
-  // trees fill the gaps, both sides, further out
-  for (let k = 0; k < 74; k++) {
+
+  // marshals and tyre stacks, one every fifty-odd units
+  for (let k = 0; k < 42; k++) {
+    const s = (k / 42) * total + rnd() * 30;
+    const side = rnd() < 0.5 ? -1 : 1;
+    const isMarshal = rnd() < 0.45;
+    put(s, side, (isMarshal ? OFF_MARSHAL : OFF_TYRES) + rnd() * 3, isMarshal ? 'marshal' : 'tyres');
+  }
+
+  // trees banked behind the crowd rather than scattered over the park
+  for (let k = 0; k < 190; k++) {
     const s = rnd() * total;
     const side = rnd() < 0.5 ? -1 : 1;
-    if (hot.some((h) => Math.abs(((s - h + total * 1.5) % total) - total * 0.5) > total * 0.5 - 60)) continue;
-    put(s, side, 34 + rnd() * 46, 'tree');
+    put(s, side, OFF_TREE_NEAR + rnd() * (OFF_TREE_FAR - OFF_TREE_NEAR), 'tree');
   }
   return out;
 }
