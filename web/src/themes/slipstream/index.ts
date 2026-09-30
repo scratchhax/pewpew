@@ -13,11 +13,17 @@ import { KART_H } from './sprites';
  * kart. Every drawSprite call sizes itself from here, so the whole scene can be
  * checked against one number instead of a scattering of magic widths.
  */
+/** The held-item slot, in buffer pixels. */
+const ITEM_SLOT = 52;
 const H_SHADOW = KART_H * 0.43;    // a flat smudge as wide as the tyres
 const H_BOX = KART_H * 0.95;       // item box: about as tall as the kart chasing it
-const H_SHELL = KART_H * 0.34;     // a shell is a thing you trip over
-const H_BANANA = KART_H * 0.20;
-const H_HAZARD = KART_H * 0.24;
+// Items are drawn big on purpose. At the old sizes a shell was a median nine
+// display pixels tall on a 1080p screen and a banana was four, against ninety
+// for a kart's own shadow - at that size every item is the same coloured
+// smudge, and it is only on screen for as long as it takes to drive past.
+const H_SHELL = KART_H * 0.85;
+const H_BANANA = KART_H * 0.62;
+const H_HAZARD = KART_H * 0.5;
 const H_FLAME = KART_H * 0.5;
 const H_LABEL = KART_H * 0.17;     // the name tag floating over the helmet
 const H_GLOW = KART_H * 1.15;
@@ -80,7 +86,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     <div id="slip-count"></div>
     <div id="slip-order"><div class="pos"><b>P1</b><i>/8</i></div><div class="who">—</div></div>
     <div id="slip-kmh"><b>0</b> <span>km/h</span></div>
-    <div id="slip-item"><canvas width="34" height="34"></canvas></div>
+    <div id="slip-item"><canvas width="52" height="52"></canvas></div>
     <div id="slip-map"><div class="cap">CIRCUIT</div><canvas width="118" height="118"></canvas></div>`;
   host.mount.appendChild(hud);
   const q = (s: string): HTMLElement => hud.querySelector(s) as HTMLElement;
@@ -328,7 +334,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       const p = m7.project(hz.x, hz.y, cam);
       if (!p) continue;
       const spr = hz.kind === 'oil' ? oilSpr : bananaSpr;
-      const ww = hz.kind === 'oil' ? H_HAZARD * 0.7 : H_BANANA;
+      const ww = hz.kind === 'oil' ? H_HAZARD : H_BANANA;
       draws.push({ depth: p.depth, run: () => m7.drawSprite(spr, hz.x, hz.y, cam, ww, Math.min(1, hz.life / 2)) });
     }
     // trackside: the crowd, the trees, the marshals. Sorted with everything
@@ -435,11 +441,20 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     whoEl.classList.toggle('ghost', hero.ghost);
     kmhEl.textContent = String(Math.round(hero.speed * 2.05));
     // item slot: what the hero is holding
-    itemCtx.clearRect(0, 0, 34, 34);
+    itemCtx.clearRect(0, 0, ITEM_SLOT, ITEM_SLOT);
     if (hero.item) {
-      const spr = hero.item === 'mushroom' ? mushroomSpr : hero.item === 'banana' ? bananaSpr : shellGreen;
+      // the slot is the one place you can read what you are holding without
+      // it flashing past, so show the right shell and keep the aspect: forcing
+      // every sprite into a square squashed the banana and stretched the shell
+      const spr = hero.item === 'mushroom' ? mushroomSpr
+        : hero.item === 'banana' ? bananaSpr
+        : hero.item === 'star' ? starHudSpr
+        : hero.item === 'red' ? shellRed : shellGreen;
+      const pad = 4, box = ITEM_SLOT - pad * 2;
+      const k = Math.min(box / spr.width, box / spr.height);
+      const w = Math.round(spr.width * k), h = Math.round(spr.height * k);
       itemCtx.imageSmoothingEnabled = false;
-      itemCtx.drawImage(spr, 3, 3, 28, 28);
+      itemCtx.drawImage(spr, Math.round((ITEM_SLOT - w) / 2), Math.round((ITEM_SLOT - h) / 2), w, h);
       itemEl.classList.add('lit');
     } else {
       itemCtx.strokeStyle = 'rgba(200, 196, 180, 0.25)';
@@ -460,6 +475,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     }
   }
 
+  const starHudSpr = star();
   let starCache: HTMLCanvasElement | null = null;
   const starSpr = (): HTMLCanvasElement => (starCache ??= star());
   let glowCache: HTMLCanvasElement | null = null;

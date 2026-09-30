@@ -36,13 +36,17 @@ body[data-theme="slipstream"] #slip-kmh b { font: 900 42px/1 ui-monospace, monos
 body[data-theme="slipstream"] #slip-kmh span { font-size: 12px; letter-spacing: 0.2em; color: #9aa2b5; }
 
 body[data-theme="slipstream"] #slip-item {
-  position: fixed; left: calc(env(safe-area-inset-left, 0px) + 50%); transform: translateX(calc(-50% - 78px));
+  position: fixed; left: calc(env(safe-area-inset-left, 0px) + 50%); transform: translateX(calc(-50% - 132px));
   bottom: 10px; z-index: 38; pointer-events: none;
-  background: rgba(8, 10, 16, 0.6); padding: 2px;
-  border: 2px solid rgba(160, 156, 140, 0.3);
+  background: rgba(8, 10, 16, 0.6); padding: 3px;
+  border: 2px solid rgba(160, 156, 140, 0.35);
 }
 body[data-theme="slipstream"] #slip-item.lit { border-color: #ffd23f; box-shadow: 0 0 12px rgba(255, 210, 63, 0.35); }
-body[data-theme="slipstream"] #slip-item canvas { image-rendering: pixelated; display: block; }
+/* the slot is the one place an item sits still long enough to be read, so it
+   is drawn at twice its buffer size rather than one to one */
+body[data-theme="slipstream"] #slip-item canvas {
+  image-rendering: pixelated; display: block; width: 104px; height: 104px;
+}
 
 /* the race has one map, and it's the circuit — no room for a generic radar */
 body[data-theme="slipstream"] #radar-wrap { display: none !important; }

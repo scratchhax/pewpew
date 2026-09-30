@@ -766,26 +766,56 @@ export function flame(): HTMLCanvasElement {
 }
 
 /** The red shell: it flies, it homes, it should not be this fast. */
+/**
+ * A turtle shell: a domed top with segment lines over a pale rim, which is a
+ * silhouette that still reads at a dozen pixels. It used to be two concentric
+ * circles with a stripe, indistinguishable from a banana at racing distance.
+ */
 export function shell(color = '#d0262c', dark = '#7a1216'): HTMLCanvasElement {
-  const [cv, c] = sprite(20, 14);
-  c.fillStyle = dark; c.beginPath(); c.arc(11, 7, 6, 0, Math.PI * 2); c.fill();
-  c.fillStyle = color; c.beginPath(); c.arc(11, 7, 4.4, 0, Math.PI * 2); c.fill();
-  c.fillStyle = '#ffd86a'; c.fillRect(13, 5, 2, 4);          // wing stripe
-  c.fillStyle = '#ff8a3c'; c.fillRect(0, 5, 5, 3);           // rocket flames
-  c.fillStyle = '#ffe98a'; c.fillRect(1, 6, 3, 1);
-  c.fillStyle = '#f4f2ea'; c.fillRect(15, 6, 3, 2);          // nose cone
+  const W = 30, H = 26;
+  const [cv, c] = sprite(W, H);
+  // pale underside rim, wider than the dome so it frames it
+  c.fillStyle = '#f4f2ea';
+  c.beginPath(); c.ellipse(W / 2, 18, 13, 6.5, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#c9c4b4';
+  c.beginPath(); c.ellipse(W / 2, 20, 13, 4.5, 0, 0, Math.PI * 2); c.fill();
+  // the dome
+  c.fillStyle = dark;
+  c.beginPath(); c.ellipse(W / 2, 15, 12, 11, 0, Math.PI, 0); c.fill();
+  c.fillStyle = color;
+  c.beginPath(); c.ellipse(W / 2, 15, 10, 9, 0, Math.PI, 0); c.fill();
+  // segments, so the dome reads as a shell and not a ball
+  c.strokeStyle = dark; c.lineWidth = 1.4;
+  for (const a of [-0.8, 0, 0.8]) {
+    c.beginPath();
+    c.moveTo(W / 2 + Math.sin(a) * 3, 6 + Math.abs(a) * 2);
+    c.lineTo(W / 2 + Math.sin(a) * 10, 15);
+    c.stroke();
+  }
+  c.beginPath(); c.ellipse(W / 2, 15, 6, 5.5, 0, Math.PI, 0); c.stroke();
+  // highlight
+  c.fillStyle = 'rgba(255,255,255,0.55)';
+  c.fillRect(W / 2 - 7, 9, 4, 2);
+  outline(cv);
   return cv;
 }
 
 /** Oil slick: a block's calling card. */
+/** An oil slick: wide and flat, so it reads as ground rather than an object. */
 export function oil(): HTMLCanvasElement {
-  const [cv, c] = sprite(24, 12);
+  const W = 44, H = 18;
+  const [cv, c] = sprite(W, H);
   c.fillStyle = '#0c0d12';
-  c.beginPath(); c.ellipse(12, 6, 11, 5, 0, 0, Math.PI * 2); c.fill();
-  c.fillStyle = '#3b2a55';
-  c.beginPath(); c.ellipse(9, 5, 4, 1.6, 0.4, 0, Math.PI * 2); c.fill();
-  c.fillStyle = '#22534a';
-  c.beginPath(); c.ellipse(15, 7, 3, 1.2, -0.3, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.ellipse(22, 9, 21, 8, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#171a26';
+  c.beginPath(); c.ellipse(22, 8, 18, 6, 0, 0, Math.PI * 2); c.fill();
+  // the rainbow sheen that says oil and not shadow
+  c.fillStyle = '#4a3370';
+  c.beginPath(); c.ellipse(15, 7, 7, 2.6, 0.35, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#2b6a5e';
+  c.beginPath(); c.ellipse(29, 10, 6, 2.2, -0.3, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#6b4a8a';
+  c.beginPath(); c.ellipse(20, 11, 4, 1.4, 0.1, 0, Math.PI * 2); c.fill();
   return cv;
 }
 
@@ -840,24 +870,53 @@ export function itemBox(phase = 0): HTMLCanvasElement {
 }
 
 /** Banana: small, silly, ruinous. */
+/**
+ * A banana skin: a crescent with the stalk on one tip. Built by walking the
+ * columns and filling between an inner and an outer arc - subtracting one
+ * ellipse from another ate the wrong half and left a bowl with a stalk
+ * floating next to it.
+ */
 export function banana(): HTMLCanvasElement {
-  const [cv, c] = sprite(14, 9);
-  c.fillStyle = '#f2c53c';
-  c.fillRect(2, 4, 10, 3); c.fillRect(1, 3, 3, 2); c.fillRect(10, 2, 3, 2);
-  c.fillStyle = '#c79a20'; c.fillRect(2, 6, 10, 1);
-  c.fillStyle = '#6b4a12'; c.fillRect(1, 2, 2, 1);
+  const W = 30, H = 20;
+  const [cv, c] = sprite(W, H);
+  const cx = W / 2, cy = 3, ro = 14, ri = 9.5;
+  for (let x = 0; x < W; x++) {
+    const dx = x - cx;
+    if (Math.abs(dx) >= ro) continue;
+    const yo = cy + Math.sqrt(ro * ro - dx * dx);
+    const yi = Math.abs(dx) < ri ? cy + Math.sqrt(ri * ri - dx * dx) : cy;
+    const top = Math.round(yi), bot = Math.round(yo);
+    if (bot <= top) continue;
+    c.fillStyle = '#ffd233';
+    c.fillRect(x, top, 1, bot - top);
+    c.fillStyle = '#c9971b';                    // shading along the outer edge
+    c.fillRect(x, bot - 2, 1, 2);
+    c.fillStyle = '#ffeb9c';                    // highlight along the inner edge
+    c.fillRect(x, top, 1, 1);
+  }
+  // the stalk, on the left tip
+  c.fillStyle = '#5a3d0f';
+  c.fillRect(1, 5, 4, 3);
+  c.fillRect(0, 4, 2, 3);
+  outline(cv);
   return cv;
 }
 
-/** Boost mushroom. */
+/** A speed mushroom: fat spotted cap over a pale stalk with two eyes. */
 export function mushroom(): HTMLCanvasElement {
-  const [cv, c] = sprite(14, 12);
-  c.fillStyle = '#c72c30'; c.fillRect(1, 1, 12, 6);
-  c.fillRect(0, 3, 14, 3);
-  c.fillStyle = '#f2ece0';
-  c.fillRect(3, 2, 2, 2); c.fillRect(8, 1, 3, 2); c.fillRect(6, 4, 2, 2);
-  c.fillStyle = '#e6cfae'; c.fillRect(4, 7, 6, 4);
-  c.fillStyle = '#2a1a10'; c.fillRect(5, 8, 1, 2); c.fillRect(8, 8, 1, 2);
+  const W = 26, H = 24;
+  const [cv, c] = sprite(W, H);
+  c.fillStyle = '#e03a3e';
+  c.beginPath(); c.ellipse(13, 11, 12, 10, 0, Math.PI, 0); c.fill();
+  c.fillRect(1, 9, 24, 3);
+  c.fillStyle = '#f7f1e4';
+  for (const [x, y, r] of [[6, 7, 3], [17, 5, 4], [12, 10, 2.6], [21, 10, 2.2]]) {
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+  }
+  c.fillStyle = '#efe2c6'; c.fillRect(8, 12, 10, 10);
+  c.fillStyle = '#d6c3a0'; c.fillRect(8, 12, 10, 1);
+  c.fillStyle = '#2a1a10'; c.fillRect(10, 15, 2, 4); c.fillRect(15, 15, 2, 4);
+  outline(cv);
   return cv;
 }
 
