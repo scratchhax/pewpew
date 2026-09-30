@@ -258,6 +258,8 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
   setRes();
 
   const drift = [0, 0, 0];
+  const center = [0, 0, 0];
+  (speckPoints.material as ShaderMaterial).uniforms.uCenter.value = center;
   return {
     renderer, scene, camera, bloom, lens, specks: speckPoints,
     resize(w, h) { renderer.setSize(w, h); composer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); setRes(); },
@@ -270,7 +272,8 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
       const u = (speckPoints.material as ShaderMaterial).uniforms;
       u.uTime.value = t;
       u.uDrift.value = drift;
-      u.uCenter.value = [camera.position.x, camera.position.y, camera.position.z];
+      center[0] = camera.position.x; center[1] = camera.position.y; center[2] = camera.position.z;
+      u.uCenter.value = center;
       (backdropMesh.material as ShaderMaterial).uniforms.uTime.value = t;
       (mistMesh.material as ShaderMaterial).uniforms.uTime.value = t;
       lens.uniforms.uTime.value = t;

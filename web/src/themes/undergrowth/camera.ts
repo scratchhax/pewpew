@@ -1,7 +1,7 @@
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import type { PerspectiveCamera } from 'three';
 import type { Sim } from '../mycelium/filaments';
-import { lift, R, S } from './web3d';
+import { lift, vertexWorld, R, S } from './web3d';
 
 /** Max heading change per second: big retargets become slow pans, not snaps. */
 const TURN_RATE = (22 * Math.PI) / 180;
@@ -97,8 +97,7 @@ export class Flycam {
   private nearestV(p: Vector3): number {
     let best = -1, bd = Infinity;
     for (let i = 0; i < this.sim.V.length; i++) {
-      const v = this.sim.V[i];
-      lift(v.x, v.y, this.tmp);
+      if (!vertexWorld(this.sim, i, this.tmp)) continue;
       const d = distSq(this.tmp, p);
       if (d < bd) { bd = d; best = i; }
     }
@@ -133,8 +132,8 @@ export class Flycam {
       const next = e.a === v ? e.b : e.a;
       if (this.recent.has(next)) continue;
       let w = e.mem + 2 * e.flow + 0.15 * Math.random();
-      const nv = this.sim.V[next];
-      lift(nv.x, nv.y, this.tmp).sub(this.pos).normalize();
+      if (!vertexWorld(this.sim, next, this.tmp)) continue;
+      this.tmp.sub(this.pos).normalize();
       // persistence: strongly prefer continuing the way we're already heading,
       // so the ride turns like a forager, not a drunk
       w *= 1 + 2.5 * Math.max(0, this.tmp.dot(this.lastDir));
@@ -179,8 +178,7 @@ export class Flycam {
     this.path.push(v);
     this.addRecent(v);
     this.extendRoute(t);
-    const a = this.sim.V[this.path[0]];
-    if (a) lift(a.x, a.y, this.routeAnchor);
+    vertexWorld(this.sim, this.path[0], this.routeAnchor);
   }
 
   /** The top `k` components by size (then activity), with their busiest vertex. */
@@ -224,8 +222,7 @@ export class Flycam {
     for (const c of comps) {
       if (c.size < 20) continue;
       const tv = this.sim.V[c.v];
-      if (!tv) continue;
-      lift(tv.x, tv.y, this.tmp3);
+      if (!tv || !vertexWorld(this.sim, c.v, this.tmp3)) continue;
       if (this.tmp3.distanceTo(this.pos) < 8) continue;
       // never glide back to where we just came from — that ping-pong is what
       // reads as the whole scene snapping back and forth
@@ -313,7 +310,7 @@ export class Flycam {
       if (!a) {
         this.newRoute(t);
       } else {
-        lift(a.x, a.y, this.tmp);
+        vertexWorld(this.sim, this.path[0], this.tmp);
         if (this.tmp.distanceTo(this.routeAnchor) > 0.5) this.newRoute(t);
       }
     }
@@ -370,8 +367,8 @@ export class Flycam {
       this.dist -= dropped;
       for (let i = 1; i < this.cum.length; i++) this.cum[i] -= dropped;
     }
-    const a0 = this.sim.V[this.path[0]];
-    if (a0) lift(a0.x, a0.y, this.routeAnchor);
+    const a0 = this.path[0];
+    vertexWorld(this.sim, a0, this.routeAnchor);
 
     const p = this.pointAt(this.dist);
     if (!p) { if (this.relocate(t)) return; this.newRoute(t); return; }
@@ -420,7 +417,7 @@ export class Flycam {
     for (let i = 0; i < sim.V.length; i++) {
       const v = sim.V[i];
       const w = 0.04 + v.mem + v.flow * 1.6;
-      lift(v.x, v.y, this.tmp3);
+      if (!vertexWorld(sim, i, this.tmp3)) continue;
       this.tmp.subVectors(this.tmp3, this.pos);
       const d2 = this.tmp.lengthSq();
       if (d2 < 1e-3 || d2 > 7200) continue; // nearby-ish only
@@ -506,9 +503,9 @@ export class Flycam {
     if (k >= c.length) return null;
     const segLen = c[k] - c[k - 1];
     const f = segLen > 0 ? (d - c[k - 1]) / segLen : 0;
-    const a = this.sim.V[p[k - 1]], b = this.sim.V[p[k]];
-    if (!a || !b) return null;
-    return lift(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, this.tmp2).clone();
+    if (!vertexWorld(this.sim, p[k - 1], this.tmp2)) return null;
+    if (!vertexWorld(this.sim, p[k], this.tmp3)) return null;
+    return this.tmp2.lerp(this.tmp3, f).clone();
   }
 
   /** A slow in-place look-around while there's nothing worth riding (an empty mat, or small components still growing) — it pans the whole sphere, up and down as well as around. */

@@ -15,6 +15,8 @@ const TAU = Math.PI * 2;
 
 /** The mat's colour families, same as seen from above: ice-cyan, teal, spring. */
 const HUES = [new Color(0x49e6ff), new Color(0x5ff0cf), new Color(0x8cf29a)];
+/** HUES as flat linear rgb triples, for the per-edge tint loop. */
+const HUE3: Float32Array = Float32Array.from(HUES.flatMap((c) => [c.r, c.g, c.b]));
 
 /**
  * The radial band [0.36..0.98]·R a loam point sits in. Low frequency, so
@@ -55,6 +57,29 @@ export function lift(x: number, y: number, out: Vector3): Vector3 {
 /** The outward (radial) direction at a loam point — "up" off the web. */
 export function radial(x: number, y: number, out: Vector3): Vector3 {
   return out.copy(lift(x, y, out)).normalize();
+}
+
+/**
+ * Cached world position of a sim vertex. Vertex coordinates never change —
+ * compaction only renumbers them — so a lifted position is stable per slot
+ * and is invalidated wholesale when `structureRev` bumps.
+ */
+const vworld = new WeakMap<Sim, { rev: number; xs: Float64Array; ys: Float64Array; zs: Float64Array }>();
+export function vertexWorld(sim: Sim, i: number, out: Vector3): boolean {
+  const n = sim.V.length;
+  if (i < 0 || i >= n) return false;
+  let c = vworld.get(sim);
+  if (!c || c.rev !== sim.structureRev) {
+    c = { rev: sim.structureRev, xs: new Float64Array(n), ys: new Float64Array(n), zs: new Float64Array(n) };
+    c.xs.fill(NaN); c.ys.fill(NaN); c.zs.fill(NaN);
+    vworld.set(sim, c);
+  }
+  if (Number.isNaN(c.xs[i])) {
+    lift(sim.V[i].x, sim.V[i].y, out);
+    c.xs[i] = out.x; c.ys[i] = out.y; c.zs[i] = out.z;
+  }
+  out.set(c.xs[i], c.ys[i], c.zs[i]);
+  return true;
 }
 
 // ── shared soft textures ────────────────────────────────────────────────────
@@ -133,11 +158,10 @@ class FilamentWeb {
   private tint: Float32Array;
   private wid: Float32Array;
   private idx: Uint32Array;
-  private edgeSlot = new Map<number, number>(); // live edge index → vertex slot
+  private slot = new Int32Array(0); // edge index → vertex slot (-1 = not drawn)
   private live = 0;
   private structRev = -1;
   private lastRebuild = 0;
-  private tmp = new Color();
   private maxEdges: number;
 
   constructor(scene: Scene, maxEdges: number) {
@@ -189,18 +213,19 @@ class FilamentWeb {
     this.lastRebuild = t;
     this.structRev = sim.structureRev;
     const V = sim.V, E = sim.E;
+    if (this.slot.length < E.length) this.slot = new Int32Array(E.length);
+    this.slot.fill(-1, 0, E.length);
     let n = 0;
-    this.edgeSlot.clear();
     for (let ei = 0; ei < E.length; ei++) {
       const e = E[ei];
       if (e.dead || n >= this.maxEdges) continue;
       const a = V[e.a], b = V[e.b];
       if (!a || !b) continue;
       const slot = n * 4;
-      this.edgeSlot.set(ei, slot);
-      lift(a.x, a.y, _v);
+      this.slot[ei] = slot;
+      if (!vertexWorld(sim, e.a, _v)) continue;
       const ax = _v.x, ay = _v.y, az = _v.z;
-      lift(b.x, b.y, _v);
+      if (!vertexWorld(sim, e.b, _v)) continue;
       const bx = _v.x, by = _v.y, bz = _v.z;
       let dx = bx - ax, dy = by - ay, dz = bz - az;
       const dl = Math.hypot(dx, dy, dz) || 1;
@@ -219,32 +244,46 @@ class FilamentWeb {
     }
     this.live = n;
     this.geo.setDrawRange(0, n * 4);
-    this.geo.attributes.position.needsUpdate = true;
-    this.geo.attributes.aTangent.needsUpdate = true;
-    this.geo.index!.needsUpdate = true;
+    // upload only the live prefix — the buffers are sized for the whole budget
+    const upload = (attr: BufferAttribute, count: number) => {
+      attr.needsUpdate = true;
+      attr.addUpdateRange(0, count);
+    };
+    if (n > 0) {
+      upload(this.geo.attributes.position as BufferAttribute, n * 12);
+      upload(this.geo.attributes.aTangent as BufferAttribute, n * 12);
+      upload(this.geo.index as unknown as BufferAttribute, n * 12);
+    }
   }
 
   /** Flow and memory change every frame: re-tint and re-width the live threads. */
   update(sim: Sim, t: number, glow: number): void {
     this.rebuildStructure(sim, t);
     const V = sim.V, E = sim.E;
-    for (let ei = 0; ei < E.length; ei++) {
-      const slot = this.edgeSlot.get(ei);
-      if (slot === undefined) continue;
+    const alphaMul = Math.min(1, glow);
+    for (let ei = 0, m = Math.min(E.length, this.slot.length); ei < m; ei++) {
+      const slot = this.slot[ei];
+      if (slot < 0) continue;
       const e = E[ei];
-      const h = HUES[V[e.b]?.hue ?? 1] ?? HUES[1];
+      let hi = V[e.b]?.hue ?? 1;
+      if (hi < 0 || hi > 2) hi = 1;
+      const h3 = hi * 3;
       const bright = (0.10 + e.mem * 0.55 + e.flow * 1.3) * glow;
-      this.tmp.copy(h).multiplyScalar(bright);
-      const alpha = (0.16 + e.mem * 0.5 + e.flow * 0.55) * Math.min(1, glow);
+      const r = HUE3[h3] * bright, g = HUE3[h3 + 1] * bright, b = HUE3[h3 + 2] * bright;
+      const alpha = (0.16 + e.mem * 0.5 + e.flow * 0.55) * alphaMul;
       const width = 0.10 + e.flow * 0.34 + e.mem * 0.28;
       for (let k = 0; k < 4; k++) {
         const ti = (slot + k) * 4;
-        this.tint[ti] = this.tmp.r; this.tint[ti + 1] = this.tmp.g; this.tint[ti + 2] = this.tmp.b; this.tint[ti + 3] = alpha;
+        this.tint[ti] = r; this.tint[ti + 1] = g; this.tint[ti + 2] = b; this.tint[ti + 3] = alpha;
         this.wid[slot + k] = width;
       }
     }
-    this.geo.attributes.aTint.needsUpdate = true;
-    this.geo.attributes.aWidth.needsUpdate = true;
+    const n4 = this.live * 4;
+    if (n4 > 0) {
+      const tint = this.geo.attributes.aTint as BufferAttribute, wid = this.geo.attributes.aWidth as BufferAttribute;
+      tint.needsUpdate = true; tint.addUpdateRange(0, n4 * 4);
+      wid.needsUpdate = true; wid.addUpdateRange(0, n4);
+    }
   }
 }
 
@@ -333,14 +372,20 @@ function makePoints(scene: Scene, max: number, order: number): { points: Points;
 }
 
 const PULSE_TRAILS = 3; // main + 2 ghosts
+const PULSE_GHOSTS: Array<[number, number, number]> = [[-7, 0.55, 0.4], [-15, 0.4, 0.18]];
 
 /** Light running the threads. Returns pass-bys each frame for the whoosh sfx. */
 class Pulses {
   private buf: ReturnType<typeof makePoints>;
-  private cum = new Map<SimPulse, Float32Array>();
+  /** pulse → path metrics: cumulative lengths + cached edge indices + this frame's mark */
+  private cum = new Map<SimPulse, { cum: Float32Array; eis: Int32Array; seen: boolean }>();
+  private cumRev = -1;
+  private stale: SimPulse[] = [];
   private walk = new Vector3();
   private camPos = new Vector3();
   private c3 = new Color();
+  private wa = new Vector3();
+  private wb = new Vector3();
   private max: number;
   readonly points: Points;
 
@@ -353,21 +398,28 @@ class Pulses {
   setPx(px: number): void { this.buf.setPx(px); }
   setCam(p: Vector3): void { this.camPos.copy(p); }
 
-  /** Cumulative segment lengths along a pulse's path (edge lengths never change). */
-  private cumlen(sim: Sim, p: SimPulse): Float32Array | null {
-    let c = this.cum.get(p);
-    if (c) return c;
+  /** Path metrics per pulse; edge indices are re-resolved when the sim renumbers. */
+  private cumlen(sim: Sim, p: SimPulse): { cum: Float32Array; eis: Int32Array; seen: boolean } | null {
+    if (this.cumRev !== sim.structureRev) {
+      this.cumRev = sim.structureRev;
+      this.cum.clear();
+    }
+    const hit = this.cum.get(p);
+    if (hit) return hit;
     const arr = new Float32Array(p.p.length);
+    const eis = new Int32Array(p.p.length);
     let acc = 0;
     for (let k = 1; k < p.p.length; k++) {
       const ei = this.edge(sim, p.p[k - 1], p.p[k]);
       if (ei < 0) return null;
+      eis[k] = ei;
       acc += sim.E[ei].len;
       arr[k] = acc;
     }
     if (acc <= 0) return null;
-    this.cum.set(p, arr);
-    return arr;
+    const entry = { cum: arr, eis, seen: false };
+    this.cum.set(p, entry);
+    return entry;
   }
 
   private edge(sim: Sim, a: number, b: number): number {
@@ -378,21 +430,20 @@ class Pulses {
     return -1;
   }
 
-  /** Point at distance d along the pulse's path, lifted into the world. */
-  private at(sim: Sim, p: SimPulse, c: Float32Array, d: number, out: Vector3): boolean {
+  /** Point at distance d along the pulse's path, in world space (endpoints cached). */
+  private at(sim: Sim, p: SimPulse, c: { cum: Float32Array; eis: Int32Array }, d: number, out: Vector3): boolean {
     if (d < 0 || d > p.len) return false;
     let k = 1;
-    while (k < p.p.length && c[k] < d) k++;
+    while (k < p.p.length && c.cum[k] < d) k++;
     if (k >= p.p.length) return false;
-    const ei = this.edge(sim, p.p[k - 1], p.p[k]);
+    const ei = c.eis[k];
     if (ei < 0) return false;
     const e = sim.E[ei];
-    const f = e.len > 0 ? (d - c[k - 1]) / e.len : 0;
+    const f = e.len > 0 ? (d - c.cum[k - 1]) / e.len : 0;
     const forward = e.a === p.p[k - 1];
-    const a = sim.V[forward ? e.a : e.b], b = sim.V[forward ? e.b : e.a];
-    if (!a || !b) return false;
-    out.set(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, 0);
-    lift(out.x, out.y, out);
+    if (!vertexWorld(sim, forward ? e.a : e.b, this.wa)) return false;
+    if (!vertexWorld(sim, forward ? e.b : e.a, this.wb)) return false;
+    out.copy(this.wa).lerp(this.wb, f);
     return true;
   }
 
@@ -400,12 +451,11 @@ class Pulses {
     const { pos, col, size, alpha } = this.buf;
     const cam = this.camPos;
     let n = 0, passed = 0;
-    const alive = new Set<SimPulse>();
     for (const p of sim.pulses) {
       if (n >= this.max) break;
-      alive.add(p);
       const c = this.cumlen(sim, p);
       if (!c) continue;
+      c.seen = true;
       this.c3.set(p.col);
       // main body first, so pass-by detection uses the same position
       if (this.at(sim, p, c, p.s, this.walk)) {
@@ -421,7 +471,7 @@ class Pulses {
           passed += cross > 0 ? -1 : 1; // -1: passed left, +1: right (count, not bool)
         }
       }
-      for (const [off, sizeV, alphaV] of [[-7, 0.55, 0.4], [-15, 0.4, 0.18]] as Array<[number, number, number]>) {
+      for (const [off, sizeV, alphaV] of PULSE_GHOSTS) {
         if (this.at(sim, p, c, p.s + off, this.walk)) {
           const i = n * PULSE_TRAILS;
           pos[i * 3] = this.walk.x; pos[i * 3 + 1] = this.walk.y; pos[i * 3 + 2] = this.walk.z;
@@ -431,7 +481,10 @@ class Pulses {
         }
       }
     }
-    for (const key of [...this.cum.keys()]) if (!alive.has(key)) this.cum.delete(key);
+    this.stale.length = 0;
+    for (const [p, e] of this.cum) if (!e.seen) this.stale.push(p);
+    for (const p of this.stale) this.cum.delete(p);
+    for (const e of this.cum.values()) e.seen = false;
     for (let i = n * PULSE_TRAILS; i < this.max * PULSE_TRAILS; i++) alpha[i] = 0;
     const geo = this.points.geometry;
     geo.attributes.position.needsUpdate = true;
@@ -446,6 +499,7 @@ class Pulses {
 /** Burst spores: the sim's own 2-D physics, lifted a breath above the web. */
 class Spores {
   private buf: ReturnType<typeof makePoints>;
+  private c3 = new Color();
   readonly points: Points;
 
   constructor(scene: Scene, max: number) {
@@ -457,7 +511,7 @@ class Spores {
 
   update(sim: Sim): void {
     const { pos, col, size, alpha } = this.buf;
-    const c3 = new Color();
+    const c3 = this.c3;
     let n = 0;
     for (const s of sim.spores) {
       if (n >= size.length) break;
@@ -647,22 +701,31 @@ interface TendrilNode {
  */
 class NodeTendrils {
   private views = new Map<string, TendrilNode>();
+  /** Junction candidates, re-scanned only when the structure changes. */
+  private cand = new Map<string, { x: number; y: number; hue: number }>();
+  private candRev = -1;
 
   constructor(private scene: Scene) {}
 
   update(sim: Sim): void {
     const now = performance.now() / 1000;
-    const live = new Set<string>();
+    if (this.candRev !== sim.structureRev) {
+      // the degree scan + key hashing only need to run when the graph changes
+      this.candRev = sim.structureRev;
+      this.cand.clear();
+      for (let i = 0; i < sim.V.length; i++) {
+        const v = sim.V[i];
+        let deg = 0;
+        for (const ei of sim.adj[i]) if (!sim.E[ei].dead) deg++;
+        if (deg < 4) continue;
+        const key = `${v.x | 0}|${v.y | 0}`;
+        if (hash01(`nt|${key}`) >= 0.12) continue;
+        this.cand.set(key, v);
+      }
+    }
 
-    for (let i = 0; i < sim.V.length; i++) {
-      const v = sim.V[i];
-      let deg = 0;
-      for (const ei of sim.adj[i]) if (!sim.E[ei].dead) deg++;
-      if (deg < 4) continue;
-      const key = `${v.x | 0}|${v.y | 0}`;
-      if (hash01(`nt|${key}`) >= 0.12) continue;
+    for (const [key, v] of this.cand) {
       if (!this.views.has(key) && this.views.size >= MAX_TENDRIL_NODES) continue;
-      live.add(key);
       const view = this.views.get(key) ?? this.spawn(key, v, v.hue);
       if (!view) continue;
       // sway: pinned at the node, looser toward the tip, hanging down the radial
@@ -680,11 +743,12 @@ class NodeTendrils {
     }
 
     for (const [key, view] of [...this.views]) {
-      view.alpha += ((live.has(key) ? 1 : -1) * 1.4) * (1 / 60);
+      const keep = this.cand.has(key);
+      view.alpha += ((keep ? 1 : -1) * 1.4) * (1 / 60);
       view.alpha = Math.min(1, Math.max(0, view.alpha));
       view.mat.opacity = 0.5 * view.alpha;
       view.bell.material.opacity = 0.45 * view.alpha;
-      if (view.alpha <= 0 && !live.has(key)) {
+      if (view.alpha <= 0 && !keep) {
         this.scene.remove(view.g);
         for (const l of view.lines) l.line.geometry.dispose();
         view.mat.dispose();
@@ -882,6 +946,7 @@ class Labels {
   private cam: PerspectiveCamera | null = null;
   private w = 0;
   private h = 0;
+  private m4 = new Matrix4();
 
   constructor(overlay: HTMLElement) {
     this.root = document.createElement('div');
@@ -934,7 +999,7 @@ class Labels {
       }
     }
     // project what is wanted, retire the rest
-    const m4 = new Matrix4();
+    const m4 = this.m4;
     const cam = this.cam;
     for (const [key, l] of [...this.byKey]) {
       if (!wanted.has(key)) {
@@ -979,7 +1044,7 @@ export class UndergrowthView {
     this.web = new FilamentWeb(scene, budgets.edges);
     this.nodules = new Nodules(scene, budgets.nodes);
     this.pulses = new Pulses(scene, budgets.pulses);
-    this.spores = new Spores(scene, 400);
+    this.spores = new Spores(scene, budgets.spores);
     this.shrooms = new Shrooms(scene);
     this.tendrils = new NodeTendrils(scene);
     this.bills = new Billboards(scene);
