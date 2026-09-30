@@ -14,16 +14,42 @@ export interface Character {
   num: number;       // race number 1-99
   acc: number;       // accent hue (suit, trim, helmet pattern)
   veh: number;       // vehicle archetype, index into VEHICLES
+  drv: number;       // which of the cast is driving, index into DRIVERS
 }
+
+/**
+ * How big a kart is on the board, in board units. The renderer sizes sprites
+ * from KART_H and the race solver builds its collision box from KART_W and
+ * KART_L, so the box a kart is shoved out of is the box you can see. The old
+ * solver used a half-width of 1.98 per kart against art only 2.9 wide, and the
+ * pack bounced off each other across a visible gap.
+ */
+export const KART_H = 2.9;      // how tall a kart and its driver stand
+export const KART_W = 2.9;      // how wide it is across the tyres
+export const KART_L = 3.9;      // how long it is nose to tail, from the side art
 
 /** Relative kart width per archetype, multiplied into the world size. */
 export const VEH_W = [1.0, 1.12, 0.7, 0.95, 1.24, 1.05];
 export const VEH_NAMES = ['STD', 'MUSCLE', 'BIKE', 'BALLOON', 'MONSTER', 'WEDGE'];
 
+/** Avalanche a 32-bit hash, so one changed character changes every field. */
+const mix32 = (x: number): number => {
+  x = Math.imul(x ^ (x >>> 16), 0x7feb352d);
+  x = Math.imul(x ^ (x >>> 15), 0x846ca68b);
+  return (x ^ (x >>> 16)) >>> 0;
+};
+
 export function characterFor(key: string): Character {
   let h = 2166136261;
   for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return { pat: h % 4, spoiler: (h >>> 3) % 3, num: 1 + ((h >>> 7) % 99), acc: (h >>> 13) % 360, veh: (h >>> 19) % 6 };
+  // Each field gets its own avalanche. Slicing bit-fields out of one FNV hash
+  // looked fine until the keys were 'seat0'..'seat7', which differ in a single
+  // character: six of the eight seats drew the same driver.
+  const a = mix32(h), b = mix32(h ^ 0x9e3779b9), c = mix32(h ^ 0x85ebca6b);
+  return {
+    pat: a % 4, spoiler: (a >>> 8) % 3, num: 1 + ((b >>> 4) % 99),
+    acc: b % 360, veh: (c >>> 6) % 6, drv: c % 8,
+  };
 }
 
 function sprite(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
@@ -68,25 +94,156 @@ function paint(c: CanvasRenderingContext2D, map: string[], pal: Record<string, s
   }
 }
 
-// ── driver: helmet with the driver's pattern, big enough to read ──────
-function drawHelmet(c: CanvasRenderingContext2D, x: number, y: number, ch: Character, back: boolean): void {
-  const e = hsl(ch.acc, 85, 52);
-  c.fillStyle = '#e8e6df';
-  c.fillRect(x + 2, y, 5, 1);
-  c.fillRect(x + 1, y + 1, 7, 1);
-  c.fillRect(x, y + 2, 9, 3);
-  c.fillRect(x + 1, y + 5, 7, 1);
-  c.fillRect(x + 2, y + 6, 5, 1);
-  if (ch.pat === 1) { c.fillStyle = e; c.fillRect(x, y + 3, 9, 1); }
-  if (ch.pat === 2) {
-    c.fillStyle = e;
-    c.fillRect(x, y + 2, 3, 2); c.fillRect(x + 3, y + 4, 3, 2); c.fillRect(x + 6, y + 2, 3, 2);
-  }
-  if (ch.pat === 3) {
-    c.fillStyle = e;
-    c.fillRect(x + 4, y, 1, 7); c.fillRect(x + 1, y + 3, 7, 1);
-  }
-  if (!back) { c.fillStyle = '#1c1e26'; c.fillRect(x + 1, y + 3, 7, 1); c.fillRect(x + 2, y + 4, 5, 1); }
+// ── the grid: eight drivers you can tell apart at fifty board units ───
+//
+// Each is an 11x12 pixel map. '.' is clear; the letters index a palette built
+// per driver, with the racer's own accent hue in the suit so team colours still
+// read. G/g are the driver's colour and its shade, W/P an eye and its pupil,
+// M a dark line (mouth, visor slot, whiskers), T teeth, N a beak, nose or lens,
+// R/r metal, A/a the racing suit.
+export interface Driver { name: string; skin: string; shade: string; extra: string; map: string[] }
+
+export const DRIVERS: Driver[] = [
+  { name: 'GREMLIN', skin: '#6fbf46', shade: '#3f8a2a', extra: '#ffe27a', map: [
+    '.G.......G.',
+    '.GG.....GG.',
+    '.GGGGGGGGG.',
+    'GGGGGGGGGGG',
+    'GGWPGGGWPGG',
+    'GGWWGGGWWGG',
+    'GGGGGGGGGGG',
+    'GGTTTTTTTGG',
+    'GGMMMMMMMGG',
+    '.GGGGGGGGG.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ] },
+  { name: 'RUSTBUCKET', skin: '#9aa3b2', shade: '#5a6170', extra: '#ff6b4a', map: [
+    '.....N.....',
+    '.....r.....',
+    '.RRRRRRRRR.',
+    'RRRRRRRRRRR',
+    'RAAAAAAAAAR',
+    'RAPPAAAPPAR',
+    'RAAAAAAAAAR',
+    'RRRRRRRRRRR',
+    'RrrRRRRRrrR',
+    '.RRRRRRRRR.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ] },
+  { name: 'WHISKERS', skin: '#d79a5b', shade: '#9c6634', extra: '#ffd8a8', map: [
+    '.GG.....GG.',
+    '.GgG...GgG.',
+    '.GGGGGGGGG.',
+    'GGGGGGGGGGG',
+    'GGWPGGGWPGG',
+    'GGWWGGGWWGG',
+    'GGGGGNGGGGG',
+    'MGGGMMMGGGM',
+    'GGGGGGGGGGG',
+    '.GGGGGGGGG.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ] },
+  { name: 'GOGGLES', skin: '#e8b48a', shade: '#a87450', extra: '#5ad2e8', map: [
+    '...........',
+    '..aaaaaaa..',
+    '.aaaaaaaaa.',
+    'GGGGGGGGGGG',
+    'GNNNGGGNNNG',
+    'GNPNGGGNPNG',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    'GGMMMMMMMGG',
+    '.GGGGGGGGG.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ] },
+  { name: 'RATTLE', skin: '#e9e6dc', shade: '#a8a49a', extra: '#ff4d6d', map: [
+    '...........',
+    '..GGGGGGG..',
+    '.GGGGGGGGG.',
+    'GGGGGGGGGGG',
+    'GGPPGGGPPGG',
+    'GGPPGGGPPGG',
+    'GGGGPGGGGGG',
+    'GGGGGGGGGGG',
+    'GMGMGMGMGMG',
+    '.GGGGGGGGG.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ] },
+  { name: 'BLOOP', skin: '#9ee6c4', shade: '#59a882', extra: '#c98cf0', map: [
+    '...........',
+    '...GGGGG...',
+    '..GGGGGGG..',
+    '.GGGGGGGGG.',
+    'GGGGGGGGGGG',
+    'GPPPGGPPPGG',
+    'GPPPGGPPPGG',
+    'GGPGGGGPGGG',
+    'GGGGMGGGGGG',
+    '.GGGGGGGGG.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ] },
+  { name: 'QUACKERS', skin: '#f2f0e6', shade: '#b4b1a4', extra: '#ffa32e', map: [
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+    'AAAAAAAAAAA',
+    '.GGGGGGGGG.',
+    'GGWPGGGWPGG',
+    'GGWWGGGWWGG',
+    'GGGNNNNNGGG',
+    'GGGNNNNNGGG',
+    'GGGGGGGGGGG',
+    '.GGGGGGGGG.',
+    '..aaaaaaa..',
+    '.aaaaaaaaa.',
+  ] },
+  { name: 'VISOR', skin: '#efece1', shade: '#a9a69c', extra: '#3ad1ff', map: [
+    '...........',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+    'AAAAAAAAAAA',
+    'AAAAAAAAAAA',
+    'ANNNNNNNNNA',
+    'ANPNNNNNPNA',
+    'AAAAAAAAAAA',
+    '.AAAAAAAAA.',
+    '.aaaaaaaaa.',
+    '..GGGGGGG..',
+    '.GGGGGGGGG.',
+  ] },
+];
+
+const DRIVER_W = 11, DRIVER_H = 12;
+
+/** Palette for one driver, with the racer's accent hue in the suit. */
+function drvPal(d: Driver, acc: number): Record<string, string> {
+  return {
+    G: d.skin, g: d.shade, R: d.skin, r: d.shade,
+    W: '#fbfaf4', P: '#14161d', M: '#1b1d25', T: '#fbfaf4',
+    N: d.extra, A: hsl(acc, 80, 56), a: hsl(acc, 75, 34),
+  };
+}
+
+/**
+ * Paint a driver into the canvas, centred on cx with its shoulders at baseY.
+ * 'squash' narrows the head for the side and front views, which reads as a
+ * profile at this size without needing a second set of maps.
+ */
+function drawDriver(c: CanvasRenderingContext2D, cx: number, baseY: number, ch: Character, squash = 1): void {
+  const d = DRIVERS[ch.drv % DRIVERS.length];
+  const w = Math.max(5, Math.round(DRIVER_W * squash));
+  const cv = document.createElement('canvas');
+  cv.width = DRIVER_W; cv.height = DRIVER_H;
+  const g = cv.getContext('2d')!;
+  g.imageSmoothingEnabled = false;
+  paint(g, d.map, drvPal(d, ch.acc), DRIVER_W, 0);
+  c.imageSmoothingEnabled = false;
+  c.drawImage(cv, 0, 0, DRIVER_W, DRIVER_H, Math.round(cx - w / 2), Math.round(baseY - DRIVER_H), w, DRIVER_H);
 }
 
 /** SMK rule: everything has a thick black outline — draw it around the silhouette. */
@@ -401,15 +558,24 @@ function wheelSpin(cv: HTMLCanvasElement, veh: number, wf: number): void {
   c.putImageData(img, 0, 0);
 }
 
+/**
+ * One canvas height for every view of a kart. The body is bottom-aligned in it
+ * and the driver sits in the headroom above, so a kart is the same size on the
+ * board whichever way it happens to be facing.
+ */
+const KART_PX_H = 30;
+/** Rows of the body the driver's shoulders sink into, so it looks seated. */
+const SEAT_SINK = 3;
+
 /** Rear view of the driver's machine, assembled from map + driver + number. */
 export function kartRear(hue: number, ch: Character, wf = 0): HTMLCanvasElement {
   const def = REAR[ch.veh];
-  const h = def.map.length + 2;
-  const [cv, c] = sprite(RW, h);
-  paint(c, def.map, palFor(hue, ch.acc), RW, 1);
+  const [cv, c] = sprite(RW, KART_PX_H);
+  const top = KART_PX_H - def.map.length - 1;
+  paint(c, def.map, palFor(hue, ch.acc), RW, top);
   wheelSpin(cv, ch.veh, wf);
-  if (def.plate[1]) drawPlate(c, def.plate[0], def.plate[1] + 1, ch.num);
-  drawHelmet(c, def.helmet[0], def.helmet[1] + 1, ch, true);
+  if (def.plate[1]) drawPlate(c, def.plate[0], def.plate[1] + top, ch.num);
+  drawDriver(c, RW / 2, top + def.helmet[1] + SEAT_SINK, ch);
   outline(cv);
   return cv;
 }
@@ -427,10 +593,11 @@ export function kartFront(hue: number, ch: Character): HTMLCanvasElement {
 /** Side view, facing right. */
 export function kartSide(hue: number, ch: Character): HTMLCanvasElement {
   const def = SIDE[ch.veh];
-  const h = def.map.length + 2;
-  const [cv, c] = sprite(SW, h);
-  paint(c, def.map, palFor(hue, ch.acc), SW, 1);
-  drawHelmet(c, def.helmet[0], def.helmet[1] + 1, ch, false);
+  const [cv, c] = sprite(SW, KART_PX_H);
+  const top = KART_PX_H - def.map.length - 1;
+  paint(c, def.map, palFor(hue, ch.acc), SW, top);
+  // narrower head: a profile, without a second set of maps
+  drawDriver(c, def.helmet[0] + 4, top + def.helmet[1] + SEAT_SINK, ch, 0.66);
   outline(cv);
   return cv;
 }

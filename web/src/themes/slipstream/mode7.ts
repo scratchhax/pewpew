@@ -13,7 +13,7 @@ const TEXP = 1024;          // world bitmap side (must be a power of two)
 export interface Cam {
   x: number; y: number;     // position on the world bitmap, texture units
   heading: number;          // radians; 0 = looking along +x
-  speedFrac: number;        // 0..1.4, drives the wobble
+  speedFrac: number;        // 0..1.4, drives the wobble and the field of view
   bob: number;              // horizon offset in buffer px (hills of the board)
 }
 
@@ -25,6 +25,9 @@ export class Mode7 {
   private fx = 1; private fy = 0;      // forward
   private rx = 0; private ry = 1;      // right
   private focal = 1;
+  /** The focal length the last ground pass actually used, after the speed
+   *  widening. Sprites project with this so they stay pinned to the road. */
+  drawFocal = 1;
   readonly camH = 9.2;                 // camera height above the plane, units
 
   constructor(private canvas: HTMLCanvasElement, private ctx: CanvasRenderingContext2D) {
@@ -88,7 +91,11 @@ export class Mode7 {
     const h = cam.heading;
     this.fx = Math.cos(h); this.fy = Math.sin(h);
     this.rx = -this.fy; this.ry = this.fx;
-    const f = this.focal;
+    // The field of view opens as the pace builds - the ground rushes past the
+    // edges of the screen and the horizon pulls away. It is the oldest speed
+    // cue there is and it costs one multiply. Eased, never snapped.
+    const f = this.focal * (1 - 0.13 * Math.min(1, cam.speedFrac));
+    this.drawFocal = f;
     const hy = Math.max(1, Math.min(H - 6, Math.round(H * 0.42 + cam.bob)));
     this.horizonY = hy;
 
@@ -125,7 +132,9 @@ export class Mode7 {
     const depth = dx * this.fx + dy * this.fy;
     if (depth < 1.5) return null;
     const lat = dx * this.rx + dy * this.ry;
-    const k = this.focal / depth;
+    // the focal the ground was drawn with, or sprites drift off the road as
+    // the field of view opens
+    const k = this.drawFocal / depth;
     return { sx: this.W / 2 + lat * k, baseY: this.horizonY + this.camH * k, depth, k };
   }
 
@@ -133,12 +142,17 @@ export class Mode7 {
    * Draw a sprite standing on the plane at (wx, wy). Sorted by the caller
    * (back to front); clipped to below the horizon so nothing pokes into the sky.
    */
-  drawSprite(spr: HTMLCanvasElement, wx: number, wy: number, cam: Cam, worldW: number, alpha = 1, lift = 0): boolean {
+  drawSprite(spr: HTMLCanvasElement, wx: number, wy: number, cam: Cam, worldH: number, alpha = 1, lift = 0): boolean {
     const p = this.project(wx, wy, cam);
     if (!p) return false;
-    const sw = worldW * p.k;
+    // `worldH` is how tall the thing stands on the board, in board units, and
+    // the width follows the sprite's own aspect. It used to be the other way
+    // round, which meant the same kart was 1.28 units tall seen from behind and
+    // 0.75 from the side - it shrank when it turned - and left every prop sized
+    // against nothing, so the item box came out twice the height of a kart.
+    const sh = worldH * p.k;
+    const sw = sh * (spr.width / spr.height);
     if (sw < 1 || p.sx < -sw || p.sx > this.W + sw) return false;
-    const sh = sw * (spr.height / spr.width);
     const ctx = this.ctx;
     const was = ctx.globalAlpha;
     if (alpha < 1) ctx.globalAlpha = alpha;
@@ -162,14 +176,16 @@ export class Mode7 {
     ctx.save();
     ctx.strokeStyle = col;
     ctx.lineWidth = 2;
-    const n = 5;
+    // more of them, running faster, the harder we are going: they used to
+    // appear only under a boost, so cruising had no speed cue at all
+    const n = 4 + Math.round(intensity * 5);
+    const rate = 1.5 + intensity * 3.4;
     for (let side = 0; side < 2; side++) {
       const x0 = side ? W - 26 : 6;
       for (let i = 0; i < n; i++) {
-        const ph = ((t * 2.4 + i / n) % 1);
+        const ph = ((t * rate + i / n) % 1);
         const y = H * (0.35 + 0.62 * ph);
-        const a = intensity * (1 - ph) * 0.8;
-        ctx.globalAlpha = a;
+        ctx.globalAlpha = intensity * (1 - ph) * 0.8;
         ctx.beginPath();
         ctx.moveTo(x0, y - 7); ctx.lineTo(x0 + 12, y); ctx.lineTo(x0, y + 7);
         ctx.stroke();

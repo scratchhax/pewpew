@@ -5,6 +5,23 @@ import { slipScore, engineSpeed } from './score';
 import { Mode7 } from './mode7';
 import { buildTrack, type Track } from './track';
 import { Race, SEATS } from './race';
+import * as Sprites from './sprites';
+import { KART_H } from './sprites';
+
+/**
+ * How tall each thing stands on the board, in board units, measured against a
+ * kart. Every drawSprite call sizes itself from here, so the whole scene can be
+ * checked against one number instead of a scattering of magic widths.
+ */
+const H_SHADOW = KART_H * 0.43;    // a flat smudge as wide as the tyres
+const H_BOX = KART_H * 0.72;       // item box: chest high on a driver
+const H_SHELL = KART_H * 0.34;     // a shell is a thing you trip over
+const H_BANANA = KART_H * 0.20;
+const H_HAZARD = KART_H * 0.24;
+const H_FLAME = KART_H * 0.5;
+const H_LABEL = KART_H * 0.17;     // the name tag floating over the helmet
+const H_GLOW = KART_H * 1.15;
+const H_BOARD = KART_H * 2.6;      // the trackside flip board
 import { board as boardSprite, banana, flame, ghost, itemBox, kartFront, kartRear, kartSide, label, mushroom, oil, shadow, shell, VEH_W, type Character } from './sprites';
 import type { ItemKind } from './race';
 import './hud.css';
@@ -247,18 +264,18 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       const p = m7.project(hz.x, hz.y, cam);
       if (!p) continue;
       const spr = hz.kind === 'oil' ? oilSpr : bananaSpr;
-      const ww = hz.kind === 'oil' ? 3.4 : 1.6;
+      const ww = hz.kind === 'oil' ? H_HAZARD * 0.7 : H_BANANA;
       draws.push({ depth: p.depth, run: () => m7.drawSprite(spr, hz.x, hz.y, cam, ww, Math.min(1, hz.life / 2)) });
     }
     for (const g of race.gantries) {
       if (g.respawn > 0) continue;
       const gp = track.offset(g.s, 0);
       const p = m7.project(gp.x, gp.y, cam);
-      if (p) draws.push({ depth: p.depth, run: () => m7.drawSprite(boxSpr, gp.x, gp.y, cam, 2.6, 1, 1.5 + Math.sin(f.t * 3) * 0.12) });
+      if (p) draws.push({ depth: p.depth, run: () => m7.drawSprite(boxSpr, gp.x, gp.y, cam, H_BOX, 1, KART_H * 0.5 + Math.sin(f.t * 3) * 0.12) });
     }
     const bpos = track.offset(track.boardS, -(track.width / 2 + 34));
     const bpp = m7.project(bpos.x, bpos.y, cam);
-    if (bpp) draws.push({ depth: bpp.depth, run: () => m7.drawSprite(boardSpr, bpos.x, bpos.y, cam, 8.4, 1, 1.4) });
+    if (bpp) draws.push({ depth: bpp.depth, run: () => m7.drawSprite(boardSpr, bpos.x, bpos.y, cam, H_BOARD, 1, 1.4) });
     for (const r of race.racers) {
       if (r.seat === heroIdx) continue;
       const p = race.kartPos(r.seat);
@@ -272,29 +289,31 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       const spr = r.ghost ? ghostRear(r.hue, r.char) : side ? karts(r.hue, r.char).side : facingBack ? karts(r.hue, r.char).front : karts(r.hue, r.char, wf).rear;
       const alpha = r.ghost ? 0.42 : r.flash > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(r.flash * 20)) : 1;
       const lift = r.spin > 0 ? Math.abs(Math.sin(r.spin * 9)) * 0.25 : 0;
-      draws.push({ depth: pr.depth + 0.02, run: () => m7.drawSprite(shadowSpr, p.x, p.y, cam, 4.0 * VEH_W[r.char.veh], r.ghost ? 0.3 : 1) });
+      draws.push({ depth: pr.depth + 0.02, run: () => m7.drawSprite(shadowSpr, p.x, p.y, cam, H_SHADOW * VEH_W[r.char.veh], r.ghost ? 0.3 : 1) });
       if (r.boost > 1 && !r.ghost && pr.depth < 280) {
-        const fl = 1.3 * VEH_W[r.char.veh] * (((f.t * 26 + r.seat * 7) | 0) % 2 ? 1 : 0.8);
+        const fl = H_FLAME * VEH_W[r.char.veh] * (((f.t * 26 + r.seat * 7) | 0) % 2 ? 1 : 0.8);
         const bx = p.x - Math.cos(p.heading) * 1.9, by = p.y - Math.sin(p.heading) * 1.9;
         draws.push({ depth: pr.depth + 0.01, run: () => m7.drawSprite(flameSpr, bx, by, cam, fl, 0.9, 0.1) });
       }
-      draws.push({ depth: pr.depth, run: () => m7.drawSprite(spr, p.x, p.y, cam, 3.9 * VEH_W[r.char.veh], alpha, lift) });
+      draws.push({ depth: pr.depth, run: () => m7.drawSprite(spr, p.x, p.y, cam, KART_H * VEH_W[r.char.veh], alpha, lift) });
       // name + position tag floating over the helmet
       if (pr.depth < 320) {
         const rank = race.order.indexOf(r.seat) + 1;
         const lbl = nameLabel(r.name, rank, r.hue);
-        const lw = lbl.width * 0.062;
-        draws.push({ depth: pr.depth - 0.02, run: () => m7.drawSprite(lbl, p.x, p.y, cam, lw, r.ghost ? 0.5 : 0.92, 2.5) });
+        // fixed height, width follows the text - the old rule scaled the tag's
+        // world size with its character count, so a long name was a billboard
+        // wider than the kart carrying it
+        draws.push({ depth: pr.depth - 0.02, run: () => m7.drawSprite(lbl, p.x, p.y, cam, H_LABEL, r.ghost ? 0.5 : 0.92, KART_H * 1.02) });
       }
       if (r.glow > 0 && pr.depth < 240) {
-        draws.push({ depth: pr.depth - 0.03, run: () => m7.drawSprite(glowSpr(), p.x, p.y, cam, 4.8, 0.4 * Math.min(1, r.glow)) });
+        draws.push({ depth: pr.depth - 0.03, run: () => m7.drawSprite(glowSpr(), p.x, p.y, cam, H_GLOW, 0.4 * Math.min(1, r.glow)) });
       }
     }
     for (const sh of race.shells) {
       const sp = track.offset(sh.s, sh.lat);
       const pr = m7.project(sp.x, sp.y, cam);
       if (!pr) continue;
-      draws.push({ depth: pr.depth, run: () => m7.drawSprite(sh.kind === 'red' ? shellRed : shellGreen, sp.x, sp.y, cam, 2.4, 1, 0.35) });
+      draws.push({ depth: pr.depth, run: () => m7.drawSprite(sh.kind === 'red' ? shellRed : shellGreen, sp.x, sp.y, cam, H_SHELL, 1, 0.2) });
       if (pr.depth < 26 && throttle.allow('shellwhoosh', 1.1)) {
         audio.sfx('shell', { pan: pr.sx > m7.W / 2 ? 0.6 : -0.6 });
       }
@@ -305,8 +324,10 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     // ── your kart: the fixed anchor above the bottom of the board ──
     const heroWf = ((f.t * (14 + speedFrac * 34)) | 0) % 4;
     const kartSpr = hero.ghost ? ghostRear(hero.hue, hero.char) : karts(hero.hue, hero.char, heroWf).rear;
-    const kw = Math.max(30, Math.round(m7.W * (0.08 + speedFrac * 0.012))) * VEH_W[hero.char.veh];
-    const kh = Math.round(kw * (kartSpr.height / kartSpr.width));
+    // sized by height, like every other sprite, so the hero kart is the same
+    // machine as the ones it is racing rather than a differently scaled one
+    const kh = Math.round(m7.H * (0.20 + speedFrac * 0.018)) * VEH_W[hero.char.veh];
+    const kw = Math.round(kh * (kartSpr.width / kartSpr.height));
     const steer = Math.max(-1, Math.min(1, dh * 2.2)) * kw * 0.22;
     const bounce = speedFrac * 1.2 * Math.sin(f.t * 24);
     const kartY = Math.round(m7.H - kh - Math.max(7, Math.round(m7.H * 0.08)) + bounce);
@@ -317,7 +338,10 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     }
     ctx.drawImage(kartSpr, Math.round(m7.W / 2 - kw / 2 + steer), kartY, kw, kh);
 
-    const chev = settings.kChevrons ? Math.min(0.8, Math.max(0, hero.boost - 3.5) / 11) : 0;
+    // always running, sharpening with pace, and a kick on top under a boost
+    const chev = settings.kChevrons
+      ? Math.min(0.95, 0.10 + speedFrac * 0.42 + Math.max(0, hero.boost - 3.5) / 14)
+      : 0;
     m7.drawChevrons(chev, f.t);
     engineSpeed(Math.min(1, speedFrac));
 
@@ -392,6 +416,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       LEADER: race.racers[race.leaderIdx].name,
     }),
     diag: () => ({
+      m7, race, track, sprites: Sprites,
       W: m7.W, H: m7.H, trackTotal: Math.round(track.total), rows: settings.kRows,
       hero: race.heroIdx, leader: race.leaderIdx,
       racers: race.racers.map((r) => ({ n: r.name, g: r.ghost ? 1 : 0, s: Math.round(r.s), lat: +r.lat.toFixed(1), v: r.char.veh, sp: Math.round(r.speed), a: +r.act.toFixed(1) })),
