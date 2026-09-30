@@ -63,6 +63,7 @@ async function create(host: ThemeHost<typeof UNDERGROWTH_DEFAULTS>, init: Render
     sim.maxPulses = settings.uMaxPulses;
     world.setSpecks(settings.uDust);
     world.setBloom(settings.quality !== 'low');
+    world.setAurora(settings.uAurora);
   }
   applyBudgets();
 

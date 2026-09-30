@@ -58,30 +58,66 @@ export interface World {
   setPixelRatio(r: number): void;
   setBloom(on: boolean): void;
   setSpecks(n: number): void;
+  setAurora(on: boolean): void;
   /** `t` is sim seconds (bullet time slows the void too); `driftMul` stirs the dust on weather. */
   update(dt: number, t: number, driftMul: number): void;
   render(): void;
 }
 
-/** The earth all around: dark soil below, a faint glow of the forest above. */
+/** The earth all around: dark soil below, and an aurora rippling overhead. */
 function backdrop(): Mesh {
   const mat = new ShaderMaterial({
-    uniforms: { uTime: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uAurora: { value: 1 } },
     vertexShader: vsWorld,
     fragmentShader: /* glsl */`
-      uniform float uTime;
+      uniform float uTime, uAurora;
       varying vec3 vWp;
+      float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+      float noise(vec2 p) {
+        vec2 i = floor(p), f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y);
+      }
+      float fbm(vec2 p) { return noise(p) * 0.55 + noise(p * 2.7) * 0.3 + noise(p * 6.1) * 0.15; }
+
+      // one aurora curtain: ridged noise scrolls sideways, stretched vertical
+      // to ribbons; windowed to a band of sky, its lower edge shimmering
+      float curtain(float az, float up, float seed, float scale, float speed, float hCenter, float hWidth) {
+        vec2 q = vec2(az * scale + seed * 7.3 + uTime * speed, seed * 3.1);
+        float n = fbm(q * vec2(2.4, 0.9));
+        float ribbon = 1.0 - abs(noise(q * vec2(1.6, 0.55) + n * 0.8) * 2.0 - 1.0);
+        ribbon = pow(max(ribbon, 0.0), 3.2);
+        float hv = exp(-pow((up - hCenter - 0.04 * sin(az * 4.0 + uTime * speed * 2.0)) / hWidth, 2.0));
+        float shimmer = 0.75 + 0.25 * sin(az * 23.0 + uTime * 1.4 + seed * 9.0);
+        return ribbon * hv * shimmer;
+      }
       void main() {
         vec3 dir = normalize(vWp - cameraPosition);
         float up = dir.y;
         vec3 soil = vec3(0.010, 0.014, 0.012);
         vec3 earth = vec3(0.016, 0.030, 0.026);
-        vec3 canopy = vec3(0.030, 0.075, 0.062);
+        vec3 night = vec3(0.020, 0.048, 0.046);
         vec3 col = mix(soil, earth, smoothstep(-0.85, 0.05, up));
-        col = mix(col, canopy, smoothstep(0.15, 0.9, up) * 0.8);
-        // a slow, breathing band where the canopy glow leaks in
-        float band = exp(-pow((up - 0.22 + 0.03 * sin(uTime * 0.07 + dir.x * 3.0)) * 7.0, 2.0));
-        col += vec3(0.05, 0.14, 0.11) * band * 0.35;
+        col = mix(col, night, smoothstep(0.12, 0.6, up));
+        float az = atan(dir.z, dir.x);
+        if (uAurora > 0.001) {
+          float c1 = curtain(az, up, 0.0, 2.2, 0.045, 0.42, 0.26);
+          float c2 = curtain(az, up, 1.0, 3.4, 0.070, 0.58, 0.20);
+          float c3 = curtain(az, up, 2.0, 1.6, 0.030, 0.30, 0.30);
+          float a = c1 * 0.55 + c2 * 0.42 + c3 * 0.3;
+          float rise = smoothstep(0.10, 0.32, up);
+          vec3 teal = vec3(0.10, 0.72, 0.52), cyan = vec3(0.22, 0.55, 0.95), violet = vec3(0.46, 0.24, 0.86);
+          vec3 ac = mix(teal, cyan, clamp(c2 * 1.6, 0.0, 1.0));
+          ac = mix(ac, violet, clamp((c1 + c2) * 0.45 + smoothstep(0.72, 0.95, up) * 0.5, 0.0, 1.0) * 0.55);
+          float breathe = 0.85 + 0.15 * sin(uTime * 0.11) * sin(uTime * 0.043 + 2.0);
+          col += ac * a * rise * breathe * uAurora * 0.60;
+          col += vec3(0.05, 0.11, 0.10) * rise * rise * 0.12;
+        } else {
+          vec3 canopy = vec3(0.030, 0.075, 0.062);
+          col = mix(col, canopy, smoothstep(0.15, 0.9, up) * 0.8);
+          float band = exp(-pow((up - 0.22 + 0.03 * sin(uTime * 0.07 + dir.x * 3.0)) * 7.0, 2.0));
+          col += vec3(0.05, 0.14, 0.11) * band * 0.35;
+        }
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -227,6 +263,7 @@ export function createWorld(mount: HTMLElement, antialias: boolean, powerPref: W
     setPixelRatio(r) { renderer.setPixelRatio(r); composer.setPixelRatio(r); composer.setSize(window.innerWidth, window.innerHeight); setRes(); },
     setBloom(on) { bloom.enabled = on; },
     setSpecks(n) { speckPoints.geometry.setDrawRange(0, n); },
+    setAurora(on) { (backdropMesh.material as ShaderMaterial).uniforms.uAurora.value = on ? 1 : 0; },
     update(dt, t, driftMul) {
       drift[0] += dt * 1.6 * driftMul; drift[1] += dt * 0.4 * driftMul; drift[2] += dt * 1.1 * driftMul;
       const u = (speckPoints.material as ShaderMaterial).uniforms;

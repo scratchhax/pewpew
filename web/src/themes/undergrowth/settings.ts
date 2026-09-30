@@ -17,6 +17,7 @@ export const UNDERGROWTH_DEFAULTS = {
   uScorch: true,        // block → a scorch scar where the flow ran
   uBlight: true,        // threat → a blight fog crawls the web
   uLabels: true,        // host and domain labels
+  uAurora: true,        // an aurora ripples across the sky above the mat
   uFocus: true,         // the camera drifts toward fresh blooms and blights
   uPersist: true,       // the garden survives reloads (shared with the Mycelium scene)
 
@@ -59,6 +60,7 @@ export const UNDERGROWTH_CONTROLS = {
     toggle('uSprouts', 'DHCP sprouts'), toggle('uSpores', 'Wi-Fi spores'),
     toggle('uScorch', 'Block scorch'), toggle('uBlight', 'Threat blight'),
     toggle('uLabels', 'Labels'), toggle('uFocus', 'Follow events'), toggle('uPersist', 'Keep the garden'),
+    toggle('uAurora', 'Aurora sky'),
   ],
   budgets: [
     range('uCamSpeed', 'Flight speed', 2, 30, 0.5),
