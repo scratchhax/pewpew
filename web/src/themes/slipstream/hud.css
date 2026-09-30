@@ -47,28 +47,17 @@ body[data-theme="slipstream"] #slip-item canvas { image-rendering: pixelated; di
 /* the race has one map, and it's the circuit — no room for a generic radar */
 body[data-theme="slipstream"] #radar-wrap { display: none !important; }
 
+/* where the radar normally sits: this scene hides the radar because the
+   circuit is its map, and bottom-right put it under the RACE FLUX panel */
 body[data-theme="slipstream"] #slip-map {
-  position: fixed; right: 14px; bottom: 14px; z-index: 38; pointer-events: none;
+  position: fixed; left: 24px; top: 132px; z-index: 38; pointer-events: none;
   border: 2px solid rgba(255, 210, 63, 0.5); background: rgba(8, 10, 16, 0.66);
-  padding: 4px; image-rendering: pixelated;
+  padding: 4px 4px 2px; image-rendering: pixelated;
 }
 body[data-theme="slipstream"] #slip-map canvas { image-rendering: pixelated; display: block; }
 body[data-theme="slipstream"] #slip-map .cap {
   font: 700 9px/1.4 ui-monospace, monospace; letter-spacing: 0.22em; color: #ffd23f;
+  margin-bottom: 2px;
 }
 
-body[data-theme="slipstream"] #slip-caution {
-  position: fixed; left: 0; right: 0; top: 0; height: 34px; z-index: 37;
-  display: none; align-items: center; justify-content: center;
-  font: 900 14px/1 ui-monospace, monospace; letter-spacing: 0.4em; color: #101010;
-  background: repeating-linear-gradient(45deg, #ffd23f 0 14px, #14110a 14px 28px);
-  text-shadow: none; pointer-events: none;
-}
-body[data-theme="slipstream"] #slip-caution.on { display: flex; animation: slip-yel 0.8s steps(2) infinite; }
-@keyframes slip-yel { 50% { filter: brightness(0.6); } }
 
-body[data-theme="slipstream"] #slip-flash {
-  position: fixed; inset: 0; z-index: 36; pointer-events: none;
-  background: #fff; opacity: 0; transition: opacity 0.35s linear;
-}
-body[data-theme="slipstream"] #slip-flash.on { opacity: 0.8; transition: opacity 0.04s; }
