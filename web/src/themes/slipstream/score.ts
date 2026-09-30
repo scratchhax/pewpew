@@ -3,72 +3,93 @@ import type { State } from '../../state';
 import { Conductor, Style, type Mood, type StyleDef } from '../../sound/conductor';
 
 /**
- * SLIPSTREAM's soundtrack: 16-bit race-pop played by a band, not a bleeper.
+ * SLIPSTREAM's soundtrack: 16-bit race-pop, major key, shuffled.
  *
- *   grand prix   : 164 bpm shuffle — claps on the backbeat, a walking bass,
- *                  off-beat brass stabs and a bell hook over the top
- *   sunset drift : 138 bpm cruise — muted guitar comp, horn pad, organ
- *   rainbow      : 176 bpm sprint — supersaw lead over four on the floor,
- *                  glass arpeggio riding the bar
+ *   circuit  : 172 bpm — claps on the backbeat, a bass bouncing root to
+ *              fifth, off-beat brass stabs, a bell hook over the top
+ *   seaside  : 152 bpm cruise — organ pad, chopped guitar, horn, bells
+ *   rainbow  : 184 bpm sprint — plucked bass, brass, glass sparkle, bells
  *
- * Every style states a HOOK: a short phrase keyed to the bar, so there is
- * something to remember. Both of the originals were a drum machine and one
- * chip voice playing root notes, which is why nothing stuck.
+ * Three rules hold across all of them, because the previous version broke all
+ * three and came out sounding like a warning rather than a race. Every chord
+ * in every style is major - SEASIDE used to be C natural minor, with Cm, Ab,
+ * Fm and Gm, and on rotate it played a third of the time. Every melody is
+ * written in the major pentatonic, so no passing note can land on a flattened
+ * third or seventh even by accident. And everything shuffles: the off-beat
+ * sixteenth lands about a third of a step late, which is the difference
+ * between a loop that marches and one that bounces.
+ *
+ * Each style states a two-bar HOOK up in the fifth octave, on bells, so there
+ * is something to whistle. The reese bass and the supersaw are gone - those
+ * are drum-and-bass and trance textures and neither belongs on a kart track.
  *
  * On top: the start-lights beeps, the pit radio blip, the shell's screaming
  * fly-past, spin-out slides, lap chimes — and a square-wave engine purr
  * whose pitch rides the hero's speed.
  */
 
-class GrandPrix extends Style {
+/** A frequency `n` semitones above the tonic, `oct` octaves up. */
+const semisOf = (root: number, n: number, oct: number): number => root * Math.pow(2, oct + n / 12);
+
+/**
+ * Major pentatonic, for every melody in this score. Picking the notes from a
+ * five-note major scale means no phrase can land on a flattened third or
+ * seventh, which is the interval that was making the old soundtrack sound
+ * like a warning rather than a race.
+ */
+const PENTA = [0, 2, 4, 7, 9];
+
+/**
+ * A shuffled sixteenth. The off-beat lands late, which is the whole difference
+ * between a loop that marches and one that bounces. Everything in this score
+ * swings; nothing did before.
+ */
+const SWING = 0.3;
+
+class Circuit extends Style {
   readonly id = 'green';
-  readonly bpm = 164;
+  readonly bpm = 172;
   readonly root = 43.65;                                     // F
-  readonly scale = [0, 2, 4, 5, 7, 9, 11];
-  readonly chords = [[0, 4, 7], [5, 9, 12], [7, 11, 14], [2, 5, 9]];
+  readonly scale = PENTA;
+  // I - IV - V - I, all major
+  readonly chords = [[0, 4, 7], [5, 9, 12], [7, 11, 14], [0, 4, 7]];
   readonly barsPerChord = 1;
   readonly leadOct = 5;
   readonly level = 0.62;
 
-  /** The hook: scale degrees per sixteenth, -1 for a rest. Two bars long. */
+  /** Two bars of tune, as pentatonic degrees; -1 is a rest. */
   private static readonly HOOK = [
-    4, -1, 2, -1, 0, -1, 2, 4, -1, -1, 5, -1, 4, -1, 2, -1,
-    0, -1, -1, 2, 4, -1, 7, -1, 5, -1, 4, 2, -1, -1, -1, -1,
+    0, -1, 2, 4, -1, 2, 0, -1, 4, -1, 5, 7, -1, 5, 4, -1,
+    2, -1, 4, 5, -1, 7, 9, -1, 7, -1, 5, 4, 2, -1, 0, -1,
   ];
 
+  private sw(pos: number, t: number): number { return pos % 2 ? t + this.stepDur * SWING : t; }
+
   step(i: number, t: number, m: Mood): void {
-    const s = this.s, b = this.bus, pos = i % 16;
-    const ch = this.chordAt(i);
+    const s = this.s, b = this.bus, pos = i % 16, ch = this.chordAt(i);
+    const st = this.sw(pos, t);
 
-    // shuffled backbeat: kick on 1 and the and-of-3, claps on 2 and 4
-    if (pos === 0 || pos === 6 || pos === 10) s.kick(b, t, pos === 0 ? 0.16 : 0.1);
-    if (pos === 4 || pos === 12) {
-      s.snare(b, t, 0.055, pos === 12 ? 0.25 : -0.25);
-      s.stomp(b, t, 0.03);                                   // handclap layer
-    }
-    if (pos % 2 === 1) s.hat(b, t, 0.012, pos % 4 ? 0.4 : -0.4, pos === 15);
+    // kick on the one and the and-of-three, claps on two and four
+    if (pos === 0 || pos === 6 || pos === 10) s.kick(b, t, pos === 0 ? 0.115 : 0.07);
+    if (pos === 4 || pos === 12) { s.snare(b, t, 0.036, pos === 12 ? 0.25 : -0.25); s.stomp(b, t, 0.024); }
+    if (pos % 2 === 1) s.hat(b, st, 0.012, pos % 4 ? 0.4 : -0.4, pos === 15);
 
-    // walking bass: root, fifth, octave, and a chromatic lead-in to the turn
+    // bass bounces root to fifth, eighths, shuffled
     if (pos % 2 === 0) {
-      const deg = [0, 0, 2, 0, 1, 0, 2, 1][pos >> 1];
-      const f = semisOf(this.root, ch[deg % ch.length], 1) * (pos === 14 ? 2 : 1);
-      s.guitar(b, t, f, 0.05, true, -0.2);
-      if (pos === 0 || pos === 8) s.chip(b, t, f, 0.022, this.stepDur * 1.6, -0.35);
+      const n = [0, 2, 0, 1, 0, 2, 0, 1][pos >> 1];
+      s.pluck(b, st, semisOf(this.root, ch[n % ch.length], 1), 0.055, -0.2, 0.15);
     }
 
-    // brass stabs on the off-beats, the sound of a kart racer's chorus
+    // brass on the off-beats: the chorus of every kart racer ever written
     if (pos === 2 || pos === 7 || pos === 11) {
-      const g = pos === 7 ? 0.03 : 0.022;
-      for (const n of ch) s.brass(b, t, semisOf(this.root, n, 3), g, this.stepDur * 1.4, pos === 7 ? 0.3 : -0.3);
+      for (const n of ch) s.brass(b, st, semisOf(this.root, n, 3), pos === 7 ? 0.042 : 0.032, this.stepDur * 1.3, pos === 7 ? 0.3 : -0.3);
     }
 
-    // the hook, on bells, two bars long
-    const hk = GrandPrix.HOOK[i % 32];
-    if (hk >= 0) s.bell(b, t, this.scaleTone(hk, 5), 0.028, 0.15, 0.25);
+    const hk = Circuit.HOOK[i % 32];
+    if (hk >= 0) s.bell(b, st, this.scaleTone(hk, 5), 0.055, 0.15, 0.25);
 
-    // crash over the turn into a new chord
-    if (this.isChordStart(i)) s.crash(b, t, 0.03, 0.2, 0.9);
-    if (m.tension > 0.45 && pos === 14) s.zap(b, t, this.scaleTone(7, 5), 0.016, 0.5);
+    if (this.isChordStart(i)) s.crash(b, t, 0.028, 0.2, 0.9);
+    if (m.tension > 0.5 && pos === 14) s.ping(b, st, this.scaleTone(9, 5), 0.014, 0.5);
   }
 
   lead(t: number, f: number, g: number, pan: number): void {
@@ -76,74 +97,101 @@ class GrandPrix extends Style {
   }
 }
 
+class Seaside extends Style {
+  readonly id = 'sunset';
+  readonly bpm = 152;
+  readonly root = 36.71;                                     // D
+  readonly scale = PENTA;
+  // I - IV - V - IV, all major. It used to be Cm, Ab, Fm, Gm.
+  readonly chords = [[0, 4, 7], [5, 9, 12], [7, 11, 14], [5, 9, 12]];
+  readonly barsPerChord = 2;
+  readonly leadOct = 5;
+  readonly level = 0.58;
+
+  // fuller than a cruise usually asks for: with the old sparse version the
+  // style sat at 7.9% of its energy above 1.5 kHz against 11-12% for the
+  // other two, which is a tune nobody can hear
+  private static readonly HOOK = [
+    4, -1, 5, 4, -1, 2, 0, -1, 2, -1, 4, 5, -1, 4, 2, -1,
+    5, -1, 7, 5, -1, 4, 2, -1, 4, -1, 2, 0, -1, 2, 4, -1,
+  ];
+
+  private sw(pos: number, t: number): number { return pos % 2 ? t + this.stepDur * SWING : t; }
+
+  step(i: number, t: number, m: Mood): void {
+    const s = this.s, b = this.bus, pos = i % 16, ch = this.chordAt(i);
+    const st = this.sw(pos, t);
+
+    if (pos === 0 || pos === 8) s.kick(b, t, 0.095);
+    if (pos === 4 || pos === 12) { s.snare(b, t, 0.032, 0); s.stomp(b, t, 0.02); }
+    if (pos % 2 === 1) s.hat(b, st, 0.011, 0.35);
+
+    // organ pad holds the chord, guitar chops the off-beats
+    if (this.isChordStart(i)) for (const n of ch) s.organ(b, t, semisOf(this.root, n, 3), 0.02, this.stepDur * 26, -0.3);
+    if (pos % 4 === 3) for (const n of ch) s.guitar(b, st, semisOf(this.root, n, 3), 0.024, true, 0.32);
+    if (pos % 4 === 0) s.pluck(b, t, semisOf(this.root, ch[(pos >> 2) % ch.length], 1), 0.05, -0.25, 0.2);
+    if (pos === 8) s.horn(b, t, semisOf(this.root, ch[2], 3), 0.03, 0.35);
+    if (pos % 4 === 2) s.glass(b, st, semisOf(this.root, ch[(pos >> 2) % ch.length], 5), 0.02, -0.35);
+
+    const hk = Seaside.HOOK[i % 32];
+    if (hk >= 0) s.bell(b, st, this.scaleTone(hk, 5), 0.05, 0.2, 0.3);
+
+    if (m.tension > 0.55 && pos === 14) s.ping(b, st, this.scaleTone(7, 5), 0.012, -0.4);
+  }
+
+  lead(t: number, f: number, g: number, pan: number): void {
+    this.s.glass(this.bus, t, f, g * 1.1, pan);
+  }
+}
+
 class Rainbow extends Style {
   readonly id = 'rainbow';
-  readonly bpm = 176;
+  readonly bpm = 184;
   readonly root = 49;                                        // G
-  readonly scale = [0, 2, 4, 7, 9, 11];
-  readonly chords = [[0, 4, 7], [9, 12, 16], [5, 9, 12], [7, 11, 14]];
+  readonly scale = PENTA;
+  // I - IV - V - IV, all major. It used to lean on a reese and a supersaw.
+  readonly chords = [[0, 4, 7], [5, 9, 12], [7, 11, 14], [5, 9, 12]];
   readonly barsPerChord = 1;
   readonly leadOct = 5;
-  readonly level = 0.55;
+  readonly level = 0.56;
+
+  private static readonly HOOK = [
+    7, 9, 7, 5, 4, -1, 5, 7, 9, -1, 7, 5, -1, 4, 2, -1,
+    0, 2, 4, 5, 7, 9, 11, -1, 9, 7, 5, 4, 2, 0, -1, -1,
+  ];
+
+  private sw(pos: number, t: number): number { return pos % 2 ? t + this.stepDur * SWING : t; }
 
   step(i: number, t: number, m: Mood): void {
-    const s = this.s, b = this.bus, pos = i % 16;
-    const ch = this.chordAt(i);
-    if (pos % 4 === 0) s.kick(b, t, 0.15);
-    if (pos === 4 || pos === 12) s.snare(b, t, 0.05, 0);
-    if (pos % 2 === 1) s.hat(b, t, 0.011, pos % 4 ? 0.45 : -0.45);
-    if (pos % 2 === 0) s.reese(b, t, semisOf(this.root, ch[0], 1), 0.03, this.stepDur * 1.8);
-    // glass arpeggio climbing the chord across the bar
-    s.glass(b, t, semisOf(this.root, ch[pos % ch.length], 4 + ((pos >> 2) & 1)), 0.012, ((pos / 15) * 2 - 1) * 0.6);
-    if (pos === 0 || pos === 8) {
-      for (const n of ch) s.supersaw(b, t, semisOf(this.root, n, 3), 0.018, this.stepDur * 6, 0.2);
-    }
-    if (m.tension > 0.5 && pos === 6) s.crash(b, t, 0.022, -0.4, 0.7);
+    const s = this.s, b = this.bus, pos = i % 16, ch = this.chordAt(i);
+    const st = this.sw(pos, t);
+
+    if (pos % 4 === 0) s.kick(b, t, 0.105);
+    if (pos === 4 || pos === 12) { s.snare(b, t, 0.034, 0); s.stomp(b, t, 0.022); }
+    if (pos % 2 === 1) s.hat(b, st, 0.011, pos % 4 ? 0.45 : -0.45);
+
+    // a bouncing plucked bass, not a reese
+    if (pos % 2 === 0) s.pluck(b, st, semisOf(this.root, ch[(pos >> 1) % 2 ? 2 : 0], 1), 0.05, -0.2, 0.12);
+    // sparkle on the off-beats
+    if (pos % 4 === 2) s.glass(b, st, semisOf(this.root, ch[(pos >> 2) % ch.length], 5), 0.024, ((pos / 15) * 2 - 1) * 0.6);
+    if (pos === 0 || pos === 8) for (const n of ch) s.brass(b, t, semisOf(this.root, n, 3), 0.03, this.stepDur * 2.2, 0.25);
+
+    const hk = Rainbow.HOOK[i % 32];
+    if (hk >= 0) s.bell(b, st, this.scaleTone(hk, 5), 0.05, 0.15, -0.2);
+
+    if (this.isChordStart(i) && (i / 16) % 4 === 0) s.crash(b, t, 0.026, -0.3, 0.8);
+    if (m.tension > 0.5 && pos === 6) s.ping(b, st, this.scaleTone(11, 5), 0.013, 0.4);
   }
 
   lead(t: number, f: number, g: number, pan: number): void {
-    this.s.supersaw(this.bus, t, f, g * 0.9, 0.2, pan);
+    this.s.bell(this.bus, t, f, g, pan);
   }
 }
-
-class SunsetDrift extends Style {
-  readonly id = 'sunset';
-  readonly bpm = 138;
-  readonly root = 32.7;                                      // C
-  readonly scale = [0, 2, 3, 5, 7, 10];
-  readonly chords = [[0, 3, 7], [8, 12, 15], [5, 8, 12], [7, 10, 14]];
-  readonly barsPerChord = 2;
-  readonly leadOct = 4;
-  readonly level = 0.55;
-
-  step(i: number, t: number, m: Mood): void {
-    const s = this.s, b = this.bus, pos = i % 16;
-    const ch = this.chordAt(i);
-    if (pos % 8 === 0) s.kick(b, t, 0.12);
-    if (pos % 8 === 4) s.tom(b, t, 110, 0.05, 0.2);
-    if (pos % 4 === 2) s.hat(b, t, 0.01, 0.4);
-    // muted guitar comp on the off-beats: the cruise
-    if (pos % 4 === 3) for (const n of ch) s.guitar(b, t, semisOf(this.root, n, 3), 0.016, true, 0.3);
-    // bass walks the chord instead of sitting on the root
-    if (pos % 4 === 0) s.guitar(b, t, semisOf(this.root, ch[(pos >> 2) % ch.length], 1), 0.045, false, -0.25);
-    if (pos === 0) s.organ(b, t, semisOf(this.root, ch[0], 3), 0.026, this.stepDur * 14, -0.3);
-    if (pos === 8) s.horn(b, t, semisOf(this.root, ch[2], 3), 0.02, 0.35);
-    if (pos === 6 || pos === 10) s.glass(b, t, semisOf(this.root, ch[2], 5), 0.01, 0.4);
-    if (m.tension > 0.5 && pos === 12) s.snare(b, t, 0.03, 0);
-  }
-
-  lead(t: number, f: number, g: number, pan: number): void {
-    this.s.piano(this.bus, t, f, g * 1.2, pan);
-  }
-}
-
-/** A frequency `n` semitones above the tonic, `oct` octaves up. */
-const semisOf = (root: number, n: number, oct: number): number => root * Math.pow(2, oct + n / 12);
 
 const STYLES: StyleDef[] = [
-  { id: 'green', name: 'Grand prix — brass and bells', make: (s, bus) => new GrandPrix(s, bus) },
-  { id: 'sunset', name: 'Sunset drift — cruising', make: (s, bus) => new SunsetDrift(s, bus) },
-  { id: 'rainbow', name: 'Rainbow — supersaw sprint', make: (s, bus) => new Rainbow(s, bus) },
+  { id: 'green', name: 'Circuit — brass and bells', make: (s, bus) => new Circuit(s, bus) },
+  { id: 'sunset', name: 'Seaside — organ cruise', make: (s, bus) => new Seaside(s, bus) },
+  { id: 'rainbow', name: 'Rainbow — bells and sparkle', make: (s, bus) => new Rainbow(s, bus) },
 ];
 
 export const SLIP_MUSIC: Array<[string, string]> = [
