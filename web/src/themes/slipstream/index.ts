@@ -300,7 +300,12 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
 
     // ── camera: behind the hero, looking a car-length ahead ──
     const hp = race.kartPos(heroIdx);
-    const back = 9 + hero.speed * 0.035;
+    // The camera chases this point rather than snapping to it, and at racing
+    // pace that lag is worth about eleven board units of extra distance on its
+    // own - so the nominal follow distance is short. Measured: at 13.5 the
+    // hero came out 13% of the screen height against the 20% it had when it
+    // was pinned to the bottom.
+    const back = 6.5 + hero.speed * 0.03;
     const behind = track.offset(hp.s - back, hero.lat * 0.55);
     const aim = track.atS(hero.s + 7);
     camX += (behind.x - camX) * Math.min(1, dtr * 3.6);
@@ -358,7 +363,6 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     const bpp = m7.project(bpos.x, bpos.y, cam);
     if (bpp) draws.push({ depth: bpp.depth, run: () => m7.drawSprite(boardSpr, bpos.x, bpos.y, cam, H_BOARD, 1, 1.4) });
     for (const r of race.racers) {
-      if (r.seat === heroIdx) continue;
       const p = race.kartPos(r.seat);
       const pr = m7.project(p.x, p.y, cam);
       if (!pr) continue;
@@ -372,7 +376,8 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       const wf = r.ghost ? 0 : ((f.t * (16 + r.speed * 0.38)) | 0) % 4;
       const spr = r.ghost ? ghostRear(r.hue, r.char) : side ? karts(r.hue, r.char).side : facingBack ? karts(r.hue, r.char).front : karts(r.hue, r.char, wf).rear;
       const alpha = r.ghost ? 0.42 : r.flash > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(r.flash * 20)) : 1;
-      const lift = r.spin > 0 ? Math.abs(Math.sin(r.spin * 9)) * 0.25 : 0;
+      const lift = (r.spin > 0 ? Math.abs(Math.sin(r.spin * 9)) * 0.25 : 0)
+        + (r.seat === heroIdx ? speedFrac * 0.035 * Math.sin(f.t * 24) : 0);
       draws.push({ depth: pr.depth + 0.02, run: () => m7.drawSprite(shadowSpr, p.x, p.y, cam, H_SHADOW * VEH_W[r.char.veh], r.ghost ? 0.3 : 1) });
       if (r.boost > 1 && !r.ghost && pr.depth < 280) {
         const fl = H_FLAME * VEH_W[r.char.veh] * (((f.t * 26 + r.seat * 7) | 0) % 2 ? 1 : 0.8);
@@ -380,8 +385,9 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
         draws.push({ depth: pr.depth + 0.01, run: () => m7.drawSprite(flameSpr, bx, by, cam, fl, 0.9, 0.1) });
       }
       draws.push({ depth: pr.depth, run: () => m7.drawSprite(spr, p.x, p.y, cam, KART_H * VEH_W[r.char.veh], alpha, lift) });
-      // name + position tag floating over the helmet
-      if (pr.depth < 320) {
+      // name + position tag floating over the helmet (not your own: the HUD
+      // already says who you are)
+      if (pr.depth < 320 && r.seat !== heroIdx) {
         const rank = race.order.indexOf(r.seat) + 1;
         const lbl = nameLabel(r.name, rank, r.hue);
         // fixed height, width follows the text - the old rule scaled the tag's
@@ -410,23 +416,6 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     }
     draws.sort((a, b) => b.depth - a.depth);
     for (const d of draws) d.run();
-
-    // ── your kart: the fixed anchor above the bottom of the board ──
-    const heroWf = ((f.t * (14 + speedFrac * 34)) | 0) % 4;
-    const kartSpr = hero.ghost ? ghostRear(hero.hue, hero.char) : karts(hero.hue, hero.char, heroWf).rear;
-    // sized by height, like every other sprite, so the hero kart is the same
-    // machine as the ones it is racing rather than a differently scaled one
-    const kh = Math.round(m7.H * (0.20 + speedFrac * 0.018)) * VEH_W[hero.char.veh];
-    const kw = Math.round(kh * (kartSpr.width / kartSpr.height));
-    const steer = Math.max(-1, Math.min(1, dh * 2.2)) * kw * 0.22;
-    const bounce = speedFrac * 1.2 * Math.sin(f.t * 24);
-    const kartY = Math.round(m7.H - kh - Math.max(7, Math.round(m7.H * 0.08)) + bounce);
-    if (hero.boost > 0.5) {
-      const flick = ((f.t * 24) | 0) % 2 ? 1 : 0.82;
-      const fw = kw * 0.62 * flick, fh = fw * (flameSpr.height / flameSpr.width);
-      ctx.drawImage(flameSpr, Math.round(m7.W / 2 - fw / 2 + steer), Math.round(kartY + kh - fh * 0.45), fw, fh);
-    }
-    ctx.drawImage(kartSpr, Math.round(m7.W / 2 - kw / 2 + steer), kartY, kw, kh);
 
     // always running, sharpening with pace, and a kick on top under a boost
     const chev = settings.kChevrons
