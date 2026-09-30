@@ -15,7 +15,21 @@ import { characterFor, DRIVERS, KART_L, KART_W, VEH_W, type Character } from './
  */
 
 export const SEATS = 8;
-export type ItemKind = 'mushroom' | 'banana' | 'shell';
+export type ItemKind = 'mushroom' | 'banana' | 'shell' | 'red' | 'star';
+
+/**
+ * The item table, weighted the way a kart racer weights it: plenty of the
+ * cheap stuff, and the good stuff turns up often enough to matter. The old
+ * code rolled a flat three-way between mushroom, banana and green shell, and
+ * only twice a minute at that.
+ */
+const ITEM_TABLE: ItemKind[] = [
+  'mushroom', 'mushroom', 'mushroom',
+  'banana', 'banana', 'banana',
+  'shell', 'shell', 'shell', 'shell',
+  'red', 'red',
+  'star',
+];
 
 export interface Racer {
   seat: number;
@@ -33,6 +47,7 @@ export interface Racer {
   surge: number;            // traffic draft, decaying
   boost: number;            // pad/sprint/mushroom kick, decaying faster
   spin: number;             // spin-out timer
+  star: number;             // invincible, and everything bounces off
   glow: number;             // red chase glow after a threat
   flash: number;            // takeover flash
   ghost: boolean;
@@ -60,8 +75,26 @@ const DRAFT_NEAR = 3.5, DRAFT_FAR = 26, DRAFT_WIDE = 5.5;
 const paceFor = (ch: Character): number => 0.90 + ((ch.num * 37 + ch.drv * 11) % 21) / 100;
 
 export interface Hazard { x: number; y: number; life: number; cool: number; kind: 'oil' | 'banana' }
-export interface Shell { s: number; lat: number; life: number; kind: 'red' | 'green'; target: number }
-export interface Gantry { s: number; respawn: number }
+/**
+ * A shell on the board. A red one hunts its target; a green one is fired down
+ * the road and bounces off the edges until its life runs out or it hits
+ * somebody, which is the difference between an item and a guided missile.
+ */
+export interface Shell {
+  s: number; lat: number; life: number;
+  kind: 'red' | 'green';
+  target: number;            // red only: the seat it is hunting
+  latV: number;              // green only: sideways drift, flipped by a bounce
+  from: number;              // the seat that fired it, immune for a moment
+  armed: number;             // seconds until it can hit its own firer
+  prevS: number;             // last frame's position, so the hit test can sweep
+}
+/**
+ * A row of item boxes across the road, the way the game lays them out. Each
+ * box has its own respawn: a shared one meant the first kart through took the
+ * whole row and the other seven found it empty.
+ */
+export interface Gantry { s: number; respawn: number; lanes: number[]; taken: number[] }
 
 export interface RaceHooks {
   onLap(seat: number): void;
@@ -73,9 +106,9 @@ export interface RaceHooks {
   onUse(seat: number, kind: ItemKind): void;
 }
 
-/** Starting lane for a seat: eight cars spread across the usable road. */
+/** Starting lane for a seat: eight cars spread across the racing line. */
 const lineFor = (i: number, width: number): number =>
-  (i - (SEATS - 1) / 2) * (width * 0.62 / SEATS);
+  (i - (SEATS - 1) / 2) * (width * 0.42 / SEATS);
 
 const hueFor = (key: string): number => {
   let h = 2166136261;
@@ -148,14 +181,23 @@ export class Race {
         hue: (i * 47 + 20) % 360, char: characterFor(`seat${i}`),
         s: -i * 7, lat: lineFor(i, track.width), latV: 0, line: lineFor(i, track.width),
         pace: paceFor(characterFor(`seat${i}`)), draft: 0, seed: i * 137.31,
-        speed: 0, surge: 0, boost: 0, spin: 0, glow: 0, flash: 0,
+        speed: 0, surge: 0, boost: 0, spin: 0, star: 0, glow: 0, flash: 0,
         // one of the cast, racing properly - a ghost is a host that has gone
         // quiet, not "nobody has connected yet"
         ghost: false, laps: 0, dist: -i * 7, act: 0, lastSeen: t0, item: null, itemT: 0,
       });
     }
     this.padLight = track.pads.map(() => 0);
-    this.gantries = [{ s: track.total * 0.28, respawn: 0 }, { s: track.total * 0.72, respawn: 0 }];
+    // five rows a lap, five boxes across: eight karts pass a row every few
+    // seconds, so somebody always has something
+    const LANES = 5;
+    this.gantries = [0.14, 0.32, 0.5, 0.68, 0.86].map((f) => ({
+      s: track.total * f,
+      respawn: 0,
+      lanes: Array.from({ length: LANES }, (_, k) =>
+        (k - (LANES - 1) / 2) * (track.width * 0.62 / LANES)),
+      taken: new Array(LANES).fill(0),
+    }));
     this.order = this.racers.map((r) => r.seat);
   }
 
@@ -233,7 +275,8 @@ export class Race {
         if (settings.kShell && !this.shells.some((s) => s.kind === 'red') && t - this.lastShell > 8) {
           this.lastShell = t;
           const leader = this.racers[this.leaderIdx];
-          this.shells.push({ s: leader.s - this.track.total * 0.06, lat: 0, life: 16, kind: 'red', target: this.leaderIdx });
+          this.shells.push({ s: leader.s - this.track.total * 0.06, lat: 0, life: 16, kind: 'red',
+            target: this.leaderIdx, latV: 0, from: -1, armed: 0, prevS: leader.s - this.track.total * 0.06 });
           this.hooks.onShellFire(-1, 'red');
         }
         const off = ip ? this.ipSeat.get(ip) : undefined;
@@ -265,7 +308,9 @@ export class Race {
     const base = 46 * pace * tr.speed * (0.85 + Math.min(1, rate30s / 40) * 0.55);
     this.caution = Math.max(0, this.caution - dt);
     const yellow = this.caution > 0 ? 0.55 : 1;
-    const latLim = tr.width * 0.40;               // keep the pack on the asphalt
+    // about ten kart widths: wide enough for two abreast and a dive up the
+    // inside, narrow enough that the field is always in each other's way
+    const latLim = tr.width * 0.26;
 
     for (let oi = this.hazards.length - 1; oi >= 0; oi--) {
       this.hazards[oi].life -= dt;
@@ -273,7 +318,10 @@ export class Race {
       if (this.hazards[oi].life <= 0) this.hazards.splice(oi, 1);
     }
     for (let i = 0; i < this.padLight.length; i++) this.padLight[i] = Math.max(0, this.padLight[i] - dt);
-    for (const g of this.gantries) g.respawn = Math.max(0, g.respawn - dt);
+    for (const g of this.gantries) {
+      g.respawn = Math.max(0, g.respawn - dt);
+      for (let k = 0; k < g.taken.length; k++) g.taken[k] = Math.max(0, g.taken[k] - dt);
+    }
 
     // positions first: the rubber-band reads the running order
     this.order = this.racers.map((r) => r.seat).sort((a, b) => this.racers[b].dist - this.racers[a].dist);
@@ -349,6 +397,7 @@ export class Race {
       r.surge *= Math.exp(-dt / 2.6);
       r.boost *= Math.exp(-dt / 1.6);
       r.act *= Math.exp(-dt / 40);
+      r.star = Math.max(0, r.star - dt);
       r.glow = Math.max(0, r.glow - dt);
       r.flash = Math.max(0, r.flash - dt * 1.4);
       if (r.ip && !r.ghost && t - r.lastSeen > 180) r.ghost = true;   // quiet hosts haunt
@@ -369,15 +418,21 @@ export class Race {
       }
       // item gantries: roll under the box, take what's inside
       for (const g of this.gantries) {
-        if (g.respawn > 0 || r.item) continue;
-        if (crossed(prev, r.s, g.s, tr.total)) {
-          const kinds: ItemKind[] = ['mushroom', 'banana', 'shell'];
-          r.item = kinds[(Math.random() * 3) | 0];
-          r.itemT = 1.5 + Math.random() * 1.8;
-          g.respawn = 6;
-          this.pickedUp++;
-          this.hooks.onPickup(r.seat, r.item);
+        if (r.item) break;
+        if (!crossed(prev, r.s, g.s, tr.total)) continue;
+        // the nearest box in the row that is still standing
+        let lane = -1, bd = 4.2;
+        for (let k = 0; k < g.lanes.length; k++) {
+          if (g.taken[k] > 0) continue;
+          const d = Math.abs(g.lanes[k] - r.lat);
+          if (d < bd) { bd = d; lane = k; }
         }
+        if (lane < 0) continue;
+        r.item = ITEM_TABLE[(Math.random() * ITEM_TABLE.length) | 0];
+        r.itemT = 0.6 + Math.random() * 1.2;
+        g.taken[lane] = 2.5;
+        this.pickedUp++;
+        this.hooks.onPickup(r.seat, r.item);
       }
       // …and use it shortly after, so the pack is never polite for long
       if (r.item) {
@@ -387,24 +442,40 @@ export class Race {
           r.item = null;
           this.used++;
           if (kind === 'mushroom') r.boost = Math.max(r.boost, 15);
+          if (kind === 'star') { r.star = 7; r.boost = Math.max(r.boost, 9); }
           if (kind === 'banana') {
             const p = tr.offset(r.s - 9, r.lat);
             this.hazards.push({ x: p.x, y: p.y, life: 45, cool: 0, kind: 'banana' });
           }
           if (kind === 'shell') {
-            const ahead = this.order.map((s) => this.racers[s]).find((x) => x.seat !== r.seat && x.dist > r.dist);
+            // fired down the road, not at anybody: it bounces off the edges
+            // until it finds a kart or runs out of life
+            this.shells.push({
+              s: r.s + 3, lat: r.lat, life: 9, kind: 'green', target: -1,
+              latV: (Math.random() - 0.5) * 5, from: r.seat, armed: 1.1, prevS: r.s + 3,
+            });
+            this.hooks.onShellFire(r.seat, 'green');
+          }
+          if (kind === 'red') {
+            const ahead = this.order.map((k) => this.racers[k]).find((x) => x.seat !== r.seat && x.dist > r.dist);
             if (ahead) {
-              this.shells.push({ s: r.s + 2, lat: r.lat, life: 12, kind: 'green', target: ahead.seat });
-              this.hooks.onShellFire(r.seat, 'green');
+              this.shells.push({
+                s: r.s + 3, lat: r.lat, life: 11, kind: 'red', target: ahead.seat,
+                latV: 0, from: r.seat, armed: 0.6, prevS: r.s + 3,
+              });
+              this.hooks.onShellFire(r.seat, 'red');
             } else {
-              r.boost = Math.max(r.boost, 15);   // leading from the front: the shell becomes a mushroom
+              r.boost = Math.max(r.boost, 15);   // leading: it becomes a mushroom
             }
           }
           this.hooks.onUse(r.seat, kind);
         }
       }
       // hazards: roll over one and spin (with a mercy window)
-      if (r.spin <= 0 && t - this.lastSpin > 1.6) {
+      // no global cooldown: each hazard has its own, which is the one that
+      // matters. A shared timer meant the whole field could only spin once
+      // every 1.6s between them however many bananas were lying about.
+      if (r.spin <= 0 && r.star <= 0) {
         const p = this.kartPos(r.seat);
         for (const h of this.hazards) {
           if (h.cool <= 0 && (h.x - p.x) ** 2 + (h.y - p.y) ** 2 < 9) {
@@ -465,21 +536,61 @@ export class Race {
 
     this.jamAfter = this.jamScan(tr);
 
-    // shells close on their mark
+    // shells: red ones hunt, green ones fly and bounce
+    const edge = tr.width * 0.30;         // a shell bounces off the racing line's edges
     for (let i = this.shells.length - 1; i >= 0; i--) {
       const sh = this.shells[i];
-      const mark = this.racers[sh.target];
-      sh.s += base * 2.6 * dt;
-      sh.lat += (mark.lat - sh.lat) * Math.min(1, dt * 2);
       sh.life -= dt;
-      const gap = mark.s - sh.s;
-      if (gap < 2.5 && gap > -2) {
+      sh.armed = Math.max(0, sh.armed - dt);
+      sh.prevS = sh.s;
+      sh.s += base * (sh.kind === 'red' ? 2.6 : 2.1) * dt;
+      if (sh.kind === 'red') {
+        const mark = this.racers[sh.target];
+        sh.lat += (mark.lat - sh.lat) * Math.min(1, dt * 2);
+      } else {
+        // a green leans toward whoever is closest ahead: on a road this wide a
+        // shell fired dead straight just finds empty asphalt
+        let bestLat = null, bestDs = 70;
+        for (const k of this.racers) {
+          if (k.seat === sh.from && sh.armed > 0) continue;
+          let ds = (k.s - sh.s) % tr.total;
+          if (ds > tr.total / 2) ds -= tr.total;
+          if (ds < -tr.total / 2) ds += tr.total;
+          if (ds <= 0 || ds > bestDs) continue;
+          bestDs = ds; bestLat = k.lat;
+        }
+        if (bestLat !== null) sh.latV += (bestLat - sh.lat) * 1.6 * dt;
+        sh.lat += sh.latV * dt;
+        if (sh.lat > edge) { sh.lat = edge; sh.latV = -Math.abs(sh.latV); }
+        if (sh.lat < -edge) { sh.lat = -edge; sh.latV = Math.abs(sh.latV); }
+      }
+      // Anything it catches, not just the one it was aimed at - and tested
+      // across the whole step, not at a point. A shell covers about 1.4 units
+      // a frame against a window barely two units wide, so a point test walked
+      // straight through karts: measured, ten shells in a minute, every one
+      // living out its full life without ever landing.
+      let hitSeat = -1;
+      const travelled = sh.s - sh.prevS;
+      for (const k of this.racers) {
+        if (k.seat === sh.from && sh.armed > 0) continue;
+        if (k.spin > 0 || k.star > 0) continue;
+        let ds = (k.s - sh.s) % tr.total;
+        if (ds > tr.total / 2) ds -= tr.total;
+        if (ds < -tr.total / 2) ds += tr.total;
+        // the kart is on the segment the shell just swept, plus its own length
+        const reach = halfL(k) + Math.max(0, travelled);
+        if (ds > halfL(k) || ds < -reach) continue;
+        if (Math.abs(k.lat - sh.lat) > halfW(k) + 2.4) continue;
+        hitSeat = k.seat; break;
+      }
+      if (hitSeat >= 0) {
+        const mark = this.racers[hitSeat];
         if (mark.spin <= 0) {
           mark.spin = 1.5;
           this.hooks.onShellHit(mark.seat, sh.kind);
         }
         this.shells.splice(i, 1);
-      } else if (sh.life <= 0 || (sh.kind === 'red' && gap > tr.total * 0.5)) this.shells.splice(i, 1);
+      } else if (sh.life <= 0) this.shells.splice(i, 1);
     }
   }
 

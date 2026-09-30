@@ -602,6 +602,145 @@ export function kartSide(hue: number, ch: Character): HTMLCanvasElement {
   return cv;
 }
 
+// ── trackside: the circuit has an audience ───────────────────────────
+
+/** A head from the cast, shoulders and all, for a face in the crowd. */
+function castHead(c: CanvasRenderingContext2D, x: number, y: number, drv: number, acc: number, rows = 10): void {
+  const d = DRIVERS[drv % DRIVERS.length];
+  const pal = drvPal(d, acc);
+  for (let i = 0; i < Math.min(rows, d.map.length); i++) {
+    const r = d.map[i];
+    for (let k = 0; k < r.length; k++) {
+      const col = pal[r[k]];
+      if (!col || r[k] === '.') continue;
+      c.fillStyle = col;
+      c.fillRect(x + k, y + i, 1, 1);
+    }
+  }
+}
+
+/**
+ * A packed grandstand: a tiered block with a crowd in it. `wave` shifts which
+ * rows are standing, so the stand ripples as you go past instead of sitting
+ * there as wallpaper.
+ */
+export function stand(hue: number, wave: number, seed: number): HTMLCanvasElement {
+  const W = 84, H = 46;
+  const [cv, c] = sprite(W, H);
+  // the structure
+  c.fillStyle = '#2a2f3c'; c.fillRect(0, 10, W, H - 10);
+  c.fillStyle = hsl(hue, 55, 34); c.fillRect(0, H - 8, W, 8);       // skirt
+  c.fillStyle = hsl(hue, 70, 52); c.fillRect(0, H - 8, W, 2);       // trim
+  // roof
+  c.fillStyle = '#171a24'; c.fillRect(-2, 4, W + 4, 7);
+  c.fillStyle = hsl(hue, 65, 44); c.fillRect(-2, 4, W + 4, 2);
+  for (let x = 4; x < W; x += 20) { c.fillStyle = '#171a24'; c.fillRect(x, 11, 2, H - 19); }
+  // four tiers of heads, back rows higher and dimmer
+  let h = seed >>> 0;
+  const rnd = (): number => { h = (h * 1664525 + 1013904223) >>> 0; return h / 4294967296; };
+  for (let row = 0; row < 4; row++) {
+    const y = 14 + row * 7;
+    const bob = ((wave + row) % 3 === 0) ? -1 : 0;    // a rolling wave, not a strobe
+    for (let x = 2; x < W - 8; x += 7) {
+      const drv = (rnd() * 8) | 0;
+      const acc = (rnd() * 360) | 0;
+      c.save();
+      c.globalAlpha = 0.55 + row * 0.15;
+      c.translate(x + (rnd() < 0.5 ? 0 : 1), y + bob);
+      c.scale(0.55, 0.55);
+      castHead(c, 0, 0, drv, acc, 9);
+      c.restore();
+    }
+  }
+  outline(cv);
+  return cv;
+}
+
+/** One fan up against the fence, arms up. */
+export function fan(drv: number, acc: number, up: boolean): HTMLCanvasElement {
+  const [cv, c] = sprite(16, 22);
+  castHead(c, 3, up ? 3 : 4, drv, acc, 12);
+  // arms, raised on the up frame
+  c.fillStyle = hsl(acc, 80, 56);
+  if (up) { c.fillRect(1, 4, 2, 5); c.fillRect(13, 4, 2, 5); }
+  else { c.fillRect(1, 10, 2, 5); c.fillRect(13, 10, 2, 5); }
+  outline(cv);
+  return cv;
+}
+
+/** A pine by the fence: cheap depth, and it tells you how fast you are going. */
+export function tree(seed: number): HTMLCanvasElement {
+  const [cv, c] = sprite(20, 34);
+  const g = 92 + (seed % 5) * 7;
+  c.fillStyle = '#4a3320'; c.fillRect(8, 26, 4, 8);
+  for (let i = 0; i < 4; i++) {
+    const w = 18 - i * 3, y = 24 - i * 6;
+    c.fillStyle = `hsl(${g}, ${46 + i * 5}%, ${20 + i * 5}%)`;
+    c.fillRect((20 - w) / 2, y, w, 8);
+  }
+  outline(cv);
+  return cv;
+}
+
+/** A balloon arch marker, the kind that flaps over a kart circuit. */
+export function balloons(hue: number): HTMLCanvasElement {
+  const [cv, c] = sprite(22, 30);
+  c.fillStyle = '#c9cdd6'; c.fillRect(10, 14, 2, 16);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 4) * Math.PI;
+    const x = 11 - Math.cos(a) * 9, y = 12 - Math.sin(a) * 9;
+    c.fillStyle = hsl((hue + i * 62) % 360, 88, 58);
+    c.beginPath(); c.arc(x, y, 3.2, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.5)';
+    c.fillRect(x - 2, y - 2, 1, 1);
+  }
+  outline(cv);
+  return cv;
+}
+
+/** A marshal post: a striped board and somebody waving behind it. */
+export function marshal(drv: number, acc: number, up: boolean): HTMLCanvasElement {
+  const [cv, c] = sprite(20, 26);
+  c.fillStyle = '#e9e6dc'; c.fillRect(0, 12, 20, 10);
+  c.fillStyle = '#b03a2e';
+  for (let x = 0; x < 20; x += 6) c.fillRect(x, 12, 3, 10);
+  castHead(c, 5, up ? 0 : 1, drv, acc, 11);
+  outline(cv);
+  return cv;
+}
+
+/** A stack of tyres on the apex. */
+export function tyres(): HTMLCanvasElement {
+  const [cv, c] = sprite(20, 16);
+  for (let r = 0; r < 3; r++) {
+    const y = 13 - r * 4, w = 18 - r * 3;
+    c.fillStyle = r === 1 ? '#c9cdd6' : '#25272e';
+    c.fillRect((20 - w) / 2, y, w, 4);
+    c.fillStyle = 'rgba(255,255,255,0.12)';
+    c.fillRect((20 - w) / 2, y, w, 1);
+  }
+  outline(cv);
+  return cv;
+}
+
+/** The warm halo around a kart that has picked up a star. */
+export function star(): HTMLCanvasElement {
+  const [cv, c] = sprite(36, 36);
+  const g = c.createRadialGradient(18, 18, 2, 18, 18, 18);
+  g.addColorStop(0, 'rgba(255, 246, 190, 0.95)');
+  g.addColorStop(0.45, 'rgba(255, 208, 70, 0.55)');
+  g.addColorStop(1, 'rgba(255, 170, 40, 0)');
+  c.fillStyle = g;
+  c.fillRect(0, 0, 36, 36);
+  // five points, so it reads as a star and not just a blob
+  c.fillStyle = 'rgba(255, 250, 220, 0.9)';
+  for (let k = 0; k < 5; k++) {
+    const a = -Math.PI / 2 + (k / 5) * Math.PI * 2;
+    c.fillRect(18 + Math.cos(a) * 13 - 1.5, 18 + Math.sin(a) * 13 - 1.5, 3, 3);
+  }
+  return cv;
+}
+
 /** Ground shadow: SMK never lets a sprite float — every kart sits on one. */
 export function shadow(): HTMLCanvasElement {
   const [cv, c] = sprite(28, 12);
