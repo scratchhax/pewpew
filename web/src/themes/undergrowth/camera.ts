@@ -69,8 +69,8 @@ export class Flycam {
   get speedNow(): number { return this.curSpeed; }
 
   /** Route state (for the diag overlay). */
-  get routeInfo(): { route: number; total: number; dist: number; travel: number; tdist: number } {
-    return { route: this.path.length, total: this.cum[this.cum.length - 1], dist: this.dist, travel: this.travel, tdist: this.travel >= 0 ? this.pos.distanceTo(this.travelTarget) : -1 };
+  get routeInfo(): { route: number; total: number; dist: number; travel: number; tdist: number; vel: number[] } {
+    return { route: this.path.length, total: this.cum[this.cum.length - 1], dist: this.dist, travel: this.travel, tdist: this.travel >= 0 ? this.pos.distanceTo(this.travelTarget) : -1, vel: [this.velDir.x, this.velDir.y, this.velDir.z] };
   }
 
   /** Drift toward a mat vertex (a fresh bloom, a blight) for ~8 s. */
@@ -266,18 +266,8 @@ export class Flycam {
       this.cam.position.copy(this.pos);
       return;
     }
-    this.curSpeed += (this.speed * 1.3 - this.curSpeed) * Math.min(1, dt * 2);
     this.tmp.copy(this.travelTarget).sub(this.pos);
     this.tmp.normalize();
-    // Zero-g cornering: a fast vehicle can't turn tight — cut thrust while
-    // the target is off to the side, pivot gently, power back up on the new
-    // heading. Turns shrink from 80-unit runaway loops to gentle banks.
-    if (this.velDir.lengthSq() > 1e-6) {
-      const off = this.velDir.angleTo(this.tmp);
-      const slow = off < 0.6 ? 1 : Math.max(0.25, 1 - (off - 0.6) * 1.2);
-      const tgt = this.speed * 1.3 * slow;
-      this.curSpeed += (tgt - this.curSpeed) * Math.min(1, dt * (tgt > this.curSpeed ? 2 : 4));
-    }
     const r = this.pos.length();
     const near = Math.min(1, d0 / 16); // the field fades off on final approach
     if (r > 1e-3) {
@@ -287,7 +277,9 @@ export class Flycam {
       if (deep > 0) this.tmp.addScaledVector(rad, deep * 2.2).normalize();
       else if (high > 0) this.tmp.addScaledVector(rad, -high * 1.4).normalize();
     }
-    this.steer(dt, this.tmp);
+    // Zero-g cornering: past the gentle zone the pivot slows harder than the
+    // brake — target switches become wide sweeping arcs, not pivots in place.
+    this.corner(dt, this.tmp, this.speed * 1.3);
     this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
     this.aim(this.tmp, dt);
     this.lastDir.copy(this.tmp);
@@ -357,7 +349,6 @@ export class Flycam {
     }
 
     // advance
-    this.curSpeed += (this.speed - this.curSpeed) * Math.min(1, dt * 1.2);
     this.dist += this.curSpeed * dt;
     // prune the trail behind us so the route (and the pointAt scan) stay small
     while (this.path.length > 2 && this.dist > 30) {
@@ -389,7 +380,11 @@ export class Flycam {
     // new junction never swings the drift
     const rb = Math.min(1, (t - this.routeT) / 2);
     if (rb < 1 && this.velDir.lengthSq() > 1e-6) this.tmp.lerp(this.velDir, 1 - rb).normalize();
-    this.steer(dt, this.tmp);
+    // Zero-g cornering on the rails too (same law as doTravel): a junction
+    // switch or fresh rail that demands a heading way off the current one
+    // slows the PIVOT harder than it brakes — a wide sweeping arc, never a
+    // pivot in place at speed.
+    this.corner(dt, this.tmp, this.speed);
     this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
 
     // the anti-burn-in wander only — no sway, no roll, ever
@@ -474,15 +469,32 @@ export class Flycam {
 
   /**
    * Turn the velocity toward `desired`, capped at POS_TURN per second — the
-   * vehicle's rule: the direction of travel NEVER changes abruptly.
+   * vehicle's rule: the direction of travel NEVER changes abruptly. `rateMul`
+   * widens the arc for hard heading demands (a target switch): slower pivot
+   * at near-speed is a wide sweeping arc, while a fast pivot on cut speed
+   * is a pivot-in-place, which reads as a snap.
    */
-  private steer(dt: number, desired: Vector3): void {
+  private steer(dt: number, desired: Vector3, rateMul = 1): void {
     if (this.velDir.lengthSq() < 1e-6) this.velDir.copy(desired);
     else {
       const ang = this.velDir.angleTo(desired);
-      if (ang > 1e-4) this.velDir.lerp(desired, Math.min(1, (POS_TURN * dt) / ang)).normalize();
+      if (ang > 1e-4) this.velDir.lerp(desired, Math.min(1, (POS_TURN * dt * rateMul) / ang)).normalize();
     }
     this.velDir.normalize();
+  }
+
+  /**
+   * The cornering law, shared by rail-riding and gliding: past the gentle
+   * zone, the pivot slows HARDER than the brake — wide sweeping arcs, never
+   * a pivot in place. Eases curSpeed and steers with the matching multiplier.
+   */
+  private corner(dt: number, desired: Vector3, baseSpeed: number): void {
+    const off = this.velDir.lengthSq() > 1e-6 ? this.velDir.angleTo(desired) : 0;
+    const hard = Math.max(0, off - 0.5);
+    const turnMul = Math.max(0.3, 1 - hard * 0.8);
+    const speedMul = Math.max(0.72, 1 - hard * 0.45);
+    this.curSpeed += (baseSpeed * speedMul - this.curSpeed) * Math.min(1, dt * 2.5);
+    this.steer(dt, desired, turnMul);
   }
 
   /** Slerp toward `q`, always via the short arc (negate if the dot says long way). */
