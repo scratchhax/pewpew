@@ -3,42 +3,106 @@ import type { State } from '../../state';
 import { Conductor, Style, type Mood, type StyleDef } from '../../sound/conductor';
 
 /**
- * SLIPSTREAM's soundtrack: 16-bit race-pop through a cartridge speaker.
+ * SLIPSTREAM's soundtrack: 16-bit race-pop played by a band, not a bleeper.
  *
- *   green flag   : 168 bpm chip four-on-the-floor, walking bass blips, a
- *                  lead that runs the circuit like the karts do
- *   sunset drift : 138 bpm cruising organ rock, tom heartbeat, wide pads
+ *   grand prix   : 164 bpm shuffle — claps on the backbeat, a walking bass,
+ *                  off-beat brass stabs and a bell hook over the top
+ *   sunset drift : 138 bpm cruise — muted guitar comp, horn pad, organ
+ *   rainbow      : 176 bpm sprint — supersaw lead over four on the floor,
+ *                  glass arpeggio riding the bar
+ *
+ * Every style states a HOOK: a short phrase keyed to the bar, so there is
+ * something to remember. Both of the originals were a drum machine and one
+ * chip voice playing root notes, which is why nothing stuck.
  *
  * On top: the start-lights beeps, the pit radio blip, the shell's screaming
  * fly-past, spin-out slides, lap chimes — and a square-wave engine purr
  * whose pitch rides the hero's speed.
  */
 
-class GreenFlag extends Style {
+class GrandPrix extends Style {
   readonly id = 'green';
-  readonly bpm = 168;
-  readonly root = 41.2;                                      // E
-  readonly scale = [0, 2, 4, 7, 9];
-  readonly chords = [[0, 4, 7], [5, 9, 12], [7, 11, 14], [0, 4, 7]];
+  readonly bpm = 164;
+  readonly root = 43.65;                                     // F
+  readonly scale = [0, 2, 4, 5, 7, 9, 11];
+  readonly chords = [[0, 4, 7], [5, 9, 12], [7, 11, 14], [2, 5, 9]];
   readonly barsPerChord = 1;
-  readonly leadOct = 4;
-  readonly level = 0.6;
+  readonly leadOct = 5;
+  readonly level = 0.62;
+
+  /** The hook: scale degrees per sixteenth, -1 for a rest. Two bars long. */
+  private static readonly HOOK = [
+    4, -1, 2, -1, 0, -1, 2, 4, -1, -1, 5, -1, 4, -1, 2, -1,
+    0, -1, -1, 2, 4, -1, 7, -1, 5, -1, 4, 2, -1, -1, -1, -1,
+  ];
 
   step(i: number, t: number, m: Mood): void {
     const s = this.s, b = this.bus, pos = i % 16;
-    if (pos % 4 === 0) s.kick(b, t, 0.15);
-    if (pos === 4 || pos === 12) s.snare(b, t, 0.06, pos === 12 ? 0.3 : -0.3);
-    if (pos % 2 === 1) s.hat(b, t, 0.013, pos % 4 ? 0.35 : -0.35);
-    // chip bassline: root eighths with a pickup
-    if (pos % 2 === 0) {
-      const bass = this.tones(i, 1)[0] * (pos === 6 || pos === 14 ? 2 : 1);
-      s.chip(b, t, bass, 0.03, this.stepDur * 0.9, pos % 4 ? 0.3 : -0.3);
+    const ch = this.chordAt(i);
+
+    // shuffled backbeat: kick on 1 and the and-of-3, claps on 2 and 4
+    if (pos === 0 || pos === 6 || pos === 10) s.kick(b, t, pos === 0 ? 0.16 : 0.1);
+    if (pos === 4 || pos === 12) {
+      s.snare(b, t, 0.055, pos === 12 ? 0.25 : -0.25);
+      s.stomp(b, t, 0.03);                                   // handclap layer
     }
-    if (m.tension > 0.4 && pos === 8) s.chip(b, t, this.tones(i, 5)[0], 0.012, 0.1, 0.4, 5);
+    if (pos % 2 === 1) s.hat(b, t, 0.012, pos % 4 ? 0.4 : -0.4, pos === 15);
+
+    // walking bass: root, fifth, octave, and a chromatic lead-in to the turn
+    if (pos % 2 === 0) {
+      const deg = [0, 0, 2, 0, 1, 0, 2, 1][pos >> 1];
+      const f = semisOf(this.root, ch[deg % ch.length], 1) * (pos === 14 ? 2 : 1);
+      s.guitar(b, t, f, 0.05, true, -0.2);
+      if (pos === 0 || pos === 8) s.chip(b, t, f, 0.022, this.stepDur * 1.6, -0.35);
+    }
+
+    // brass stabs on the off-beats, the sound of a kart racer's chorus
+    if (pos === 2 || pos === 7 || pos === 11) {
+      const g = pos === 7 ? 0.03 : 0.022;
+      for (const n of ch) s.brass(b, t, semisOf(this.root, n, 3), g, this.stepDur * 1.4, pos === 7 ? 0.3 : -0.3);
+    }
+
+    // the hook, on bells, two bars long
+    const hk = GrandPrix.HOOK[i % 32];
+    if (hk >= 0) s.bell(b, t, this.scaleTone(hk, 5), 0.028, 0.15, 0.25);
+
+    // crash over the turn into a new chord
+    if (this.isChordStart(i)) s.crash(b, t, 0.03, 0.2, 0.9);
+    if (m.tension > 0.45 && pos === 14) s.zap(b, t, this.scaleTone(7, 5), 0.016, 0.5);
   }
 
   lead(t: number, f: number, g: number, pan: number): void {
-    this.s.chip(this.bus, t, f, g, 0.16, pan, 0);
+    this.s.bell(this.bus, t, f, g * 1.1, pan);
+  }
+}
+
+class Rainbow extends Style {
+  readonly id = 'rainbow';
+  readonly bpm = 176;
+  readonly root = 49;                                        // G
+  readonly scale = [0, 2, 4, 7, 9, 11];
+  readonly chords = [[0, 4, 7], [9, 12, 16], [5, 9, 12], [7, 11, 14]];
+  readonly barsPerChord = 1;
+  readonly leadOct = 5;
+  readonly level = 0.55;
+
+  step(i: number, t: number, m: Mood): void {
+    const s = this.s, b = this.bus, pos = i % 16;
+    const ch = this.chordAt(i);
+    if (pos % 4 === 0) s.kick(b, t, 0.15);
+    if (pos === 4 || pos === 12) s.snare(b, t, 0.05, 0);
+    if (pos % 2 === 1) s.hat(b, t, 0.011, pos % 4 ? 0.45 : -0.45);
+    if (pos % 2 === 0) s.reese(b, t, semisOf(this.root, ch[0], 1), 0.03, this.stepDur * 1.8);
+    // glass arpeggio climbing the chord across the bar
+    s.glass(b, t, semisOf(this.root, ch[pos % ch.length], 4 + ((pos >> 2) & 1)), 0.012, ((pos / 15) * 2 - 1) * 0.6);
+    if (pos === 0 || pos === 8) {
+      for (const n of ch) s.supersaw(b, t, semisOf(this.root, n, 3), 0.018, this.stepDur * 6, 0.2);
+    }
+    if (m.tension > 0.5 && pos === 6) s.crash(b, t, 0.022, -0.4, 0.7);
+  }
+
+  lead(t: number, f: number, g: number, pan: number): void {
+    this.s.supersaw(this.bus, t, f, g * 0.9, 0.2, pan);
   }
 }
 
@@ -54,11 +118,17 @@ class SunsetDrift extends Style {
 
   step(i: number, t: number, m: Mood): void {
     const s = this.s, b = this.bus, pos = i % 16;
-    if (pos % 8 === 0) s.kick(b, t, 0.11);
+    const ch = this.chordAt(i);
+    if (pos % 8 === 0) s.kick(b, t, 0.12);
     if (pos % 8 === 4) s.tom(b, t, 110, 0.05, 0.2);
     if (pos % 4 === 2) s.hat(b, t, 0.01, 0.4);
-    if (pos === 0) s.organ(b, t, this.tones(i, 3)[0], 0.028, this.stepDur * 14, -0.3);
-    if ((pos === 6 || pos === 10) && this.id) s.chip(b, t, this.tones(i, 4)[2] ?? this.tones(i, 4)[0], 0.008, 0.2, 0.4);
+    // muted guitar comp on the off-beats: the cruise
+    if (pos % 4 === 3) for (const n of ch) s.guitar(b, t, semisOf(this.root, n, 3), 0.016, true, 0.3);
+    // bass walks the chord instead of sitting on the root
+    if (pos % 4 === 0) s.guitar(b, t, semisOf(this.root, ch[(pos >> 2) % ch.length], 1), 0.045, false, -0.25);
+    if (pos === 0) s.organ(b, t, semisOf(this.root, ch[0], 3), 0.026, this.stepDur * 14, -0.3);
+    if (pos === 8) s.horn(b, t, semisOf(this.root, ch[2], 3), 0.02, 0.35);
+    if (pos === 6 || pos === 10) s.glass(b, t, semisOf(this.root, ch[2], 5), 0.01, 0.4);
     if (m.tension > 0.5 && pos === 12) s.snare(b, t, 0.03, 0);
   }
 
@@ -67,9 +137,13 @@ class SunsetDrift extends Style {
   }
 }
 
+/** A frequency `n` semitones above the tonic, `oct` octaves up. */
+const semisOf = (root: number, n: number, oct: number): number => root * Math.pow(2, oct + n / 12);
+
 const STYLES: StyleDef[] = [
-  { id: 'green', name: 'Green flag — chip race-pop', make: (s, bus) => new GreenFlag(s, bus) },
+  { id: 'green', name: 'Grand prix — brass and bells', make: (s, bus) => new GrandPrix(s, bus) },
   { id: 'sunset', name: 'Sunset drift — cruising', make: (s, bus) => new SunsetDrift(s, bus) },
+  { id: 'rainbow', name: 'Rainbow — supersaw sprint', make: (s, bus) => new Rainbow(s, bus) },
 ];
 
 export const SLIP_MUSIC: Array<[string, string]> = [

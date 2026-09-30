@@ -14,7 +14,7 @@ import { KART_H } from './sprites';
  * checked against one number instead of a scattering of magic widths.
  */
 const H_SHADOW = KART_H * 0.43;    // a flat smudge as wide as the tyres
-const H_BOX = KART_H * 0.72;       // item box: chest high on a driver
+const H_BOX = KART_H * 0.95;       // item box: about as tall as the kart chasing it
 const H_SHELL = KART_H * 0.34;     // a shell is a thing you trip over
 const H_BANANA = KART_H * 0.20;
 const H_HAZARD = KART_H * 0.24;
@@ -68,15 +68,12 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     <div id="slip-order"><div class="pos"><b>P1</b><i>/8</i></div><div class="who">—</div></div>
     <div id="slip-kmh"><b>0</b> <span>km/h</span></div>
     <div id="slip-item"><canvas width="34" height="34"></canvas></div>
-    <div id="slip-map"><canvas width="118" height="118"></canvas><div class="cap">CIRCUIT</div></div>
-    <div id="slip-caution">CAUTION — PACK EASING</div>
-    <div id="slip-flash"></div>`;
+    <div id="slip-map"><div class="cap">CIRCUIT</div><canvas width="118" height="118"></canvas></div>`;
   host.mount.appendChild(hud);
   const q = (s: string): HTMLElement => hud.querySelector(s) as HTMLElement;
   const countEl = q('#slip-count'), posEl = q('#slip-order .pos'), whoEl = q('#slip-order .who');
   const kmhEl = q('#slip-kmh b'), mapEl = q('#slip-map'), mapCv = q('#slip-map canvas') as HTMLCanvasElement;
   const itemCv = q('#slip-item canvas') as HTMLCanvasElement, itemEl = q('#slip-item');
-  const cautionEl = q('#slip-caution'), flashEl = q('#slip-flash');
   const mapCtx = mapCv.getContext('2d')!;
   const itemCtx = itemCv.getContext('2d')!;
 
@@ -97,7 +94,11 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
   // ── sprites ──
   const shellRed = shell('#d0262c', '#7a1216');
   const shellGreen = shell('#2ea043', '#14532d');
-  const boxSpr = itemBox();
+  // eight frames of the shimmer, baked once and cycled; rebuilding a 24x24
+  // canvas every frame for a prop is not worth it
+  const boxFrames = Array.from({ length: 8 }, (_, i) => itemBox(i / 8));
+  const boxFrame = (ph: number): HTMLCanvasElement => boxFrames[Math.floor(ph * 8) % 8];
+  const boxSpr = boxFrames[0];
   const bananaSpr = banana();
   const mushroomSpr = mushroom();
   const oilSpr = oil();
@@ -233,10 +234,6 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
 
     const heroIdx = race.pickHero(settings.kCam, f.t);
     const hero = race.racers[heroIdx];
-    if (lastHero >= 0 && heroIdx !== lastHero) {
-      flashEl.classList.add('on');
-      setTimeout(() => flashEl.classList.remove('on'), 50);
-    }
     lastHero = heroIdx;
 
     // ── camera: behind the hero, looking a car-length ahead ──
@@ -267,11 +264,14 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       const ww = hz.kind === 'oil' ? H_HAZARD * 0.7 : H_BANANA;
       draws.push({ depth: p.depth, run: () => m7.drawSprite(spr, hz.x, hz.y, cam, ww, Math.min(1, hz.life / 2)) });
     }
+    // the shell cycles the rainbow, so the sprite is rebuilt a few times a
+    // second rather than baked once - eight frames is enough to shimmer
+    const boxNow = boxFrame((f.t * 0.55) % 1);
     for (const g of race.gantries) {
       if (g.respawn > 0) continue;
       const gp = track.offset(g.s, 0);
       const p = m7.project(gp.x, gp.y, cam);
-      if (p) draws.push({ depth: p.depth, run: () => m7.drawSprite(boxSpr, gp.x, gp.y, cam, H_BOX, 1, KART_H * 0.5 + Math.sin(f.t * 3) * 0.12) });
+      if (p) draws.push({ depth: p.depth, run: () => m7.drawSprite(boxNow, gp.x, gp.y, cam, H_BOX, 1, KART_H * 0.52 + Math.sin(f.t * 2.2) * 0.14) });
     }
     const bpos = track.offset(track.boardS, -(track.width / 2 + 34));
     const bpp = m7.project(bpos.x, bpos.y, cam);
@@ -351,7 +351,6 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     whoEl.textContent = `${hero.name}${hero.laps > 0 ? `  ·  LAP ${hero.laps}` : ''}`;
     whoEl.classList.toggle('ghost', hero.ghost);
     kmhEl.textContent = String(Math.round(hero.speed * 2.05));
-    cautionEl.classList.toggle('on', race.caution > 0);
     // item slot: what the hero is holding
     itemCtx.clearRect(0, 0, 34, 34);
     if (hero.item) {

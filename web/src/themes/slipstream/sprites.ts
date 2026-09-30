@@ -104,7 +104,7 @@ function paint(c: CanvasRenderingContext2D, map: string[], pal: Record<string, s
 export interface Driver { name: string; skin: string; shade: string; extra: string; map: string[] }
 
 export const DRIVERS: Driver[] = [
-  { name: 'GREMLIN', skin: '#6fbf46', shade: '#3f8a2a', extra: '#ffe27a', map: [
+  { name: 'GREMLIN', skin: '#7fe049', shade: '#3f9622', extra: '#fff05a', map: [
     '.G.......G.',
     '.GG.....GG.',
     '.GGGGGGGGG.',
@@ -118,7 +118,7 @@ export const DRIVERS: Driver[] = [
     '..AAAAAAA..',
     '.AAAAAAAAA.',
   ] },
-  { name: 'RUSTBUCKET', skin: '#9aa3b2', shade: '#5a6170', extra: '#ff6b4a', map: [
+  { name: 'RUSTBUCKET', skin: '#c2ccdb', shade: '#6b7486', extra: '#ff5e3a', map: [
     '.....N.....',
     '.....r.....',
     '.RRRRRRRRR.',
@@ -132,7 +132,7 @@ export const DRIVERS: Driver[] = [
     '..AAAAAAA..',
     '.AAAAAAAAA.',
   ] },
-  { name: 'WHISKERS', skin: '#d79a5b', shade: '#9c6634', extra: '#ffd8a8', map: [
+  { name: 'WHISKERS', skin: '#ffa94d', shade: '#b8611c', extra: '#ffe9c4', map: [
     '.GG.....GG.',
     '.GgG...GgG.',
     '.GGGGGGGGG.',
@@ -146,7 +146,7 @@ export const DRIVERS: Driver[] = [
     '..AAAAAAA..',
     '.AAAAAAAAA.',
   ] },
-  { name: 'GOGGLES', skin: '#e8b48a', shade: '#a87450', extra: '#5ad2e8', map: [
+  { name: 'GOGGLES', skin: '#ffc79a', shade: '#b0764a', extra: '#3ee0ff', map: [
     '...........',
     '..aaaaaaa..',
     '.aaaaaaaaa.',
@@ -160,7 +160,7 @@ export const DRIVERS: Driver[] = [
     '..AAAAAAA..',
     '.AAAAAAAAA.',
   ] },
-  { name: 'RATTLE', skin: '#e9e6dc', shade: '#a8a49a', extra: '#ff4d6d', map: [
+  { name: 'RATTLE', skin: '#f6f4ec', shade: '#a8a49a', extra: '#ff3d63', map: [
     '...........',
     '..GGGGGGG..',
     '.GGGGGGGGG.',
@@ -174,7 +174,7 @@ export const DRIVERS: Driver[] = [
     '..AAAAAAA..',
     '.AAAAAAAAA.',
   ] },
-  { name: 'BLOOP', skin: '#9ee6c4', shade: '#59a882', extra: '#c98cf0', map: [
+  { name: 'BLOOP', skin: '#6ff5c0', shade: '#2fae7c', extra: '#e07bff', map: [
     '...........',
     '...GGGGG...',
     '..GGGGGGG..',
@@ -188,7 +188,7 @@ export const DRIVERS: Driver[] = [
     '..AAAAAAA..',
     '.AAAAAAAAA.',
   ] },
-  { name: 'QUACKERS', skin: '#f2f0e6', shade: '#b4b1a4', extra: '#ffa32e', map: [
+  { name: 'QUACKERS', skin: '#fffdf2', shade: '#c0bdac', extra: '#ff9c00', map: [
     '..AAAAAAA..',
     '.AAAAAAAAA.',
     'AAAAAAAAAAA',
@@ -202,7 +202,7 @@ export const DRIVERS: Driver[] = [
     '..aaaaaaa..',
     '.aaaaaaaaa.',
   ] },
-  { name: 'VISOR', skin: '#efece1', shade: '#a9a69c', extra: '#3ad1ff', map: [
+  { name: 'VISOR', skin: '#f4f1e6', shade: '#a9a69c', extra: '#19e0ff', map: [
     '...........',
     '..AAAAAAA..',
     '.AAAAAAAAA.',
@@ -651,15 +651,52 @@ export function oil(): HTMLCanvasElement {
 }
 
 /** The floating item box under the gantries. */
-export function itemBox(): HTMLCanvasElement {
-  const [cv, c] = sprite(16, 16);
-  c.fillStyle = '#8a4a10'; c.fillRect(2, 2, 12, 12);
-  c.fillStyle = '#f0a838'; c.fillRect(3, 3, 10, 10);
-  c.fillStyle = '#ffd86a'; c.fillRect(4, 4, 8, 8);
-  c.fillStyle = '#3a2408';
-  c.font = 'bold 8px monospace'; c.textBaseline = 'middle';
-  c.fillText('?', 4.5, 8.5);
-  c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(4, 4, 8, 1);
+/**
+ * The item box: a translucent cube with an iridescent shell and a '?' floating
+ * inside it. `phase` rolls the hue so the box shimmers as it spins, which is
+ * the whole point of the thing - it used to be 16x16 of three browns with an
+ * 8px question mark, which reads as a crate.
+ */
+export function itemBox(phase = 0): HTMLCanvasElement {
+  const N = 24;
+  const [cv, c] = sprite(N, N);
+  const h0 = (phase * 360) % 360;
+  // shell: four nested rings, each a step further round the wheel
+  for (let r = 0; r < 4; r++) {
+    c.fillStyle = hsl((h0 + r * 42) % 360, 92, 60 - r * 6);
+    c.fillRect(1 + r, 1 + r, N - 2 - r * 2, N - 2 - r * 2);
+  }
+  // glassy middle so the '?' sits inside the box rather than on it
+  c.fillStyle = 'rgba(16, 12, 30, 0.55)';
+  c.fillRect(5, 5, N - 10, N - 10);
+  // corner studs, the SMK tell
+  c.fillStyle = '#fffbe8';
+  for (const [x, y] of [[1, 1], [N - 3, 1], [1, N - 3], [N - 3, N - 3]]) c.fillRect(x, y, 2, 2);
+  // the mark: drawn as pixels so it stays crisp at any zoom
+  const Q = [
+    '.###.',
+    '#...#',
+    '...#.',
+    '..#..',
+    '..#..',
+    '.....',
+    '..#..',
+  ];
+  const qx = (N - 5) / 2 | 0, qy = 6;
+  c.fillStyle = '#120f1e';
+  for (let y = 0; y < Q.length; y++) for (let x = 0; x < 5; x++) {
+    if (Q[y][x] !== '#') continue;
+    c.fillRect(qx + x - 1, qy + y, 3, 1);          // shadow, one pixel out
+  }
+  c.fillStyle = '#fffbe8';
+  for (let y = 0; y < Q.length; y++) for (let x = 0; x < 5; x++) {
+    if (Q[y][x] === '#') c.fillRect(qx + x, qy + y, 1, 1);
+  }
+  // top-face highlight
+  c.fillStyle = 'rgba(255, 255, 255, 0.55)';
+  c.fillRect(4, 3, N - 8, 1);
+  c.fillStyle = 'rgba(255, 255, 255, 0.22)';
+  c.fillRect(3, 4, 2, N - 8);
   return cv;
 }
 
