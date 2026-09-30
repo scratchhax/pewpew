@@ -213,11 +213,11 @@ export class Flycam {
     return out.slice(0, k);
   }
 
-  /** Glide to an active patch — lively AND roughly ahead, so the ride never becomes endless backwards transit. */
+  /** Glide to an active patch — lively AND roughly ahead, so the ride never becomes endless backwards transit. A target that would demand a U-turn is NOT a candidate: at the cornering law's slow pivot, a 180° retarget is a long outward spiral that sails the web out of view. */
   private relocate(t: number): boolean {
     if (t - this.lastRelocateT < 4) return false;
     const comps = this.bestComps(5).slice();
-    const velN = this.velDir.lengthSq() > 1e-6 ? this.tmp.copy(this.velDir).normalize() : null;
+    const ref = this.velDir.lengthSq() > 1e-6 ? this.tmp.copy(this.velDir).normalize() : this.tmp.copy(this.lastDir).normalize();
     const cand: { v: number; p: Vector3; score: number }[] = [];
     for (const c of comps) {
       if (c.size < 20) continue;
@@ -228,12 +228,10 @@ export class Flycam {
       // reads as the whole scene snapping back and forth
       if (this.tmp3.distanceTo(this.lastTravelA) < 25) continue;
       if (this.tmp3.distanceTo(this.lastTravelB) < 25) continue;
-      let fwd = 1;
-      if (velN) {
-        const dir = this.tmp2.copy(this.tmp3).sub(this.pos).normalize();
-        fwd = 0.3 + 0.7 * Math.max(0, velN.dot(dir));
-      }
-      cand.push({ v: c.v, p: this.tmp3.clone(), score: c.act * fwd });
+      const dir = this.tmp2.copy(this.tmp3).sub(this.pos).normalize();
+      const ahead = Math.max(0, ref.dot(dir));
+      if (ahead < 0.17) continue; // >80° off heading: wait for a component in front
+      cand.push({ v: c.v, p: this.tmp3.clone(), score: c.act * (0.55 + 0.45 * ahead) });
     }
     cand.sort((a, b) => b.score - a.score);
     const best = cand[0];
@@ -280,6 +278,7 @@ export class Flycam {
     // Zero-g cornering: past the gentle zone the pivot slows harder than the
     // brake — target switches become wide sweeping arcs, not pivots in place.
     this.corner(dt, this.tmp, this.speed * 1.3);
+    this.contain(dt);
     this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
     this.aim(this.tmp, dt);
     this.lastDir.copy(this.tmp);
@@ -320,10 +319,16 @@ export class Flycam {
       if (c && c.size >= 60) {
         const tv = this.sim.V[c.v];
         if (tv) {
-          lift(tv.x, tv.y, this.travelTarget);
+          vertexWorld(this.sim, c.v, this.travelTarget);
           if (this.travelTarget.distanceTo(this.pos) > 10) {
-            this.startTravel();
-            this.travel = c.v; // the ride continues on this frame; the glide starts next
+            // same no-U-turn law as relocate: a drift retarget behind the
+            // camera is a slow outward spiral, not a ride
+            const ref = this.velDir.lengthSq() > 1e-6 ? this.tmp2.copy(this.velDir) : this.tmp2.copy(this.lastDir);
+            const dir = this.tmp3.copy(this.travelTarget).sub(this.pos).normalize();
+            if (ref.dot(dir) > 0.17) {
+              this.startTravel();
+              this.travel = c.v; // the ride continues on this frame; the glide starts next
+            }
           } else this.newRoute(t);
         }
       }
@@ -388,6 +393,7 @@ export class Flycam {
       // pivot in place at speed.
       this.corner(dt, this.tmp, this.speed);
     }
+    this.contain(dt);
     this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
 
     // the anti-burn-in wander only — no sway, no roll, ever
@@ -489,16 +495,37 @@ export class Flycam {
   }
 
   /**
+   * The bounding edge. The mat wraps a shell — beyond its outer rim (or too
+   * deep into the hollow core) the camera is steered back, curving home on
+   * the same arc law instead of reflecting. This is the backstop every mode
+   * obeys, so no path (glide, coast, hover, rail) can ever carry the ride
+   * out of the web.
+   */
+  private contain(dt: number): void {
+    const r = this.pos.length();
+    if (r < 1e-3 || this.velDir.lengthSq() < 1e-6) return;
+    const out = r > R ? Math.min(1, (r - R) / (0.4 * R)) : 0;
+    const deep = r < 0.55 * R ? Math.min(1, (0.55 * R - r) / (0.35 * R)) : 0;
+    const bias = out - deep;
+    if (bias === 0) return;
+    const rad = this.tmp4.copy(this.pos).multiplyScalar(1 / r);
+    this.tmp3.copy(this.velDir).addScaledVector(rad, -bias * 2.0);
+    if (this.tmp3.lengthSq() > 1e-6) this.steer(dt, this.tmp3, 0.9);
+  }
+
+  /**
    * The cornering law, shared by rail-riding and gliding: a swimmer changes
    * HEADING, not momentum — past the gentle zone the pivot slows dramatically
    * while the speed barely dips, so direction changes are long wide arcs.
-   * (Braking hard through a turn reads as a stop-and-go jolt.)
+   * (Braking hard through a turn reads as a stop-and-go jolt.) For a hard
+   * REVERSAL the wide arc is geometrically wrong — it spirals outward off
+   * the mat — so callers can raise the floors (tighter arc, deeper brake).
    */
-  private corner(dt: number, desired: Vector3, baseSpeed: number): void {
+  private corner(dt: number, desired: Vector3, baseSpeed: number, turnFloor = 0.25, speedFloor = 0.85): void {
     const off = this.velDir.lengthSq() > 1e-6 ? this.velDir.angleTo(desired) : 0;
     const hard = Math.max(0, off - 0.5);
-    const turnMul = Math.max(0.25, 1 - hard * 0.85);
-    const speedMul = Math.max(0.85, 1 - hard * 0.3);
+    const turnMul = Math.max(turnFloor, 1 - hard * 0.85);
+    const speedMul = Math.max(speedFloor, 1 - hard * 0.3);
     this.curSpeed += (baseSpeed * speedMul - this.curSpeed) * Math.min(1, dt * 1.5);
     this.steer(dt, desired, turnMul);
   }
@@ -534,20 +561,25 @@ export class Flycam {
     // never makes
     if (this.pullDir.lengthSq() > 1e-6) {
       this.tmp3.copy(this.pullDir).normalize();
-      // stay near the shell while gliding: the same soft radial field the
-      // glide uses — deep inside bias out, outside bias in, curved not braked
-      const r = this.pos.length();
-      if (r > 1e-3) {
-        const rad = this.tmp4.copy(this.pos).multiplyScalar(1 / r);
-        const deep = Math.min(1, Math.max(0, (0.62 * R - r) / (0.25 * R)));
-        const high = Math.min(1, Math.max(0, (r - 0.95 * R) / (0.2 * R)));
-        if (deep > 0) this.tmp3.addScaledVector(rad, deep * 2.2).normalize();
-        else if (high > 0) this.tmp3.addScaledVector(rad, -high * 1.4).normalize();
-      }
       this.corner(dt, this.tmp3, this.speed * 0.35);
     } else {
+      // nothing in reach: skim the shell — strip the radial component of the
+      // drift so the glide circles the web's surface instead of sailing off
+      // into the void (pullDir goes quiet beyond its reach, so this is the
+      // containment that keeps the constellation in view)
       this.curSpeed += (this.speed * 0.35 - this.curSpeed) * Math.min(1, dt * 1.2);
+      const r = this.pos.length();
+      if (r > 1e-3 && this.velDir.lengthSq() > 1e-6) {
+        const rad = this.tmp4.copy(this.pos).multiplyScalar(1 / r);
+        const along = this.velDir.dot(rad);
+        this.tmp3.copy(this.velDir).addScaledVector(rad, -along);
+        if (this.tmp3.lengthSq() > 1e-4) {
+          this.tmp3.normalize();
+          this.steer(dt, this.tmp3, 0.7);
+        }
+      }
     }
+    this.contain(dt);
     if (this.velDir.lengthSq() > 1e-6) {
       this.pos.addScaledVector(this.velDir, this.curSpeed * dt);
     }
