@@ -394,7 +394,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     diag: () => ({
       W: m7.W, H: m7.H, rows: settings.kRows,
       hero: race.heroIdx, leader: race.leaderIdx,
-      racers: race.racers.map((r) => ({ n: r.name, g: r.ghost ? 1 : 0, s: Math.round(r.s), lat: Math.round(r.lat), sp: Math.round(r.speed), a: +r.act.toFixed(1) })),
+      racers: race.racers.map((r) => ({ n: r.name, g: r.ghost ? 1 : 0, s: Math.round(r.s), lat: +r.lat.toFixed(1), v: r.char.veh, sp: Math.round(r.speed), a: +r.act.toFixed(1) })),
       caution: +race.caution.toFixed(1),
       cam: { x: +camX.toFixed(1), y: +camY.toFixed(1), h: +camHeading.toFixed(2) },
       camOffTrack: +Math.hypot(camX - track.xs[track.nearest(camX, camY)], camY - track.ys[track.nearest(camX, camY)]).toFixed(1),

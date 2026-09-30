@@ -1,6 +1,6 @@
 import type { Track } from './track';
 import type { SceneEvent } from '../../events';
-import { characterFor, type Character } from './sprites';
+import { characterFor, VEH_W, type Character } from './sprites';
 
 /**
  * The race. Exactly eight karts, always: a seat belongs to a host, never to
@@ -22,6 +22,7 @@ export interface Racer {
   ip: string; name: string; hue: number; char: Character;
   s: number;                // arc position along the lap
   lat: number;              // lateral offset from the racing line
+  avoid: number;            // persistent shove from body contact
   seed: number;
   speed: number;
   surge: number;            // traffic draft, decaying
@@ -38,7 +39,7 @@ export interface Racer {
   itemT: number;
 }
 
-export interface Hazard { x: number; y: number; life: number; kind: 'oil' | 'banana' }
+export interface Hazard { x: number; y: number; life: number; cool: number; kind: 'oil' | 'banana' }
 export interface Shell { s: number; lat: number; life: number; kind: 'red' | 'green'; target: number }
 export interface Gantry { s: number; respawn: number }
 
@@ -101,7 +102,7 @@ export class Race {
     for (let i = 0; i < SEATS; i++) {
       this.racers.push({
         seat: i, ip: '', name: 'NO DRIVER', hue: (i * 47 + 20) % 360, char: characterFor(`seat${i}`),
-        s: -i * 7, lat: (i % 2 ? 1 : -1) * track.width * 0.16, seed: i * 137.31,
+        s: -i * 7, lat: (i % 2 ? 1 : -1) * track.width * 0.16, avoid: 0, seed: i * 137.31,
         speed: 0, surge: 0, boost: 0, spin: 0, glow: 0, flash: 0,
         ghost: true, laps: 0, dist: -i * 7, act: 0, lastSeen: t0, item: null, itemT: 0,
       });
@@ -175,7 +176,7 @@ export class Race {
           this.lastSpin = t;
           r.spin = 0.9 + Math.random() * 0.5;
           const p = this.track.offset(r.s, r.lat);
-          this.hazards.push({ x: p.x, y: p.y, life: 9, kind: 'oil' });
+          this.hazards.push({ x: p.x, y: p.y, life: 9, cool: 0, kind: 'oil' });
           this.hooks.onSpin(r.seat);
         }
         break;
@@ -219,6 +220,7 @@ export class Race {
 
     for (let oi = this.hazards.length - 1; oi >= 0; oi--) {
       this.hazards[oi].life -= dt;
+      this.hazards[oi].cool = Math.max(0, this.hazards[oi].cool - dt);
       if (this.hazards[oi].life <= 0) this.hazards.splice(oi, 1);
     }
     for (let i = 0; i < this.padLight.length; i++) this.padLight[i] = Math.max(0, this.padLight[i] - dt);
@@ -240,12 +242,13 @@ export class Race {
       r.speed += (Math.max(2, target) - r.speed) * Math.min(1, dt * 0.9);
       if (r.spin > 0) {
         r.spin -= dt;
-        r.speed *= 0.2;
+        r.speed *= Math.exp(-dt * 3.4);   // frame-rate independent, and recoverable
       }
       const prev = r.s;
       r.s += r.speed * dt;
       r.dist += r.speed * dt;
-      r.lat = Math.sin(t * 0.25 + r.seed) * tr.width * 0.18 + (r.seat % 2 ? 1 : -1) * tr.width * 0.07;
+      r.lat = Math.sin(t * 0.25 + r.seed) * tr.width * 0.18 + (r.seat % 2 ? 1 : -1) * tr.width * 0.07 + r.avoid;
+      r.avoid *= Math.exp(-dt / 2.2);
       r.surge *= Math.exp(-dt / 2.6);
       r.boost *= Math.exp(-dt / 1.6);
       r.act *= Math.exp(-dt / 40);
@@ -289,7 +292,7 @@ export class Race {
           if (kind === 'mushroom') r.boost = Math.max(r.boost, 15);
           if (kind === 'banana') {
             const p = tr.offset(r.s - 9, r.lat);
-            this.hazards.push({ x: p.x, y: p.y, life: 45, kind: 'banana' });
+            this.hazards.push({ x: p.x, y: p.y, life: 45, cool: 0, kind: 'banana' });
           }
           if (kind === 'shell') {
             const ahead = this.order.map((s) => this.racers[s]).find((x) => x.seat !== r.seat && x.dist > r.dist);
@@ -307,8 +310,9 @@ export class Race {
       if (r.spin <= 0 && t - this.lastSpin > 1.6) {
         const p = this.kartPos(r.seat);
         for (const h of this.hazards) {
-          if ((h.x - p.x) ** 2 + (h.y - p.y) ** 2 < 9) {
+          if (h.cool <= 0 && (h.x - p.x) ** 2 + (h.y - p.y) ** 2 < 9) {
             this.lastSpin = t;
+            h.cool = 3;   // one kart spins per slip, not every frame it lingers
             r.spin = 0.8 + Math.random() * 0.4;
             this.hooks.onSpin(r.seat);
             break;
@@ -326,15 +330,15 @@ export class Race {
         if (ds > tr.total / 2) ds -= tr.total;
         if (ds < -tr.total / 2) ds += tr.total;
         if (Math.abs(ds) > 3.6) continue;
-        const minLat = 4.0;
+        const minLat = 1.9 * (VEH_W[a.char.veh] + VEH_W[b.char.veh]) * 0.95;
         const dl = a.lat - b.lat;
         if (Math.abs(dl) > minLat) continue;
         const push = (minLat - Math.abs(dl)) * 0.5 + 0.02;
         const dir = dl > 0 ? 1 : dl < 0 ? -1 : (a.seat < b.seat ? -1 : 1);
-        a.lat += dir * push; b.lat -= dir * push;
-        const lim = tr.width * 0.5 - 1;
-        a.lat = Math.max(-lim, Math.min(lim, a.lat));
-        b.lat = Math.max(-lim, Math.min(lim, b.lat));
+        a.avoid += dir * push; b.avoid -= dir * push;
+        const lim = tr.width * 0.42;
+        a.avoid = Math.max(-lim, Math.min(lim, a.avoid));
+        b.avoid = Math.max(-lim, Math.min(lim, b.avoid));
         if (Math.abs(dl) < minLat * 0.5) {
           if (ds > 0) a.speed *= 1 - 0.3 * dt; else b.speed *= 1 - 0.3 * dt;
         }
