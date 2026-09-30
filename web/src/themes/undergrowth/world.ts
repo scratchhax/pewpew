@@ -105,12 +105,13 @@ function backdrop(): Mesh {
           float c2 = curtain(az, up, 1.0, 3.4, 0.070, 0.58, 0.20);
           float c3 = curtain(az, up, 2.0, 1.6, 0.030, 0.30, 0.30);
           float a = c1 * 0.55 + c2 * 0.42 + c3 * 0.3;
+          a = min(a, 0.42);   // stay under the bloom threshold: backdrop, not haze
           float rise = smoothstep(0.10, 0.32, up);
           vec3 teal = vec3(0.10, 0.72, 0.52), cyan = vec3(0.22, 0.55, 0.95), violet = vec3(0.46, 0.24, 0.86);
           vec3 ac = mix(teal, cyan, clamp(c2 * 1.6, 0.0, 1.0));
           ac = mix(ac, violet, clamp((c1 + c2) * 0.45 + smoothstep(0.72, 0.95, up) * 0.5, 0.0, 1.0) * 0.55);
           float breathe = 0.85 + 0.15 * sin(uTime * 0.11) * sin(uTime * 0.043 + 2.0);
-          col += ac * a * rise * breathe * uAurora * 0.60;
+          col += ac * a * rise * breathe * uAurora * 0.80;
           col += vec3(0.05, 0.11, 0.10) * rise * rise * 0.12;
         } else {
           vec3 canopy = vec3(0.030, 0.075, 0.062);
