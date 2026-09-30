@@ -17,6 +17,18 @@ export interface Circuit {
   speed: number;        // pace flavour multiplier (bowls are faster)
 }
 
+/**
+ * A thing standing beside the road: where it is on the lap, how far off the
+ * racing line, and which of the trackside sprites it is. Generated once with
+ * the circuit so a track always has the same crowd in the same places.
+ */
+export interface Prop {
+  s: number;          // arc position along the lap
+  lat: number;        // offset from the centre line, board units
+  kind: 'stand' | 'fan' | 'tree' | 'balloons' | 'marshal' | 'tyres';
+  seed: number;       // picks the driver, hue and jitter for this one
+}
+
 export interface Track {
   id: string;
   name: string;
@@ -30,6 +42,7 @@ export interface Track {
   boardS: number;
   width: number;
   speed: number;
+  props: Prop[];
   atS(s: number): { x: number; y: number; tx: number; ty: number };
   /** Lateral offset (+left / −right of the racing line) baked to world space. */
   offset(s: number, lat: number): { x: number; y: number };
@@ -197,6 +210,54 @@ function bake(c: Circuit, s: ReturnType<typeof sample>): { canvas: HTMLCanvasEle
   return { canvas: cv, px: new Uint32Array(img.data.buffer) };
 }
 
+/** A stable seed per circuit id, so a track keeps its crowd between reloads. */
+function seedOf(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+/**
+ * Where everything stands. A crowd gathers where a crowd would: packed stands
+ * and fans at the start line and around the item rows, marshals on the apexes,
+ * and trees filling the long empty stretches so the lap never looks bare.
+ * `lat` is measured from the centre line, so a prop clears the road by however
+ * much the shoulder is wide.
+ */
+function layout(total: number, width: number, padFr: number[], boardFr: number, seed: number): Prop[] {
+  const rnd = mulberry32(seed);
+  const out: Prop[] = [];
+  const edge = width / 2;
+  const put = (s: number, side: number, off: number, kind: Prop['kind']) =>
+    out.push({ s: ((s % total) + total) % total, lat: side * (edge + off), kind, seed: (rnd() * 1e9) | 0 });
+
+  // grandstands: the start line, and wherever a pad or the board is
+  const hot = [0, boardFr * total, ...padFr.map((f) => f * total), total * 0.5];
+  for (const h of hot) {
+    for (const side of [-1, 1]) {
+      if (rnd() < 0.35) continue;
+      put(h + (rnd() - 0.5) * 30, side, 30, 'stand');
+      // fans pressed against the fence in front of it
+      for (let k = 0; k < 7; k++) put(h - 34 + k * 10 + rnd() * 5, side, 13 + rnd() * 5, 'fan');
+      put(h + 46, side, 18, 'balloons');
+    }
+  }
+  // marshals and tyre stacks around the rest of the lap
+  for (let k = 0; k < 16; k++) {
+    const s = (k / 16) * total + rnd() * 40;
+    const side = rnd() < 0.5 ? -1 : 1;
+    put(s, side, 12 + rnd() * 4, rnd() < 0.45 ? 'marshal' : 'tyres');
+  }
+  // trees fill the gaps, both sides, further out
+  for (let k = 0; k < 74; k++) {
+    const s = rnd() * total;
+    const side = rnd() < 0.5 ? -1 : 1;
+    if (hot.some((h) => Math.abs(((s - h + total * 1.5) % total) - total * 0.5) > total * 0.5 - 60)) continue;
+    put(s, side, 34 + rnd() * 46, 'tree');
+  }
+  return out;
+}
+
 function distToTrack(s: ReturnType<typeof sample>, x: number, y: number): number {
   let bd = Infinity;
   const m = s.xs.length;
@@ -253,6 +314,7 @@ export function buildTrack(sel: string, hostname: string): Track {
     xs: smp.xs, ys: smp.ys, txs: smp.txs, tys: smp.tys, cum: smp.cum, total: smp.total,
     pads: c.padFr.map((f) => f * smp.total), boardS: c.boardFr * smp.total,
     width: c.width, speed: c.speed,
+    props: layout(smp.total, c.width, c.padFr, c.boardFr, seedOf(id)),
     atS(sv: number) {
       const s = wrapS(sv), i = idxAt(s), j = (i + 1) % m;
       const seg = (j === 0 ? smp.total : smp.cum[j]) - smp.cum[i];

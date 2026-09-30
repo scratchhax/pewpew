@@ -22,7 +22,20 @@ const H_FLAME = KART_H * 0.5;
 const H_LABEL = KART_H * 0.17;     // the name tag floating over the helmet
 const H_GLOW = KART_H * 1.15;
 const H_BOARD = KART_H * 2.6;      // the trackside flip board
-import { board as boardSprite, banana, flame, ghost, itemBox, kartFront, kartRear, kartSide, label, mushroom, oil, shadow, shell, VEH_W, type Character } from './sprites';
+const H_STAND = KART_H * 3.4;      // a packed grandstand
+const H_FAN = KART_H * 0.78;       // one fan against the fence
+const H_TREE = KART_H * 3.1;
+const H_BALLOONS = KART_H * 2.6;
+const H_MARSHAL = KART_H * 1.0;
+const H_TYRES = KART_H * 0.62;
+/**
+ * How far trackside furniture is drawn, scaled by the scene's own row budget -
+ * the low tier renders 160 rows and runs on the kiosk Pi, so it keeps the near
+ * crowd and drops the far stands rather than paying for five hundred sprites a
+ * frame it cannot resolve anyway.
+ */
+const propFar = (rows: number): number => 200 + rows * 1.6;
+import { balloons, board as boardSprite, banana, fan, flame, ghost, itemBox, kartFront, kartRear, kartSide, label, marshal, mushroom, oil, shadow, shell, stand, star, tree, tyres, VEH_W, type Character } from './sprites';
 import type { ItemKind } from './race';
 import './hud.css';
 
@@ -99,6 +112,55 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
   const boxFrames = Array.from({ length: 8 }, (_, i) => itemBox(i / 8));
   const boxFrame = (ph: number): HTMLCanvasElement => boxFrames[Math.floor(ph * 8) % 8];
   const boxSpr = boxFrames[0];
+
+  // The crowd is static art, so bake it once per circuit and index it by the
+  // prop's own seed. Only the wave has frames: a stand ripples across three
+  // phases and a fan has arms up or down, both eased by how they are chosen
+  // rather than flicked, because nothing here blinks.
+  const standCache = new Map<string, HTMLCanvasElement>();
+  const fanCache = new Map<string, HTMLCanvasElement>();
+  const treeCache = new Map<number, HTMLCanvasElement>();
+  const balloonCache = new Map<number, HTMLCanvasElement>();
+  const marshalCache = new Map<string, HTMLCanvasElement>();
+  const tyreSpr = tyres();
+  const propSpr = (p: { kind: string; seed: number }, wave: number): HTMLCanvasElement => {
+    const drv = p.seed % 8, acc = (p.seed >>> 3) % 360, hue = (p.seed >>> 5) % 360;
+    switch (p.kind) {
+      case 'stand': {
+        const k = `${p.seed}:${wave % 3}`;
+        let c = standCache.get(k);
+        if (!c) { c = stand(hue, wave % 3, p.seed); standCache.set(k, c); }
+        return c;
+      }
+      case 'fan': {
+        const k = `${p.seed}:${wave & 1}`;
+        let c = fanCache.get(k);
+        if (!c) { c = fan(drv, acc, (wave & 1) === 1); fanCache.set(k, c); }
+        return c;
+      }
+      case 'marshal': {
+        const k = `${p.seed}:${wave & 1}`;
+        let c = marshalCache.get(k);
+        if (!c) { c = marshal(drv, acc, (wave & 1) === 1); marshalCache.set(k, c); }
+        return c;
+      }
+      case 'balloons': {
+        let c = balloonCache.get(hue);
+        if (!c) { c = balloons(hue); balloonCache.set(hue, c); }
+        return c;
+      }
+      case 'tyres': return tyreSpr;
+      default: {
+        let c = treeCache.get(p.seed % 97);
+        if (!c) { c = tree(p.seed % 97); treeCache.set(p.seed % 97, c); }
+        return c;
+      }
+    }
+  };
+  const PROP_H: Record<string, number> = {
+    stand: H_STAND, fan: H_FAN, tree: H_TREE,
+    balloons: H_BALLOONS, marshal: H_MARSHAL, tyres: H_TYRES,
+  };
   const bananaSpr = banana();
   const mushroomSpr = mushroom();
   const oilSpr = oil();
@@ -264,14 +326,33 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       const ww = hz.kind === 'oil' ? H_HAZARD * 0.7 : H_BANANA;
       draws.push({ depth: p.depth, run: () => m7.drawSprite(spr, hz.x, hz.y, cam, ww, Math.min(1, hz.life / 2)) });
     }
+    // trackside: the crowd, the trees, the marshals. Sorted with everything
+    // else so a kart passes in front of a stand properly.
+    const wave = (f.t * 2.4) | 0;
+    const far = propFar(settings.kRows);
+    for (const pr of track.props) {
+      const pp = track.offset(pr.s, pr.lat);
+      const p = m7.project(pp.x, pp.y, cam);
+      if (!p || p.depth > far) continue;
+      const spr = propSpr(pr, wave + ((pr.seed >> 7) & 3));
+      const h = PROP_H[pr.kind] ?? H_TREE;
+      draws.push({ depth: p.depth, run: () => m7.drawSprite(spr, pp.x, pp.y, cam, h) });
+    }
+
     // the shell cycles the rainbow, so the sprite is rebuilt a few times a
     // second rather than baked once - eight frames is enough to shimmer
     const boxNow = boxFrame((f.t * 0.55) % 1);
     for (const g of race.gantries) {
-      if (g.respawn > 0) continue;
-      const gp = track.offset(g.s, 0);
-      const p = m7.project(gp.x, gp.y, cam);
-      if (p) draws.push({ depth: p.depth, run: () => m7.drawSprite(boxNow, gp.x, gp.y, cam, H_BOX, 1, KART_H * 0.52 + Math.sin(f.t * 2.2) * 0.14) });
+      // every box in the row, not one in the middle of the road
+      for (let li = 0; li < g.lanes.length; li++) {
+        if (g.taken[li] > 0) continue;          // this one has been taken
+        const lane = g.lanes[li];
+        const gp = track.offset(g.s, lane);
+        const p = m7.project(gp.x, gp.y, cam);
+        if (!p) continue;
+        const lift = KART_H * 0.52 + Math.sin(f.t * 2.2 + lane * 0.4) * 0.14;
+        draws.push({ depth: p.depth, run: () => m7.drawSprite(boxNow, gp.x, gp.y, cam, H_BOX, 1, lift) });
+      }
     }
     const bpos = track.offset(track.boardS, -(track.width / 2 + 34));
     const bpp = m7.project(bpos.x, bpos.y, cam);
@@ -283,8 +364,11 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       if (!pr) continue;
       const toR = Math.atan2(p.y - camY, p.x - camX);
       const relAng = Math.atan2(Math.sin(toR - camHeading), Math.cos(toR - camHeading));
-      const side = Math.abs(relAng) > 1.1;
-      const facingBack = Math.cos(p.heading - camHeading) < -0.2;
+      // a spinning kart turns: rear, side, front, side, about two turns a second
+      const spinning = r.spin > 0;
+      const turn = spinning ? ((r.spin * 7.5) | 0) % 4 : -1;
+      const side = spinning ? (turn === 1 || turn === 3) : Math.abs(relAng) > 1.1;
+      const facingBack = spinning ? turn === 2 : Math.cos(p.heading - camHeading) < -0.2;
       const wf = r.ghost ? 0 : ((f.t * (16 + r.speed * 0.38)) | 0) % 4;
       const spr = r.ghost ? ghostRear(r.hue, r.char) : side ? karts(r.hue, r.char).side : facingBack ? karts(r.hue, r.char).front : karts(r.hue, r.char, wf).rear;
       const alpha = r.ghost ? 0.42 : r.flash > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(r.flash * 20)) : 1;
@@ -307,6 +391,12 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       }
       if (r.glow > 0 && pr.depth < 240) {
         draws.push({ depth: pr.depth - 0.03, run: () => m7.drawSprite(glowSpr(), p.x, p.y, cam, H_GLOW, 0.4 * Math.min(1, r.glow)) });
+      }
+      // a star: a halo that rises over the first second and falls over the
+      // last, rather than the strobe the game uses
+      if (r.star > 0 && pr.depth < 300) {
+        const a = 0.55 * Math.min(1, r.star / 1.2) * Math.min(1, (7 - r.star) / 0.8 + 0.2);
+        draws.push({ depth: pr.depth - 0.04, run: () => m7.drawSprite(starSpr(), p.x, p.y, cam, H_GLOW * 1.15, Math.max(0, Math.min(0.6, a)), 0.2) });
       }
     }
     for (const sh of race.shells) {
@@ -377,6 +467,8 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     }
   }
 
+  let starCache: HTMLCanvasElement | null = null;
+  const starSpr = (): HTMLCanvasElement => (starCache ??= star());
   let glowCache: HTMLCanvasElement | null = null;
   const glowSpr = (): HTMLCanvasElement => {
     if (!glowCache) {
