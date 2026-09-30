@@ -392,7 +392,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       LEADER: race.racers[race.leaderIdx].name,
     }),
     diag: () => ({
-      W: m7.W, H: m7.H, rows: settings.kRows,
+      W: m7.W, H: m7.H, trackTotal: Math.round(track.total), rows: settings.kRows,
       hero: race.heroIdx, leader: race.leaderIdx,
       racers: race.racers.map((r) => ({ n: r.name, g: r.ghost ? 1 : 0, s: Math.round(r.s), lat: +r.lat.toFixed(1), v: r.char.veh, sp: Math.round(r.speed), a: +r.act.toFixed(1) })),
       caution: +race.caution.toFixed(1),
@@ -401,6 +401,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       shells: race.shells.map((s) => s.kind), hazards: race.hazards.length,
       pickedUp: race.pickedUp, used: race.used,
       spreadLaps: +((race.racers[race.order[0]].dist - race.racers[race.order[race.order.length - 1]].dist) / track.total).toFixed(2),
+      jamBefore: +race.jamBefore.toFixed(2), jamAfter: +race.jamAfter.toFixed(2), jamPair: race.jamPair,
       go,
     }),
   };

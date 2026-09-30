@@ -86,6 +86,25 @@ export class Race {
   caution = 0;
   shells: Shell[] = [];
   hazards: Hazard[] = [];
+  jamBefore = 0; jamAfter = 0; jamPair: [number, number] | null = null;
+
+  private jamScan(tr: Track): number {
+    let worst = 0;
+    for (let i = 0; i < this.racers.length; i++) {
+      for (let j = i + 1; j < this.racers.length; j++) {
+        const a = this.racers[i], b = this.racers[j];
+        let ds = (b.s - a.s) % tr.total;
+        if (ds > tr.total / 2) ds -= tr.total;
+        if (ds < -tr.total / 2) ds += tr.total;
+        const hw = 1.98 * (VEH_W[a.char.veh] + VEH_W[b.char.veh]);
+        const dl = a.lat - b.lat;
+        if (Math.abs(ds) >= hw * 0.95 || Math.abs(dl) >= hw) continue;
+        const pen = Math.min(hw - Math.abs(dl), hw * 0.95 - Math.abs(ds));
+        if (pen > worst) { worst = pen; this.jamPair = [a.seat, b.seat]; }
+      }
+    }
+    return worst;
+  }
   gantries: Gantry[];
   padLight: number[];
   lastDomain = '';
@@ -248,7 +267,7 @@ export class Race {
       r.s += r.speed * dt;
       r.dist += r.speed * dt;
       r.lat = Math.sin(t * 0.25 + r.seed) * tr.width * 0.18 + (r.seat % 2 ? 1 : -1) * tr.width * 0.07 + r.avoid;
-      r.avoid *= Math.exp(-dt / 2.2);
+      r.avoid *= Math.exp(-dt / 4.5);
       r.surge *= Math.exp(-dt / 2.6);
       r.boost *= Math.exp(-dt / 1.6);
       r.act *= Math.exp(-dt / 40);
@@ -321,29 +340,41 @@ export class Race {
       }
     }
 
-    // karts are solid: shove overlapping pairs apart across the lane, and
-    // the one that barged in from behind scrubbed a touch of speed for it
+    this.jamBefore = this.jamScan(tr);
+    // karts are solid boxes on the board, not ghosts: resolve every pair
+    // along whichever axis penetrates least — shove side by side, or shove
+    // apart nose-to-tail so a tailgate never slides through a rear wing
     for (let i = 0; i < this.racers.length; i++) {
       for (let j = i + 1; j < this.racers.length; j++) {
         const a = this.racers[i], b = this.racers[j];
         let ds = (b.s - a.s) % tr.total;
         if (ds > tr.total / 2) ds -= tr.total;
         if (ds < -tr.total / 2) ds += tr.total;
-        if (Math.abs(ds) > 3.6) continue;
-        const minLat = 1.9 * (VEH_W[a.char.veh] + VEH_W[b.char.veh]) * 0.95;
+        const hwA = 1.98 * VEH_W[a.char.veh], hwB = 1.98 * VEH_W[b.char.veh];
+        const hw = hwA + hwB;                       // full widths, no discount
+        const hl = hw * 0.95;                       // billboards spread their width in depth too
         const dl = a.lat - b.lat;
-        if (Math.abs(dl) > minLat) continue;
-        const push = (minLat - Math.abs(dl)) * 0.5 + 0.02;
+        if (Math.abs(ds) >= hl || Math.abs(dl) >= hw) continue;
+        const penLat = hw - Math.abs(dl);
+        const penLon = hl - Math.abs(ds);
+        // always separate side to side — that is the axis the player sees…
+        const push = penLat * 0.5 + 0.02;
         const dir = dl > 0 ? 1 : dl < 0 ? -1 : (a.seat < b.seat ? -1 : 1);
         a.avoid += dir * push; b.avoid -= dir * push;
         const lim = tr.width * 0.42;
         a.avoid = Math.max(-lim, Math.min(lim, a.avoid));
         b.avoid = Math.max(-lim, Math.min(lim, b.avoid));
-        if (Math.abs(dl) < minLat * 0.5) {
-          if (ds > 0) a.speed *= 1 - 0.3 * dt; else b.speed *= 1 - 0.3 * dt;
+        // …and when it was more a nose bump than a side swipe, separate
+        // along the track too, so nobody's front end sits in a rear wing
+        if (penLon > 0.12 && Math.abs(dl) < hw * 0.7) {
+          const dirS = ds >= 0 ? 1 : -1;            // b sits ahead
+          b.s += dirS * penLon * 0.5; a.s -= dirS * penLon * 0.5;
+          if (ds >= 0) a.speed *= 1 - 0.9 * dt; else b.speed *= 1 - 0.9 * dt;   // rear kart bogs down
         }
       }
     }
+
+    this.jamAfter = this.jamScan(tr);
 
     // shells close on their mark
     for (let i = this.shells.length - 1; i >= 0; i--) {
