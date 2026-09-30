@@ -1,6 +1,6 @@
 import type { Track } from './track';
 import type { SceneEvent } from '../../events';
-import { characterFor, VEH_W, type Character } from './sprites';
+import { characterFor, DRIVERS, KART_L, KART_W, VEH_W, type Character } from './sprites';
 
 /**
  * The race. Exactly eight karts, always: a seat belongs to a host, never to
@@ -22,7 +22,12 @@ export interface Racer {
   ip: string; name: string; hue: number; char: Character;
   s: number;                // arc position along the lap
   lat: number;              // lateral offset from the racing line
-  avoid: number;            // persistent shove from body contact
+  latV: number;             // lateral velocity - steering is integrated, so a
+                            // shove from body contact stays resolved instead of
+                            // being overwritten by next frame's steering
+  line: number;             // the lane this driver likes to sit in
+  pace: number;             // per-driver ability, so the grid is not a clone army
+  draft: number;            // slipstream gain right now, 0..1
   seed: number;
   speed: number;
   surge: number;            // traffic draft, decaying
@@ -39,6 +44,21 @@ export interface Racer {
   itemT: number;
 }
 
+/** Half-extents of a kart on the board, straight from the drawn sprite. */
+const halfW = (r: Racer): number => KART_W * 0.5 * VEH_W[r.char.veh];
+const halfL = (r: Racer): number => KART_L * 0.5 * VEH_W[r.char.veh];
+
+/** Slipstream window: arc gap to the kart ahead, and how far off-line it works. */
+const DRAFT_NEAR = 3.5, DRAFT_FAR = 26, DRAFT_WIDE = 5.5;
+
+/**
+ * A driver's pace, from its character, so a host always races the same way.
+ * The spread has to be wide enough to actually shuffle the order over a lap -
+ * the first version drew from the same clustered hash as everything else and
+ * the whole grid came out within one speed unit of each other.
+ */
+const paceFor = (ch: Character): number => 0.90 + ((ch.num * 37 + ch.drv * 11) % 21) / 100;
+
 export interface Hazard { x: number; y: number; life: number; cool: number; kind: 'oil' | 'banana' }
 export interface Shell { s: number; lat: number; life: number; kind: 'red' | 'green'; target: number }
 export interface Gantry { s: number; respawn: number }
@@ -52,6 +72,10 @@ export interface RaceHooks {
   onPickup(seat: number, kind: ItemKind): void;
   onUse(seat: number, kind: ItemKind): void;
 }
+
+/** Starting lane for a seat: eight cars spread across the usable road. */
+const lineFor = (i: number, width: number): number =>
+  (i - (SEATS - 1) / 2) * (width * 0.62 / SEATS);
 
 const hueFor = (key: string): number => {
   let h = 2166136261;
@@ -96,10 +120,10 @@ export class Race {
         let ds = (b.s - a.s) % tr.total;
         if (ds > tr.total / 2) ds -= tr.total;
         if (ds < -tr.total / 2) ds += tr.total;
-        const hw = 1.98 * (VEH_W[a.char.veh] + VEH_W[b.char.veh]);
+        const hw = halfW(a) + halfW(b), hl = halfL(a) + halfL(b);
         const dl = a.lat - b.lat;
-        if (Math.abs(ds) >= hw * 0.95 || Math.abs(dl) >= hw) continue;
-        const pen = Math.min(hw - Math.abs(dl), hw * 0.95 - Math.abs(ds));
+        if (Math.abs(ds) >= hl || Math.abs(dl) >= hw) continue;
+        const pen = Math.min(hw - Math.abs(dl), hl - Math.abs(ds));
         if (pen > worst) { worst = pen; this.jamPair = [a.seat, b.seat]; }
       }
     }
@@ -120,10 +144,14 @@ export class Race {
   constructor(readonly track: Track, t0: number, private hooks: RaceHooks) {
     for (let i = 0; i < SEATS; i++) {
       this.racers.push({
-        seat: i, ip: '', name: 'NO DRIVER', hue: (i * 47 + 20) % 360, char: characterFor(`seat${i}`),
-        s: -i * 7, lat: (i % 2 ? 1 : -1) * track.width * 0.16, avoid: 0, seed: i * 137.31,
+        seat: i, ip: '', name: DRIVERS[characterFor(`seat${i}`).drv % DRIVERS.length].name,
+        hue: (i * 47 + 20) % 360, char: characterFor(`seat${i}`),
+        s: -i * 7, lat: lineFor(i, track.width), latV: 0, line: lineFor(i, track.width),
+        pace: paceFor(characterFor(`seat${i}`)), draft: 0, seed: i * 137.31,
         speed: 0, surge: 0, boost: 0, spin: 0, glow: 0, flash: 0,
-        ghost: true, laps: 0, dist: -i * 7, act: 0, lastSeen: t0, item: null, itemT: 0,
+        // one of the cast, racing properly - a ghost is a host that has gone
+        // quiet, not "nobody has connected yet"
+        ghost: false, laps: 0, dist: -i * 7, act: 0, lastSeen: t0, item: null, itemT: 0,
       });
     }
     this.padLight = track.pads.map(() => 0);
@@ -136,7 +164,7 @@ export class Race {
     let idx = this.ipSeat.get(ip);
     if (idx === undefined) {
       // an empty seat first (a ghost nobody claimed) …
-      idx = this.racers.findIndex((r) => r.ghost && !r.ip);
+      idx = this.racers.findIndex((r) => !r.ip);
       if (idx < 0) {
         // … otherwise the quietest kart pits and a new driver takes over —
         // but only if it has genuinely gone quiet, and never two handovers
@@ -156,6 +184,7 @@ export class Race {
       // a takeover: the new driver joins from the back of the pack
       const back = Math.min(...this.racers.map((x) => x.dist));
       r.ip = ip; r.name = shortName(se, ip); r.hue = hueFor(ip); r.char = characterFor(ip);
+      r.pace = paceFor(r.char);          // a new driver brings its own pace
       r.s = back - 14; r.dist = back - 14; r.laps = 0;   // counted from the moment they join
       r.item = null; r.spin = 0; r.surge = 0; r.boost = 0;
       r.ghost = false; r.flash = 1;
@@ -236,6 +265,7 @@ export class Race {
     const base = 46 * pace * tr.speed * (0.85 + Math.min(1, rate30s / 40) * 0.55);
     this.caution = Math.max(0, this.caution - dt);
     const yellow = this.caution > 0 ? 0.55 : 1;
+    const latLim = tr.width * 0.40;               // keep the pack on the asphalt
 
     for (let oi = this.hazards.length - 1; oi >= 0; oi--) {
       this.hazards[oi].life -= dt;
@@ -256,9 +286,44 @@ export class Race {
       // and the leader eases off the throttle, so nobody rides away
       const gap = Math.max(0, leaderDist - r.dist);
       const rubber = Math.min(1.38, 1 + gap / (tr.total * 0.7)) * (rank === 0 ? 0.9 : 1);
-      const ghostMul = r.ghost ? 0.8 : 1;
-      const target = base * rubber * ghostMul * yellow + r.surge + r.boost;
-      r.speed += (Math.max(2, target) - r.speed) * Math.min(1, dt * 0.9);
+      const ghostMul = r.ghost ? 0.88 : 1;
+      // The slipstream this scene is named after. Sit in the hole the kart
+      // ahead punches in the air and you gain on it; the effect falls off with
+      // the gap and with how far off its line you are, so you have to pull out
+      // to complete the pass. Without this every racer converged on the same
+      // target and all eight sat at exactly speed 31, nobody ever passing.
+      let draft = 0;
+      for (const o of this.racers) {
+        if (o === r) continue;
+        let ds = (o.s - r.s) % tr.total;
+        if (ds > tr.total / 2) ds -= tr.total;
+        if (ds < -tr.total / 2) ds += tr.total;
+        if (ds <= DRAFT_NEAR || ds >= DRAFT_FAR) continue;
+        const off = Math.abs(o.lat - r.lat);
+        if (off >= DRAFT_WIDE) continue;
+        const along = 1 - (ds - DRAFT_NEAR) / (DRAFT_FAR - DRAFT_NEAR);
+        draft = Math.max(draft, along * (1 - off / DRAFT_WIDE));
+      }
+      r.draft += (draft - r.draft) * Math.min(1, dt * 4);
+      let target = base * rubber * r.pace * ghostMul * yellow * (1 + 0.18 * r.draft)
+        + r.surge + r.boost;
+      // Closing on the kart ahead: brake to its pace rather than drive into it.
+      // Shoving `s` apart after the fact cannot win, because the speed model
+      // just drives them back together next frame - 24% of frames still had two
+      // karts inside each other. Queueing up behind a slower kart, and having to
+      // pull out of the tow to pass, is also what makes a pack read as a pack.
+      const gapStop = halfL(r) * 2.1;
+      for (const o of this.racers) {
+        if (o === r) continue;
+        let ds = (o.s - r.s) % tr.total;
+        if (ds > tr.total / 2) ds -= tr.total;
+        if (ds < -tr.total / 2) ds += tr.total;
+        if (ds <= 0 || ds > gapStop) continue;
+        if (Math.abs(o.lat - r.lat) > halfW(r) + halfW(o)) continue;
+        const close = 1 - ds / gapStop;                 // 0 at the edge, 1 on the bumper
+        target = Math.min(target, o.speed + (1 - close) * 14);
+      }
+      r.speed += (Math.max(2, target) - r.speed) * Math.min(1, dt * 1.4);
       if (r.spin > 0) {
         r.spin -= dt;
         r.speed *= Math.exp(-dt * 3.4);   // frame-rate independent, and recoverable
@@ -266,8 +331,21 @@ export class Race {
       const prev = r.s;
       r.s += r.speed * dt;
       r.dist += r.speed * dt;
-      r.lat = Math.sin(t * 0.25 + r.seed) * tr.width * 0.18 + (r.seat % 2 ? 1 : -1) * tr.width * 0.07 + r.avoid;
-      r.avoid *= Math.exp(-dt / 4.5);
+      // Lateral position is integrated, never assigned. It used to be
+      //   r.lat = sin(t*0.25 + seed) * width*0.18 + bias + r.avoid
+      // which put every kart on a rail: the solver shoved a pair apart into
+      // `avoid`, `avoid` decayed, and the sine pulled them straight back
+      // together, so 76% of frames had two karts inside one another. Now the
+      // driver steers toward the line it wants and a shove moves the kart.
+      const wander = Math.sin(t * 0.21 + r.seed) * tr.width * 0.055;
+      // in the tow and running out of road ahead: pull out and have a go
+      const pull = r.draft > 0.5 ? (r.line >= 0 ? 1 : -1) * tr.width * 0.11 * (r.draft - 0.5) / 0.5 : 0;
+      const want = Math.max(-latLim, Math.min(latLim, r.line + wander + pull));
+      r.latV += (want - r.lat) * 3.0 * dt;
+      r.latV *= Math.exp(-dt * 2.6);
+      r.lat += r.latV * dt;
+      if (r.lat > latLim) { r.lat = latLim; r.latV = Math.min(0, r.latV); }
+      if (r.lat < -latLim) { r.lat = -latLim; r.latV = Math.max(0, r.latV); }
       r.surge *= Math.exp(-dt / 2.6);
       r.boost *= Math.exp(-dt / 1.6);
       r.act *= Math.exp(-dt / 40);
@@ -344,34 +422,45 @@ export class Race {
     // karts are solid boxes on the board, not ghosts: resolve every pair
     // along whichever axis penetrates least — shove side by side, or shove
     // apart nose-to-tail so a tailgate never slides through a rear wing
-    for (let i = 0; i < this.racers.length; i++) {
-      for (let j = i + 1; j < this.racers.length; j++) {
-        const a = this.racers[i], b = this.racers[j];
-        let ds = (b.s - a.s) % tr.total;
-        if (ds > tr.total / 2) ds -= tr.total;
-        if (ds < -tr.total / 2) ds += tr.total;
-        const hwA = 1.98 * VEH_W[a.char.veh], hwB = 1.98 * VEH_W[b.char.veh];
-        const hw = hwA + hwB;                       // full widths, no discount
-        const hl = hw * 0.95;                       // billboards spread their width in depth too
-        const dl = a.lat - b.lat;
-        if (Math.abs(ds) >= hl || Math.abs(dl) >= hw) continue;
-        const penLat = hw - Math.abs(dl);
-        const penLon = hl - Math.abs(ds);
-        // always separate side to side — that is the axis the player sees…
-        const push = penLat * 0.5 + 0.02;
-        const dir = dl > 0 ? 1 : dl < 0 ? -1 : (a.seat < b.seat ? -1 : 1);
-        a.avoid += dir * push; b.avoid -= dir * push;
-        const lim = tr.width * 0.42;
-        a.avoid = Math.max(-lim, Math.min(lim, a.avoid));
-        b.avoid = Math.max(-lim, Math.min(lim, b.avoid));
-        // …and when it was more a nose bump than a side swipe, separate
-        // along the track too, so nobody's front end sits in a rear wing
-        if (penLon > 0.12 && Math.abs(dl) < hw * 0.7) {
-          const dirS = ds >= 0 ? 1 : -1;            // b sits ahead
-          b.s += dirS * penLon * 0.5; a.s -= dirS * penLon * 0.5;
-          if (ds >= 0) a.speed *= 1 - 0.9 * dt; else b.speed *= 1 - 0.9 * dt;   // rear kart bogs down
+    // Karts are solid boxes the size the art draws them. Separate each pair
+    // along whichever axis it penetrates least, writing the correction into
+    // position rather than into a decaying accumulator, and iterate - one pass
+    // through a tight pack only shuffles the overlap along the row.
+    const solveLim = tr.width * 0.46;
+    for (let pass = 0; pass < 6; pass++) {
+      let touched = false;
+      for (let i = 0; i < this.racers.length; i++) {
+        for (let j = i + 1; j < this.racers.length; j++) {
+          const a = this.racers[i], b = this.racers[j];
+          let ds = (b.s - a.s) % tr.total;
+          if (ds > tr.total / 2) ds -= tr.total;
+          if (ds < -tr.total / 2) ds += tr.total;
+          const hw = halfW(a) + halfW(b), hl = halfL(a) + halfL(b);
+          const dl = b.lat - a.lat;
+          if (Math.abs(ds) >= hl || Math.abs(dl) >= hw) continue;
+          touched = true;
+          const penLat = hw - Math.abs(dl);
+          const penLon = hl - Math.abs(ds);
+          // side to side is the axis the player reads, so prefer it unless the
+          // nose overlap is clearly the shallower one
+          if (penLat * 0.62 <= penLon) {
+            const dir = dl > 0 ? 1 : dl < 0 ? -1 : (a.seat < b.seat ? -1 : 1);
+            const push = penLat * 0.5 + 0.004;
+            b.lat += dir * push; a.lat -= dir * push;
+            b.latV += dir * push * 2.2; a.latV -= dir * push * 2.2;
+            b.lat = Math.max(-solveLim, Math.min(solveLim, b.lat));
+            a.lat = Math.max(-solveLim, Math.min(solveLim, a.lat));
+          } else {
+            const dirS = ds >= 0 ? 1 : -1;          // b sits ahead
+            const push = penLon * 0.5 + 0.004;
+            b.s += dirS * push; b.dist += dirS * push;
+            a.s -= dirS * push; a.dist -= dirS * push;
+            const rear = ds >= 0 ? a : b;           // the one behind bogs down
+            rear.speed *= Math.max(0, 1 - 1.8 * dt);
+          }
         }
       }
+      if (!touched) break;
     }
 
     this.jamAfter = this.jamScan(tr);

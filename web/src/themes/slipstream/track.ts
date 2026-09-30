@@ -144,14 +144,24 @@ function bake(c: Circuit, s: ReturnType<typeof sample>): { canvas: HTMLCanvasEle
   for (let i = 1; i <= m; i++) path.lineTo(s.xs[i % m], s.ys[i % m]);
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   const stroke = (w: number, col: string) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke(path); };
-  stroke(c.width + 34, '#5a4628');                       // dirt shoulder
-  stroke(c.width + 18, '#b03a2e');                       // curb red
-  ctx.setLineDash([26, 26]);
-  stroke(c.width + 18, '#e8e4da');                       // curb white
+  stroke(c.width + 26, '#5a4628');                       // dirt shoulder
+  stroke(c.width + 13, '#b03a2e');                       // curb red
+  // Butt caps, or the dash is not a dash: a round cap on a stroke this wide
+  // reaches half its width past each end, which is longer than the gap, and
+  // the white filled the red in completely. The kerb came out as one solid
+  // cream band, and where the circuit doubles back the two of them merged
+  // into a white slab lying across the middle of the road.
+  ctx.lineCap = 'butt';
+  ctx.setLineDash([20, 20]);
+  stroke(c.width + 13, '#e8e4da');                       // curb white
   ctx.setLineDash([]);
+  ctx.lineCap = 'round';
   stroke(c.width, '#3c3f47');                             // asphalt
-  ctx.setLineDash([20, 30]);
-  stroke(5, '#c9cdd6');                                  // centre line
+  // 1.4 units, against a kart 2.9 wide. At 5 it was nearly two karts across,
+  // and since the camera only sees about +/-7 units at the bottom of the
+  // screen, one dash covered most of the road as a white slab.
+  ctx.setLineDash([16, 30]);
+  stroke(1.4, '#b9bdc6');                                 // centre line
   ctx.setLineDash([]);
 
   // start line: a checker band across the road at s = 0
@@ -159,10 +169,10 @@ function bake(c: Circuit, s: ReturnType<typeof sample>): { canvas: HTMLCanvasEle
   ctx.save();
   ctx.translate(a0.x, a0.y);
   ctx.rotate(Math.atan2(a0.ty, a0.tx));
-  const hw = c.width / 2, sq = 11;
-  for (let r = 0; r < 2; r++) for (let k = -Math.ceil(hw / sq); k < hw / sq; k++) {
-    ctx.fillStyle = ((k + r) & 1) ? '#111' : '#eee';
-    ctx.fillRect(r * sq - sq, k * sq, sq, sq);
+  const hw = c.width / 2, sq = 5;          // half a kart per square, like the game
+  for (let r = 0; r < 4; r++) for (let k = -Math.ceil(hw / sq); k < hw / sq; k++) {
+    ctx.fillStyle = ((k + r) & 1) ? '#141414' : '#e8e8e8';
+    ctx.fillRect(r * sq - sq * 2, k * sq, sq, sq);
   }
   ctx.restore();
 
