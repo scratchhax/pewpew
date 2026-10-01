@@ -16,7 +16,7 @@ export const BUILTIN_DEFAULT = 'scifi';
 /** What the scene picker shows for each theme (kept here so picking never downloads every theme). */
 export const SCENES: Record<string, { title: string; blurb: string; accent: string }> = {
   scifi: { title: 'Orbital Command', blurb: 'A space station defending your network: asteroids, lasers and constellations.', accent: '#46f0d9' },
-  holdout: { title: 'The Holdout', blurb: 'A walled compound under siege: zombies press the walls, turrets hold the line, supply drops come in on parachutes, and the horde comes when the lights flicker.', accent: '#ff6a30' },
+  holdout: { title: 'Last Outpost', blurb: 'A walled compound under siege: zombies press the walls, turrets hold the line, supply drops come in on parachutes, and the horde comes when the lights flicker.', accent: '#ff6a30' },
   racing: { title: 'Midnight Run', blurb: 'A neon street race: traffic, roadblocks, rivals and police chases.', accent: '#ff3fb4' },
   rush: { title: 'Packet Rush', blurb: 'A 16-bit runner: gems, stompable baddies, query blocks, rivals and a hunter drone.', accent: '#41a6f6' },
   spy: { title: 'Panopticon', blurb: 'A made-up planet under watch: signal arcs, satellites, and an eye of god that zooms in on the people behind the traffic.', accent: '#e8c26a' },

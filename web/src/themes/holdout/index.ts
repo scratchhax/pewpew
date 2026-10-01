@@ -34,7 +34,7 @@ const COLORS = {
  */
 export const holdout: Theme<typeof HOLDOUT_DEFAULTS> = {
   id: 'holdout',
-  title: 'THE HOLDOUT',
+  title: 'LAST OUTPOST',
   hud: HOLDOUT_HUD,
   accentHue: 40,
   defaults: HOLDOUT_DEFAULTS,

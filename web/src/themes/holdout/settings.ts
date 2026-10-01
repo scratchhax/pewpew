@@ -106,7 +106,7 @@ export const HOLDOUT_HUD: HudLabelOverrides = {
   uplink: 'UPLINK',
   link: 'ACTIVE',
   weather: { calm: 'CALM', storm: 'STORM', hurricane: 'HORDE NIGHT' },
-  status: 'HOLDOUT',
+  status: 'LAST OUTPOST',
   threat: 'THREAT',
   power: 'SUPPLY',
   telemetry: 'COMMAND LOG',
