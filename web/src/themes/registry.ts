@@ -16,7 +16,7 @@ export const BUILTIN_DEFAULT = 'scifi';
 /** What the scene picker shows for each theme (kept here so picking never downloads every theme). */
 export const SCENES: Record<string, { title: string; blurb: string; accent: string }> = {
   scifi: { title: 'Orbital Command', blurb: 'A space station defending your network: asteroids, lasers and constellations.', accent: '#46f0d9' },
-  zombie: { title: 'Last Outpost', blurb: "A walled compound holding out against the internet's zombies.", accent: '#9fe36b' },
+  holdout: { title: 'The Holdout', blurb: 'A walled compound under siege: zombies press the walls, turrets hold the line, supply drops come in on parachutes, and the horde comes when the lights flicker.', accent: '#ff6a30' },
   racing: { title: 'Midnight Run', blurb: 'A neon street race: traffic, roadblocks, rivals and police chases.', accent: '#ff3fb4' },
   rush: { title: 'Packet Rush', blurb: 'A 16-bit runner: gems, stompable baddies, query blocks, rivals and a hunter drone.', accent: '#41a6f6' },
   spy: { title: 'Panopticon', blurb: 'A made-up planet under watch: signal arcs, satellites, and an eye of god that zooms in on the people behind the traffic.', accent: '#e8c26a' },
@@ -28,7 +28,6 @@ export const SCENES: Record<string, { title: string; blurb: string; accent: stri
   fragnet: { title: 'FRAGNET', blurb: 'Your network is Hell: a first-person patrol of a procedural maze where intruders are demons, allowed traffic is ammunition, and five traces open the exit.', accent: '#ff7a2a' },
   substrate: { title: 'Substrate', blurb: 'Your network draws on paper: every flow is a crack leaving the last one at right angles, hosts plant the seeds the plan grows from, and pigment washes the spaces between. A picture every couple of minutes, then a fresh one.', accent: '#b08050' },
   slipstream: { title: 'Slipstream', blurb: 'An eight-kart Mode 7 grand prix in 16-bit: every seat is a host and traffic is the draft, DHCP hands the quiet karts to new drivers, blocks leave oil, Wi-Fi joins light the boost pads, and threats fire red shells at the leader.', accent: '#ffd23f' },
-  holdout: { title: 'The Holdout', blurb: 'A walled compound under siege: zombies press the walls, turrets hold the line, supply drops come in on parachutes, and the horde comes when the lights flicker.', accent: '#ff6a30' },
 };
 /** Themes in picker order: the known scenes first (as the README lists them), then any others. */
 export const SCENE_ORDER = [...Object.keys(SCENES).filter((id) => THEME_IDS.includes(id)), ...THEME_IDS.filter((id) => !(id in SCENES))];
