@@ -34,6 +34,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [themePages()],
   server: {
+    allowedHosts: ['wheatley'],
     proxy: {
       '/ws': { target: 'ws://localhost:8080', ws: true },
       '/api': { target: 'http://localhost:8080' },

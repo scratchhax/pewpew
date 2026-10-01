@@ -25,6 +25,8 @@ const H_SHELL = KART_H * 0.85;
 const H_BANANA = KART_H * 0.62;
 const H_HAZARD = KART_H * 0.5;
 const H_FLAME = KART_H * 0.5;
+const H_SPARK = KART_H * 0.3;      // a drift spark: smaller than a boost flame
+const SPARK_LATV = 4.5;            // how hard a kart must slide sideways to spit sparks
 const H_LABEL = KART_H * 0.17;     // the name tag floating over the helmet
 const H_GLOW = KART_H * 1.15;
 const H_BOARD = KART_H * 2.6;      // the trackside flip board
@@ -41,7 +43,7 @@ const H_TYRES = KART_H * 0.62;
  * frame it cannot resolve anyway.
  */
 const propFar = (rows: number): number => 200 + rows * 1.6;
-import { balloons, board as boardSprite, banana, fan, flame, ghost, itemBox, kartFront, kartRear, kartSide, label, marshal, mushroom, oil, shadow, shell, stand, star, tree, tyres, VEH_W, type Character } from './sprites';
+import { balloons, board as boardSprite, banana, fan, flame, ghost, itemBox, kartFront, kartRear, kartSide, label, marshal, mushroom, oil, shadow, shell, spark, stand, star, tree, tyres, VEH_W, type Character } from './sprites';
 import type { ItemKind } from './race';
 import './hud.css';
 
@@ -171,6 +173,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
   const mushroomSpr = mushroom();
   const oilSpr = oil();
   const flameSpr = flame();
+  const sparkA = spark(0), sparkB = spark(1);
   const shadowSpr = shadow();
   const ksprCache = new Map<string, { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement }>();
   const karts = (hue: number, ch: Character, wf = 0): { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement } => {
@@ -395,6 +398,19 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
         draws.push({ depth: pr.depth + 0.01, run: () => m7.drawSprite(flameSpr, bx, by, cam, fl, 0.9, 0.1) });
       }
       draws.push({ depth: pr.depth, run: () => m7.drawSprite(spr, p.x, p.y, cam, KART_H * VEH_W[r.char.veh], alpha, lift) });
+      // drift sparks: a kart sliding sideways hard spits a hot burst from each
+      // rear tyre — stateless, flickered per frame like the boost flames
+      if (!r.ghost && r.spin <= 0 && Math.abs(r.latV) > SPARK_LATV && r.speed > 30 && pr.depth < 300) {
+        const fx = Math.cos(p.heading), fy = Math.sin(p.heading);
+        const rx = -fy, ry = fx;
+        const bx = p.x - fx * 1.6, by = p.y - fy * 1.6;
+        const sf = H_SPARK * VEH_W[r.char.veh];
+        const sp = (((f.t * 24 + r.seat * 5) | 0) % 2) ? sparkA : sparkB;
+        for (const s of [-1, 1]) {
+          const sx = bx + rx * 0.95 * s, sy = by + ry * 0.95 * s;
+          draws.push({ depth: pr.depth + 0.015, run: () => m7.drawSprite(sp, sx, sy, cam, sf, 0.9, 0) });
+        }
+      }
       // name + position tag floating over the helmet (not your own: the HUD
       // already says who you are)
       if (pr.depth < 320 && r.seat !== heroIdx) {

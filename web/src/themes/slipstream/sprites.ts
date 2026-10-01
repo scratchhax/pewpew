@@ -101,7 +101,7 @@ function paint(c: CanvasRenderingContext2D, map: string[], pal: Record<string, s
 // read. G/g are the driver's colour and its shade, W/P an eye and its pupil,
 // M a dark line (mouth, visor slot, whiskers), T teeth, N a beak, nose or lens,
 // R/r metal, A/a the racing suit.
-export interface Driver { name: string; skin: string; shade: string; extra: string; map: string[] }
+export interface Driver { name: string; skin: string; shade: string; extra: string; map: string[]; cap: string[]; side: string[] }
 
 export const DRIVERS: Driver[] = [
   { name: 'GREMLIN', skin: '#7fe049', shade: '#3f9622', extra: '#fff05a', map: [
@@ -117,6 +117,32 @@ export const DRIVERS: Driver[] = [
     '.GGGGGGGGG.',
     '..AAAAAAA..',
     '.AAAAAAAAA.',
+  ], cap: [
+    '.G...GGGG.G.',
+    '..GGGGGGGG..',
+    '.GGGGGGGGGG.',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    '.gggggggggg.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ], side: [
+    '..G.GGG.G...',
+    '..GGGGGGG..',
+    '.GGGGGGGGG.',
+    '.GGGGGGGGG.',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    '.GGGGGGGWP.',
+    '.GGGGGGGGG.',
+    '.ggggggggg.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+    '.AAAAAAAAA.',
   ] },
   { name: 'RUSTBUCKET', skin: '#c2ccdb', shade: '#6b7486', extra: '#ff5e3a', map: [
     '.....N.....',
@@ -130,6 +156,32 @@ export const DRIVERS: Driver[] = [
     'RrrRRRRRrrR',
     '.RRRRRRRRR.',
     '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ], cap: [
+    '....RRR....',
+    '...RRRRR...',
+    '..RRRRRRR..',
+    '.RRRRRRRRR.',
+    'RRRRRRRRRRR',
+    'RRRRMRRMRRR',
+    'RRRRMRRMRRR',
+    'RRRRRRRRRRR',
+    'RRRRRRRRRRR',
+    '.rrrrrrrrr.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ], side: [
+    '......N....',
+    '.....r.....',
+    '...RRRRR...',
+    '..RRRRRRR..',
+    '.RRRRRRRRR.',
+    'RRRRRRRRRRR',
+    'RRRRRRRRRRR',
+    '.RRRRRRNNR.',
+    '.rrrrrrrrr.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
     '.AAAAAAAAA.',
   ] },
   { name: 'WHISKERS', skin: '#ffa94d', shade: '#b8611c', extra: '#ffe9c4', map: [
@@ -145,6 +197,32 @@ export const DRIVERS: Driver[] = [
     '.GGGGGGGGG.',
     '..AAAAAAA..',
     '.AAAAAAAAA.',
+  ], cap: [
+    '.G.......G.',
+    '.GG.GGGG.GG',
+    '.GGGGGGGGG.',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    '.GGMMGGMMGG.',
+    'GGGGGGGGGGG',
+    '.ggggggggg.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ], side: [
+    '.G.......G.',
+    '.GG.GGGG.GG',
+    '.GGGGGGGGG.',
+    '.GGGGGGGGG.',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    '.MMGGGGGWP.',
+    '.GGGGGGGGG.',
+    '.ggggggggg.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+    '.AAAAAAAAA.',
   ] },
   { name: 'GOGGLES', skin: '#ffc79a', shade: '#b0764a', extra: '#3ee0ff', map: [
     '...........',
@@ -157,6 +235,32 @@ export const DRIVERS: Driver[] = [
     'GGGGGGGGGGG',
     'GGMMMMMMMGG',
     '.GGGGGGGGG.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ], cap: [
+    '...aaaaa...',
+    '..aaaaaaa..',
+    '.aaaaaaaa.',
+    'aaaaaaaaa',
+    'aaaaaaaaa',
+    'aaNNNNNaa',
+    'aaaaaaaaa',
+    'aaaaaaaaa',
+    'aaaaaaaaa',
+    '.aaaaaaaa.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ], side: [
+    '...aaaaa...',
+    '..aaaaaaa..',
+    '.aaaaaaaa.',
+    '.aaaaaaaa.',
+    'aaaaaaaaa',
+    'aaaaaaaaa',
+    'aaaaaaaaa',
+    '.GGGGGGNNG.',
+    '.GGGGGGGGG.',
+    '.ggggggggg.',
     '..AAAAAAA..',
     '.AAAAAAAAA.',
   ] },
@@ -173,6 +277,32 @@ export const DRIVERS: Driver[] = [
     '.GGGGGGGGG.',
     '..AAAAAAA..',
     '.AAAAAAAAA.',
+  ], cap: [
+    '...GGGGG...',
+    '..GGGGGGG..',
+    '.GGGGGGGGG.',
+    'GGGGGGGGGGG',
+    'GGNGGGGGNGG',
+    'GGGGNGGGGGG',
+    'GGGGGGGGGGG',
+    'GGGGGGNGGGG',
+    'GGGGGGGGGGG',
+    '.ggggggggg.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ], side: [
+    '...GGGGG...',
+    '..GNGGGGG..',
+    '.GGGGGGGGG.',
+    '.GGGGGGGGG.',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    '.GGGGGGGWP.',
+    '.GGNGGGGGG.',
+    '.ggggggggg.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
   ] },
   { name: 'BLOOP', skin: '#6ff5c0', shade: '#2fae7c', extra: '#e07bff', map: [
     '...........',
@@ -185,6 +315,32 @@ export const DRIVERS: Driver[] = [
     'GGPGGGGPGGG',
     'GGGGMGGGGGG',
     '.GGGGGGGGG.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ], cap: [
+    '.....N.....',
+    '....NNN....',
+    '..GGGGGGG..',
+    '.GGGGGGGGG.',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    '.ggggggggg.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ], side: [
+    '.....N.....',
+    '....NNN....',
+    '..GGGGGGG..',
+    '.GGGGGGGGG.',
+    '.GGGGGGGGG.',
+    'GGGGGGGGGGG',
+    'GGGGGGGGGGG',
+    '.GGGGGGGWP.',
+    '.GGGGGGGGG.',
+    '.ggggggggg.',
     '..AAAAAAA..',
     '.AAAAAAAAA.',
   ] },
@@ -201,6 +357,32 @@ export const DRIVERS: Driver[] = [
     '.GGGGGGGGG.',
     '..aaaaaaa..',
     '.aaaaaaaaa.',
+  ], cap: [
+    '...AAAAA...',
+    '..AAAAAAA..',
+    '.AAAAAAAA.',
+    'AAAAAAAAA',
+    'AAAAAAAAA',
+    'AAAAAAAAA',
+    'AAAAAAAAA',
+    'AAAAAAAAA',
+    '..AAGGGAA..',
+    '.AAAAAAAA.',
+    '..aaaaaaa..',
+    '.aaaaaaaaa.',
+  ], side: [
+    '...AAAAA...',
+    '..AAAAAAA..',
+    '.AAAAAAAA.',
+    '.AAAAAAAA.',
+    'AAAAAAAAA',
+    'AAAAAAAAA',
+    'AAAAAAAAA',
+    '.GGGGGGGNN.',
+    '.GGGGGGNN..',
+    '.ggggggggg.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
   ] },
   { name: 'VISOR', skin: '#f4f1e6', shade: '#a9a69c', extra: '#19e0ff', map: [
     '...........',
@@ -215,6 +397,32 @@ export const DRIVERS: Driver[] = [
     '.aaaaaaaaa.',
     '..GGGGGGG..',
     '.GGGGGGGGG.',
+  ], cap: [
+    '...AAAAA...',
+    '..AAAAAAA..',
+    '.AAAAAAAA.',
+    'AAAAAAAAA',
+    'AAAAAAAAA',
+    'AAAAAAAAA',
+    'AAAAAAAAA',
+    'AAAANNNNAAA',
+    'AAAAAAAAA',
+    '.AAAAAAAA.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
+  ], side: [
+    '...AAAAA...',
+    '..AAAAAAA..',
+    '.AAAAAAAA.',
+    '.AAAAAAAA.',
+    'AAAAAAAAA',
+    'AAAAAAAAA',
+    '.AANNNNNNA.',
+    '.GGGGGGGGG.',
+    '.GGGGGGGGG.',
+    '.ggggggggg.',
+    '..AAAAAAA..',
+    '.AAAAAAAAA.',
   ] },
 ];
 
@@ -231,19 +439,21 @@ function drvPal(d: Driver, acc: number): Record<string, string> {
 
 /**
  * Paint a driver into the canvas, centred on cx with its shoulders at baseY.
- * 'squash' narrows the head for the side and front views, which reads as a
- * profile at this size without needing a second set of maps.
+ * 'rear' shows the back of the cap (no face — SMK), 'side' a profile with a
+ * sliver of face under the brim. 'squash' narrows the head for the side view.
  */
-function drawDriver(c: CanvasRenderingContext2D, cx: number, baseY: number, ch: Character, squash = 1): void {
+function drawDriver(c: CanvasRenderingContext2D, cx: number, baseY: number, ch: Character, view: 'rear' | 'side', squash = 1, scale = 1): void {
   const d = DRIVERS[ch.drv % DRIVERS.length];
-  const w = Math.max(5, Math.round(DRIVER_W * squash));
+  const m = view === 'rear' ? d.cap : d.side;
+  const w = Math.max(4, Math.round(DRIVER_W * squash * scale));
+  const h = Math.max(5, Math.round(DRIVER_H * scale));
   const cv = document.createElement('canvas');
   cv.width = DRIVER_W; cv.height = DRIVER_H;
   const g = cv.getContext('2d')!;
   g.imageSmoothingEnabled = false;
-  paint(g, d.map, drvPal(d, ch.acc), DRIVER_W, 0);
+  paint(g, m, drvPal(d, ch.acc), DRIVER_W, 0);
   c.imageSmoothingEnabled = false;
-  c.drawImage(cv, 0, 0, DRIVER_W, DRIVER_H, Math.round(cx - w / 2), Math.round(baseY - DRIVER_H), w, DRIVER_H);
+  c.drawImage(cv, 0, 0, DRIVER_W, DRIVER_H, Math.round(cx - w / 2), Math.round(baseY - h), w, h);
 }
 
 /** SMK rule: everything has a thick black outline — draw it around the silhouette. */
@@ -276,20 +486,22 @@ const DIGITS: number[][][] = [
   [[1, 1, 1], [1, 0, 1], [1, 1, 1], [0, 0, 1], [1, 1, 1]],   // 9
 ];
 
-/** Rear number plate: white rectangle mounted dead centre, digits inside. */
+/** Rear number plate: a big white rectangle dead centre, chunky bold digits. */
 function drawPlate(c: CanvasRenderingContext2D, cx: number, y: number, num: number): void {
   const s = String(num);
-  const dw = s.length * 4 - 1;
-  const x0 = cx - Math.floor(dw / 2) - 1;
+  const dw = s.length * 7 - 1;   // each digit is 3×2 px wide + a 1px gap
+  const pad = 2;
+  const pw = dw + pad * 2;
+  const x0 = cx - Math.floor(pw / 2);
   c.fillStyle = '#101116';
-  c.fillRect(x0 - 1, y - 1, dw + 4, 8);
+  c.fillRect(x0 - 1, y - 1, pw + 2, 8);
   c.fillStyle = '#efece1';
-  c.fillRect(x0, y, dw + 2, 6);
+  c.fillRect(x0, y, pw, 6);
   c.fillStyle = '#101116';
   for (let i = 0; i < s.length; i++) {
     const d = DIGITS[+s[i]];
     for (let r = 0; r < 5; r++) for (let x = 0; x < 3; x++) {
-      if (d[r][x]) c.fillRect(x0 + i * 4 + x, y + 1 + r, 1, 1);
+      if (d[r][x]) c.fillRect(x0 + pad + i * 7 + x * 2, y + 1 + r, 2, 1);
     }
   }
 }
@@ -309,6 +521,12 @@ const tire7 = (mid: Seg[], solid = false): string =>
   row(['K', 1], ...(solid ? ([['T', 5]] as Seg[]) : ([['T', 1], ['R', 3], ['T', 1]] as Seg[])), ['K', 1],
       ...mid,
       ['K', 1], ...(solid ? ([['T', 5]] as Seg[]) : ([['T', 1], ['R', 3], ['T', 1]] as Seg[])), ['K', 1]);
+// Rounded tyre tops/bottoms: the corner tread is cut so the blob reads as a
+// sphere rather than a brick — the SMK silhouette.
+const tireRound = (mid: Seg[]): string =>
+  row(['.', 1], ['T', 1], ['R', 2], ['T', 1], ['.', 1], ...mid, ['.', 1], ['T', 1], ['R', 2], ['T', 1], ['.', 1]);
+const tire7Round = (mid: Seg[]): string =>
+  row(['.', 1], ['T', 1], ['R', 3], ['T', 1], ['.', 1], ...mid, ['.', 1], ['T', 1], ['R', 3], ['T', 1], ['.', 1]);
 
 const DIFF18: Seg[] = [['m', 2], ['D', 4], ['m', 2], ['D', 4], ['m', 2], ['D', 4]];
 const DIFF20: Seg[] = [['m', 2], ['D', 4], ['m', 2], ['D', 4], ['m', 2], ['D', 4], ['m', 2]];
@@ -346,7 +564,7 @@ const REAR: MapDef[] = [
       row(['A', 20]),
       row(['S', 18]),
       row(['.', 1], ['K', 5], ['.', 1], ['D', 18], ['.', 1], ['K', 5], ['.', 1]),
-      tire7([['D', 1], ['B', 16], ['D', 1]]),
+      tire7Round([['D', 1], ['B', 16], ['D', 1]]),
       tire7([['D', 1], ['B', 16], ['D', 1]]),
       tire7([['D', 1], ['B', 16], ['D', 1]]),
       tire7([['U', 1], ['D', 16], ['U', 1]]),
@@ -406,7 +624,7 @@ const REAR: MapDef[] = [
       row(['.', 6], ['D', 1], ['B', 18], ['D', 1], ['.', 6]),
       row(['K', 7], ['.', 1], ['D', 16], ['.', 1], ['K', 7]),
       row(['K', 1], ['T', 1], ['K', 1], ['T', 3], ['K', 1], ['D', 1], ['B', 16], ['D', 1], ['K', 1], ['T', 3], ['K', 1], ['T', 1], ['K', 1]),
-      tire7([['D', 1], ['B', 16], ['D', 1]]),
+      tire7Round([['D', 1], ['B', 16], ['D', 1]]),
       tire7([['U', 1], ['D', 16], ['U', 1]]),
       tire7(DIFF18, true),
       row(['K', 7], ['.', 18], ['K', 7]),
@@ -424,7 +642,7 @@ const REAR: MapDef[] = [
       row(['D', 1], ['L', 1], ['A', 18], ['L', 1], ['D', 1]),
       row(['S', 20]),
       row(['.', 1], ['K', 4], ['.', 1], ['D', 1], ['B', 18], ['D', 1], ['.', 1], ['K', 4], ['.', 1]),
-      tireRow([['D', 1], ['A', 1], ['B', 14], ['A', 1], ['D', 1]]),
+      tireRound([['D', 1], ['A', 1], ['B', 14], ['A', 1], ['D', 1]]),
       tireRow([['D', 1], ['B', 18], ['D', 1]]),
       tireRow([['U', 1], ['D', 18], ['U', 1]]),
       tireRow([['m', 2], ['D', 4], ['m', 2], ['D', 4], ['m', 2], ['D', 4]], true),
@@ -575,7 +793,8 @@ export function kartRear(hue: number, ch: Character, wf = 0): HTMLCanvasElement 
   paint(c, def.map, palFor(hue, ch.acc), RW, top);
   wheelSpin(cv, ch.veh, wf);
   if (def.plate[1]) drawPlate(c, def.plate[0], def.plate[1] + top, ch.num);
-  drawDriver(c, RW / 2, top + def.helmet[1] + SEAT_SINK, ch);
+  const ds = Math.min(1.1, Math.max(0.6, VEH_W[ch.veh]));
+  drawDriver(c, RW / 2, top + def.helmet[1] + SEAT_SINK, ch, 'rear', 1, ds);
   outline(cv);
   return cv;
 }
@@ -596,8 +815,9 @@ export function kartSide(hue: number, ch: Character): HTMLCanvasElement {
   const [cv, c] = sprite(SW, KART_PX_H);
   const top = KART_PX_H - def.map.length - 1;
   paint(c, def.map, palFor(hue, ch.acc), SW, top);
-  // narrower head: a profile, without a second set of maps
-  drawDriver(c, def.helmet[0] + 4, top + def.helmet[1] + SEAT_SINK, ch, 0.66);
+  // a proper side profile: cap brim forward, a sliver of face under it
+  const ds = Math.min(1.1, Math.max(0.6, VEH_W[ch.veh]));
+  drawDriver(c, def.helmet[0] + 4, top + def.helmet[1] + SEAT_SINK, ch, 'side', 0.8, ds);
   outline(cv);
   return cv;
 }
@@ -762,6 +982,21 @@ export function flame(): HTMLCanvasElement {
       c.fillRect(x0 + 2 - Math.ceil(w / 2), y, w, 1);
     }
   }
+  return cv;
+}
+
+/**
+ * A drift spark: a small hot burst that pops out of a rear tyre the moment a
+ * kart is sliding sideways hard. Two frames — a wide flash and a tight ember —
+ * flickered at high speed so a cornering kart spits sparks like SMK.
+ */
+export function spark(frame: number): HTMLCanvasElement {
+  const maps: string[][] = [
+    ['........', '...OO...', '..OWWO..', '.OWWWWO.', '..OWWO..', '...OO...', '........', '........'],
+    ['........', '........', '...OO...', '..OWWO..', '...OO...', '........', '........', '........'],
+  ];
+  const [cv, c] = sprite(8, 8);
+  paint(c, maps[frame % 2], { W: '#fffdf2', Y: '#ffe27a', O: '#ff9d3c' }, 8, 0);
   return cv;
 }
 
