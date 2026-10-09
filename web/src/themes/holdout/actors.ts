@@ -34,8 +34,6 @@ interface Zombie {
   claw: number;
   clawT: number;
   clawed: boolean;             // already arrived at this wall once
-  fleeing: boolean;            // dog that gave up: running back off-screen
-  dog: boolean;                // feral pack runner: fast, low, snaps past the guards
   pounce: Pounce | null;       // mid-leap at a survivor
   inside: boolean;             // got through a broken wall: hunts inside the compound
 }
@@ -73,19 +71,10 @@ export class Zombies {
   constructor(private layer: Container, private lights: Container, private tex: ZTextures,
               private compound: Compound, private fx: Fx) {}
 
-  count(): number { return this.list.filter((z) => !z.brute && z.horde === 0 && !z.dog && !z.inside && z.dying <= 0).length; }
+  count(): number { return this.list.filter((z) => !z.brute && z.horde === 0 && !z.inside && z.dying <= 0).length; }
   hordes(): number { return new Set(this.list.filter((z) => z.brute && z.dying <= 0).map((z) => z.horde)).size; }
-  /** Feral runners on screen (a pack or two at most, whatever the settings say). */
-  dogs(): number { return this.list.filter((z) => z.dog && z.dying <= 0).length; }
-
   spawn(angle: number, color: number): void {
     this.add(angle, color, false, 0, 0);
-  }
-
-  /** A pack of feral dogs: fast, low, mostly silhouette and eye glints. */
-  spawnPack(angle: number, color: number): void {
-    const n = 2 + ((Math.random() * 3) | 0);
-    for (let i = 0; i < n; i++) this.add(angle + (Math.random() - 0.5) * 0.25, color, false, 0, i * 0.12, false, true);
   }
 
   /** A brute plus a pack, weaving in on one bearing. */
@@ -101,22 +90,22 @@ export class Zombies {
     this.add(angle, color, false, 0, 0, true);
   }
 
-  private add(angle: number, color: number, brute: boolean, horde: number, delay: number, sprinter = false, dog = false): void {
+  private add(angle: number, color: number, brute: boolean, horde: number, delay: number, sprinter = false): void {
     const L = this.compound.L;
     const start = edgePoint(L.cx, L.cy, L.w, L.h, angle, 1.05);
     const end = wallPoint(L, start, 16 * L.unit);
     const dist = Math.hypot(end.x - start.x, end.y - start.y);
-    const speed = (dog ? 230 : sprinter ? 130 : horde ? 48 : 40) * L.unit * (0.85 + Math.random() * 0.3);
-    const s = new Sprite(dog ? this.tex.dog : this.tex.frame(sprinter ? 'zombie_stand' : (Math.random() < 0.8 ? 'zombie' : 'zombie_stand')));
-    s.anchor.set(dog ? 0.5 : 0.45, 0.5);
-    s.scale.set((dog ? 0.75 + Math.random() * 0.2 : brute ? 1.9 : sprinter ? 0.8 : 0.95 + Math.random() * 0.2) * L.unit);
+    const speed = (sprinter ? 130 : horde ? 48 : 40) * L.unit * (0.85 + Math.random() * 0.3);
+    const s = new Sprite(this.tex.frame(sprinter ? 'zombie_stand' : (Math.random() < 0.8 ? 'zombie' : 'zombie_stand')));
+    s.anchor.set(0.45, 0.5);
+    s.scale.set((brute ? 1.9 : sprinter ? 0.8 : 0.95 + Math.random() * 0.2) * L.unit);
     // sickly skin variety; brutes a paler, meaner green; sprinters a more yellow, feverish tint
-    s.tint = dog ? 0xffffff : brute ? 0xc8ff9a : sprinter ? 0xd8e8a0 : [0xffffff, 0xd8f0c8, 0xe8e0c0, 0xc8e8d8][(Math.random() * 4) | 0];
+    s.tint = brute ? 0xc8ff9a : sprinter ? 0xd8e8a0 : [0xffffff, 0xd8f0c8, 0xe8e0c0, 0xc8e8d8][(Math.random() * 4) | 0];
     s.position.set(start.x, start.y);
     s.rotation = Math.atan2(end.y - start.y, end.x - start.x);
     // a PAIR of eyes, set apart across the heading, so it reads as a face
-    const eyeTint = dog ? 0xd8ff5a : sprinter ? 0xff8a3a : brute ? 0xff9a45 : 0xff3a2a;
-    const eyeScale = (dog ? 0.12 : brute ? 0.3 : 0.17) * L.unit;
+    const eyeTint = sprinter ? 0xff8a3a : brute ? 0xff9a45 : 0xff3a2a;
+    const eyeScale = (brute ? 0.3 : 0.17) * L.unit;
     const eyes: Sprite[] = [];
     for (const side of [-1, 1]) {
       const eye = new Sprite(this.tex.glow);
@@ -126,27 +115,25 @@ export class Zombies {
       this.lights.addChild(eye);
     }
     this.layer.addChild(s);
-    const lone = !brute && horde === 0 && !sprinter && !dog;
+    const lone = !brute && horde === 0 && !sprinter;
     this.list.push({
       s, eyes, sx: start.x, sy: start.y, tx: end.x, ty: end.y,
       t: -delay * speed / Math.max(1, dist), dur: dist / speed, speed,
       killAt: sprinter ? null
-        : dog ? 0.45 + Math.random() * 0.2
         : brute ? 0.82 + Math.random() * 0.12
         : lone ? (Math.random() < 0.72 ? 0.55 + Math.random() * 0.38 : null)
         : 0.72 + Math.random() * 0.28,
-      phase: Math.random() * 10, weave: dog ? 14 : sprinter ? 10 : horde ? 22 : 6,
+      phase: Math.random() * 10, weave: sprinter ? 10 : horde ? 22 : 6,
       brute, horde, sprinter, dying: 0, seen: 0, watched: false, shot: false,
       baseScale: s.scale.x, fallFrom: 0, fallDir: 1, color,
       breached: false, targetBuilding: { x: L.cx, y: L.cy }, bangs: 0, bangT: 0,
-      intercepted: false, claw: 0, clawT: 0, clawed: false, fleeing: false,
-      dog, pounce: null, inside: false,
+      intercepted: false, claw: 0, clawT: 0, clawed: false, pounce: null, inside: false,
     });
   }
 
   /** Anything with teeth at the walls or loose inside? (drives alarm + audio) */
   underAttack(): boolean {
-    return this.list.some((z) => z.dying <= 0 && !z.fleeing && (z.brute || z.inside || z.claw > 0 || z.dog));
+    return this.list.some((z) => z.dying <= 0 && (z.brute || z.inside || z.claw > 0));
   }
 
   /** A wall side just broke: the ones clawing at it come through and hunt. */
@@ -201,7 +188,7 @@ export class Zombies {
         for (const e of z.eyes) fade(e, e.alpha * Math.max(0, 1 - dt * 3));   // eyes dim out, not cut
         if (z.dying <= 0) {
           // leave a dark corpse on the ground
-          this.addCorpse(z.s.x, z.s.y, z.s.rotation, z.baseScale, z.dog);
+          this.addCorpse(z.s.x, z.s.y, z.s.rotation, z.baseScale);
           z.s.destroy();
           for (const e of z.eyes) e.destroy();
           this.list.splice(i, 1);
@@ -209,13 +196,6 @@ export class Zombies {
         continue;
       }
       z.t += dt / z.dur;
-      if (z.fleeing && z.t >= 1) {
-        // gone over the horizon; packs come and go, they don't linger
-        for (const e of z.eyes) e.destroy();
-        z.s.destroy();
-        this.list.splice(i, 1);
-        continue;
-      }
       if (z.t < 0) { z.s.visible = false; continue; }
       z.s.visible = true;
       z.seen += dt;
@@ -253,12 +233,11 @@ export class Zombies {
       const px = -uy / len, py = ux / len;
       const k = Math.min(1, z.t);
       // one shamble per two beats; a horde weaves slower, a brute slowest of all,
-      // a dog fairly runs the beat into the ground
-      const step = beat * Math.PI * (z.brute ? 0.6 : z.sprinter ? 1.6 : z.dog ? 2.4 : 1) + z.phase;
-      const sway = Math.sin(beat * Math.PI * (z.brute ? 0.25 : z.sprinter ? 1.4 : z.dog ? 2.4 : z.horde ? 0.4 : 1) + z.phase) * z.weave * L.unit * (1 - k * 0.6);
+      const step = beat * Math.PI * (z.brute ? 0.6 : z.sprinter ? 1.6 : 1) + z.phase;
+      const sway = Math.sin(beat * Math.PI * (z.brute ? 0.25 : z.sprinter ? 1.4 : z.horde ? 0.4 : 1) + z.phase) * z.weave * L.unit * (1 - k * 0.6);
       const x = z.sx + ux * k + px * sway, y = z.sy + uy * k + py * sway;
       z.s.position.set(x, y);
-      z.s.rotation = Math.atan2(uy, ux) + Math.sin(step) * (z.dog ? 0.06 : 0.12);
+      z.s.rotation = Math.atan2(uy, ux) + Math.sin(step) * 0.12;
       // eyes lead the body out of the dark: at night they're the first thing you see
       this.placeEyes(z, x, y, darkness);
       // clamped sprinters at their target don't advance past t=1
@@ -285,15 +264,8 @@ export class Zombies {
         if (best) z.pounce = { fx: x, fy: y, tx: best.x, ty: best.y, t: 0, person: false };
       }
 
-      if (threatening || (z.killAt !== null && z.t >= z.killAt)) {
-        if (z.dog && !threatening && Math.random() > 0.6) {
-          // the guards' snap-shot at a runner: rounds chase it, dirt kicks up,
-          // and most of the pack gets clean away
-          z.killAt = null;
-          this.snap(z, { x, y });
-        } else {
-          this.kill(z, { x, y }, z.brute ? 3 : 1);
-        }
+      if (threatening || z.inside || (z.killAt !== null && z.t >= z.killAt)) {
+        this.kill(z, { x, y }, z.brute ? 3 : 1);
       } else if (z.t >= 1) {
         if (z.inside) {
           // loose inside the walls: hunt the nearest survivor; the wall guns
@@ -305,7 +277,7 @@ export class Zombies {
           }
           if (nearest && nd > 30 * L.unit) {
             z.sx = x; z.sy = y; z.tx = nearest.x; z.ty = nearest.y; z.t = 0;
-            z.dur = nd / ((z.dog ? 140 : 95) * L.unit);
+            z.dur = nd / (95 * L.unit);
           } else if (nearest && !z.pounce) {
             z.pounce = { fx: x, fy: y, tx: nearest.x, ty: nearest.y, t: 0, person: true };
           } else if (!nearest && z.killAt === null) {
@@ -344,19 +316,9 @@ export class Zombies {
               this.kill(z, { x, y }, 1);
             }
           }
-        } else if (z.dog && z.clawed && z.claw <= 0) {
-          // burst over and still breathing: through the gap if the wall is
-          // open, otherwise a dog at a closed fence runs for it
-          const gap = this.compound.gapNear({ x, y });
-          const to = gap ? this.compound.insidePoint(gap)
-            : edgePoint(L.cx, L.cy, L.w, L.h, Math.atan2(y - L.cy, x - L.cx), 1.15);
-          if (gap) z.inside = true;
-          else { z.fleeing = true; z.killAt = null; }
-          z.sx = x; z.sy = y; z.tx = to.x; z.ty = to.y; z.t = 0;
-          z.dur = Math.hypot(z.tx - z.sx, z.ty - z.sy) / ((gap ? 140 : 200) * L.unit);
         } else if (z.claw <= 0) {
-          // first arrival, or a zombie's burst expired: cling to the fence
-          z.claw = z.dog ? 0.8 + Math.random() * 0.8 : 1.2 + Math.random();
+          // first arrival, or a burst expired: cling to the fence
+          z.claw = 1.2 + Math.random();
           z.clawT = 0;
           if (!z.clawed) {
             z.clawed = true;
@@ -367,13 +329,15 @@ export class Zombies {
           // clawing at the wall: dust and thuds until the wall guns finish it
           z.claw -= dt;
           z.clawT += dt;
-          z.s.rotation += Math.sin(z.clawT * (z.dog ? 42 : 26) + z.phase) * 0.07;
-          if (z.clawT > (z.dog ? 0.18 : 0.3)) {
+          z.s.rotation += Math.sin(z.clawT * 26 + z.phase) * 0.07;
+          if (z.clawT > 0.3) {
             z.clawT = 0;
             this.fx.emit(x, y, 0xc9b48a, 2, 26, 0.14, 0.5);
-            this.onClaw?.(x, y, z.dog ? 0 : 0.05);   // claws don't break a wall
+            this.onClaw?.(x, y, 0.05);
           }
-          if (z.claw <= 0 && !z.dog) this.kill(z, { x, y }, z.brute ? 3 : 1);
+          // the guns keep working on it between bursts, so a clawer always
+          // dies eventually and the alarm can actually recover
+          this.kill(z, { x, y }, z.brute ? 3 : 1);
         }
       }
     }
@@ -385,8 +349,8 @@ export class Zombies {
    *  body out of the dark. */
   private placeEyes(z: Zombie, x: number, y: number, darkness: number): void {
     const L = this.compound.L;
-    const fwd = (z.dog ? 7 : 6.5) * L.unit;
-    const apart = (z.brute ? 9 : z.dog ? 4.2 : 5.6) * L.unit;
+    const fwd = 6.5 * L.unit;
+    const apart = (z.brute ? 9 : 5.6) * L.unit;
     const c = Math.cos(z.s.rotation), s = Math.sin(z.s.rotation);
     const a = darkness * (z.brute ? 1 : 0.85) * Math.min(1, z.seen / 1.5);
     for (let i = 0; i < 2; i++) {
@@ -418,7 +382,7 @@ export class Zombies {
     const vx = (z.tx - z.sx) / z.dur, vy = (z.ty - z.sy) / z.dur;
     const spd = Math.min(300, Math.hypot(vx, vy) / L.unit);
     const spread = (1.2 + spd / 150) * L.unit;
-    const hitR = (z.brute ? 18 : z.dog ? 9 : 13) * L.unit;
+    const hitR = (z.brute ? 18 : 13) * L.unit;
     const rnd = () => Math.random() + Math.random() - 1;   // −1..1, centre-heavy
     const bulletSpeed = 900 * L.unit;
     for (const i of free) {
@@ -449,29 +413,6 @@ export class Zombies {
     return true;
   }
 
-  /** The guards' snap-shot at a runner: a volley aimed ahead of a dog that's
-   *  about to cut the other way — dirt kicks up, and most of the pack runs on. */
-  private snap(z: Zombie, p: Point): void {
-    const L = this.compound.L;
-    const free = this.shooters(z, p).filter((i) => (this.towerCd[i] ?? 0) <= 0);
-    if (free.length === 0) return;
-    this.onShot?.(p.x, 1);
-    const vx = (z.tx - z.sx) / z.dur, vy = (z.ty - z.sy) / z.dur;
-    for (const i of free) {
-      this.towerCd[i] = 0.8 + Math.random() * 0.5;
-      const muzzle = this.compound.aim(i, p);
-      this.fx.muzzleFlash(muzzle.x, muzzle.y);
-      this.fx.smokePuff(muzzle.x, muzzle.y);
-      const d = Math.hypot(p.x - muzzle.x, p.y - muzzle.y) || 1;
-      const fly = d / (900 * L.unit);
-      const aim = {
-        x: p.x + vx * fly + (Math.random() - 0.5) * 14 * L.unit,
-        y: p.y + vy * fly + (Math.random() - 0.5) * 14 * L.unit,
-      };
-      this.fx.bullet(muzzle.x, muzzle.y, aim, 900 * L.unit,
-        (bx, by) => this.fx.emit(bx, by, 0x6a5a44, 4, 40, 0.16, 0.5));
-    }
-  }
 
   private hit(z: Zombie, x: number, y: number): void {
     if (z.dying > 0) return;
@@ -484,17 +425,17 @@ export class Zombies {
     z.fallDir = Math.random() < 0.5 ? -1 : 1;
   }
 
-  private addCorpse(x: number, y: number, rot: number, scale: number, dog = false): void {
+  private addCorpse(x: number, y: number, rot: number, scale: number): void {
     if (this.corpses.length >= this.maxCorpses) {
       const old = this.corpses.shift()!;
       old.s.destroy();
     }
-    const s = new Sprite(dog ? this.tex.dog : this.tex.frame('zombie'));
+    const s = new Sprite(this.tex.frame('zombie'));
     s.anchor.set(0.5);
     s.position.set(x, y);
-    s.rotation = dog ? rot : rot + Math.PI / 2;
-    s.scale.set(scale * (dog ? 0.85 : 0.7));
-    s.tint = dog ? 0x2a2620 : 0x3a3a2a;
+    s.rotation = rot + Math.PI / 2;
+    s.scale.set(scale * 0.7);
+    s.tint = 0x3a3a2a;
     s.alpha = 0.5;
     this.layer.addChild(s);
     this.corpses.push({ s, age: 0 });
