@@ -47,7 +47,7 @@ export default holdout;
 
 async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
                       init: RendererInit): Promise<ThemeInstance> {
-  const { settings, state, throttle, audio } = host;
+  const { settings, state, throttle, audio, hud } = host;
 
   const app = new Application();
   await app.init({
@@ -88,12 +88,16 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
   };
   const walkers = new Walkers(layers.actors, layers.lights, tex, fx);
   zombies.onWalkIntercept = (x, y) => walkers.killNearestVulnerable(x, y);
+  let survivorsDown = 0;
   walkers.onWalkedKilled = (x, y) => {
     // the pounce lands: impact thud, a groan over it, the world dips for a beat
     audio.sfx('breach', { count: 1, pan: (x / L.w - 0.5) * 0.6 });
     audio.sfx('groan', { pan: (x / L.w - 0.5) * 0.5 });
+    audio.sfx('survivorDown', { pan: (x / L.w - 0.5) * 0.5 });
     state.slowmo(0.3, 0.5);
     if (settings.hScreenShake) shake = Math.min(5, shake + 3);
+    fx.stain(x, y);
+    hud.setExtraStat('SURVIVORS DOWN', ++survivorsDown);
   };
   const sky = new Sky(dark, top, tex.rain, tex.glow);
   // thunder follows its flash after a distance delay, like real storms
@@ -102,6 +106,17 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     compound.addWallScratch(x, y);
     audio.sfx('breach', { count: 1, pan: (x / L.w - 0.5) * 0.8 });
     if (settings.hScreenShake) shake = Math.min(4, shake + 1.2);
+    // the same claws are quietly opening a door
+    const gap = compound.addClawDamage(x, y, 0.05);
+    if (gap) {
+      zombies.breakInside(gap);
+      fx.debris(gap.x, gap.y, 18);
+      fx.emit(gap.x, gap.y, 0x8a1408, 10, 90, 0.3, 0.6);
+      audio.sfx('wallbreak', { pan: (gap.x / L.w - 0.5) * 0.8 });
+      alarmKick = 1;
+      state.slowmo(0.4, 0.6);
+      if (settings.hScreenShake) shake = Math.min(7, shake + 5);
+    }
   };
   const groove = new Groove();
 
@@ -405,8 +420,9 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     // perimeter lights track zombies
     compound.updatePerimeter(zombies.positions(), dt);
 
-    // pressure to score
-    const pressure = Math.min(1, (zombies.count() / Math.max(1, settings.hMaxZombies)) * 0.5 + (attacked ? 0.4 : 0) + (alarm * 0.3));
+    // pressure to score: bodies at the gate, teeth at the wall, anything loose inside
+    const clawing = zombies.clawing().length + zombies.insideCount();
+    const pressure = Math.min(1, (zombies.count() / Math.max(1, settings.hMaxZombies)) * 0.4 + (attacked ? 0.45 : 0) + (alarm * 0.3) + Math.min(0.15, clawing * 0.05));
     (audio as unknown as { setPressure?: (p: number) => void }).setPressure?.(pressure);
 
     // corpses age out

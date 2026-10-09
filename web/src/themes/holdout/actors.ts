@@ -35,6 +35,7 @@ interface Zombie {
   clawT: number;
   dog: boolean;                // feral pack runner: fast, low, snaps past the guards
   pounce: Pounce | null;       // mid-leap at a survivor
+  inside: boolean;             // got through a broken wall: hunts inside the compound
 }
 
 export interface ZombieHits { kills: Point[]; breaches: Point[] }
@@ -64,7 +65,7 @@ export class Zombies {
   constructor(private layer: Container, private lights: Container, private tex: ZTextures,
               private compound: Compound, private fx: Fx) {}
 
-  count(): number { return this.list.filter((z) => !z.brute && z.horde === 0 && !z.dog && z.dying <= 0).length; }
+  count(): number { return this.list.filter((z) => !z.brute && z.horde === 0 && !z.dog && !z.inside && z.dying <= 0).length; }
   hordes(): number { return new Set(this.list.filter((z) => z.brute && z.dying <= 0).map((z) => z.horde)).size; }
   /** Feral runners on screen (a pack or two at most, whatever the settings say). */
   dogs(): number { return this.list.filter((z) => z.dog && z.dying <= 0).length; }
@@ -130,12 +131,37 @@ export class Zombies {
       brute, horde, sprinter, dying: 0, seen: 0, watched: false, shot: false,
       baseScale: s.scale.x, fallFrom: 0, fallDir: 1, color,
       breached: false, targetBuilding: { x: L.cx, y: L.cy }, bangs: 0, bangT: 0,
-      intercepted: false, claw: 0, clawT: 0, dog, pounce: null,
+      intercepted: false, claw: 0, clawT: 0, dog, pounce: null, inside: false,
     });
   }
 
-  /** Any horde brute still coming? (drives the alarm + threat audio) */
-  underAttack(): boolean { return this.list.some((z) => z.brute && z.dying <= 0); }
+  /** Anything with teeth at the walls or loose inside? (drives alarm + audio) */
+  underAttack(): boolean {
+    return this.list.some((z) => z.dying <= 0 && (z.brute || z.inside || z.claw > 0 || z.dog));
+  }
+
+  /** A wall side just broke: the ones clawing at it come through and hunt. */
+  breakInside(gap: Point): number {
+    const L = this.compound.L;
+    const inPoint = this.compound.insidePoint(gap);
+    let n = 0;
+    for (const z of this.list) {
+      if (z.claw <= 0 || z.dying > 0 || z.inside) continue;
+      if (Math.hypot(z.s.x - gap.x, z.s.y - gap.y) > 150 * L.unit) continue;
+      z.claw = 0;
+      z.inside = true;
+      z.intercepted = false;
+      z.sx = z.s.x; z.sy = z.s.y;
+      z.tx = inPoint.x; z.ty = inPoint.y;
+      z.t = 0;
+      z.dur = Math.hypot(z.tx - z.sx, z.ty - z.sy) / (90 * L.unit);
+      z.killAt = null;
+      n++;
+    }
+    return n;
+  }
+
+  insideCount(): number { return this.list.filter((z) => z.inside && z.dying <= 0).length; }
 
   /** Where every zombie is, fallen ones included (survivors step around them). */
   positions(): Point[] {
@@ -254,7 +280,24 @@ export class Zombies {
           hits.kills.push({ x, y });
         }
       } else if (z.t >= 1) {
-        if (z.sprinter) {
+        if (z.inside) {
+          // loose inside the walls: hunt the nearest survivor; the wall guns
+          // get their chance through the `threatening` cover fire above
+          let nearest: Point | null = null, nd = Infinity;
+          for (const p of people) {
+            const d = Math.hypot(p.x - x, p.y - y);
+            if (d < nd) { nd = d; nearest = p; }
+          }
+          if (nearest && nd > 30 * L.unit) {
+            z.sx = x; z.sy = y; z.tx = nearest.x; z.ty = nearest.y; z.t = 0;
+            z.dur = nd / (95 * L.unit);
+          } else if (nearest && !z.pounce) {
+            z.pounce = { fx: x, fy: y, tx: nearest.x, ty: nearest.y, t: 0, person: true };
+          } else if (!nearest && z.killAt === null) {
+            // nothing left to hunt: the guns drop it where it stands
+            z.killAt = z.t + 0.2;
+          }
+        } else if (z.sprinter) {
           // sprinter breaches: sprints into the compound to hunt a person
           if (!z.breached) {
             z.breached = true;

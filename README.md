@@ -474,7 +474,7 @@ the walls, the internet is everything outside. The HUD is relabelled to match
 
 | Event | On screen |
 |-------|-----------|
-| block | a zombie shambles in from a bearing fixed by the remote IP. The nearest tower guard turns and fires; rounds fly to it and it topples when they land. The odd one reaches the fence, clings to it and claws until the wall guns drop it (a breach nudges the camera). At night, blocked traffic occasionally announces itself as a **pack run**: two or four feral dogs at a dead sprint, mostly silhouette and eye glints — the guards get one snap-shot volley, and misses just kick up dirt |
+| block | a zombie shambles in from a bearing fixed by the remote IP. The nearest tower guard turns and fires; rounds fly to it and it topples when they land. The odd one reaches the fence, clings to it and claws until the wall guns drop it (a breach nudges the camera) — but walls aren't forever: one side clawed long enough splinters open, and what was clawing pours through the gap and hunts the courtyard until the crossfire drops it, while the hole planks itself over. At night, blocked traffic occasionally announces itself as a **pack run**: two or four feral dogs at a dead sprint, mostly silhouette and eye glints — the guards get one snap-shot volley, and misses just kick up dirt |
 | threat | a horde: a brute leading a weaving pack. The nearest towers open fire with bursts, the scene takes on a steady red cast and the floodlights turn red while the brute lives |
 | allow (border) | supply runs: outbound, a scavenger runs from the camp through a gate and off the map; inbound, a survivor carries a crate in. Survivors step around zombies, and the towers shoot any zombie that gets close to one — but one that makes it pounces, and the blood spray says the rest |
 | allow (LAN↔LAN) | a courier strolls between two tents |
@@ -485,6 +485,8 @@ the walls, the internet is everything outside. The HUD is relabelled to match
 
 **The HUD is the outpost's own paperwork:** notes on hand-cut card taped to the
 wall, stencilled headings, ammo-box gauges and a radio log on ruled paper.
+Every survivor that goes down leaves a stain that never dries and a tally on
+the **SURVIVORS DOWN** line.
 
 **Dead country.** The ground and trees are drained to grey-brown, with old
 bloodstains outside the walls. That happens once when the scene is built, so
@@ -505,6 +507,16 @@ each bar, and during a horde the red wash follows the heartbeat. The scene
 keeps its own clock and eases toward the music's beat (never more than ±50%
 speed), so a new song never makes anything jump. With the sound off it keeps a
 steady walking tempo.
+
+**The soundtrack is scored to the siege.** Three styles crossfade with scene
+pressure: **Drone** is the night watch — sub drones, whispers drifting past, a
+warped music box, and a heartbeat once the dark is full in. **Siege** brings
+taiko and stomps, string stabs and a far-off organ. **Horde** is the charge: a
+taiko ensemble, cello spiccato, grinding dissonant strings and a choir under
+the chord changes. Each style layers in more as pressure climbs, and the
+events have their own stingers — a wall breaking lands as a boom with strings
+falling down, and a survivor going down is a glass note, a low cello stab and
+a skipped heartbeat.
 
 ### Midnight Run
 

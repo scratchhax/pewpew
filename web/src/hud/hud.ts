@@ -208,6 +208,20 @@ export class Hud {
     q('demo-badge').style.display = on ? '' : 'none';
   }
 
+  /** Optional theme-supplied stat row in the telemetry panel (e.g. SURVIVORS DOWN). */
+  setExtraStat(label: string, value: string | number): void {
+    let row = document.getElementById('stat-extra');
+    if (!row) {
+      row = document.createElement('div');
+      row.id = 'stat-extra';
+      row.className = 'stat-row';
+      row.innerHTML = '<span id="stat-extra-label"></span><b id="stat-extra-value"></b>';
+      document.getElementById('hud-stats')?.appendChild(row);
+    }
+    document.getElementById('stat-extra-label')!.textContent = label;
+    document.getElementById('stat-extra-value')!.textContent = String(value);
+  }
+
   private names = new Map<string, string>();   // MAC → hostname learned from DHCP
 
   log(ev: NetEvent): void {

@@ -4,7 +4,7 @@ interface Particle { s: Sprite; vx: number; vy: number; age: number; life: numbe
 interface Bullet { s: Sprite; x: number; y: number; target: () => { x: number; y: number }; speed: number; delay: number; onHit?: (x: number, y: number) => void }
 interface Ring { x: number; y: number; r: number; maxR: number; age: number; life: number; color: number; width: number }
 interface Dash { x1: number; y1: number; x2: number; y2: number; age: number; life: number; color: number }
-interface Decal { s: Sprite; age: number }
+interface Decal { s: Sprite; age: number; forever?: boolean }
 
 /** Rounds in flight at once (a busy horde night can't flood the scene). */
 const MAX_BULLETS = 80;
@@ -31,6 +31,7 @@ export class Fx {
   private rings: Ring[] = [];
   private dashes: Dash[] = [];
   private decals: Decal[] = [];
+  private stains: Decal[] = [];
   private g = new Graphics();
   readonly parachuteG = new Graphics();
   maxParticles = 3000;
@@ -101,6 +102,20 @@ export class Fx {
     this.trimDecals();
   }
 
+  /** A bloodstain that never dries: where a survivor went down. */
+  stain(x: number, y: number): void {
+    if (!this.blood || this.maxDecals <= 0) return;
+    const s = new Sprite(this.splats[(Math.random() * this.splats.length) | 0]);
+    s.anchor.set(0.5);
+    s.x = x; s.y = y;
+    s.rotation = Math.random() * Math.PI * 2;
+    s.scale.set(0.95 + Math.random() * 0.4);
+    s.alpha = 0;
+    this.decalLayer.addChild(s);
+    this.stains.push({ s, age: 0, forever: true });
+    while (this.stains.length > 12) this.stains.shift()!.s.destroy();
+  }
+
   /** Bright flash at a muzzle: one frame of white-yellow, 60ms. */
   muzzleFlash(x: number, y: number): void {
     if (this.particles.length >= this.maxParticles) return;
@@ -155,6 +170,8 @@ export class Fx {
   clearDecals(): void {
     for (const d of this.decals) d.s.destroy();
     this.decals = [];
+    for (const d of this.stains) d.s.destroy();
+    this.stains = [];
   }
 
   private trimDecals(): void {
@@ -225,6 +242,11 @@ export class Fx {
       d.age += dt;
       d.s.alpha = d.age < 0.5 ? 0.8 * (d.age / 0.5) : Math.max(0, 0.8 - Math.max(0, d.age - 90) / 40);
       if (d.age > 90 && d.s.alpha <= 0) { d.s.destroy(); this.decals.splice(i, 1); }
+    }
+    // stains soak in and stay
+    for (const d of this.stains) {
+      d.age += dt;
+      d.s.alpha = d.age < 0.5 ? 0.8 * (d.age / 0.5) : 0.8;
     }
     this.trimDecals();
 

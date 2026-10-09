@@ -43,7 +43,7 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
   const throttle = new Throttle();
 
   const scene = await theme.create(
-    { settings, state, throttle, audio, mount: document.getElementById('app')! },
+    { settings, state, throttle, audio, mount: document.getElementById('app')!, hud: { setExtraStat: (l, v) => hud.setExtraStat(l, v) } },
     { antialias: settings.antialias, powerPref: settings.powerPref, resolution: settings.renderScale },
   );
   if (params.has('diag')) (window as any).__diag = { ...scene.diag?.() };

@@ -6,9 +6,9 @@ import type { Bed, Synth, Bus } from '../../sound/synth';
 /**
  * The Holdout's soundtrack. Three styles driven by scene pressure:
  *
- *   drone  (0–0.35)  : a low sustained pulse — deep pad, slow filtered noise, cold bells
- *   siege  (0.35–0.7): rhythmic — pulsing ostinato, toms on the beat, tension arps
- *   horde  (0.7–1.0) : driving — 8th-note bass, gated snare, heartbeat, brass stabs
+ *   drone  (0–0.28)  : night watch — sub drones, whispers, a warped music box, a heartbeat
+ *   siege  (0.28–0.55): war drums — taiko and stomps, string stabs, a far-off organ
+ *   horde  (0.55–1.0): the charge — taiko ensemble, cello spiccato, grinding strings, choir
  *
  * Pressure is the compound's threat level: it rises with blocks and threats,
  * decays slowly. The conductor crossfades between styles over ~1.5 s when the
@@ -26,8 +26,9 @@ class Drone extends Style {
   readonly leadOct = 3;
   readonly level = 1.1;
   private bellT = 0;
+  private whisperT = 4;
 
-  enter(): void { this.bellT = 0; }
+  enter(): void { this.bellT = 0; this.whisperT = 4; }
 
   step(i: number, t: number, m: Mood): void {
     const s = this.s, b = this.bus, bar = Math.floor(i / 16), pos = i % 16;
@@ -35,19 +36,40 @@ class Drone extends Style {
     if (this.isChordStart(i)) {
       const hold = this.barsPerChord * 16 * this.stepDur;
       s.pad(b, t, [tones[0] / 2, tones[0], tones[0] * 1.01], 0.04, hold, 300 + m.night * 200);
+      // a sub-drone an octave under: felt more than heard
+      s.pad(b, t, [tones[0] / 2, tones[0] / 2 * 1.007], 0.03, hold, 150);
+      // sometimes a cello note joins from far away
+      if (Math.random() < 0.5) s.cello(b, t, tones[0], 0.03, hold * 0.6, (Math.random() - 0.5) * 0.8);
     }
     // slow sub pulse on beats
     if (pos % 4 === 0) s.bassPulse(b, t, tones[0] / 2, 0.06 + m.tension * 0.03);
+    // whispers drift through at night, panning like someone walking past
+    this.whisperT -= this.stepDur;
+    if (this.whisperT <= 0 && m.night > 0.3) {
+      s.whisper(b, t, 0.02 + m.night * 0.025, (Math.random() * 2 - 1) * 0.9);
+      this.whisperT = 6 + Math.random() * 10;
+    }
+    // a warped music box picks out a camp melody, half the notes missing
+    if (bar % 2 === 1 && pos === 8 && Math.random() < 0.35) {
+      s.warpedBox(b, t, this.tones(i, 3)[pick([0, 1, 2])], 0.03,
+        0.06 + Math.random() * 0.1, (Math.random() - 0.5) * 0.7);
+    }
     // cold bell, sparse
     this.bellT -= this.stepDur;
     if (this.bellT <= 0 && bar % 2 === 1 && pos === 8 && Math.random() < 0.4) {
       s.bell(b, t, this.tones(i, 3)[pick([0, 2])], 0.04, 0, 0.5);
       this.bellT = 2 + Math.random() * 2;
     }
+    // wind chimes on the wire fence
+    if (bar % 4 === 2 && pos === 12 && Math.random() < 0.4) {
+      s.glass(b, t, this.tones(i, 4)[pick([1, 2])], 0.018, (Math.random() - 0.5) * 1.2);
+    }
     // distant swell at night
     if (m.night > 0.5 && bar % 4 === 0 && pos === 0) {
       s.swell(b, t, tones[0] * 4, 0.02 * m.night, 4, 0.3);
     }
+    // the compound's own heartbeat once the dark is full in
+    if (m.night > 0.55 && pos % 8 === 0) s.heart(b, t, 0.045 * m.night);
   }
 
   lead(t: number, f: number, g: number, pan: number): void { this.s.bell(this.bus, t, f, g * 0.7, pan, 0.5); }
@@ -70,6 +92,8 @@ class Siege extends Style {
     if (this.isChordStart(i)) {
       const hold = this.barsPerChord * 16 * this.stepDur;
       s.pad(b, t, [tones[0] / 2, tones[0], tones[1]], 0.03, hold, 500 + m.tension * 800);
+      // a church organ two rooms away, only on the chord change
+      s.organ(b, t, tones[0], 0.018, hold * 0.5, -0.3);
     }
     // pulsing ostinato: 8ths, filter opens with tension
     if (pos % 2 === 0 || m.tension > 0.5) {
@@ -80,16 +104,25 @@ class Siege extends Style {
       const accent = pos % 4 === 0 ? 1 : 0.7;
       s.arp(b, t, f, (0.03 + m.tension * 0.02) * accent, cutoff, pos % 4 < 2 ? -0.2 : 0.2);
     }
-    // toms on the beat
-    if (pos === 0) s.tom(b, t, 100, 0.12 + m.tension * 0.06);
-    if (pos === 8) s.tom(b, t, 80, 0.1);
-    if (m.tension > 0.4 && pos === 12) s.tom(b, t, 120, 0.08, 0.3);
+    // war drums: taiko on the ground beats, stomps on the off beats
+    if (pos === 0) s.taiko(b, t, 0.13 + m.tension * 0.05, -0.25);
+    if (pos === 6 || pos === 8) s.taiko(b, t, 0.07 + m.tension * 0.04, 0.25);
+    if (pos === 4 || pos === 12) s.stomp(b, t, 0.07 + m.tension * 0.05);
+    if (m.tension > 0.3 && pos === 14) s.taiko(b, t, 0.05, 0);
+    // strings stab off the beat once the pressure is on
+    if (m.tension > 0.45 && pos % 4 === 2) {
+      s.strings(b, t, tones[0] * 2, 0.02 + m.tension * 0.02, pos % 8 === 2 ? -0.35 : 0.35);
+    }
     // bass pulse
     if (pos % 4 === 0) s.bassPulse(b, t, tones[0] / 4, 0.08 + m.tension * 0.04);
     // cold bell figure
     if (bar % 2 === 1 && [0, 4, 8, 12].includes(pos) && Math.random() < 0.5) {
       s.bell(b, t, this.tones(i, 3)[pick([0, 1, 2])], 0.035, 0, 0.3);
     }
+    // every 8 bars something is about to happen
+    if (i % 128 === 96) s.riser(b, t, 16 * this.stepDur, 0.022);
+    // intensity layer: 16th hats when it's really pressing
+    if (m.tension > 0.75 && pos % 2 === 1) s.hat(b, t, 0.02, 0, false);
   }
 
   lead(t: number, f: number, g: number, pan: number): void { this.s.pluck(this.bus, t, f, g * 0.8, pan); }
@@ -114,22 +147,41 @@ class Horde extends Style {
       const f = pos % 8 === 6 ? tones[0] * 1.5 : tones[0] / 2;
       s.bassPulse(b, t, f, 0.1 + m.tension * 0.04);
     }
+    // taiko ensemble: the pattern is the charge
+    if (pos === 0 || pos === 3 || pos === 8 || pos === 11) {
+      s.taiko(b, t, pos === 0 ? 0.14 : 0.07, pos % 8 === 0 ? -0.2 : 0.2);
+    }
     // kick on 1 and 3
     if (pos === 0 || pos === 8) s.kick(b, t, 0.14);
-    // gated snare on 2 and 4
-    if (pos === 4 || pos === 12) s.snare(b, t, 0.08 + m.tension * 0.04, 0);
+    // stomps answer the gated snare on 2 and 4
+    if (pos === 4 || pos === 12) {
+      s.snare(b, t, 0.08 + m.tension * 0.04, 0);
+      s.stomp(b, t, 0.08 + m.tension * 0.04);
+    }
+    // cellos sawing 8th spiccato under everything
+    if (pos % 2 === 0) {
+      s.cello(b, t, tones[0], 0.03 + m.tension * 0.015, this.stepDur * 1.4, pos % 4 === 0 ? -0.25 : 0.25);
+    }
     // hats on 16ths when tension is high
     if (m.tension > 0.5 && pos % 2 === 1) s.hat(b, t, 0.03, 0, false);
     // sawtooth stabs on chord changes
     if (pos === 0 && bar % 2 === 0) {
       s.sawLead(b, t, tones[0], 0.04, this.stepDur * 4, 0);
     }
+    // every 4th bar the strings lurch: root plus its neighbour, grinding
+    if (bar % 4 === 0 && pos === 0) {
+      s.strings(b, t, tones[0] * 2, 0.045, -0.3);
+      s.strings(b, t, tones[0] * 2 * 1.06, 0.035, 0.3);
+    }
     // tom fills
     if (bar % 4 === 3 && pos >= 12) s.tom(b, t, 90 + pos * 15, 0.1, (pos - 14) * 0.15);
-    // pad for weight
+    // pad for weight, choir under the chord changes
     if (this.isChordStart(i)) {
       s.pad(b, t, [tones[0] / 2, tones[0]], 0.025, 16 * this.stepDur, 400);
+      s.choir(b, t, [tones[0] * 2, tones[1] * 2], 0.016, 16 * this.stepDur);
     }
+    // intensity layer: doubled bass and open hats at the very top
+    if (m.tension > 0.8 && pos % 2 === 1) s.bassPulse(b, t, tones[0] / 2, 0.05);
   }
 
   lead(t: number, f: number, g: number, pan: number): void { this.s.sawLead(this.bus, t, f, g * 0.6, 0.15, pan); }
@@ -191,7 +243,7 @@ class HoldoutConductor extends Conductor {
     const pinned = this.setting<string>('hMusicStyle');
     if (pinned !== 'pressure' && this.styles.has(pinned)) return pinned;
     const p = this.mood.tension;
-    const target = p < 0.35 ? 'drone' : p < 0.7 ? 'siege' : 'horde';
+    const target = p < 0.28 ? 'drone' : p < 0.55 ? 'siege' : 'horde';
     return target;
   }
 
@@ -317,6 +369,23 @@ class HoldoutConductor extends Conductor {
       if (t < 0) return;
       const root = this.chordAt(t, 1)[pick([1, 2])];
       s.groan(this.sfxBus, t, root * 2.5, 0.07 * st.gBlock, pan, 0.9 + Math.random() * 0.5);
+    } else if (name === 'wallbreak') {
+      // the wall goes: boom, a shock on the chord, and strings falling down
+      const t = this.slot('wallbreak', 1, 1.2);
+      if (t < 0) return;
+      s.boom(this.sfxBus, t, 0.14 * st.gBlock);
+      s.shock(this.sfxBus, t, this.chordAt(t, 1)[0] * 2, 0.07 * st.gBlock);
+      const c = this.chordAt(t, 2)[0];
+      s.strings(this.sfxBus, t, c, 0.05 * st.gBlock, pan);
+      s.strings(this.sfxBus, t + 0.14, c * 0.84, 0.04 * st.gBlock, pan);
+      s.strings(this.sfxBus, t + 0.28, c * 0.71, 0.035 * st.gBlock, pan);
+    } else if (name === 'survivorDown') {
+      // one of ours: a glass note, a low cello stab, and a skipped heartbeat
+      const t = this.slot('survivorDown', 1, 0.8);
+      if (t < 0) return;
+      s.glass(this.sfxBus, t, this.chordAt(t, 4)[pick([1, 2])], 0.045, pan);
+      s.cello(this.sfxBus, t, this.chordAt(t, 1)[0], 0.09 * st.gBlock, 0.5, pan);
+      this.markHeart(t);
     }
   }
 

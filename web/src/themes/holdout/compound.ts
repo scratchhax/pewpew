@@ -56,11 +56,17 @@ export class Compound {
   private mastHeat = 0;
   private mastGlow = 0;
   private wallDamage = 0;       // 0-1, accumulates on breach, decays
+  /** Per-side claw damage (0 top, 1 right, 2 bottom, 3 left) and the gaps
+   *  that open when a side gives way. */
+  private sideDamage = [0, 0, 0, 0];
+  private sideCooldown = [0, 0, 0, 0];
+  private gaps: { side: number; at: number; x: number; y: number }[] = [];
+  private gapG = new Graphics();
   maxTents = 28;
 
   constructor(private app: Application, private layers: Layers, private tex: ZTextures) {
     layers.ground.addChild(this.groundSprite);
-    layers.walls.addChild(this.wallG, this.crackG, this.perimeterG);
+    layers.walls.addChild(this.wallG, this.crackG, this.perimeterG, this.gapG);
     for (const s of [this.mastLight, this.genLight]) {
       s.texture = tex.glow; s.anchor.set(0.5); s.blendMode = 'add';
       layers.lights.addChild(s);
@@ -304,6 +310,76 @@ export class Compound {
 
   setWallDamage(d: number): void { this.wallDamage = Math.max(0, Math.min(1, d)); }
   getWallDamage(): number { return this.wallDamage; }
+
+  // ── the wall giving way ────────────────────────────────────────────────────
+  private sideOf(x: number, y: number): number {
+    const L = this.L;
+    const d = [Math.abs(y - L.y0), Math.abs(x - L.x1), Math.abs(y - L.y1), Math.abs(x - L.x0)];
+    let best = 0;
+    for (let i = 1; i < 4; i++) if (d[i] < d[best]) best = i;
+    return best;
+  }
+
+  /** A claw tick on a wall side. Returns the gap point when that side breaks. */
+  addClawDamage(x: number, y: number, by: number): Point | null {
+    const side = this.sideOf(x, y);
+    if (this.sideCooldown[side] > 0) return null;
+    this.sideDamage[side] = Math.min(1, this.sideDamage[side] + by);
+    if (this.sideDamage[side] < 1) return null;
+    const L = this.L;
+    const along = 0.25 + Math.random() * 0.5;
+    const gx = side === 1 ? L.x1 : side === 3 ? L.x0 : L.x0 + along * (L.x1 - L.x0);
+    const gy = side === 0 ? L.y0 : side === 2 ? L.y1 : L.y0 + along * (L.y1 - L.y0);
+    this.gaps.push({ side, at: this.t, x: gx, y: gy });
+    this.sideDamage[side] = 0;
+    this.sideCooldown[side] = 30;
+    return { x: gx, y: gy };
+  }
+
+  /** A point just inside the wall at a gap (where infiltrators emerge). */
+  insidePoint(gap: Point): Point {
+    const L = this.L;
+    const k = 2.6 * L.wall;
+    const dx = L.cx - gap.x, dy = L.cy - gap.y;
+    const d = Math.hypot(dx, dy) || 1;
+    return { x: gap.x + (dx / d) * k, y: gap.y + (dy / d) * k };
+  }
+
+  /** The hole, then planks creeping over it, then it's a wall again. */
+  private drawGaps(): void {
+    const g = this.gapG;
+    g.clear();
+    const L = this.L, W = L.wall;
+    for (let i = this.gaps.length - 1; i >= 0; i--) {
+      const gap = this.gaps[i];
+      const age = this.t - gap.at;
+      if (age > 45) { this.gaps.splice(i, 1); continue; }
+      const repair = Math.min(1, Math.max(0, (age - 12) / 30));
+      const horiz = gap.side === 0 || gap.side === 2;
+      const len = 34 * L.unit;
+      // the hole
+      g.rect(gap.x - (horiz ? len / 2 : W * 1.1), gap.y - (horiz ? W * 1.1 : len / 2),
+        horiz ? len : W * 2.2, horiz ? W * 2.2 : len).fill({ color: 0x0a0806, alpha: 0.92 * (1 - repair) });
+      // splintered ends
+      for (const s of [-1, 1]) {
+        const bx = horiz ? gap.x + s * len / 2 : gap.x;
+        const by = horiz ? gap.y : gap.y + s * len / 2;
+        const a = Math.atan2(L.cy - by, L.cx - bx);
+        g.moveTo(bx, by).lineTo(bx + Math.cos(a) * W * 1.4, by + Math.sin(a) * W * 1.4)
+          .stroke({ width: 2, color: 0x241c12, alpha: 0.9 * (1 - repair) });
+      }
+      // planks closing it as it repairs
+      const planks = Math.round(repair * 4);
+      for (let p = 0; p < planks; p++) {
+        const off = (p - 1.5) * (len / 4);
+        const px = horiz ? gap.x + off : gap.x;
+        const py = horiz ? gap.y : gap.y + off;
+        g.rect(px - (horiz ? len / 9 : W * 1.2), py - (horiz ? W * 1.2 : len / 9),
+          horiz ? len / 4.5 : W * 2.4, horiz ? W * 2.4 : len / 4.5)
+          .fill({ color: 0x8a6f4a, alpha: 0.85 });
+      }
+    }
+  }
 
   /** Claw marks where a zombie clings to the wall: short parallel rakes. */
   addWallScratch(x: number, y: number): void {
@@ -554,6 +630,13 @@ export class Compound {
     // wall damage decay (repair over time)
     this.wallDamage = Math.max(0, this.wallDamage - dt * 0.005);
     if (this.wallDamage < 0.05) this.crackG.clear();
+
+    // claw damage bleeds off slowly while nobody is on the wall; gaps plank over
+    for (let s = 0; s < 4; s++) {
+      this.sideCooldown[s] = Math.max(0, this.sideCooldown[s] - dt);
+      this.sideDamage[s] = Math.max(0, this.sideDamage[s] - dt * 0.01);
+    }
+    this.drawGaps();
   }
 }
 
