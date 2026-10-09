@@ -7,10 +7,13 @@ import { edgePoint } from '../../state';
 
 const BLOOD = 0x9a1010;
 
+interface Pounce { fx: number; fy: number; tx: number; ty: number; t: number; person: boolean }
+
 interface Zombie {
-  s: Sprite; eye: Sprite;
+  s: Sprite; eyes: Sprite[];
   sx: number; sy: number; tx: number; ty: number;
   t: number; dur: number;
+  speed: number;               // px/s along the path (for resuming after a pounce)
   killAt: number | null;       // progress at which a tower drops it (null = reaches the wall)
   phase: number; weave: number;  // phase: this zombie's offset against the beat
   brute: boolean; horde: number; // horde id (0 = lone zombie)
@@ -31,6 +34,7 @@ interface Zombie {
   claw: number;
   clawT: number;
   dog: boolean;                // feral pack runner: fast, low, snaps past the guards
+  pounce: Pounce | null;       // mid-leap at a survivor
 }
 
 export interface ZombieHits { kills: Point[]; breaches: Point[] }
@@ -101,15 +105,22 @@ export class Zombies {
     s.tint = dog ? 0xffffff : brute ? 0xc8ff9a : sprinter ? 0xd8e8a0 : [0xffffff, 0xd8f0c8, 0xe8e0c0, 0xc8e8d8][(Math.random() * 4) | 0];
     s.position.set(start.x, start.y);
     s.rotation = Math.atan2(end.y - start.y, end.x - start.x);
-    const eye = new Sprite(this.tex.glow);
-    eye.anchor.set(0.5); eye.blendMode = 'add'; eye.tint = dog ? 0xd8ff5a : sprinter ? 0xffcc00 : brute ? 0xff9a45 : 0xff3a2a;
-    eye.scale.set((dog ? 0.16 : brute ? 0.42 : 0.26) * L.unit); fade(eye, 0);
+    // a PAIR of eyes, set apart across the heading, so it reads as a face
+    const eyeTint = dog ? 0xd8ff5a : sprinter ? 0xff8a3a : brute ? 0xff9a45 : 0xff3a2a;
+    const eyeScale = (dog ? 0.12 : brute ? 0.3 : 0.17) * L.unit;
+    const eyes: Sprite[] = [];
+    for (const side of [-1, 1]) {
+      const eye = new Sprite(this.tex.glow);
+      eye.anchor.set(0.5); eye.blendMode = 'add'; eye.tint = eyeTint;
+      eye.scale.set(eyeScale); fade(eye, 0);
+      eyes.push(eye);
+      this.lights.addChild(eye);
+    }
     this.layer.addChild(s);
-    this.lights.addChild(eye);
     const lone = !brute && horde === 0 && !sprinter && !dog;
     this.list.push({
-      s, eye, sx: start.x, sy: start.y, tx: end.x, ty: end.y,
-      t: -delay * speed / Math.max(1, dist), dur: dist / speed,
+      s, eyes, sx: start.x, sy: start.y, tx: end.x, ty: end.y,
+      t: -delay * speed / Math.max(1, dist), dur: dist / speed, speed,
       killAt: sprinter ? null
         : dog ? 0.45 + Math.random() * 0.2
         : brute ? 0.82 + Math.random() * 0.12
@@ -119,7 +130,7 @@ export class Zombies {
       brute, horde, sprinter, dying: 0, seen: 0, watched: false, shot: false,
       baseScale: s.scale.x, fallFrom: 0, fallDir: 1, color,
       breached: false, targetBuilding: { x: L.cx, y: L.cy }, bangs: 0, bangT: 0,
-      intercepted: false, claw: 0, clawT: 0, dog,
+      intercepted: false, claw: 0, clawT: 0, dog, pounce: null,
     });
   }
 
@@ -151,11 +162,12 @@ export class Zombies {
         z.s.alpha = Math.max(0, z.dying / 0.9);
         z.s.rotation = z.fallFrom + z.fallDir * 0.9 * Math.sin(fall * Math.PI / 2);
         z.s.scale.set(z.baseScale * (1 - 0.15 * fall));
-        fade(z.eye, z.eye.alpha * Math.max(0, 1 - dt * 3));   // eyes dim out, not cut
+        for (const e of z.eyes) fade(e, e.alpha * Math.max(0, 1 - dt * 3));   // eyes dim out, not cut
         if (z.dying <= 0) {
           // leave a dark corpse on the ground
           this.addCorpse(z.s.x, z.s.y, z.s.rotation, z.baseScale, z.dog);
-          z.s.destroy(); z.eye.destroy();
+          z.s.destroy();
+          for (const e of z.eyes) e.destroy();
           this.list.splice(i, 1);
         }
         continue;
@@ -165,6 +177,35 @@ export class Zombies {
       z.s.visible = true;
       z.seen += dt;
       z.s.alpha = Math.min(1, z.seen / 0.8);
+      // a pounce: a short accelerating leap onto a survivor, body stretching
+      // into it, then the blood happens where it lands
+      if (z.pounce) {
+        const p = z.pounce;
+        p.t += dt / 0.32;
+        const k = Math.min(1, p.t);
+        const e = k * k;
+        const x = p.fx + (p.tx - p.fx) * e, y = p.fy + (p.ty - p.fy) * e;
+        z.s.position.set(x, y);
+        z.s.rotation = Math.atan2(p.ty - p.fy, p.tx - p.fx);
+        z.s.scale.set(z.baseScale * (1 + 0.4 * Math.sin(Math.PI * k)));
+        this.placeEyes(z, x, y, darkness);
+        if (k >= 1) {
+          z.s.scale.set(z.baseScale);
+          z.pounce = null;
+          if (p.person) {
+            this.onWalkIntercept?.(p.tx, p.ty);
+            this.kill(z, { x: p.tx, y: p.ty }, 1);
+            hits.kills.push({ x: p.tx, y: p.ty });
+          } else {
+            this.onWalkIntercept?.(p.tx, p.ty);
+            z.intercepted = true;
+            // carry on to the wall from where the leap landed
+            z.sx = p.tx; z.sy = p.ty; z.t = 0;
+            z.dur = Math.hypot(z.tx - z.sx, z.ty - z.sy) / z.speed;
+          }
+        }
+        continue;
+      }
       const ux = z.tx - z.sx, uy = z.ty - z.sy;
       const len = Math.hypot(ux, uy) || 1;
       const px = -uy / len, py = ux / len;
@@ -176,9 +217,8 @@ export class Zombies {
       const x = z.sx + ux * k + px * sway, y = z.sy + uy * k + py * sway;
       z.s.position.set(x, y);
       z.s.rotation = Math.atan2(uy, ux) + Math.sin(step) * (z.dog ? 0.06 : 0.12);
-      z.eye.position.set(x + Math.cos(z.s.rotation) * (z.dog ? 7 : 6) * L.unit, y + Math.sin(z.s.rotation) * (z.dog ? 7 : 6) * L.unit);
       // eyes lead the body out of the dark: at night they're the first thing you see
-      fade(z.eye, darkness * (z.brute ? 1 : 0.85) * Math.min(1, z.seen / 1.5));
+      this.placeEyes(z, x, y, darkness);
       // clamped sprinters at their target don't advance past t=1
       if (z.sprinter && z.breached && Math.hypot(z.tx - x, z.ty - y) < 22 * L.unit) z.t = 1;
 
@@ -192,13 +232,15 @@ export class Zombies {
 
       // guards won't let a zombie reach a survivor out on the road
       const threatening = people.some((p) => Math.hypot(p.x - x, p.y - y) < cover);
-      // a zombie closing on a VULNERABLE walker intercepts (kills the walker, keeps going)
-      if (!z.intercepted) {
-        const nearVuln = vulnerable.some((p) => Math.hypot(p.x - x, p.y - y) < cover);
-        if (nearVuln) {
-          this.onWalkIntercept?.(x, y);
-          z.intercepted = true;
+      // a vulnerable walker in pounce range gets leapt on: a short, fast,
+      // accelerating leap, then the blood happens where it lands
+      if (!z.intercepted && !z.pounce) {
+        let best: Point | null = null, bd = 70 * L.unit;
+        for (const p of vulnerable) {
+          const d = Math.hypot(p.x - x, p.y - y);
+          if (d < bd) { bd = d; best = p; }
         }
+        if (best) z.pounce = { fx: x, fy: y, tx: best.x, ty: best.y, t: 0, person: false };
       }
 
       if (threatening || (z.killAt !== null && z.t >= z.killAt)) {
@@ -235,10 +277,11 @@ export class Zombies {
             // towers get a chance to stop them: killAt at 55-90% of inside distance
             z.killAt = 0.55 + Math.random() * 0.35;
           } else {
-            // at the person: kill them
-            const dx = z.tx - x, dy = z.ty - y;
-            const dist = Math.hypot(dx, dy);
-            if (dist < 18 * this.compound.L.unit) {
+            // closing on the person: pounce when in range
+            const dist = Math.hypot(z.tx - x, z.ty - y);
+            if (dist < 60 * L.unit && !z.pounce) {
+              z.pounce = { fx: x, fy: y, tx: z.tx, ty: z.ty, t: 0, person: true };
+            } else if (dist < 18 * L.unit) {
               this.onWalkIntercept?.(x, y);
               this.kill(z, { x, y }, 1);
               hits.kills.push({ x, y });
@@ -269,6 +312,22 @@ export class Zombies {
       }
     }
     return hits;
+  }
+
+  /** Two eye glints set well apart across the heading (small soft glows merge
+   *  into one dot if they're closer than about twice their size), leading the
+   *  body out of the dark. */
+  private placeEyes(z: Zombie, x: number, y: number, darkness: number): void {
+    const L = this.compound.L;
+    const fwd = (z.dog ? 7 : 6.5) * L.unit;
+    const apart = (z.brute ? 9 : z.dog ? 4.2 : 5.6) * L.unit;
+    const c = Math.cos(z.s.rotation), s = Math.sin(z.s.rotation);
+    const a = darkness * (z.brute ? 1 : 0.85) * Math.min(1, z.seen / 1.5);
+    for (let i = 0; i < 2; i++) {
+      const o = i === 0 ? -apart : apart;
+      z.eyes[i].position.set(x + c * fwd - s * o, y + s * fwd + c * o);
+      fade(z.eyes[i], a);
+    }
   }
 
   /** The nearest tower; a brute also draws the next one, but only if it's
@@ -421,13 +480,17 @@ export class Walkers {
     return this.list.filter((w) => w.vulnerable && w.dead <= 0 && w.seg < w.path.length - 1).map((w) => ({ x: w.s.x, y: w.s.y }));
   }
 
-  /** A zombie reached a vulnerable walker: topple + blood + callback. */
+  /** A zombie reached a vulnerable walker: the pounce lands, blood sprays,
+   *  the survivor is thrown and goes down spinning. */
   killWalker(w: Walker): void {
     w.dead = 0.9;
-    w.s.rotation += 0.4;
-    this.fx?.emit(w.s.x, w.s.y, BLOOD, 6, 50, 0.2, 0.6);
-    this.fx?.splat(w.s.x, w.s.y, 1);
-    this.onWalkedKilled?.(w.s.x, w.s.y);
+    w.s.rotation += 0.6;
+    const x = w.s.x, y = w.s.y;
+    this.fx?.emit(x, y, 0xd02020, 18, 150, 0.26, 0.7);   // the spray, bright enough to see
+    this.fx?.emit(x, y, BLOOD, 8, 55, 0.42, 1.0);        // heavy drops that travel
+    this.fx?.splat(x, y, 2);
+    this.fx?.ring(x, y, 0x661111, 40 * (w.s.scale.x / 0.85), 2.5, 0.6);
+    this.onWalkedKilled?.(x, y);
   }
 
   /** Kill the nearest vulnerable walker to (x, y) within `range` px. Returns true if one was found. */
@@ -448,10 +511,13 @@ export class Walkers {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const w = this.list[i];
       if (w.dead > 0) {
-        // dying: topple and fade
+        // dying: thrown a step, spinning out and fading
         w.dead -= dt;
-        w.s.rotation += dt * 2.5;
-        w.s.alpha = Math.max(0, w.dead / 0.9);
+        const d = Math.max(0, w.dead / 0.9);
+        w.s.rotation += dt * 4.5;
+        w.s.x += Math.cos(w.s.rotation) * 70 * d * dt;
+        w.s.y += Math.sin(w.s.rotation) * 70 * d * dt;
+        w.s.alpha = d;
         if (w.prop) w.prop.alpha = Math.max(0, w.dead / 0.9);
         fade(w.lamp, 0);
         if (w.dead <= 0) {

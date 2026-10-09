@@ -89,8 +89,11 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
   const walkers = new Walkers(layers.actors, layers.lights, tex, fx);
   zombies.onWalkIntercept = (x, y) => walkers.killNearestVulnerable(x, y);
   walkers.onWalkedKilled = (x, y) => {
-    fx.ring(x, y, 0x661111, 20 * L.unit, 1.5, 0.5);
+    // the pounce lands: impact thud, a groan over it, the world dips for a beat
+    audio.sfx('breach', { count: 1, pan: (x / L.w - 0.5) * 0.6 });
     audio.sfx('groan', { pan: (x / L.w - 0.5) * 0.5 });
+    state.slowmo(0.3, 0.5);
+    if (settings.hScreenShake) shake = Math.min(5, shake + 3);
   };
   const sky = new Sky(dark, top, tex.rain, tex.glow);
   // thunder follows its flash after a distance delay, like real storms
@@ -161,7 +164,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
       case 'zombie':
         if (zombies.count() >= settings.hMaxZombies) return false;
         // at night the occasional blocked request is the sound of paws instead
-        if (sky.darkness > 0.6 && zombies.dogs() < 8 && Math.random() < 0.08) {
+        if (sky.darkness > 0.6 && zombies.dogs() < 8 && Math.random() < 0.12) {
           zombies.spawnPack(angle, color);
           audio.sfx('howl', { pan: Math.cos(angle) * 0.8 });
         } else if (Math.random() < 0.12) zombies.spawnSprinter(angle, color);

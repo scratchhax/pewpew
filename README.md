@@ -476,7 +476,7 @@ the walls, the internet is everything outside. The HUD is relabelled to match
 |-------|-----------|
 | block | a zombie shambles in from a bearing fixed by the remote IP. The nearest tower guard turns and fires; rounds fly to it and it topples when they land. The odd one reaches the fence, clings to it and claws until the wall guns drop it (a breach nudges the camera). At night, blocked traffic occasionally announces itself as a **pack run**: two or four feral dogs at a dead sprint, mostly silhouette and eye glints — the guards get one snap-shot volley, and misses just kick up dirt |
 | threat | a horde: a brute leading a weaving pack. The nearest towers open fire with bursts, the scene takes on a steady red cast and the floodlights turn red while the brute lives |
-| allow (border) | supply runs: outbound, a scavenger runs from the camp through a gate and off the map; inbound, a survivor carries a crate in. Survivors step around zombies, and the towers shoot any zombie that gets close to one |
+| allow (border) | supply runs: outbound, a scavenger runs from the camp through a gate and off the map; inbound, a survivor carries a crate in. Survivors step around zombies, and the towers shoot any zombie that gets close to one — but one that makes it pounces, and the blood spray says the rest |
 | allow (LAN↔LAN) | a courier strolls between two tents |
 | dns | a dashed radio call from the client's tent to the mast, whose blue light warms with traffic |
 | dhcp | a new survivor walks in through a gate and pitches a tent labelled with the device's hostname. Renewals ring the tent; names fade when a device goes quiet |
