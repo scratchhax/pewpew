@@ -5,35 +5,43 @@ import { fade } from './fx';
 interface Drop { s: Sprite; speed: number }
 interface Fog { s: Sprite; vx: number; phase: number }
 
-/** Darkness per traffic weather. Even a calm day is overcast and gloomy. */
-const GLOOM = { calm: 0.42, storm: 0.62, hurricane: 0.82 } as const;
+/** Darkness per traffic weather. Calm is a gloomy overcast; horde night is near-black. */
+const GLOOM = { calm: 0.52, storm: 0.74, hurricane: 0.94 } as const;
 /** Low mist per weather (scaled by the fog budget toggle). */
 const MIST = { calm: 0.7, storm: 0.85, hurricane: 1 } as const;
 
 /**
  * Traffic weather as time of day: CALM is a grey overcast day, STORM is dusk
- * with rain, HURRICANE is horde night (dark, heavy rain, thick fog). There's
- * always a cold wash that deepens toward the edges, and some mist. Also paints the red alarm
+ * with rain and occasional lightning, HURRICANE is horde night (near-black,
+ * heavy rain, thick dark fog, frequent lightning). There's always a cold wash
+ * that deepens toward the edges, and some mist. Also paints the red alarm
  * wash while a horde is attacking. Screen space, above the world.
  */
 export class Sky {
   darkness = GLOOM.calm;
+  /** Thunder follows the flash after a distance delay (index.ts schedules it). */
+  onThunder?: (pan: number) => void;
   /** One full-screen layer for both the cold darkness and the vignette (one fill pass on a Pi). */
   private overlay: Sprite;
   private alarmG = new Graphics();
+  private flashG = new Graphics();
   private rain: Drop[] = [];
   private fog: Fog[] = [];
   private rainLayer = new Container();
   private t = 0;
   private w = 0;
   private h = 0;
+  private flash = 0;
+  private echoT = 0;
+  private strikeT = 8 + Math.random() * 10;
   density = 1;
 
-  /** `dark` sits under the lights; `top` (rain, fog, alarm) over everything. */
+  /** `dark` sits under the lights; `top` (rain, fog, alarm, lightning) over everything. */
   constructor(dark: Container, private top: Container, private rainTex: Texture, private glow: Texture) {
     this.overlay = new Sprite(gloomTexture());
     dark.addChild(this.overlay);
-    top.addChild(this.alarmG, this.rainLayer);
+    this.flashG.blendMode = 'add';
+    top.addChild(this.alarmG, this.rainLayer, this.flashG);
   }
 
   resize(w: number, h: number): void {
@@ -67,7 +75,7 @@ export class Sky {
     for (let i = 0; i < 14; i++) {
       const s = new Sprite(this.glow);
       s.anchor.set(0.5);
-      s.tint = 0x7a8a82;
+      s.tint = 0x2a3230;   // dark mist: fog hides things, it doesn't glow
       s.position.set(Math.random() * this.w, Math.random() * this.h);
       s.scale.set(12 + Math.random() * 10);
       s.alpha = 0;
@@ -77,10 +85,28 @@ export class Sky {
   }
 
   /** `heart`: the soundtrack's heartbeat during a horde (softened), or null to breathe on its own. */
-  update(dt: number, weather: Weather, dayNight: boolean, rainOn: boolean, alarm: number, fogOn = true, heart: number | null = null): void {
+  update(dt: number, weather: Weather, dayNight: boolean, rainOn: boolean, alarm: number,
+         fogOn = true, lightningOn = true, heart: number | null = null): void {
     this.t += dt;
     const target = dayNight ? GLOOM[weather] : GLOOM.calm;
     this.darkness += (target - this.darkness) * Math.min(1, dt * 0.35);
+
+    // lightning: rare at storm dusk, frequent at horde night. The one
+    // deliberate blink in this theme, and it's behind a setting.
+    if (lightningOn && weather !== 'calm') {
+      this.strikeT -= dt;
+      if (this.strikeT <= 0) {
+        this.strikeT = weather === 'hurricane' ? 4 + Math.random() * 6 : 12 + Math.random() * 16;
+        this.flash = 1;
+        if (Math.random() < 0.4) this.echoT = 0.12 + Math.random() * 0.1;   // double strike
+        this.onThunder?.((Math.random() - 0.5) * 1.4);
+      }
+    }
+    if (this.echoT > 0) {
+      this.echoT -= dt;
+      if (this.echoT <= 0) this.flash = Math.max(this.flash, 0.75);
+    }
+    this.flash = Math.max(0, this.flash - dt * 4);
 
     // a cold blue-green cast that deepens toward the edges; the centre sits at
     // exactly `darkness` (until the corners reach black)
@@ -92,6 +118,10 @@ export class Sky {
       const breath = heart === null ? 1 + 0.1 * Math.sin(this.t * 1.2) : 0.95 + 0.15 * heart;
       this.alarmG.rect(0, 0, this.w, this.h).fill({ color: 0xff2a1a, alpha: 0.07 * alarm * breath });
     }
+
+    // lightning: a hard blue-white strike over everything, ~250 ms decay
+    this.flashG.clear();
+    if (this.flash > 0.01) this.flashG.rect(0, 0, this.w, this.h).fill({ color: 0xbfd4ff, alpha: 0.4 * this.flash });
 
     const wet = !rainOn ? 0 : weather === 'hurricane' ? 1 : weather === 'storm' ? 0.55 : 0;
     this.rainLayer.visible = wet > 0;
@@ -116,18 +146,18 @@ export class Sky {
 }
 
 /** Centre opacity of the gloom texture (the corners are fully opaque). */
-const GLOOM_CENTRE = 0.55;
+const GLOOM_CENTRE = 0.62;
 
-/** A cold dark wash: opaque in the middle, solid at the corners — tighter than the zombie theme. */
+/** A cold dark wash: a pool of dim centre light, the corners swallowed by black. */
 function gloomTexture(): Texture {
   const s = 256;
   const c = document.createElement('canvas');
   c.width = c.height = s;
   const ctx = c.getContext('2d')!;
-  const g = ctx.createRadialGradient(s / 2, s / 2, s * 0.22, s / 2, s / 2, s * 0.65);
+  const g = ctx.createRadialGradient(s / 2, s / 2, s * 0.16, s / 2, s / 2, s * 0.62);
   g.addColorStop(0, `rgba(5,12,10,${GLOOM_CENTRE})`);
-  g.addColorStop(0.5, `rgba(3,9,8,${GLOOM_CENTRE + (1 - GLOOM_CENTRE) * 0.55})`);
-  g.addColorStop(1, 'rgba(1,5,4,1)');
+  g.addColorStop(0.5, `rgba(3,9,8,${GLOOM_CENTRE + (1 - GLOOM_CENTRE) * 0.6})`);
+  g.addColorStop(1, 'rgba(1,4,3,1)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
   return Texture.from(c);

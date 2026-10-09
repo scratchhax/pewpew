@@ -27,6 +27,9 @@ interface Zombie {
   bangs: number;
   bangT: number;
   intercepted: boolean;  // already grabbed a vulnerable walker
+  // fence pressure: a wall-reacher clings and claws before the wall guns drop it
+  claw: number;
+  clawT: number;
 }
 
 export interface ZombieHits { kills: Point[]; breaches: Point[] }
@@ -49,6 +52,8 @@ export class Zombies {
   onBang?: (x: number, y: number) => void;
   /** A zombie intercepted a vulnerable walker at (x, y). */
   onWalkIntercept?: (x: number, y: number) => void;
+  /** A zombie is clawing at the wall at (x, y) (thuds + scratches). */
+  onClaw?: (x: number, y: number) => void;
   maxCorpses = 20;
 
   constructor(private layer: Container, private lights: Container, private tex: ZTextures,
@@ -65,7 +70,7 @@ export class Zombies {
   spawnHorde(angle: number, color: number): void {
     const id = ++this.hordeSeq;
     this.add(angle, color, true, id, 0, false);
-    const pack = 4 + ((Math.random() * 3) | 0);
+    const pack = 6 + ((Math.random() * 5) | 0);
     for (let i = 0; i < pack; i++) this.add(angle + (Math.random() - 0.5) * 0.35, color, false, id, 0.4 + i * 0.25, false);
   }
 
@@ -79,17 +84,17 @@ export class Zombies {
     const start = edgePoint(L.cx, L.cy, L.w, L.h, angle, 1.05);
     const end = wallPoint(L, start, 16 * L.unit);
     const dist = Math.hypot(end.x - start.x, end.y - start.y);
-    const speed = (sprinter ? 130 : horde ? 58 : 40) * L.unit * (0.85 + Math.random() * 0.3);
+    const speed = (sprinter ? 130 : horde ? 48 : 40) * L.unit * (0.85 + Math.random() * 0.3);
     const s = new Sprite(this.tex.frame(sprinter ? 'zombie_stand' : (Math.random() < 0.8 ? 'zombie' : 'zombie_stand')));
     s.anchor.set(0.45, 0.5);
-    s.scale.set((brute ? 1.7 : sprinter ? 0.8 : 0.95 + Math.random() * 0.2) * L.unit);
+    s.scale.set((brute ? 1.9 : sprinter ? 0.8 : 0.95 + Math.random() * 0.2) * L.unit);
     // sickly skin variety; brutes a paler, meaner green; sprinters a more yellow, feverish tint
     s.tint = brute ? 0xc8ff9a : sprinter ? 0xd8e8a0 : [0xffffff, 0xd8f0c8, 0xe8e0c0, 0xc8e8d8][(Math.random() * 4) | 0];
     s.position.set(start.x, start.y);
     s.rotation = Math.atan2(end.y - start.y, end.x - start.x);
     const eye = new Sprite(this.tex.glow);
     eye.anchor.set(0.5); eye.blendMode = 'add'; eye.tint = sprinter ? 0xffcc00 : brute ? 0xff9a45 : 0xff3a2a;
-    eye.scale.set((brute ? 0.34 : 0.2) * L.unit); fade(eye, 0);
+    eye.scale.set((brute ? 0.42 : 0.26) * L.unit); fade(eye, 0);
     this.layer.addChild(s);
     this.lights.addChild(eye);
     const lone = !brute && horde === 0 && !sprinter;
@@ -98,13 +103,13 @@ export class Zombies {
       t: -delay * speed / Math.max(1, dist), dur: dist / speed,
       killAt: sprinter ? null
         : brute ? 0.82 + Math.random() * 0.12
-        : lone ? (Math.random() < 0.88 ? 0.55 + Math.random() * 0.38 : null)
-        : 0.5 + Math.random() * 0.45,
+        : lone ? (Math.random() < 0.72 ? 0.55 + Math.random() * 0.38 : null)
+        : 0.72 + Math.random() * 0.28,
       phase: Math.random() * 10, weave: sprinter ? 10 : horde ? 22 : 6,
       brute, horde, sprinter, dying: 0, seen: 0, watched: false, shot: false,
       baseScale: s.scale.x, fallFrom: 0, fallDir: 1, color,
       breached: false, targetBuilding: { x: L.cx, y: L.cy }, bangs: 0, bangT: 0,
-      intercepted: false,
+      intercepted: false, claw: 0, clawT: 0,
     });
   }
 
@@ -114,6 +119,11 @@ export class Zombies {
   /** Where every zombie is, fallen ones included (survivors step around them). */
   positions(): Point[] {
     return this.list.filter((z) => z.t >= 0).map((z) => ({ x: z.s.x, y: z.s.y }));
+  }
+
+  /** Zombies currently clinging to the fence (for ambient groans and their panning). */
+  clawing(): Point[] {
+    return this.list.filter((z) => z.claw > 0).map((z) => ({ x: z.s.x, y: z.s.y }));
   }
 
   /** `people` are survivors on the move: a zombie closing on one draws cover fire. */
@@ -156,7 +166,8 @@ export class Zombies {
       z.s.position.set(x, y);
       z.s.rotation = Math.atan2(uy, ux) + Math.sin(step) * 0.12;
       z.eye.position.set(x + Math.cos(z.s.rotation) * 6 * L.unit, y + Math.sin(z.s.rotation) * 6 * L.unit);
-      fade(z.eye, darkness * 0.45 * Math.min(1, z.seen / 1.5));
+      // eyes lead the body out of the dark: at night they're the first thing you see
+      fade(z.eye, darkness * (z.brute ? 1 : 0.85) * Math.min(1, z.seen / 1.5));
       // clamped sprinters at their target don't advance past t=1
       if (z.sprinter && z.breached && Math.hypot(z.tx - x, z.ty - y) < 22 * L.unit) z.t = 1;
 
@@ -215,12 +226,26 @@ export class Zombies {
               hits.kills.push({ x, y });
             }
           }
-        } else {
-          // regular breach: wall guns finish it
+        } else if (z.claw <= 0) {
+          // reached the fence: cling to it and claw until the wall guns drop it
+          z.claw = 1.2 + Math.random();
+          z.clawT = 0;
           hits.breaches.push({ x, y });
           this.fx.emit(x, y, 0xc9b48a, 6, 40, 0.22, 0.8);
-          this.kill(z, { x, y }, z.brute ? 3 : 1);
-          hits.kills.push({ x, y });
+        } else {
+          // clawing at the wall: dust and thuds until the wall guns finish it
+          z.claw -= dt;
+          z.clawT += dt;
+          z.s.rotation += Math.sin(z.clawT * 26 + z.phase) * 0.07;
+          if (z.clawT > 0.3) {
+            z.clawT = 0;
+            this.fx.emit(x, y, 0xc9b48a, 2, 26, 0.14, 0.5);
+            this.onClaw?.(x, y);
+          }
+          if (z.claw <= 0) {
+            this.kill(z, { x, y }, z.brute ? 3 : 1);
+            hits.kills.push({ x, y });
+          }
         }
       }
     }
@@ -258,9 +283,9 @@ export class Zombies {
 
   private hit(z: Zombie, x: number, y: number): void {
     if (z.dying > 0) return;
-    this.fx.emit(x, y, BLOOD, z.brute ? 8 : 4, z.brute ? 70 : 45, 0.18, 0.6);
-    this.fx.splat(x, y, z.brute ? 1.8 : 1);
-    if (z.brute) this.fx.ring(x, y, z.color, 110 * this.compound.L.unit, 3.5, 0.9);
+    this.fx.emit(x, y, BLOOD, z.brute ? 10 : 5, z.brute ? 70 : 45, 0.18, 0.6);
+    this.fx.splat(x, y, z.brute ? 2.2 : 1.2);
+    if (z.brute) this.fx.ring(x, y, 0x661111, 110 * this.compound.L.unit, 3.5, 0.9);
     z.dying = 0.9;
     z.fallFrom = z.s.rotation;
     z.fallDir = Math.random() < 0.5 ? -1 : 1;

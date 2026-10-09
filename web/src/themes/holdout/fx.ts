@@ -94,7 +94,7 @@ export class Fx {
     s.anchor.set(0.5);
     s.x = x; s.y = y;
     s.rotation = Math.random() * Math.PI * 2;
-    s.scale.set((0.4 + Math.random() * 0.3) * size);
+    s.scale.set((0.55 + Math.random() * 0.4) * size);
     s.alpha = 0;
     this.decalLayer.addChild(s);
     this.decals.push({ s, age: 0 });

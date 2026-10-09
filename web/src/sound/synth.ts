@@ -729,6 +729,14 @@ export class Synth {
     this.out(env, bus, pan, 0.45);
   }
 
+  /** Distant thunder: a crack that rolls into a long low rumble. */
+  thunder(bus: Bus, t: number, g: number, pan: number): void {
+    if (!(g > 0.001)) return;
+    this.noiseHit(bus, t, { type: 'lowpass', f: 420, fTo: 90, g, a: 0.05, h: 0.15, r: 1.8, pan, rev: 0.9 });
+    this.noiseHit(bus, t + 0.08, { type: 'lowpass', f: 160, g: g * 0.7, a: 0.3, h: 0.2, r: 2.2, pan, rev: 1 });
+    this.tone(bus, t + 0.05, 44, { g: g * 0.8, a: 0.1, h: 0.3, r: 2, glide: 0.5, pan, rev: 0.8 });
+  }
+
   /** Radio chirp: two short tones and a crackle of static. */
   chirp(bus: Bus, t: number, f: number, f2: number, g: number, pan: number): void {
     this.tone(bus, t, f, { g, a: 0.004, h: 0.035, r: 0.03, pan, rev: 0.2, echo: 0.25 });

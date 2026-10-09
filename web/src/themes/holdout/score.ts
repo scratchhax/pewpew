@@ -302,6 +302,15 @@ class HoldoutConductor extends Conductor {
       for (const [m, g, r] of [[1, 0.06, 1.4], [2.43, 0.04, 0.9], [3.87, 0.03, 0.6], [5.61, 0.02, 0.35]] as const) {
         s.tone(this.sfxBus, t, f * m, { g: g * st.gBlock, a: 0.002, r, pan, rev: 0.6 });
       }
+    } else if (name === 'groan') {
+      const t = this.slot('groan', 4, 1.3);
+      if (t < 0) return;
+      const root = this.chordAt(t, 1)[pick([0, 0, 2])];
+      s.groan(this.sfxBus, t, root, 0.06 * st.gBlock, pan, 1.4 + Math.random() * 0.9);
+    } else if (name === 'thunder') {
+      const t = this.slot('thunder', 2, 3);
+      if (t < 0) return;
+      s.thunder(this.sfxBus, t, 0.16 * st.gBlock, pan);
     }
   }
 

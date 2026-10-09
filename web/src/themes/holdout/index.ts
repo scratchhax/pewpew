@@ -93,6 +93,13 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     audio.sfx('groan', { pan: (x / L.w - 0.5) * 0.5 });
   };
   const sky = new Sky(dark, top, tex.rain, tex.glow);
+  // thunder follows its flash after a distance delay, like real storms
+  sky.onThunder = (pan) => setTimeout(() => audio.sfx('thunder', { pan }), 500 + Math.random() * 1800);
+  zombies.onClaw = (x, y) => {
+    compound.addWallScratch(x, y);
+    audio.sfx('breach', { count: 1, pan: (x / L.w - 0.5) * 0.8 });
+    if (settings.hScreenShake) shake = Math.min(4, shake + 1.2);
+  };
   const groove = new Groove();
 
   let L: Layout = makeLayout(app.screen.width, app.screen.height);
@@ -110,6 +117,8 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
   // supply drop parachutes
   interface Parachute { x: number; y: number; vy: number; targetY: number; landed: boolean; landedT: number; crate: { x: number; y: number } | null }
   const parachutes: Parachute[] = [];
+  // ambient groans: distant voices at night, thicker when the fence is crowded
+  let groanT = 6 + Math.random() * 8;
 
   function applyBudgets(): void {
     fx.maxParticles = settings.hMaxParticles;
@@ -334,7 +343,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     for (const b of hits.breaches) {
       audio.sfx('breach', { pan: (b.x / L.w) * 2 - 1 });
       fx.debris(b.x, b.y, 14);
-      fx.emit(b.x, b.y, 0xff4422, 8, 100, 0.3, 0.5);
+      fx.emit(b.x, b.y, 0x8a1408, 8, 100, 0.3, 0.5);
       compound.addWallCrack(b.x, b.y);
       state.slowmo(0.35, 0.4);
       punch += 0.012;
@@ -391,6 +400,17 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     // corpses age out
     zombies.updateCorpses(dt);
 
+    // ambient groans: distant voices at night, thicker when the fence is crowded
+    groanT -= dt;
+    if (groanT <= 0) {
+      const clawing = zombies.clawing();
+      groanT = Math.max(3.5, 12 - clawing.length * 1.5) + Math.random() * 5;
+      if (sky.darkness > 0.6 && (clawing.length > 0 || Math.random() < 0.5)) {
+        const at = clawing.length > 0 ? clawing[(Math.random() * clawing.length) | 0] : null;
+        audio.sfx('groan', { pan: at ? (at.x / L.w - 0.5) * 1.2 : (Math.random() - 0.5) * 1.6 });
+      }
+    }
+
     // birds during calm
     fx.birdEnabled = state.weather === 'calm' && settings.hNightExtras;
     fx.updateBirds(dt, L.w, L.h);
@@ -401,7 +421,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     fx.update(dt);
     compound.update(dt, sky.darkness, alarm, groove);
     sky.update(dt, state.weather, settings.hDayNight, settings.hRain, alarm, settings.hNightExtras,
-      settings.hMusicVisuals && groove.style ? groove.heart : null);
+      settings.hLightning, settings.hMusicVisuals && groove.style ? groove.heart : null);
 
     // draw parachutes (canopy + lines + crate)
     const paraG = fx.parachuteG;

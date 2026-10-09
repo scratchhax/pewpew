@@ -22,9 +22,9 @@ interface Tent { name: string; slot: number; sprite: Sprite; label: Text; age: n
 
 const LABEL = new TextStyle({ fill: 0xf3e6c8, fontFamily: 'monospace', fontSize: 10, stroke: { color: 0x1b140c, width: 3 } });
 const BUILDING_LABEL = new TextStyle({ fill: 0xffe2b0, fontFamily: 'monospace', fontSize: 12, fontWeight: 'bold', stroke: { color: 0x1b140c, width: 3 } });
-const WALL_DARK = 0x3a3a3a, WALL_TRIM = 0xe86a17;
+const WALL_DARK = 0x33332f, WALL_TRIM = 0xb85a17;
 // dead, washed-out country: tints pull the pack's bright greens toward olive and grey
-const GRASS_TINT = 0xa09a78, CONCRETE_TINT = 0xb4ab9c, TREE_TINT = 0x8e9480, DEAD_TREE_TINT = 0x8a7a6a;
+const GRASS_TINT = 0x8a8568, CONCRETE_TINT = 0x9c948a, TREE_TINT = 0x7e8472, DEAD_TREE_TINT = 0x7a6c5e;
 const GROUND_WASH = 0x3c382c, OLD_BLOOD = 0x4a2a22;
 /** Tent names fade out once a device has been quiet this long (seconds). */
 const LABEL_RECENT = 30;
@@ -185,11 +185,11 @@ export class Compound {
     }
   }
 
-  /** Colour mostly drained and a little darkened: the grim look, applied at bake time only. */
+  /** Colour mostly drained and pulled down a notch: the grim look, applied at bake time only. */
   private drainFilter(): ColorMatrixFilter {
     const f = new ColorMatrixFilter();
     f.saturate(-0.55);
-    f.brightness(0.88, true);
+    f.brightness(0.8, true);
     return f;
   }
 
@@ -305,6 +305,17 @@ export class Compound {
   setWallDamage(d: number): void { this.wallDamage = Math.max(0, Math.min(1, d)); }
   getWallDamage(): number { return this.wallDamage; }
 
+  /** Claw marks where a zombie clings to the wall: short parallel rakes. */
+  addWallScratch(x: number, y: number): void {
+    const g = this.crackG;
+    for (let i = 0; i < 3; i++) {
+      const ox = (i - 1) * 3 + (Math.random() - 0.5) * 2;
+      const len = 5 + Math.random() * 6;
+      g.moveTo(x + ox, y).lineTo(x + ox + (Math.random() - 0.5) * 3, y + len)
+        .stroke({ width: 1, color: 0x14100c, alpha: 0.5 });
+    }
+  }
+
   private placeTowers(): void {
     for (const t of this.towers) { t.base.destroy(); t.guard.destroy(); t.cone.destroy(); }
     this.towers = this.L.towers.map((p) => {
@@ -364,7 +375,7 @@ export class Compound {
     label.anchor.set(0.5);
     const lamp = new Sprite(this.tex.glow);
     lamp.anchor.set(0.5); lamp.blendMode = 'add';
-    b = { host, slot, roof, label, lamp, heat: 0, glow: 0, color: 0xffffff, tint: 0xffffff };
+    b = { host, slot, roof, label, lamp, heat: 0, glow: 0, color: 0xffd8a0, tint: 0xffd8a0 };
     this.layers.props.addChild(roof);
     this.layers.labels.addChild(label);
     this.layers.lights.addChild(lamp);
@@ -490,11 +501,16 @@ export class Compound {
       tw.guard.rotation = tw.aim;
       tw.cone.rotation = tw.aim;
       tw.cone.scale.set(5.2 * this.L.unit, 1.7 * this.L.unit);
-      fade(tw.cone, night * 0.4 * (0.85 + 0.3 * energy));        // floodlights breathe with the music (slowly)
+      // floodlights breathe with the music (slowly) and flicker faintly, like failing bulbs
+      const flicker = 0.94 + 0.06 * Math.sin(this.t * 2.3 + i * 1.7) * Math.sin(this.t * 0.7 + i);
+      fade(tw.cone, night * 0.4 * (0.85 + 0.3 * energy) * flicker);
       tw.cone.tint = mix(0xfff0c8, 0xff6a50, Math.min(1, alarm));   // alarm shifts to red, steadily
     });
 
-    for (const lamp of this.gateLamps) lamp.alpha = 0.08 + night * 0.55;
+    for (let i = 0; i < this.gateLamps.length; i++) {
+      const flicker = 0.93 + 0.07 * Math.sin(this.t * 1.9 + i * 2.1);
+      this.gateLamps[i].alpha = (0.08 + night * 0.55) * flicker;
+    }
 
     this.mastHeat = Math.max(0, this.mastHeat - dt * 0.35);
     this.mastGlow = ease(this.mastGlow, this.mastHeat, dt, 1);
@@ -502,7 +518,9 @@ export class Compound {
     this.mastLight.tint = 0x55b5ff;
     this.mastLight.scale.set(0.9 * this.L.unit * (1 + this.mastGlow * 0.3));
     this.genLight.tint = 0xffd27a;
-    this.genLight.alpha = (0.1 + night * 0.35) * this.power;
+    // the generator stutters while the power dips
+    const genFlicker = this.brownout > 0 ? 0.7 + 0.3 * Math.sin(this.t * 23) : 1;
+    this.genLight.alpha = (0.1 + night * 0.35) * this.power * genFlicker;
     this.genLight.scale.set(1.4 * this.L.unit);
 
     for (const b of this.buildings.values()) {
@@ -510,7 +528,7 @@ export class Compound {
       b.glow = ease(b.glow, b.heat, dt, 0.9);
       b.tint = mix(b.tint, b.color, Math.min(1, dt * 0.8));
       b.lamp.tint = b.tint;
-      b.lamp.scale.set(2.4 * this.L.unit);
+      b.lamp.scale.set(1.8 * this.L.unit);
       fade(b.lamp, Math.min(0.45, b.glow * 0.3 + night * 0.2) * this.power);
     }
     const now = performance.now();

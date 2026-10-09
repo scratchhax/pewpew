@@ -19,6 +19,7 @@ export const HOLDOUT_DEFAULTS = {
   hBuildings: true,            // AP / gateway hosts as buildings
   hDayNight: true,             // weather darkens the map, lights come on
   hRain: true,
+  hLightning: true,            // storm strikes: the theme's one deliberate blink
   hBlood: true,
   hScreenShake: true,
 
@@ -78,7 +79,8 @@ export const HOLDOUT_CONTROLS = {
     select('hWifi', 'Wi-Fi', VISUALS),
     select('hSystem', 'System', VISUALS),
     toggle('hBuildings', 'Buildings'), toggle('hDayNight', 'Day / night'),
-    toggle('hRain', 'Rain'), toggle('hBlood', 'Blood'), toggle('hScreenShake', 'Screen shake'),
+    toggle('hRain', 'Rain'), toggle('hLightning', 'Lightning'),
+    toggle('hBlood', 'Blood'), toggle('hScreenShake', 'Screen shake'),
     toggle('hMusicVisuals', 'Move with the music'),
   ],
   budgets: [
