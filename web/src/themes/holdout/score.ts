@@ -311,6 +311,12 @@ class HoldoutConductor extends Conductor {
       const t = this.slot('thunder', 2, 3);
       if (t < 0) return;
       s.thunder(this.sfxBus, t, 0.16 * st.gBlock, pan);
+    } else if (name === 'howl') {
+      // a groan pushed up two octaves reads as a yipping, feral howl
+      const t = this.slot('howl', 3, 1.4);
+      if (t < 0) return;
+      const root = this.chordAt(t, 1)[pick([1, 2])];
+      s.groan(this.sfxBus, t, root * 2.5, 0.07 * st.gBlock, pan, 0.9 + Math.random() * 0.5);
     }
   }
 

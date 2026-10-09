@@ -13,6 +13,8 @@ export interface ZTextures {
   tent: Texture;
   /** A small brass round with a faint motion streak, pointing +x. */
   bullet: Texture;
+  /** Near-black feral dog silhouette, running toward +x. */
+  dog: Texture;
 }
 
 export async function loadTextures(): Promise<ZTextures> {
@@ -63,6 +65,7 @@ export async function loadTextures(): Promise<ZTextures> {
       ctx.arc(s * 0.88, cy, 2, -Math.PI / 2, Math.PI / 2);
       ctx.fill();
     }),
+    dog: canvasTexture(48, drawDog),
     dot: canvasTexture(8, (ctx, s) => {
       ctx.fillStyle = '#fff';
       ctx.beginPath();
@@ -112,6 +115,51 @@ function drawTent(ctx: CanvasRenderingContext2D, s: number): void {
   ctx.beginPath(); ctx.moveTo(cx, y0); ctx.lineTo(cx, y1 - s * 0.16); ctx.stroke();
   ctx.lineWidth = 1.5;
   ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+}
+
+/**
+ * A feral dog seen from above, running toward +x: lean body, head low and
+ * forward, legs mid-stride, tail trailing. Drawn near-black — in the dark it
+ * reads as a silhouette with eye glints added on top, and a lightning flash
+ * freezes the pack mid-stride.
+ */
+function drawDog(ctx: CanvasRenderingContext2D, s: number): void {
+  const u = s / 48;
+  const cy = s / 2;
+  ctx.fillStyle = '#231d13';
+  // body
+  ctx.beginPath();
+  ctx.ellipse(21 * u, cy, 12 * u, 5.5 * u, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // head low and forward, muzzle out front
+  ctx.beginPath();
+  ctx.arc(35 * u, cy, 4.6 * u, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(37 * u, cy - 1.8 * u, 8 * u, 3.6 * u);
+  // ears
+  ctx.beginPath();
+  ctx.moveTo(33 * u, cy - 4 * u); ctx.lineTo(36.5 * u, cy - 8 * u); ctx.lineTo(37 * u, cy - 3 * u); ctx.closePath();
+  ctx.moveTo(33 * u, cy + 4 * u); ctx.lineTo(36.5 * u, cy + 8 * u); ctx.lineTo(37 * u, cy + 3 * u); ctx.closePath();
+  ctx.fill();
+  // legs mid-stride: front pair forward, rear pair back
+  ctx.fillRect(26 * u, cy - 8 * u, 2.6 * u, 5 * u);
+  ctx.fillRect(30 * u, cy + 3 * u, 2.6 * u, 5 * u);
+  ctx.fillRect(11 * u, cy - 8 * u, 2.6 * u, 5 * u);
+  ctx.fillRect(15 * u, cy + 3 * u, 2.6 * u, 5 * u);
+  // tail trailing
+  ctx.strokeStyle = '#231d13';
+  ctx.lineWidth = 2.2 * u;
+  ctx.beginPath();
+  ctx.moveTo(10 * u, cy);
+  ctx.quadraticCurveTo(4 * u, cy - 1 * u, 2 * u, cy - 5 * u);
+  ctx.stroke();
+  // faint spine catch so the silhouette separates from the bake
+  ctx.strokeStyle = 'rgba(215,208,190,0.24)';
+  ctx.lineWidth = 1.2 * u;
+  ctx.beginPath();
+  ctx.moveTo(12 * u, cy - 3.5 * u);
+  ctx.quadraticCurveTo(22 * u, cy - 5.5 * u, 31 * u, cy - 3 * u);
+  ctx.stroke();
 }
 
 function splat(ctx: CanvasRenderingContext2D, s: number, seed: number): void {

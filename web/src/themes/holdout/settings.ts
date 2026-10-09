@@ -58,6 +58,7 @@ const select = (key: Key, label: string, options: Array<[string, string]>): Cont
 const VISUALS: Array<[string, string]> = [
   ['zombie', 'Zombie'],
   ['sprinter', 'Sprinter'],
+  ['pack', 'Pack run'],
   ['horde', 'Horde'],
   ['scavenger', 'Scavenger'],
   ['parachute', 'Supply drop'],

@@ -160,12 +160,21 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     switch (visual) {
       case 'zombie':
         if (zombies.count() >= settings.hMaxZombies) return false;
-        if (Math.random() < 0.12) zombies.spawnSprinter(angle, color);
+        // at night the occasional blocked request is the sound of paws instead
+        if (sky.darkness > 0.6 && zombies.dogs() < 8 && Math.random() < 0.08) {
+          zombies.spawnPack(angle, color);
+          audio.sfx('howl', { pan: Math.cos(angle) * 0.8 });
+        } else if (Math.random() < 0.12) zombies.spawnSprinter(angle, color);
         else zombies.spawn(angle, color);
         return true;
       case 'sprinter':
         if (zombies.count() >= settings.hMaxZombies) return false;
         zombies.spawnSprinter(angle, color);
+        return true;
+      case 'pack':
+        if (zombies.dogs() >= 8) return false;
+        zombies.spawnPack(angle, color);
+        audio.sfx('howl', { pan: Math.cos(angle) * 0.8 });
         return true;
       case 'horde':
         if (zombies.hordes() >= 2 || horde.active) { alarmKick = 0.5; return false; }

@@ -30,6 +30,7 @@ interface Zombie {
   // fence pressure: a wall-reacher clings and claws before the wall guns drop it
   claw: number;
   clawT: number;
+  dog: boolean;                // feral pack runner: fast, low, snaps past the guards
 }
 
 export interface ZombieHits { kills: Point[]; breaches: Point[] }
@@ -59,11 +60,19 @@ export class Zombies {
   constructor(private layer: Container, private lights: Container, private tex: ZTextures,
               private compound: Compound, private fx: Fx) {}
 
-  count(): number { return this.list.filter((z) => !z.brute && z.horde === 0 && z.dying <= 0).length; }
+  count(): number { return this.list.filter((z) => !z.brute && z.horde === 0 && !z.dog && z.dying <= 0).length; }
   hordes(): number { return new Set(this.list.filter((z) => z.brute && z.dying <= 0).map((z) => z.horde)).size; }
+  /** Feral runners on screen (a pack or two at most, whatever the settings say). */
+  dogs(): number { return this.list.filter((z) => z.dog && z.dying <= 0).length; }
 
   spawn(angle: number, color: number): void {
     this.add(angle, color, false, 0, 0);
+  }
+
+  /** A pack of feral dogs: fast, low, mostly silhouette and eye glints. */
+  spawnPack(angle: number, color: number): void {
+    const n = 2 + ((Math.random() * 3) | 0);
+    for (let i = 0; i < n; i++) this.add(angle + (Math.random() - 0.5) * 0.25, color, false, 0, i * 0.12, false, true);
   }
 
   /** A brute plus a pack, weaving in on one bearing. */
@@ -79,37 +88,38 @@ export class Zombies {
     this.add(angle, color, false, 0, 0, true);
   }
 
-  private add(angle: number, color: number, brute: boolean, horde: number, delay: number, sprinter = false): void {
+  private add(angle: number, color: number, brute: boolean, horde: number, delay: number, sprinter = false, dog = false): void {
     const L = this.compound.L;
     const start = edgePoint(L.cx, L.cy, L.w, L.h, angle, 1.05);
     const end = wallPoint(L, start, 16 * L.unit);
     const dist = Math.hypot(end.x - start.x, end.y - start.y);
-    const speed = (sprinter ? 130 : horde ? 48 : 40) * L.unit * (0.85 + Math.random() * 0.3);
-    const s = new Sprite(this.tex.frame(sprinter ? 'zombie_stand' : (Math.random() < 0.8 ? 'zombie' : 'zombie_stand')));
-    s.anchor.set(0.45, 0.5);
-    s.scale.set((brute ? 1.9 : sprinter ? 0.8 : 0.95 + Math.random() * 0.2) * L.unit);
+    const speed = (dog ? 230 : sprinter ? 130 : horde ? 48 : 40) * L.unit * (0.85 + Math.random() * 0.3);
+    const s = new Sprite(dog ? this.tex.dog : this.tex.frame(sprinter ? 'zombie_stand' : (Math.random() < 0.8 ? 'zombie' : 'zombie_stand')));
+    s.anchor.set(dog ? 0.5 : 0.45, 0.5);
+    s.scale.set((dog ? 0.75 + Math.random() * 0.2 : brute ? 1.9 : sprinter ? 0.8 : 0.95 + Math.random() * 0.2) * L.unit);
     // sickly skin variety; brutes a paler, meaner green; sprinters a more yellow, feverish tint
-    s.tint = brute ? 0xc8ff9a : sprinter ? 0xd8e8a0 : [0xffffff, 0xd8f0c8, 0xe8e0c0, 0xc8e8d8][(Math.random() * 4) | 0];
+    s.tint = dog ? 0xffffff : brute ? 0xc8ff9a : sprinter ? 0xd8e8a0 : [0xffffff, 0xd8f0c8, 0xe8e0c0, 0xc8e8d8][(Math.random() * 4) | 0];
     s.position.set(start.x, start.y);
     s.rotation = Math.atan2(end.y - start.y, end.x - start.x);
     const eye = new Sprite(this.tex.glow);
-    eye.anchor.set(0.5); eye.blendMode = 'add'; eye.tint = sprinter ? 0xffcc00 : brute ? 0xff9a45 : 0xff3a2a;
-    eye.scale.set((brute ? 0.42 : 0.26) * L.unit); fade(eye, 0);
+    eye.anchor.set(0.5); eye.blendMode = 'add'; eye.tint = dog ? 0xd8ff5a : sprinter ? 0xffcc00 : brute ? 0xff9a45 : 0xff3a2a;
+    eye.scale.set((dog ? 0.16 : brute ? 0.42 : 0.26) * L.unit); fade(eye, 0);
     this.layer.addChild(s);
     this.lights.addChild(eye);
-    const lone = !brute && horde === 0 && !sprinter;
+    const lone = !brute && horde === 0 && !sprinter && !dog;
     this.list.push({
       s, eye, sx: start.x, sy: start.y, tx: end.x, ty: end.y,
       t: -delay * speed / Math.max(1, dist), dur: dist / speed,
       killAt: sprinter ? null
+        : dog ? 0.45 + Math.random() * 0.2
         : brute ? 0.82 + Math.random() * 0.12
         : lone ? (Math.random() < 0.72 ? 0.55 + Math.random() * 0.38 : null)
         : 0.72 + Math.random() * 0.28,
-      phase: Math.random() * 10, weave: sprinter ? 10 : horde ? 22 : 6,
+      phase: Math.random() * 10, weave: dog ? 14 : sprinter ? 10 : horde ? 22 : 6,
       brute, horde, sprinter, dying: 0, seen: 0, watched: false, shot: false,
       baseScale: s.scale.x, fallFrom: 0, fallDir: 1, color,
       breached: false, targetBuilding: { x: L.cx, y: L.cy }, bangs: 0, bangT: 0,
-      intercepted: false, claw: 0, clawT: 0,
+      intercepted: false, claw: 0, clawT: 0, dog,
     });
   }
 
@@ -144,7 +154,7 @@ export class Zombies {
         fade(z.eye, z.eye.alpha * Math.max(0, 1 - dt * 3));   // eyes dim out, not cut
         if (z.dying <= 0) {
           // leave a dark corpse on the ground
-          this.addCorpse(z.s.x, z.s.y, z.s.rotation, z.baseScale);
+          this.addCorpse(z.s.x, z.s.y, z.s.rotation, z.baseScale, z.dog);
           z.s.destroy(); z.eye.destroy();
           this.list.splice(i, 1);
         }
@@ -159,13 +169,14 @@ export class Zombies {
       const len = Math.hypot(ux, uy) || 1;
       const px = -uy / len, py = ux / len;
       const k = Math.min(1, z.t);
-      // one shamble per two beats; a horde weaves slower, a brute slowest of all
-      const step = beat * Math.PI * (z.brute ? 0.6 : z.sprinter ? 1.6 : 1) + z.phase;
-      const sway = Math.sin(beat * Math.PI * (z.brute ? 0.25 : z.sprinter ? 1.4 : z.horde ? 0.4 : 1) + z.phase) * z.weave * L.unit * (1 - k * 0.6);
+      // one shamble per two beats; a horde weaves slower, a brute slowest of all,
+      // a dog fairly runs the beat into the ground
+      const step = beat * Math.PI * (z.brute ? 0.6 : z.sprinter ? 1.6 : z.dog ? 2.4 : 1) + z.phase;
+      const sway = Math.sin(beat * Math.PI * (z.brute ? 0.25 : z.sprinter ? 1.4 : z.dog ? 2.4 : z.horde ? 0.4 : 1) + z.phase) * z.weave * L.unit * (1 - k * 0.6);
       const x = z.sx + ux * k + px * sway, y = z.sy + uy * k + py * sway;
       z.s.position.set(x, y);
-      z.s.rotation = Math.atan2(uy, ux) + Math.sin(step) * 0.12;
-      z.eye.position.set(x + Math.cos(z.s.rotation) * 6 * L.unit, y + Math.sin(z.s.rotation) * 6 * L.unit);
+      z.s.rotation = Math.atan2(uy, ux) + Math.sin(step) * (z.dog ? 0.06 : 0.12);
+      z.eye.position.set(x + Math.cos(z.s.rotation) * (z.dog ? 7 : 6) * L.unit, y + Math.sin(z.s.rotation) * (z.dog ? 7 : 6) * L.unit);
       // eyes lead the body out of the dark: at night they're the first thing you see
       fade(z.eye, darkness * (z.brute ? 1 : 0.85) * Math.min(1, z.seen / 1.5));
       // clamped sprinters at their target don't advance past t=1
@@ -191,8 +202,15 @@ export class Zombies {
       }
 
       if (threatening || (z.killAt !== null && z.t >= z.killAt)) {
-        this.kill(z, { x, y }, z.brute ? 3 : 1);
-        hits.kills.push({ x, y });
+        if (z.dog && !threatening && Math.random() > 0.6) {
+          // the guards' snap-shot at a runner: rounds chase it, dirt kicks up,
+          // and most of the pack gets clean away
+          z.killAt = null;
+          this.snap(z, { x, y });
+        } else {
+          this.kill(z, { x, y }, z.brute ? 3 : 1);
+          hits.kills.push({ x, y });
+        }
       } else if (z.t >= 1) {
         if (z.sprinter) {
           // sprinter breaches: sprints into the compound to hunt a person
@@ -228,7 +246,8 @@ export class Zombies {
           }
         } else if (z.claw <= 0) {
           // reached the fence: cling to it and claw until the wall guns drop it
-          z.claw = 1.2 + Math.random();
+          // (dogs throw themselves at it in short frantic bursts)
+          z.claw = z.dog ? 0.8 + Math.random() * 0.8 : 1.2 + Math.random();
           z.clawT = 0;
           hits.breaches.push({ x, y });
           this.fx.emit(x, y, 0xc9b48a, 6, 40, 0.22, 0.8);
@@ -236,8 +255,8 @@ export class Zombies {
           // clawing at the wall: dust and thuds until the wall guns finish it
           z.claw -= dt;
           z.clawT += dt;
-          z.s.rotation += Math.sin(z.clawT * 26 + z.phase) * 0.07;
-          if (z.clawT > 0.3) {
+          z.s.rotation += Math.sin(z.clawT * (z.dog ? 42 : 26) + z.phase) * 0.07;
+          if (z.clawT > (z.dog ? 0.18 : 0.3)) {
             z.clawT = 0;
             this.fx.emit(x, y, 0xc9b48a, 2, 26, 0.14, 0.5);
             this.onClaw?.(x, y);
@@ -281,6 +300,23 @@ export class Zombies {
     }
   }
 
+  /** The guards' snap-shot at a runner: rounds chase it and kick up dirt
+   *  where it was; nobody drops. */
+  private snap(z: Zombie, p: Point): void {
+    const L = this.compound.L;
+    this.onShot?.(p.x, 1);
+    const last = { x: p.x, y: p.y };
+    const target = () => {
+      if (!z.s.destroyed) { last.x = z.s.x; last.y = z.s.y; }
+      return last;
+    };
+    for (const i of this.shooters(z, p)) {
+      const muzzle = this.compound.aim(i, p);
+      this.fx.bullet(muzzle.x, muzzle.y, target, 900 * L.unit,
+        (bx, by) => this.fx.emit(bx, by, 0x6a5a44, 4, 40, 0.16, 0.5));
+    }
+  }
+
   private hit(z: Zombie, x: number, y: number): void {
     if (z.dying > 0) return;
     this.fx.emit(x, y, BLOOD, z.brute ? 10 : 5, z.brute ? 70 : 45, 0.18, 0.6);
@@ -291,17 +327,17 @@ export class Zombies {
     z.fallDir = Math.random() < 0.5 ? -1 : 1;
   }
 
-  private addCorpse(x: number, y: number, rot: number, scale: number): void {
+  private addCorpse(x: number, y: number, rot: number, scale: number, dog = false): void {
     if (this.corpses.length >= this.maxCorpses) {
       const old = this.corpses.shift()!;
       old.s.destroy();
     }
-    const s = new Sprite(this.tex.frame('zombie'));
+    const s = new Sprite(dog ? this.tex.dog : this.tex.frame('zombie'));
     s.anchor.set(0.5);
     s.position.set(x, y);
-    s.rotation = rot + Math.PI / 2;
-    s.scale.set(scale * 0.7);
-    s.tint = 0x3a3a2a;
+    s.rotation = dog ? rot : rot + Math.PI / 2;
+    s.scale.set(scale * (dog ? 0.85 : 0.7));
+    s.tint = dog ? 0x2a2620 : 0x3a3a2a;
     s.alpha = 0.5;
     this.layer.addChild(s);
     this.corpses.push({ s, age: 0 });
