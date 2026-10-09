@@ -50,6 +50,10 @@ interface Corpse { s: Sprite; age: number }
 export class Zombies {
   private list: Zombie[] = [];
   private corpses: Corpse[] = [];
+  /** Per-tower trigger cooldown: the guards cycle, they don't stream fire. */
+  private towerCd: number[] = [];
+  /** Kills confirmed by a round landing; surfaced next frame as hits.kills. */
+  private pendingKills: Point[] = [];
   private hordeSeq = 0;
   unit = 1;
   /** Guards opened fire at screen x with this many rounds (for the soundtrack). */
@@ -176,9 +180,10 @@ export class Zombies {
   /** `people` are survivors on the move: a zombie closing on one draws cover fire. */
   /** `beat` is the scene's music clock: zombies shamble and bob in time with it. */
   update(dt: number, darkness: number, people: Point[] = [], beat = 0, vulnerable: Point[] = []): ZombieHits {
-    const hits: ZombieHits = { kills: [], breaches: [] };
+    const hits: ZombieHits = { kills: this.pendingKills.splice(0), breaches: [] };
     const L = this.compound.L;
     const cover = 130 * L.unit;
+    for (let i = 0; i < this.towerCd.length; i++) this.towerCd[i] = Math.max(0, (this.towerCd[i] ?? 0) - dt);
     for (let i = this.list.length - 1; i >= 0; i--) {
       const z = this.list[i];
       if (z.dying > 0) {
@@ -221,7 +226,6 @@ export class Zombies {
           if (p.person) {
             this.onWalkIntercept?.(p.tx, p.ty);
             this.kill(z, { x: p.tx, y: p.ty }, 1);
-            hits.kills.push({ x: p.tx, y: p.ty });
           } else {
             this.onWalkIntercept?.(p.tx, p.ty);
             z.intercepted = true;
@@ -277,7 +281,6 @@ export class Zombies {
           this.snap(z, { x, y });
         } else {
           this.kill(z, { x, y }, z.brute ? 3 : 1);
-          hits.kills.push({ x, y });
         }
       } else if (z.t >= 1) {
         if (z.inside) {
@@ -327,7 +330,6 @@ export class Zombies {
             } else if (dist < 18 * L.unit) {
               this.onWalkIntercept?.(x, y);
               this.kill(z, { x, y }, 1);
-              hits.kills.push({ x, y });
             }
           }
         } else if (z.claw <= 0) {
@@ -349,7 +351,6 @@ export class Zombies {
           }
           if (z.claw <= 0) {
             this.kill(z, { x, y }, z.brute ? 3 : 1);
-            hits.kills.push({ x, y });
           }
         }
       }
@@ -380,47 +381,79 @@ export class Zombies {
     return z.brute && b && b.d < a.d * 1.35 ? [a.i, b.i] : [a.i];
   }
 
-  /** Guards open fire: rounds fly to the zombie and it drops when the first lands. */
-  private kill(z: Zombie, p: Point, bursts: number): void {
-    z.shot = true;
-    this.onShot?.(p.x, this.shooters(z, p).length * bursts);
+  /** Guards open fire: each round is aimed where the zombie is going to be,
+   *  with a shake of the hand — rounds fly straight, so a target that keeps
+   *  cutting across its line can slip the volley. A tower still cycling from
+   *  its last volley doesn't fire; outrun the guns and you live. Returns true
+   *  if any rounds left a muzzle. */
+  private kill(z: Zombie, p: Point, bursts: number): boolean {
     const L = this.compound.L;
-    const last = { x: p.x, y: p.y };
-    // follow the zombie while it's on screen; stragglers land where it fell
-    const target = () => {
-      if (!z.s.destroyed) { last.x = z.s.x; last.y = z.s.y; }
-      return last;
-    };
-    let first = true;
-    for (const i of this.shooters(z, p)) {
+    const free = this.shooters(z, p).filter((i) => (this.towerCd[i] ?? 0) <= 0);
+    if (free.length === 0) return false;
+    z.shot = true;
+    this.onShot?.(p.x, free.length * bursts);
+    // where the zombie is heading, and how fast (capped: no teleport leads)
+    const vx = (z.tx - z.sx) / z.dur, vy = (z.ty - z.sy) / z.dur;
+    const spd = Math.min(300, Math.hypot(vx, vy) / L.unit);
+    const spread = (1.2 + spd / 150) * L.unit;
+    const hitR = (z.brute ? 18 : z.dog ? 9 : 13) * L.unit;
+    const rnd = () => Math.random() + Math.random() - 1;   // −1..1, centre-heavy
+    const bulletSpeed = 900 * L.unit;
+    for (const i of free) {
+      this.towerCd[i] = 0.8 + Math.random() * 0.5;
+      const muzzle = this.compound.aim(i, p);
+      this.fx.muzzleFlash(muzzle.x, muzzle.y);
+      this.fx.smokePuff(muzzle.x, muzzle.y);
       for (let b = 0; b < bursts; b++) {
-        const muzzle = this.compound.aim(i, p);
-        this.fx.bullet(muzzle.x, muzzle.y, target, 900 * L.unit,
-          first ? (x, y) => this.hit(z, x, y) : undefined, b * 0.12);
-        first = false;
+        const d = Math.hypot(p.x - muzzle.x, p.y - muzzle.y) || 1;
+        const fly = (d + b * 0.12 * bulletSpeed) / bulletSpeed;
+        const aim = {
+          x: p.x + vx * fly + rnd() * spread,
+          y: p.y + vy * fly + rnd() * spread,
+        };
+        this.fx.bullet(muzzle.x, muzzle.y, aim, bulletSpeed,
+          (x, y) => {
+            if (z.dying > 0 || z.s.destroyed) return;
+            if (Math.hypot(x - z.s.x, y - z.s.y) <= hitR) this.hit(z, x, y);
+            else {
+              // slipped the volley: it can be engaged again
+              z.shot = false;
+              this.fx.emit(x, y, 0x6a5a44, 3, 35, 0.14, 0.45);
+            }
+          },
+          b * 0.12);
       }
     }
+    return true;
   }
 
-  /** The guards' snap-shot at a runner: rounds chase it and kick up dirt
-   *  where it was; nobody drops. */
+  /** The guards' snap-shot at a runner: a volley aimed ahead of a dog that's
+   *  about to cut the other way — dirt kicks up, and most of the pack runs on. */
   private snap(z: Zombie, p: Point): void {
     const L = this.compound.L;
+    const free = this.shooters(z, p).filter((i) => (this.towerCd[i] ?? 0) <= 0);
+    if (free.length === 0) return;
     this.onShot?.(p.x, 1);
-    const last = { x: p.x, y: p.y };
-    const target = () => {
-      if (!z.s.destroyed) { last.x = z.s.x; last.y = z.s.y; }
-      return last;
-    };
-    for (const i of this.shooters(z, p)) {
+    const vx = (z.tx - z.sx) / z.dur, vy = (z.ty - z.sy) / z.dur;
+    for (const i of free) {
+      this.towerCd[i] = 0.8 + Math.random() * 0.5;
       const muzzle = this.compound.aim(i, p);
-      this.fx.bullet(muzzle.x, muzzle.y, target, 900 * L.unit,
+      this.fx.muzzleFlash(muzzle.x, muzzle.y);
+      this.fx.smokePuff(muzzle.x, muzzle.y);
+      const d = Math.hypot(p.x - muzzle.x, p.y - muzzle.y) || 1;
+      const fly = d / (900 * L.unit);
+      const aim = {
+        x: p.x + vx * fly + (Math.random() - 0.5) * 14 * L.unit,
+        y: p.y + vy * fly + (Math.random() - 0.5) * 14 * L.unit,
+      };
+      this.fx.bullet(muzzle.x, muzzle.y, aim, 900 * L.unit,
         (bx, by) => this.fx.emit(bx, by, 0x6a5a44, 4, 40, 0.16, 0.5));
     }
   }
 
   private hit(z: Zombie, x: number, y: number): void {
     if (z.dying > 0) return;
+    this.pendingKills.push({ x, y });
     this.fx.emit(x, y, BLOOD, z.brute ? 10 : 5, z.brute ? 70 : 45, 0.18, 0.6);
     this.fx.splat(x, y, z.brute ? 2.2 : 1.2);
     if (z.brute) this.fx.ring(x, y, 0x661111, 110 * this.compound.L.unit, 3.5, 0.9);

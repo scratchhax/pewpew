@@ -1,7 +1,7 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 
 interface Particle { s: Sprite; vx: number; vy: number; age: number; life: number; drag: number; peak: number }
-interface Bullet { s: Sprite; x: number; y: number; target: () => { x: number; y: number }; speed: number; delay: number; onHit?: (x: number, y: number) => void }
+interface Bullet { s: Sprite; x: number; y: number; target: { x: number; y: number }; speed: number; delay: number; onHit?: (x: number, y: number) => void }
 interface Ring { x: number; y: number; r: number; maxR: number; age: number; life: number; color: number; width: number }
 interface Dash { x1: number; y1: number; x2: number; y2: number; age: number; life: number; color: number }
 interface Decal { s: Sprite; age: number; forever?: boolean }
@@ -61,14 +61,16 @@ export class Fx {
   }
 
   /**
-   * A round fired from (x, y) that flies to a moving target and calls onHit on
-   * arrival. It's a small solid object in motion, not a flash, so shots read
-   * clearly without anything blinking. `delay` staggers a burst.
+   * A round fired from (x, y) that flies ballistically to a fixed point and
+   * calls onHit where it lands — it does not chase, so a target that moves
+   * out of the way makes it kick up dirt instead. It's a small solid object
+   * in motion, not a flash, so shots read clearly without anything blinking.
+   * `delay` staggers a burst.
    */
-  bullet(x: number, y: number, target: () => { x: number; y: number }, speed: number,
+  bullet(x: number, y: number, target: { x: number; y: number }, speed: number,
          onHit?: (x: number, y: number) => void, delay = 0): void {
     if (this.bullets.length >= MAX_BULLETS) {
-      if (onHit) { const t = target(); onHit(t.x, t.y); }
+      if (onHit) onHit(target.x, target.y);
       return;
     }
     const s = new Sprite(this.bulletTex);
@@ -255,7 +257,7 @@ export class Fx {
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i];
       if (b.delay > 0) { b.delay -= dt; continue; }
-      const t = b.target();
+      const t = b.target;
       const dx = t.x - b.x, dy = t.y - b.y;
       const dist = Math.hypot(dx, dy);
       const step = b.speed * dt;

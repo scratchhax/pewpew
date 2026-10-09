@@ -382,17 +382,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
       horde.beat = 0;
     }
 
-    // muzzle flash + smoke on tower fire
-    if (hits.kills.length > 0) {
-      for (const k of hits.kills) {
-        const near = compound.towersNear(k);
-        if (near.length > 0) {
-          const muzzle = compound.aim(near[0].i, k);
-          fx.muzzleFlash(muzzle.x, muzzle.y);
-          fx.smokePuff(muzzle.x, muzzle.y);
-        }
-      }
-    }
+    // muzzle flash + smoke happen at the tower the round leaves
 
     // parachutes descend
     for (let i = parachutes.length - 1; i >= 0; i--) {
