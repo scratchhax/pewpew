@@ -375,10 +375,14 @@ export class Zombies {
    *  if any rounds left a muzzle. */
   private kill(z: Zombie, p: Point, bursts: number): boolean {
     const L = this.compound.L;
+    // a tower only fires once its guard has actually swung onto the target;
+    // the ones still turning keep turning, they don't shoot sideways
     const free = this.shooters(z, p).filter((i) => (this.towerCd[i] ?? 0) <= 0);
-    if (free.length === 0) return false;
+    const ready = free.filter((i) => this.compound.aimedAt(i, p));
+    for (const i of free) if (!ready.includes(i)) this.compound.watch(i, p);
+    if (ready.length === 0) return false;
     z.shot = true;
-    this.onShot?.(p.x, free.length * bursts);
+    this.onShot?.(p.x, ready.length * bursts);
     // where the zombie is heading, and how fast — but only while it's
     // actually on a path: leading a zombie that has stopped (clawing at the
     // wall, standing over a kill) puts every round a dozen feet past it
@@ -390,7 +394,7 @@ export class Zombies {
     const hitR = (z.brute ? 18 : 13) * L.unit;
     const rnd = () => Math.random() + Math.random() - 1;   // −1..1, centre-heavy
     const bulletSpeed = 900 * L.unit;
-    for (const i of free) {
+    for (const i of ready) {
       this.towerCd[i] = 0.8 + Math.random() * 0.5;
       const muzzle = this.compound.aim(i, p);
       this.fx.muzzleFlash(muzzle.x, muzzle.y);

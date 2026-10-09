@@ -426,12 +426,21 @@ export class Compound {
     t.recoil = Math.max(t.recoil, 1);
   }
 
+  /** Is this guard turned close enough to the target to fire down the barrel? */
+  aimedAt(i: number, p: Point, tol = 0.3): boolean {
+    const t = this.towers[i];
+    const want = Math.atan2(p.y - t.base.y, p.x - t.base.x);
+    return Math.abs(angleDelta(t.aim, want)) < tol;
+  }
+
   /** Fire at a target; the guard turns onto it smoothly. Returns the muzzle. */
   aim(i: number, p: Point): Point {
     this.watch(i, p);
     const t = this.towers[i];
     const reach = 26 * this.L.unit;
-    return { x: t.base.x + Math.cos(t.target) * reach, y: t.base.y + Math.sin(t.target) * reach };
+    // the muzzle sits at the end of the barrel as it actually points, not
+    // where it wants to point: rounds leave the gun, not the intention
+    return { x: t.base.x + Math.cos(t.aim) * reach, y: t.base.y + Math.sin(t.aim) * reach };
   }
 
   /** Towers ordered by distance to a point (nearest first). */
