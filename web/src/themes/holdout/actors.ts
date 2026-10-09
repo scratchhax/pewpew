@@ -264,12 +264,12 @@ export class Zombies {
         if (best) z.pounce = { fx: x, fy: y, tx: best.x, ty: best.y, t: 0, person: false };
       }
 
-      if (threatening || z.inside || (z.killAt !== null && z.t >= z.killAt)) {
-        this.kill(z, { x, y }, z.brute ? 3 : 1);
-      } else if (z.t >= 1) {
-        if (z.inside) {
-          // loose inside the walls: hunt the nearest survivor; the wall guns
-          // get their chance through the `threatening` cover fire above
+      const engaged = threatening || (z.killAt !== null && z.t >= z.killAt);
+      if (z.inside) {
+        // loose inside the walls: the guns engage it anywhere, and it keeps
+        // hunting — both every frame, neither blocking the other
+        this.kill(z, { x, y }, 1);
+        if (z.t >= 1) {
           let nearest: Point | null = null, nd = Infinity;
           for (const p of people) {
             const d = Math.hypot(p.x - x, p.y - y);
@@ -280,11 +280,12 @@ export class Zombies {
             z.dur = nd / (95 * L.unit);
           } else if (nearest && !z.pounce) {
             z.pounce = { fx: x, fy: y, tx: nearest.x, ty: nearest.y, t: 0, person: true };
-          } else if (!nearest && z.killAt === null) {
-            // nothing left to hunt: the guns drop it where it stands
-            z.killAt = z.t + 0.2;
           }
-        } else if (z.sprinter) {
+        }
+      } else if (engaged) {
+        this.kill(z, { x, y }, z.brute ? 3 : 1);
+      } else if (z.t >= 1) {
+        if (z.sprinter) {
           // sprinter breaches: sprints into the compound to hunt a person
           if (!z.breached) {
             z.breached = true;
@@ -378,8 +379,12 @@ export class Zombies {
     if (free.length === 0) return false;
     z.shot = true;
     this.onShot?.(p.x, free.length * bursts);
-    // where the zombie is heading, and how fast (capped: no teleport leads)
-    const vx = (z.tx - z.sx) / z.dur, vy = (z.ty - z.sy) / z.dur;
+    // where the zombie is heading, and how fast — but only while it's
+    // actually on a path: leading a zombie that has stopped (clawing at the
+    // wall, standing over a kill) puts every round a dozen feet past it
+    const still = z.t >= 1 || z.pounce !== null;
+    const vx = still ? 0 : (z.tx - z.sx) / z.dur;
+    const vy = still ? 0 : (z.ty - z.sy) / z.dur;
     const spd = Math.min(300, Math.hypot(vx, vy) / L.unit);
     const spread = (1.2 + spd / 150) * L.unit;
     const hitR = (z.brute ? 18 : 13) * L.unit;
