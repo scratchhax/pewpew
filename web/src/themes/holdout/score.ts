@@ -4,192 +4,171 @@ import { Conductor, Style, pick, type Mood, type StyleDef } from '../../sound/co
 import type { Bed, Synth, Bus } from '../../sound/synth';
 
 /**
- * The Holdout's soundtrack. Three styles driven by scene pressure:
+ * The Holdout's soundtrack: horror, not rhythm. Three styles driven by scene
+ * pressure, all built from drones, sub-thumps, sour strings and long silences:
  *
- *   drone  (0–0.28)  : night watch — sub drones, whispers, a warped music box, a heartbeat
- *   siege  (0.28–0.55): war drums — taiko and stomps, string stabs, a far-off organ
- *   horde  (0.55–1.0): the charge — taiko ensemble, cello spiccato, grinding strings, choir
+ *   night  (0–0.28)  : no beat. A reese drone, noise breaths, one detuned
+ *                      piano note every few bars, knocks heard through walls.
+ *   siege  (0.28–0.55): the pulse starts — a sub-thump every few bars, a far
+ *                      taiko, a nail string left ringing on the minor second.
+ *   horde  (0.55–1.0): half-time war drums, bow-scratch stabs, a growl under
+ *                      everything, the heartbeat accelerating.
  *
- * Pressure is the compound's threat level: it rises with blocks and threats,
- * decays slowly. The conductor crossfades between styles over ~1.5 s when the
- * threshold is crossed. A pinned style (from settings) overrides pressure.
+ * Pressure is the compound's threat level. The conductor crossfades between
+ * styles when the threshold is crossed. A pinned style (from settings)
+ * overrides pressure. Nothing here is allowed to sound like a groove.
  */
 
-// ── drone ───────────────────────────────────────────────────────────────────
-class Drone extends Style {
+// ── night ───────────────────────────────────────────────────────────────────
+class Night extends Style {
   readonly id = 'drone';
+  readonly bpm = 50;
+  readonly root = 41.2;                                          // E1
+  readonly scale = [0, 1, 3, 5, 6, 8, 10];                       // phrygian, and a minor 2nd
+  readonly chords = [[0, 1, 5], [0, 1, 5], [-1, 0, 4], [0, 1, 5]];
+  readonly barsPerChord = 8;
+  readonly leadOct = 6;
+  readonly level = 1.05;
+  private breathT = 3;
+  private noteT = 5;
+  private knockT = 12;
+
+  enter(): void { this.breathT = 3; this.noteT = 5; this.knockT = 12; }
+
+  step(i: number, t: number, m: Mood): void {
+    const s = this.s, b = this.bus, pos = i % 16;
+    const tones = this.tones(i, 1);
+    // the drone: a reese two-note sour bed, re-tuned once every eight bars
+    if (this.isChordStart(i)) {
+      const hold = this.barsPerChord * 16 * this.stepDur;
+      s.reese(b, t, tones[0], 0.05, hold * 0.96);
+      s.tone(b, t, tones[0] / 2, { g: 0.05, a: 2, h: hold * 0.8, r: 3, lp: 120 });
+      // once it's been a while, a string joins and stays wrong
+      if (m.tension > 0.35) s.nail(b, t, this.scaleTone(5, 4), 0.012, hold * 0.5, 0.4);
+    }
+    // noise breaths, drifting across the room
+    this.breathT -= this.stepDur;
+    if (this.breathT <= 0) {
+      s.breath(b, t, 0.03 + m.night * 0.02, (Math.random() * 2 - 1) * 0.9);
+      this.breathT = 7 + Math.random() * 9;
+    }
+    // one piano note, high, far, drenched in the room — then nothing for a while
+    this.noteT -= this.stepDur;
+    if (this.noteT <= 0 && pos % 2 === 0) {
+      s.piano(b, t, this.scaleTone(pick([0, 1, 4, 5, 7]), 6), 0.028, (Math.random() - 0.5) * 1.2, 0.5);
+      this.noteT = 8 + Math.random() * 10;
+    }
+    // something is knocking on the outside of the compound
+    this.knockT -= this.stepDur;
+    if (this.knockT <= 0 && m.night > 0.35) {
+      s.knock(b, t, 0.05, (Math.random() * 2 - 1) * 0.8);
+      this.knockT = 14 + Math.random() * 18;
+    }
+    // whispers drift past at night
+    if (m.night > 0.4 && pos === 8 && Math.random() < 0.3) {
+      s.whisper(b, t, 0.02 + m.night * 0.02, (Math.random() * 2 - 1) * 0.9);
+    }
+    // the compound's own heartbeat once the dark is full in
+    if (m.night > 0.55 && pos % 8 === 0) s.heart(b, t, 0.05 * m.night);
+  }
+
+  lead(t: number, f: number, g: number, pan: number): void { this.s.piano(this.bus, t, f, g * 0.6, pan, 0.5); }
+}
+
+// ── siege ────────────────────────────────────────────────────────────────────
+class Siege extends Style {
+  readonly id = 'siege';
   readonly bpm = 60;
   readonly root = 41.2;                                          // E1
-  readonly scale = [0, 1, 4, 5, 7, 8, 10];                       // phrygian
+  readonly scale = [0, 1, 3, 5, 6, 8, 10];
   readonly chords = [[0, 1, 5], [0, 1, 5], [-1, 0, 4], [0, 1, 5]];
   readonly barsPerChord = 4;
-  readonly leadOct = 3;
-  readonly level = 1.1;
-  private bellT = 0;
-  private whisperT = 4;
+  readonly leadOct = 6;
+  readonly level = 1;
+  private noteT = 4;
 
-  enter(): void { this.bellT = 0; this.whisperT = 4; }
+  enter(): void { this.noteT = 4; }
 
   step(i: number, t: number, m: Mood): void {
     const s = this.s, b = this.bus, bar = Math.floor(i / 16), pos = i % 16;
     const tones = this.tones(i, 1);
     if (this.isChordStart(i)) {
       const hold = this.barsPerChord * 16 * this.stepDur;
-      s.pad(b, t, [tones[0] / 2, tones[0], tones[0] * 1.01], 0.04, hold, 300 + m.night * 200);
-      // a sub-drone an octave under: felt more than heard
-      s.pad(b, t, [tones[0] / 2, tones[0] / 2 * 1.007], 0.03, hold, 150);
-      // sometimes a cello note joins from far away
-      if (Math.random() < 0.5) s.cello(b, t, tones[0], 0.03, hold * 0.6, (Math.random() - 0.5) * 0.8);
+      s.reese(b, t, tones[0], 0.05, hold * 0.96);
+      s.tone(b, t, tones[0] / 2, { g: 0.05, a: 1.5, h: hold * 0.8, r: 2.5, lp: 120 });
+      // the nail string rings through every change
+      s.nail(b, t, this.scaleTone(5, 4), 0.014 + m.tension * 0.008, hold * 0.6, 0.35);
+      // a cello from the next room
+      if (Math.random() < 0.6) s.cello(b, t, tones[0], 0.03, hold * 0.5, (Math.random() - 0.5) * 0.8);
     }
-    // slow sub pulse on beats
-    if (pos % 4 === 0) s.bassPulse(b, t, tones[0] / 2, 0.06 + m.tension * 0.03);
-    // whispers drift through at night, panning like someone walking past
-    this.whisperT -= this.stepDur;
-    if (this.whisperT <= 0 && m.night > 0.3) {
-      s.whisper(b, t, 0.02 + m.night * 0.025, (Math.random() * 2 - 1) * 0.9);
-      this.whisperT = 6 + Math.random() * 10;
+    // the pulse: a sub-thump, not a beat — four bars apart
+    if (pos === 0 && bar % 4 === 0) s.subHit(b, t, 0.11);
+    if (pos === 8 && bar % 4 === 2) s.subHit(b, t, 0.07, 0.3);
+    // one taiko, far away, answering itself
+    if (pos === 8 && bar % 2 === 1) s.taiko(b, t, 0.05 + m.tension * 0.03, -0.4);
+    // the heartbeat, patient
+    if (pos % 8 === 0) s.heart(b, t, 0.045 + m.tension * 0.02);
+    // bows start moving when it gets close
+    if (m.tension > 0.55 && this.isChordStart(i)) {
+      s.bowHit(b, t, tones[0] * 2, 0.03, -0.3);
     }
-    // a warped music box picks out a camp melody, half the notes missing
-    if (bar % 2 === 1 && pos === 8 && Math.random() < 0.35) {
-      s.warpedBox(b, t, this.tones(i, 3)[pick([0, 1, 2])], 0.03,
-        0.06 + Math.random() * 0.1, (Math.random() - 0.5) * 0.7);
+    // a last sparse piano note, before the drums take over
+    this.noteT -= this.stepDur;
+    if (this.noteT <= 0 && pos % 2 === 0 && m.tension < 0.45) {
+      s.piano(b, t, this.scaleTone(pick([0, 1, 7]), 6), 0.024, (Math.random() - 0.5) * 1.2, 0.5);
+      this.noteT = 10 + Math.random() * 8;
     }
-    // cold bell, sparse
-    this.bellT -= this.stepDur;
-    if (this.bellT <= 0 && bar % 2 === 1 && pos === 8 && Math.random() < 0.4) {
-      s.bell(b, t, this.tones(i, 3)[pick([0, 2])], 0.04, 0, 0.5);
-      this.bellT = 2 + Math.random() * 2;
-    }
-    // wind chimes on the wire fence
-    if (bar % 4 === 2 && pos === 12 && Math.random() < 0.4) {
-      s.glass(b, t, this.tones(i, 4)[pick([1, 2])], 0.018, (Math.random() - 0.5) * 1.2);
-    }
-    // distant swell at night
-    if (m.night > 0.5 && bar % 4 === 0 && pos === 0) {
-      s.swell(b, t, tones[0] * 4, 0.02 * m.night, 4, 0.3);
-    }
-    // the compound's own heartbeat once the dark is full in
-    if (m.night > 0.55 && pos % 8 === 0) s.heart(b, t, 0.045 * m.night);
+    // every eight bars the room starts leaning forward
+    if (i % (16 * 8) === 16 * 6) s.riser(b, t, 16 * this.stepDur, 0.02);
   }
 
-  lead(t: number, f: number, g: number, pan: number): void { this.s.bell(this.bus, t, f, g * 0.7, pan, 0.5); }
-}
-
-// ── siege ────────────────────────────────────────────────────────────────────
-class Siege extends Style {
-  readonly id = 'siege';
-  readonly bpm = 96;
-  readonly root = 55;                                            // A1
-  readonly scale = [0, 2, 3, 5, 7, 8, 11];                       // harmonic minor
-  readonly chords = [[0, 3, 7], [-4, 0, 3], [5, 8, 12], [7, 11, 14]];
-  readonly barsPerChord = 2;
-  readonly leadOct = 3;
-  readonly level = 1;
-
-  step(i: number, t: number, m: Mood): void {
-    const s = this.s, b = this.bus, bar = Math.floor(i / 16), pos = i % 16;
-    const tones = this.tones(i, 2);
-    if (this.isChordStart(i)) {
-      const hold = this.barsPerChord * 16 * this.stepDur;
-      s.pad(b, t, [tones[0] / 2, tones[0], tones[1]], 0.03, hold, 500 + m.tension * 800);
-      // a church organ two rooms away, only on the chord change
-      s.organ(b, t, tones[0], 0.018, hold * 0.5, -0.3);
-    }
-    // pulsing ostinato: 8ths, filter opens with tension
-    if (pos % 2 === 0 || m.tension > 0.5) {
-      const pattern = [0, 1, 2, 1, 0, 2, 3, 2];
-      const k = pattern[(pos / 2) % 8 | 0];
-      const f = k === 3 ? tones[0] * 2 : tones[k % 3];
-      const cutoff = 600 + m.tension * 1400;
-      const accent = pos % 4 === 0 ? 1 : 0.7;
-      s.arp(b, t, f, (0.03 + m.tension * 0.02) * accent, cutoff, pos % 4 < 2 ? -0.2 : 0.2);
-    }
-    // war drums: taiko on the ground beats, stomps on the off beats
-    if (pos === 0) s.taiko(b, t, 0.13 + m.tension * 0.05, -0.25);
-    if (pos === 6 || pos === 8) s.taiko(b, t, 0.07 + m.tension * 0.04, 0.25);
-    if (pos === 4 || pos === 12) s.stomp(b, t, 0.07 + m.tension * 0.05);
-    if (m.tension > 0.3 && pos === 14) s.taiko(b, t, 0.05, 0);
-    // strings stab off the beat once the pressure is on
-    if (m.tension > 0.45 && pos % 4 === 2) {
-      s.strings(b, t, tones[0] * 2, 0.02 + m.tension * 0.02, pos % 8 === 2 ? -0.35 : 0.35);
-    }
-    // bass pulse
-    if (pos % 4 === 0) s.bassPulse(b, t, tones[0] / 4, 0.08 + m.tension * 0.04);
-    // cold bell figure
-    if (bar % 2 === 1 && [0, 4, 8, 12].includes(pos) && Math.random() < 0.5) {
-      s.bell(b, t, this.tones(i, 3)[pick([0, 1, 2])], 0.035, 0, 0.3);
-    }
-    // every 8 bars something is about to happen
-    if (i % 128 === 96) s.riser(b, t, 16 * this.stepDur, 0.022);
-    // intensity layer: 16th hats when it's really pressing
-    if (m.tension > 0.75 && pos % 2 === 1) s.hat(b, t, 0.02, 0, false);
-  }
-
-  lead(t: number, f: number, g: number, pan: number): void { this.s.pluck(this.bus, t, f, g * 0.8, pan); }
+  lead(t: number, f: number, g: number, pan: number): void { this.s.piano(this.bus, t, f, g * 0.5, pan, 0.5); }
 }
 
 // ── horde ────────────────────────────────────────────────────────────────────
 class Horde extends Style {
   readonly id = 'horde';
-  readonly bpm = 120;
-  readonly root = 55;                                            // A1
-  readonly scale = [0, 2, 3, 5, 7, 8, 10];                       // natural minor
-  readonly chords = [[0, 3, 7], [0, 3, 7], [-2, 2, 5], [7, 11, 14]];
-  readonly barsPerChord = 1;
-  readonly leadOct = 3;
-  readonly level = 0.9;
+  readonly bpm = 84;
+  readonly root = 41.2;                                          // E1
+  readonly scale = [0, 1, 3, 5, 6, 8, 10];
+  readonly chords = [[0, 1, 5], [0, 1, 5], [-1, 0, 4], [0, 1, 5]];
+  readonly barsPerChord = 2;
+  readonly leadOct = 6;
+  readonly level = 0.95;
 
   step(i: number, t: number, m: Mood): void {
     const s = this.s, b = this.bus, bar = Math.floor(i / 16), pos = i % 16;
-    const tones = this.tones(i, 2);
-    // driving 8th-note bass
-    if (pos % 2 === 0) {
-      const f = pos % 8 === 6 ? tones[0] * 1.5 : tones[0] / 2;
-      s.bassPulse(b, t, f, 0.1 + m.tension * 0.04);
-    }
-    // taiko ensemble: the pattern is the charge
-    if (pos === 0 || pos === 3 || pos === 8 || pos === 11) {
-      s.taiko(b, t, pos === 0 ? 0.14 : 0.07, pos % 8 === 0 ? -0.2 : 0.2);
-    }
-    // kick on 1 and 3
-    if (pos === 0 || pos === 8) s.kick(b, t, 0.14);
-    // stomps answer the gated snare on 2 and 4
-    if (pos === 4 || pos === 12) {
-      s.snare(b, t, 0.08 + m.tension * 0.04, 0);
-      s.stomp(b, t, 0.08 + m.tension * 0.04);
-    }
-    // cellos sawing 8th spiccato under everything
-    if (pos % 2 === 0) {
-      s.cello(b, t, tones[0], 0.03 + m.tension * 0.015, this.stepDur * 1.4, pos % 4 === 0 ? -0.25 : 0.25);
-    }
-    // hats on 16ths when tension is high
-    if (m.tension > 0.5 && pos % 2 === 1) s.hat(b, t, 0.03, 0, false);
-    // sawtooth stabs on chord changes
-    if (pos === 0 && bar % 2 === 0) {
-      s.sawLead(b, t, tones[0], 0.04, this.stepDur * 4, 0);
-    }
-    // every 4th bar the strings lurch: root plus its neighbour, grinding
-    if (bar % 4 === 0 && pos === 0) {
-      s.strings(b, t, tones[0] * 2, 0.045, -0.3);
-      s.strings(b, t, tones[0] * 2 * 1.06, 0.035, 0.3);
-    }
-    // tom fills
-    if (bar % 4 === 3 && pos >= 12) s.tom(b, t, 90 + pos * 15, 0.1, (pos - 14) * 0.15);
-    // pad for weight, choir under the chord changes
+    const tones = this.tones(i, 1);
+    // half-time war drums: one hit per bar, a stomp answering it
+    if (pos === 0) s.subHit(b, t, 0.13);
+    if (pos === 8) s.stomp(b, t, 0.09 + m.tension * 0.03);
+    if (pos === 12) s.taiko(b, t, 0.06, 0.35);
+    if (m.tension > 0.7 && pos === 6) s.subHit(b, t, 0.08, -0.3);
+    // the drone, changing its mind faster now
     if (this.isChordStart(i)) {
-      s.pad(b, t, [tones[0] / 2, tones[0]], 0.025, 16 * this.stepDur, 400);
-      s.choir(b, t, [tones[0] * 2, tones[1] * 2], 0.016, 16 * this.stepDur);
+      const hold = this.barsPerChord * 16 * this.stepDur;
+      s.reese(b, t, tones[0], 0.05, hold * 0.94);
+      s.tone(b, t, tones[0] / 2, { g: 0.05, a: 0.8, h: hold * 0.8, r: 1.5, lp: 130 });
+      // a bow dragged across the change
+      s.bowHit(b, t, tones[0] * 2, 0.035, -0.25);
+      s.bowHit(b, t + 0.2, tones[0] * 2 * 0.94, 0.025, 0.3);
     }
-    // intensity layer: doubled bass and open hats at the very top
-    if (m.tension > 0.8 && pos % 2 === 1) s.bassPulse(b, t, tones[0] / 2, 0.05);
+    // the growl: a voice under the floor
+    if (pos === 0 && bar % 2 === 0) s.groan(b, t, tones[0], 0.05, -0.2, 3.2);
+    // the nail, louder, closer
+    if (pos === 0 && bar % 4 === 0) s.nail(b, t, this.scaleTone(5, 4), 0.02, 16 * this.stepDur, 0.3);
+    // the heartbeat, and it is accelerating
+    if (pos % (m.tension > 0.8 ? 2 : 4) === 0) s.heart(b, t, 0.05 + m.tension * 0.03);
+    // every eight bars the door is coming off
+    if (i % (16 * 8) === 16 * 6) s.riser(b, t, 16 * this.stepDur, 0.028);
   }
 
-  lead(t: number, f: number, g: number, pan: number): void { this.s.sawLead(this.bus, t, f, g * 0.6, 0.15, pan); }
+  lead(t: number, f: number, g: number, pan: number): void { this.s.bowHit(this.bus, t, f, g * 0.4, pan); }
 }
 
 // ── the conductor ────────────────────────────────────────────────────────────
 const STYLES: StyleDef[] = [
-  { id: 'drone', name: 'Drone', make: (s, b) => new Drone(s, b) },
+  { id: 'drone', name: 'Night', make: (s, b) => new Night(s, b) },
   { id: 'siege', name: 'Siege', make: (s, b) => new Siege(s, b) },
   { id: 'horde', name: 'Horde', make: (s, b) => new Horde(s, b) },
 ];
@@ -202,7 +181,6 @@ export const MUSIC_STYLES: Array<[string, string]> = [
 class HoldoutConductor extends Conductor {
   private wind: Bed;
   private rain: Bed;
-  private pressure = 0;
   private lastStyle = 'drone';
 
   constructor(e: AudioEngine) {
@@ -270,7 +248,7 @@ class HoldoutConductor extends Conductor {
     if (i % 8 === 0) { this.s.heart(this.sfxBus, t, 0.11 * g); this.markHeart(t); }
     if (!this.notes) return;
     if (i % 32 === 16) this.s.riser(this.sfxBus, t, 16 * this.cur.stepDur, 0.03 * g);
-    if (i % 32 === 0 && i > 0) this.s.boom(this.sfxBus, t, 0.06 * g);
+    if (i % 32 === 0 && i > 0) this.s.subHit(this.sfxBus, t, 0.07 * g);
   }
 
   cue(kind: Cue, srcIp?: string): void {
@@ -302,11 +280,12 @@ class HoldoutConductor extends Conductor {
         return;
       }
       case 'dns': {
-        if (!this.notes || Math.random() >= st.gateDns * 0.35) return;
-        const t = this.slot('chirp', 2, 0.5);
+        // one high piano note per query, if the room is quiet enough
+        if (!this.notes || Math.random() >= st.gateDns * 0.25) return;
+        const t = this.slot('piano', 2, 0.5);
         if (t < 0) return;
         const c = this.chordAt(t, 5);
-        s.chirp(this.sfxBus, t, c[0], c[1], 0.02 * st.gDns, pan);
+        s.piano(this.sfxBus, t, c[pick([1, 2])] * 2, 0.018 * st.gDns, pan, 0.5);
         return;
       }
       case 'wifi': {
@@ -318,10 +297,13 @@ class HoldoutConductor extends Conductor {
         return;
       }
       case 'dhcp': {
-        if (!this.notes || Math.random() >= st.gateDhcp) return;
-        const t = this.slot('arrive', 4, 1.5);
+        // a new arrival: two knocks, then the creak of the gate
+        if (Math.random() >= st.gateDhcp) return;
+        const t = this.slot('knock', 4, 1.5);
         if (t < 0) return;
-        this.chordAt(t, 3).forEach((f, k) => s.musicBox(this.sfxBus, t + k * 0.07, f, 0.022 * st.gDhcp, pan + (k - 1) * 0.3));
+        s.knock(this.sfxBus, t, 0.06 * st.gDhcp, pan);
+        s.knock(this.sfxBus, t + 0.22, 0.045 * st.gDhcp, pan);
+        s.creak(this.sfxBus, t + 0.5, this.chordAt(t, 3)[0], 0.025 * st.gDhcp, pan, 0.9);
         return;
       }
       case 'system': {
@@ -370,20 +352,20 @@ class HoldoutConductor extends Conductor {
       const root = this.chordAt(t, 1)[pick([1, 2])];
       s.groan(this.sfxBus, t, root * 2.5, 0.07 * st.gBlock, pan, 0.9 + Math.random() * 0.5);
     } else if (name === 'wallbreak') {
-      // the wall goes: boom, a shock on the chord, and strings falling down
+      // the wall goes: a sub-thump, a shock, and bows falling down the scale
       const t = this.slot('wallbreak', 1, 1.2);
       if (t < 0) return;
-      s.boom(this.sfxBus, t, 0.14 * st.gBlock);
+      s.subHit(this.sfxBus, t, 0.15 * st.gBlock);
       s.shock(this.sfxBus, t, this.chordAt(t, 1)[0] * 2, 0.07 * st.gBlock);
       const c = this.chordAt(t, 2)[0];
-      s.strings(this.sfxBus, t, c, 0.05 * st.gBlock, pan);
-      s.strings(this.sfxBus, t + 0.14, c * 0.84, 0.04 * st.gBlock, pan);
-      s.strings(this.sfxBus, t + 0.28, c * 0.71, 0.035 * st.gBlock, pan);
+      s.bowHit(this.sfxBus, t, c * 2, 0.04 * st.gBlock, pan);
+      s.bowHit(this.sfxBus, t + 0.22, c * 1.7, 0.035 * st.gBlock, pan);
+      s.bowHit(this.sfxBus, t + 0.44, c * 1.4, 0.03 * st.gBlock, pan);
     } else if (name === 'survivorDown') {
-      // one of ours: a glass note, a low cello stab, and a skipped heartbeat
+      // one of ours: a knock, a low cello, and the heartbeat skipping
       const t = this.slot('survivorDown', 1, 0.8);
       if (t < 0) return;
-      s.glass(this.sfxBus, t, this.chordAt(t, 4)[pick([1, 2])], 0.045, pan);
+      s.knock(this.sfxBus, t, 0.08 * st.gBlock, pan);
       s.cello(this.sfxBus, t, this.chordAt(t, 1)[0], 0.09 * st.gBlock, 0.5, pan);
       this.markHeart(t);
     }
@@ -399,10 +381,10 @@ class HoldoutConductor extends Conductor {
         s.gunshot(this.sfxBus, when, 0.25 * this.setting<number>('hGunfire') * st.gBlock, pan, chord[0] * 2);
         break;
       case 'dns':
-        if (this.notes) s.chirp(this.sfxBus, when, chord[0] * 4, chord[1] * 4, 0.02 * st.gDns, pan);
+        if (this.notes) s.piano(this.sfxBus, when, chord[1] * 2, 0.016 * st.gDns, pan, 0.5);
         break;
       default:
-        if (this.notes) s.pluck(this.sfxBus, when, pick(chord), 0.04 * (kind === 'allow' ? st.gAllow : kind === 'wifi' ? st.gWifi : st.gDhcp), pan);
+        if (this.notes) s.piano(this.sfxBus, when, pick(chord) * 2, 0.02 * (kind === 'allow' ? st.gAllow : kind === 'wifi' ? st.gWifi : st.gDhcp), pan, 0.5);
     }
   }
 }

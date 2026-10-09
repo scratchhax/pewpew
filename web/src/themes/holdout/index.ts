@@ -88,6 +88,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
   };
   const walkers = new Walkers(layers.actors, layers.lights, tex, fx);
   zombies.onWalkIntercept = (x, y) => walkers.killNearestVulnerable(x, y);
+  zombies.onWalkDown = (x, y) => walkers.killNearestAny(x, y);
   let survivorsDown = 0;
   walkers.onWalkedKilled = (x, y) => {
     // the pounce lands: impact thud, a groan over it, the world dips for a beat
@@ -102,12 +103,12 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
   const sky = new Sky(dark, top, tex.rain, tex.glow);
   // thunder follows its flash after a distance delay, like real storms
   sky.onThunder = (pan) => setTimeout(() => audio.sfx('thunder', { pan }), 500 + Math.random() * 1800);
-  zombies.onClaw = (x, y) => {
+  zombies.onClaw = (x, y, by) => {
     compound.addWallScratch(x, y);
     audio.sfx('breach', { count: 1, pan: (x / L.w - 0.5) * 0.8 });
     if (settings.hScreenShake) shake = Math.min(4, shake + 1.2);
-    // the same claws are quietly opening a door
-    const gap = compound.addClawDamage(x, y, 0.05);
+    // the same claws are quietly opening a door (dog claws don't count)
+    const gap = by > 0 ? compound.addClawDamage(x, y, by) : null;
     if (gap) {
       zombies.breakInside(gap);
       fx.debris(gap.x, gap.y, 18);

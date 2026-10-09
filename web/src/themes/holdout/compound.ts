@@ -336,6 +336,16 @@ export class Compound {
     return { x: gx, y: gy };
   }
 
+  /** The nearest open gap within range (for things deciding to run for it). */
+  gapNear(p: Point, range = 130): Point | null {
+    let best: Point | null = null, bd = range * this.L.unit;
+    for (const g of this.gaps) {
+      const d = Math.hypot(g.x - p.x, g.y - p.y);
+      if (d < bd) { bd = d; best = { x: g.x, y: g.y }; }
+    }
+    return best;
+  }
+
   /** A point just inside the wall at a gap (where infiltrators emerge). */
   insidePoint(gap: Point): Point {
     const L = this.L;

@@ -474,7 +474,7 @@ the walls, the internet is everything outside. The HUD is relabelled to match
 
 | Event | On screen |
 |-------|-----------|
-| block | a zombie shambles in from a bearing fixed by the remote IP. The nearest tower guard turns and fires; rounds fly where the zombie is going to be — and they can miss, kicking up dirt where a runner cut across the line. Towers cycle, so four guards can be outrun, and that's how it stays interesting: the odd one reaches the fence, clings to it and claws until the wall guns drop it (a breach nudges the camera) — but walls aren't forever: one side clawed long enough splinters open, and what was clawing pours through the gap and hunts the courtyard until the crossfire drops it, while the hole planks itself over. At night, blocked traffic occasionally announces itself as a **pack run**: two or four feral dogs at a dead sprint, mostly silhouette and eye glints — the guards get one snap-shot volley, and misses just kick up dirt |
+| block | a zombie shambles in from a bearing fixed by the remote IP. The nearest tower guard turns and fires; rounds fly where the zombie is going to be — and they can miss, kicking up dirt where a runner cut across the line. Towers cycle, so four guards can be outrun, and that's how it stays interesting: the odd one reaches the fence, clings to it and claws until the wall guns drop it (a breach nudges the camera) — but walls aren't forever: one side clawed long enough splinters open, and what was clawing pours through the gap and hunts the courtyard — and it will get somebody if the crossfire doesn't get it first — while the hole planks itself over. At night, blocked traffic occasionally announces itself as a **pack run**: two or four feral dogs at a dead sprint, mostly silhouette and eye glints — the guards get one snap-shot volley, and misses just kick up dirt. A dog that reaches the fence claws in short frantic bursts, then runs for it; if the wall is open, it comes through instead |
 | threat | a horde: a brute leading a weaving pack. The nearest towers open fire with bursts, the scene takes on a steady red cast and the floodlights turn red while the brute lives |
 | allow (border) | supply runs: outbound, a scavenger runs from the camp through a gate and off the map; inbound, a survivor carries a crate in. Survivors step around zombies, and the towers shoot at any zombie that gets close to one — but the guns cycle and rounds miss, so one that makes it pounces, and the blood spray says the rest |
 | allow (LAN↔LAN) | a courier strolls between two tents |
@@ -508,15 +508,16 @@ keeps its own clock and eases toward the music's beat (never more than ±50%
 speed), so a new song never makes anything jump. With the sound off it keeps a
 steady walking tempo.
 
-**The soundtrack is scored to the siege.** Three styles crossfade with scene
-pressure: **Drone** is the night watch — sub drones, whispers drifting past, a
-warped music box, and a heartbeat once the dark is full in. **Siege** brings
-taiko and stomps, string stabs and a far-off organ. **Horde** is the charge: a
-taiko ensemble, cello spiccato, grinding dissonant strings and a choir under
-the chord changes. Each style layers in more as pressure climbs, and the
-events have their own stingers — a wall breaking lands as a boom with strings
-falling down, and a survivor going down is a glass note, a low cello stab and
-a skipped heartbeat.
+**The soundtrack is scored to the siege, and it is not in a hurry.** Three
+styles crossfade with scene pressure, all drones and silences: **Night** has
+no beat at all — a reese drone, noise breaths drifting past, one detuned
+piano note every few bars, knocks heard through the walls, a heartbeat once
+the dark is full in. **Siege** starts the pulse: a sub-bass thump every four
+bars, one taiko far away, a string left ringing on the minor second. **Horde**
+is half-time war drums, bow-scratch stabs, a growl under everything and a
+heartbeat that will not slow down. The events have their own stingers — a
+wall breaking lands as a sub-thump with bows falling down the scale, and a
+survivor going down is a knock, a low cello and a skipped heartbeat.
 
 ### Midnight Run
 

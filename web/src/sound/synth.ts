@@ -423,6 +423,38 @@ export class Synth {
     this.noiseHit(bus, t, { type: 'lowpass', f: 700, g: g * 0.4, a: 0.002, r: 0.12, pan, rev: 0.6 });
   }
 
+  // ── horror ─────────────────────────────────────────────────────────────────
+  /** Horror percussion: a sub-bass thump that drops in pitch under a body
+   *  transient — a door slamming somewhere below the floor. */
+  subHit(bus: Bus, t: number, g: number, pan = 0): void {
+    this.tone(bus, t, 110, { g, a: 0.002, r: 0.9, glide: 0.32, rev: 0.25, pan });
+    this.noiseHit(bus, t, { type: 'lowpass', f: 900, fTo: 120, g: g * 0.5, r: 0.09, pan });
+  }
+
+  /** A bow dragged across low strings: pitched noise that sags, with a
+   *  detuned saw underneath. */
+  bowHit(bus: Bus, t: number, f: number, g: number, pan = 0): void {
+    this.noiseHit(bus, t, { type: 'bandpass', f: f * 6, fTo: f * 2, q: 3.5, g, a: 0.06, h: 0.25, r: 0.7, pan, rev: 0.5 });
+    this.tone(bus, t, f, { type: 'sawtooth', g: g * 0.5, a: 0.08, h: 0.2, r: 0.6, lp: f * 8, lpTo: f * 3, detune: 30, pan, rev: 0.4 });
+  }
+
+  /** A high string left on a minor second: slow to arrive, sour, long decay. */
+  nail(bus: Bus, t: number, f: number, g: number, hold: number, pan = 0): void {
+    this.tone(bus, t, f, { type: 'sawtooth', g, a: 1.2, h: hold, r: 1.6, lp: 2400, detune: 14, pan, rev: 0.7 });
+    this.tone(bus, t, f * 1.06, { type: 'sawtooth', g: g * 0.6, a: 1.6, h: hold, r: 1.4, lp: 1800, pan, rev: 0.7 });
+  }
+
+  /** A knock heard through a wall: a dull wooden thud, far away. */
+  knock(bus: Bus, t: number, g: number, pan = 0): void {
+    this.tone(bus, t, 92, { g, a: 0.002, r: 0.22, glide: 0.55, lp: 500, pan, rev: 0.8 });
+    this.noiseHit(bus, t, { type: 'bandpass', f: 240, q: 2.5, g: g * 0.4, r: 0.12, pan, rev: 0.8 });
+  }
+
+  /** A breath: filtered noise that swells in and out of nothing. */
+  breath(bus: Bus, t: number, g: number, pan = 0): void {
+    this.noiseHit(bus, t, { type: 'lowpass', f: 480, fTo: 260, q: 0.6, g, a: 1.4, h: 0.4, r: 1.8, pan, rev: 0.6 });
+  }
+
   /** Pulsar ping: a pure tone with a long echo tail. */
   ping(bus: Bus, t: number, f: number, g: number, pan = 0): void {
     this.tone(bus, t, f, { g, a: 0.003, r: 0.5, pan, rev: 0.6, echo: 0.6 });

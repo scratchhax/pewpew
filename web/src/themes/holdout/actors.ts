@@ -33,6 +33,8 @@ interface Zombie {
   // fence pressure: a wall-reacher clings and claws before the wall guns drop it
   claw: number;
   clawT: number;
+  clawed: boolean;             // already arrived at this wall once
+  fleeing: boolean;            // dog that gave up: running back off-screen
   dog: boolean;                // feral pack runner: fast, low, snaps past the guards
   pounce: Pounce | null;       // mid-leap at a survivor
   inside: boolean;             // got through a broken wall: hunts inside the compound
@@ -62,8 +64,10 @@ export class Zombies {
   onBang?: (x: number, y: number) => void;
   /** A zombie intercepted a vulnerable walker at (x, y). */
   onWalkIntercept?: (x: number, y: number) => void;
-  /** A zombie is clawing at the wall at (x, y) (thuds + scratches). */
-  onClaw?: (x: number, y: number) => void;
+  /** A hunter that got inside (or a sprinter at arm's length) took a survivor down. */
+  onWalkDown?: (x: number, y: number) => void;
+  /** A zombie is clawing at the wall at (x, y); `by` is how much wall it damages. */
+  onClaw?: (x: number, y: number, by: number) => void;
   maxCorpses = 20;
 
   constructor(private layer: Container, private lights: Container, private tex: ZTextures,
@@ -135,13 +139,14 @@ export class Zombies {
       brute, horde, sprinter, dying: 0, seen: 0, watched: false, shot: false,
       baseScale: s.scale.x, fallFrom: 0, fallDir: 1, color,
       breached: false, targetBuilding: { x: L.cx, y: L.cy }, bangs: 0, bangT: 0,
-      intercepted: false, claw: 0, clawT: 0, dog, pounce: null, inside: false,
+      intercepted: false, claw: 0, clawT: 0, clawed: false, fleeing: false,
+      dog, pounce: null, inside: false,
     });
   }
 
   /** Anything with teeth at the walls or loose inside? (drives alarm + audio) */
   underAttack(): boolean {
-    return this.list.some((z) => z.dying <= 0 && (z.brute || z.inside || z.claw > 0 || z.dog));
+    return this.list.some((z) => z.dying <= 0 && !z.fleeing && (z.brute || z.inside || z.claw > 0 || z.dog));
   }
 
   /** A wall side just broke: the ones clawing at it come through and hunt. */
@@ -204,6 +209,13 @@ export class Zombies {
         continue;
       }
       z.t += dt / z.dur;
+      if (z.fleeing && z.t >= 1) {
+        // gone over the horizon; packs come and go, they don't linger
+        for (const e of z.eyes) e.destroy();
+        z.s.destroy();
+        this.list.splice(i, 1);
+        continue;
+      }
       if (z.t < 0) { z.s.visible = false; continue; }
       z.s.visible = true;
       z.seen += dt;
@@ -224,7 +236,7 @@ export class Zombies {
           z.s.scale.set(z.baseScale);
           z.pounce = null;
           if (p.person) {
-            this.onWalkIntercept?.(p.tx, p.ty);
+            this.onWalkDown?.(p.tx, p.ty);
             this.kill(z, { x: p.tx, y: p.ty }, 1);
           } else {
             this.onWalkIntercept?.(p.tx, p.ty);
@@ -293,7 +305,7 @@ export class Zombies {
           }
           if (nearest && nd > 30 * L.unit) {
             z.sx = x; z.sy = y; z.tx = nearest.x; z.ty = nearest.y; z.t = 0;
-            z.dur = nd / (95 * L.unit);
+            z.dur = nd / ((z.dog ? 140 : 95) * L.unit);
           } else if (nearest && !z.pounce) {
             z.pounce = { fx: x, fy: y, tx: nearest.x, ty: nearest.y, t: 0, person: true };
           } else if (!nearest && z.killAt === null) {
@@ -328,17 +340,29 @@ export class Zombies {
             if (dist < 60 * L.unit && !z.pounce) {
               z.pounce = { fx: x, fy: y, tx: z.tx, ty: z.ty, t: 0, person: true };
             } else if (dist < 18 * L.unit) {
-              this.onWalkIntercept?.(x, y);
+              this.onWalkDown?.(x, y);
               this.kill(z, { x, y }, 1);
             }
           }
+        } else if (z.dog && z.clawed && z.claw <= 0) {
+          // burst over and still breathing: through the gap if the wall is
+          // open, otherwise a dog at a closed fence runs for it
+          const gap = this.compound.gapNear({ x, y });
+          const to = gap ? this.compound.insidePoint(gap)
+            : edgePoint(L.cx, L.cy, L.w, L.h, Math.atan2(y - L.cy, x - L.cx), 1.15);
+          if (gap) z.inside = true;
+          else { z.fleeing = true; z.killAt = null; }
+          z.sx = x; z.sy = y; z.tx = to.x; z.ty = to.y; z.t = 0;
+          z.dur = Math.hypot(z.tx - z.sx, z.ty - z.sy) / ((gap ? 140 : 200) * L.unit);
         } else if (z.claw <= 0) {
-          // reached the fence: cling to it and claw until the wall guns drop it
-          // (dogs throw themselves at it in short frantic bursts)
+          // first arrival, or a zombie's burst expired: cling to the fence
           z.claw = z.dog ? 0.8 + Math.random() * 0.8 : 1.2 + Math.random();
           z.clawT = 0;
-          hits.breaches.push({ x, y });
-          this.fx.emit(x, y, 0xc9b48a, 6, 40, 0.22, 0.8);
+          if (!z.clawed) {
+            z.clawed = true;
+            hits.breaches.push({ x, y });
+            this.fx.emit(x, y, 0xc9b48a, 6, 40, 0.22, 0.8);
+          }
         } else {
           // clawing at the wall: dust and thuds until the wall guns finish it
           z.claw -= dt;
@@ -347,11 +371,9 @@ export class Zombies {
           if (z.clawT > (z.dog ? 0.18 : 0.3)) {
             z.clawT = 0;
             this.fx.emit(x, y, 0xc9b48a, 2, 26, 0.14, 0.5);
-            this.onClaw?.(x, y);
+            this.onClaw?.(x, y, z.dog ? 0 : 0.05);   // claws don't break a wall
           }
-          if (z.claw <= 0) {
-            this.kill(z, { x, y }, z.brute ? 3 : 1);
-          }
+          if (z.claw <= 0 && !z.dog) this.kill(z, { x, y }, z.brute ? 3 : 1);
         }
       }
     }
@@ -574,6 +596,19 @@ export class Walkers {
     let best: Walker | null = null, bestD = range;
     for (const w of this.list) {
       if (!w.vulnerable || w.dead > 0 || w.seg >= w.path.length - 1) continue;
+      const d = Math.hypot(w.s.x - x, w.s.y - y);
+      if (d < bestD) { best = w; bestD = d; }
+    }
+    if (best) { this.killWalker(best); return true; }
+    return false;
+  }
+
+  /** A hunter that got its teeth into the courtyard takes down whoever is
+   *  nearest, vulnerable or not. */
+  killNearestAny(x: number, y: number, range = 130): boolean {
+    let best: Walker | null = null, bestD = range;
+    for (const w of this.list) {
+      if (w.dead > 0 || w.seg >= w.path.length - 1) continue;
       const d = Math.hypot(w.s.x - x, w.s.y - y);
       if (d < bestD) { best = w; bestD = d; }
     }
