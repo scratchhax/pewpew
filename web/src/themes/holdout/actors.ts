@@ -395,7 +395,7 @@ export class Zombies {
     const rnd = () => Math.random() + Math.random() - 1;   // −1..1, centre-heavy
     const bulletSpeed = 900 * L.unit;
     for (const i of ready) {
-      this.towerCd[i] = 0.8 + Math.random() * 0.5;
+      this.towerCd[i] = 0.5 + Math.random() * 0.35;
       const muzzle = this.compound.aim(i, p);
       this.fx.muzzleFlash(muzzle.x, muzzle.y);
       this.fx.smokePuff(muzzle.x, muzzle.y);
