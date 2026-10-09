@@ -345,6 +345,12 @@ class HoldoutConductor extends Conductor {
       const t = this.slot('thunder', 2, 3);
       if (t < 0) return;
       s.thunder(this.sfxBus, t, 0.16 * st.gBlock, pan);
+    } else if (name === 'claw') {
+      // claws on the palings: a dry scrape over a small thud, quiet on purpose
+      const t = this.slot('claw', 2, 0.25);
+      if (t < 0) return;
+      s.noiseHit(this.sfxBus, t, { type: 'bandpass', f: 900, fTo: 260, q: 1.6, g: 0.03 * st.gBlock, a: 0.004, r: 0.16, pan });
+      s.tone(this.sfxBus, t, 70, { g: 0.035 * st.gBlock, a: 0.002, r: 0.12, glide: 0.6, lp: 300, pan });
     } else if (name === 'wallbreak') {
       // the wall goes: a sub-thump, a shock, and bows falling down the scale
       const t = this.slot('wallbreak', 1, 1.2);
@@ -356,11 +362,15 @@ class HoldoutConductor extends Conductor {
       s.bowHit(this.sfxBus, t + 0.22, c * 1.7, 0.035 * st.gBlock, pan);
       s.bowHit(this.sfxBus, t + 0.44, c * 1.4, 0.03 * st.gBlock, pan);
     } else if (name === 'survivorDown') {
-      // one of ours: a knock, a low cello, and the heartbeat skipping
+      // the death knell: a knock, a low cello, two piano notes a semitone
+      // apart, and the heartbeat skipping
       const t = this.slot('survivorDown', 1, 0.8);
       if (t < 0) return;
-      s.knock(this.sfxBus, t, 0.08 * st.gBlock, pan);
-      s.cello(this.sfxBus, t, this.chordAt(t, 1)[0], 0.09 * st.gBlock, 0.5, pan);
+      s.knock(this.sfxBus, t, 0.09 * st.gBlock, pan);
+      s.cello(this.sfxBus, t, this.chordAt(t, 1)[0], 0.1 * st.gBlock, 0.5, pan);
+      const c = this.chordAt(t, 5);
+      s.piano(this.sfxBus, t + 0.08, c[1] * 2, 0.035, pan, 0.6);
+      s.piano(this.sfxBus, t + 0.08, c[1] * 2 * 1.059, 0.028, pan, 0.6);
       this.markHeart(t);
     }
   }

@@ -38,7 +38,7 @@ interface Zombie {
   inside: boolean;             // got through a broken wall: hunts inside the compound
 }
 
-export interface ZombieHits { kills: Point[]; breaches: Point[] }
+export interface ZombieHits { kills: Point[]; breaches: Point[]; arrivals: Point[] }
 
 /**
  * Blocked traffic arrives as zombies from a bearing fixed by the remote IP;
@@ -172,7 +172,7 @@ export class Zombies {
   /** `people` are survivors on the move: a zombie closing on one draws cover fire. */
   /** `beat` is the scene's music clock: zombies shamble and bob in time with it. */
   update(dt: number, darkness: number, people: Point[] = [], beat = 0, vulnerable: Point[] = []): ZombieHits {
-    const hits: ZombieHits = { kills: this.pendingKills.splice(0), breaches: [] };
+    const hits: ZombieHits = { kills: this.pendingKills.splice(0), breaches: [], arrivals: [] };
     const L = this.compound.L;
     const cover = 130 * L.unit;
     for (let i = 0; i < this.towerCd.length; i++) this.towerCd[i] = Math.max(0, (this.towerCd[i] ?? 0) - dt);
@@ -322,7 +322,7 @@ export class Zombies {
           z.clawT = 0;
           if (!z.clawed) {
             z.clawed = true;
-            hits.breaches.push({ x, y });
+            hits.arrivals.push({ x, y });
             this.fx.emit(x, y, 0xc9b48a, 6, 40, 0.22, 0.8);
           }
         } else {

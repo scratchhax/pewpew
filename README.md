@@ -517,7 +517,10 @@ bars, one taiko far away, a string left ringing on the minor second. **Horde**
 is half-time war drums, bow-scratch stabs, a growl under everything and a
 heartbeat that will not slow down. The events have their own stingers — a
 wall breaking lands as a sub-thump with bows falling down the scale, and a
-survivor going down is a knock, a low cello and a skipped heartbeat.
+survivor going down is the one moment the score lets itself ring: a knock, a
+low cello, two piano notes a semitone apart and a skipped heartbeat. Claws on
+the fence stay a dry scrape — the loud bell is reserved for walls actually
+breaking.
 
 ### Midnight Run
 

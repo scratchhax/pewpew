@@ -91,8 +91,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
   zombies.onWalkDown = (x, y) => walkers.killNearestAny(x, y);
   let survivorsDown = 0;
   walkers.onWalkedKilled = (x, y) => {
-    // the pounce lands: impact thud, a groan over it, the world dips for a beat
-    audio.sfx('breach', { count: 1, pan: (x / L.w - 0.5) * 0.6 });
+    // the pounce lands: a groan over it, the death knell, the world dips
     audio.sfx('groan', { pan: (x / L.w - 0.5) * 0.5 });
     audio.sfx('survivorDown', { pan: (x / L.w - 0.5) * 0.5 });
     state.slowmo(0.3, 0.5);
@@ -105,8 +104,8 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
   sky.onThunder = (pan) => setTimeout(() => audio.sfx('thunder', { pan }), 500 + Math.random() * 1800);
   zombies.onClaw = (x, y, by) => {
     compound.addWallScratch(x, y);
-    audio.sfx('breach', { count: 1, pan: (x / L.w - 0.5) * 0.8 });
-    if (settings.hScreenShake) shake = Math.min(4, shake + 1.2);
+    audio.sfx('claw', { pan: (x / L.w - 0.5) * 0.8 });
+    if (settings.hScreenShake) shake = Math.min(3, shake + 0.6);
     // the same claws are quietly opening a door
     const gap = by > 0 ? compound.addClawDamage(x, y, by) : null;
     if (gap) {
@@ -367,6 +366,13 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
       state.slowmo(0.35, 0.4);
       punch += 0.012;
       if (settings.hScreenShake) shake = Math.min(6, shake + 4);
+    }
+    // a body hitting the fence: dust and a scrape, not the breach bell
+    for (const a of hits.arrivals) {
+      fx.debris(a.x, a.y, 6);
+      compound.addWallCrack(a.x, a.y);
+      audio.sfx('claw', { pan: (a.x / L.w) * 2 - 1 });
+      if (settings.hScreenShake) shake = Math.min(3, shake + 1);
     }
     // horde cleared
     if (horde.active && horde.beat === 2 && zombies.hordes() === 0 && hits.breaches.length === 0) {
