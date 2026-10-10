@@ -117,7 +117,7 @@ async function create(host: ThemeHost<typeof RAIN_DEFAULTS>, init: RendererInit)
 
     if (mode === 'fly') {
       // the dive is weather too: drizzle drifts through, deluge falls through
-      const flySpeed = settings.rWeather ? 0.45 + wet * 1.35 : 0.6;
+      const flySpeed = settings.rWeather ? 0.22 + wet * 0.68 : 0.3;
       const s = scene as Rain3D;
       s.step(dt, { flySpeed, density: settings.rDensity, trail: settings.rTrail });
       s.uniforms(f.t, {

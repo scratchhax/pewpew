@@ -26,15 +26,15 @@ export const RAIN_DEFAULTS = {
 
   // scene budgets = the HIGH preset
   rFarLayers: 2,             // procedural depth layers behind the log (fall mode)
-  rColumns: 64,              // columns in the 3D field (fly mode)
+  rColumns: 96,              // columns in the 3D field (fly mode)
 };
 
 export type RainSettings = CoreSettings & typeof RAIN_DEFAULTS;
 
 export const RAIN_BUDGETS: Budgets = {
-  low: { rFarLayers: 0, rFlicker: false, rDensity: 0.6, rColumns: 24 },
-  medium: { rFarLayers: 1, rFlicker: true, rDensity: 0.8, rColumns: 48 },
-  high: { rFarLayers: 2, rFlicker: true, rDensity: 1, rColumns: 64 },
+  low: { rFarLayers: 0, rFlicker: false, rDensity: 0.6, rColumns: 40 },
+  medium: { rFarLayers: 1, rFlicker: true, rDensity: 0.8, rColumns: 64 },
+  high: { rFarLayers: 2, rFlicker: true, rDensity: 1, rColumns: 96 },
   ultra: { rFarLayers: 3, rFlicker: true, rDensity: 1.2, rColumns: 96 },
 };
 
