@@ -131,6 +131,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
 .log-dhcp { color: #ffd84d; text-shadow: 0 0 6px rgba(255,216,77,0.35); }
 .log-wifi { color: #c08cff; text-shadow: 0 0 6px rgba(192,140,255,0.35); }
 .log-system { color: #7d99b3; }
+.log-radio { color: #8ad07a; font-style: italic; opacity: 0.85; text-shadow: 0 0 6px rgba(138,208,122,0.3); }
 
 /* Bounded, virtualized session inspector. Log payloads are always text nodes. */
 #expand-log { pointer-events: auto; float: right; cursor: pointer; color: var(--accent); background: transparent; border: 0; font: inherit; letter-spacing: 1px; }

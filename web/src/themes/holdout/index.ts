@@ -101,9 +101,49 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     hud.setExtraStat('SURVIVORS DOWN', ++survivorsDown);
     // and the dead don't stay down: they rise where they fell
     if (rising.length < 4) rising.push({ x, y, t: 2.5 + Math.random() * 1.5 });
+    say(pick(CHATTER.down).replace('{side}', sideName(x, y)));
   };
   // dread: every rise sinks the night a little deeper, and the score follows
   let dread = 0;
+  // radio chatter: the compound narrating its own bad night. Lines queue,
+  // the newest one wins, and the radio rests between transmissions
+  const chatterQ: string[] = [];
+  let chatterT = 5;
+  const say = (line: string) => { chatterQ.push(line); };
+  const pick = (lines: string[]) => lines[(Math.random() * lines.length) | 0];
+  const sideName = (x: number, y: number) =>
+    Math.abs(x - L.cx) > Math.abs(y - L.cy) ? (x < L.cx ? 'west' : 'east') : (y < L.cy ? 'north' : 'south');
+  const CHATTER = {
+    down: [
+      "we've lost one at the {side} wall",
+      "don't let it touch you, don't let it touch you",
+      "they're down in the open — nobody goes out there",
+      "God. That was one of ours.",
+    ],
+    rise: [
+      "movement inside the wire",
+      "that one was one of ours, I swear",
+      "it's getting up — it's getting UP",
+      "shut the gate. SHUT THE GATE.",
+      "they don't stay down. they never stay down",
+    ],
+    breach: [
+      "they're through on the {side}",
+      "the {side} wall is gone",
+      "teeth inside the perimeter, {side} side",
+    ],
+    horde: [
+      "contact, all bearings",
+      "that's not a straggler, that's a tide",
+      "brute out there, big one, everybody watch it",
+    ],
+    quiet: [
+      "…still nothing on the scope",
+      "too quiet. I don't like it",
+      "copy",
+      "…you hear that? nothing. that's good",
+    ],
+  };
   // eyes in the treeline: pairs that breathe in the dark beyond the walls
   const watchers: Array<{ a: Sprite; b: Sprite; age: number; hold: number; blink: number }> = [];
   let watcherTimer = 4;
@@ -368,6 +408,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
         horde.beat = 2;
         horde.beatT = 0;
         zombies.spawnHorde(horde.angle, COLORS.threat);
+        say(pick(CHATTER.horde));
         alarmKick = 0.7;
       } else if (horde.beat === 2) {
         // Beat 3: watch for breach (handled by hits below)
@@ -393,6 +434,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
       fx.emit(r.x, r.y, 0x9a1010, 8, 55, 0.25, 0.7);
       fx.ring(r.x, r.y, 0x661111, 34 * L.unit, 2, 0.7);
       if (settings.hScreenShake) shake = Math.min(3, shake + 1);
+      say(pick(CHATTER.rise));
     }
 
     const attacked = zombies.underAttack();
@@ -404,6 +446,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     // breach impact: debris, crack, shake, sound
     for (const b of hits.breaches) {
       audio.sfx('breach', { pan: (b.x / L.w) * 2 - 1 });
+      say(pick(CHATTER.breach).replace('{side}', sideName(b.x, b.y)));
       fx.debris(b.x, b.y, 14);
       fx.emit(b.x, b.y, 0x8a1408, 8, 100, 0.3, 0.5);
       compound.addWallCrack(b.x, b.y);
@@ -458,6 +501,15 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     const clawing = zombies.clawing().length + zombies.insideCount();
     const pressure = Math.min(1, (zombies.count() / Math.max(1, settings.hMaxZombies)) * 0.4 + (attacked ? 0.45 : 0) + (alarm * 0.3) + Math.min(0.15, clawing * 0.05) + dread * 0.25);
     (audio as unknown as { setPressure?: (p: number) => void }).setPressure?.(pressure);
+
+    // radio: one line at a time, newest event wins, silence between transmissions
+    if (!attacked && zombies.count() < 2 && Math.random() < dt * 0.03) say(pick(CHATTER.quiet));
+    chatterT -= dtReal;
+    if (chatterT <= 0 && chatterQ.length) {
+      hud.say(chatterQ.pop()!);
+      chatterQ.length = 0;
+      chatterT = 7 + Math.random() * 5;
+    }
 
     // eyes in the treeline: only in the dark, and the worse the night, the more
     // of them are watching from beyond the walls

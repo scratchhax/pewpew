@@ -224,6 +224,17 @@ export class Hud {
 
   private names = new Map<string, string>();   // MAC → hostname learned from DHCP
 
+  /** A synthetic line from the theme itself (radio chatter): terminal feed
+   *  only, never the log store - it is atmosphere, not evidence. */
+  say(text: string): void {
+    const t = new Date().toTimeString().slice(0, 8);
+    const key = text;
+    const tail = this.queue[this.queue.length - 1];
+    if (tail && tail.key === key) { tail.count++; tail.text = `${t}  ${key}`; return; }
+    this.queue.push({ text: `${t}  ${key}`, key, cls: 'log-radio', count: 1 });
+    if (this.queue.length > 1200) this.queue.shift();
+  }
+
   log(ev: NetEvent): void {
     // The store owns the retained copy; the compact feed renders from it so
     // both views show the same (bounded) text.

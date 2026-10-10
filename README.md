@@ -489,7 +489,10 @@ Every survivor that goes down leaves a stain that never dries and a tally on
 the **SURVIVORS DOWN** line — and the dead don't stay down: a few seconds
 later the stain moves, and what rises is pale, comes back as one of them, and
 hunts where it fell. Inside the walls that means the courtyard eats itself if
-the towers are busy.
+the towers are busy. The compound narrates its own bad night: the **COMMS LOG**
+picks up radio chatter — *"movement inside the wire"*, *"shut the gate. SHUT
+THE GATE."* — and on dark nights pairs of eyes breathe in and out of the
+treeline beyond the walls.
 
 **Dead country.** The ground and trees are drained to grey-brown, with old
 bloodstains outside the walls. That happens once when the scene is built, so
@@ -523,7 +526,8 @@ wall breaking lands as a sub-thump with bows falling down the scale, and a
 survivor going down is the one moment the score lets itself ring: a knock, a
 low cello, two piano notes a semitone apart and a skipped heartbeat. Claws on
 the fence stay a dry scrape — the loud bell is reserved for walls actually
-breaking.
+breaking. And every rise sinks a little dread into the mix, so a losing night
+drifts toward the siege styles even when the horde outside is thin.
 
 ### Midnight Run
 

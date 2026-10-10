@@ -71,7 +71,7 @@ export interface ThemeHost<T extends ThemeSettings = ThemeSettings> {
   /** Element the theme mounts its canvas into (full-window, under the HUD). */
   mount: HTMLElement;
   /** Small hooks into the HUD a theme may use. */
-  hud: { setExtraStat(label: string, value: string | number): void };
+  hud: { setExtraStat(label: string, value: string | number): void; say(text: string): void };
 }
 
 /** The slice of the audio engine a theme drives. */
