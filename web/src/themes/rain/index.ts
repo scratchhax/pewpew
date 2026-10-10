@@ -8,8 +8,7 @@ import { rainScore } from './score';
 /**
  * The Rain: the firewall log as digital rain, glmatrix style - columns of
  * glyphs falling out of the dark with a white spinner at the head and a
- * fading trail behind it, and behind them slices of rain flying out of a
- * wandering vanishing point, so it feels like moving into the rain. The
+ * fading trail behind it, depth layers drifting behind the near one. The
  * glyphs are not the matrix: they are tonight's log. Every event writes a
  * line - BLOCK, LOOKUP, LEASE, IDS - and the columns carry it down the
  * screen one character at a time, green for traffic that passes, red for
@@ -85,7 +84,6 @@ async function create(host: ThemeHost<typeof RAIN_DEFAULTS>, init: RendererInit)
   }
 
   let lastW = 0, lastH = 0;
-  let fly = 0; // dive phase: how deep into the rain we are
 
   function frame(f: FrameInfo): void {
     const dt = f.dt;
@@ -100,8 +98,6 @@ async function create(host: ThemeHost<typeof RAIN_DEFAULTS>, init: RendererInit)
     const wet = state.weather === 'hurricane' ? 1 : state.weather === 'storm' ? 0.5 : 0;
     const wSpeed = settings.rWeather ? 1 + wet * 0.7 : 1;
     const wDens = settings.rWeather ? 0.75 + wet * 0.25 : 1;
-    // and the dive into the rain is weather too: drizzle creeps, deluge falls
-    fly = (fly + dt * (0.18 + wet * 0.45) * settings.rSpeed) % 1e5;
 
     scene.step(dt, {
       speed: settings.rSpeed,
@@ -111,18 +107,13 @@ async function create(host: ThemeHost<typeof RAIN_DEFAULTS>, init: RendererInit)
       weatherSpeed: wSpeed,
       weatherDensity: wDens,
     });
-    const cam = settings.rCam === 'fly' ? 2 : settings.rCam === 'drift' ? 1 : 0;
     scene.uniforms(f.t, {
       trail: settings.rTrail,
       waves: settings.rWaves,
       fog: settings.rFog,
-      cam,
-      fly,
-      vpX: 0.5 + Math.sin(f.t * 0.031) * 0.12,
-      vpY: 0.5 + Math.cos(f.t * 0.023) * 0.09,
+      pan: settings.rPan,
       colorMode: settings.rColor === 'green' ? 1 : settings.rColor === 'ice' ? 2 : 0,
-      // flying is the show: even the low budget gets at least one layer to fly
-      farLayers: cam === 2 ? Math.max(1, settings.rFarLayers) : settings.rFarLayers,
+      farLayers: settings.rFarLayers,
     });
     scene.wander(f.wanderX / w, f.wanderY / h);
 

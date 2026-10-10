@@ -23,9 +23,8 @@ your own traffic. Pick a scene per screen:
   to lock onto a red file and trace the intruder
 - **The Rain**: xscreensaver's glmatrix pointed at the firewall — columns of
   glyphs fall out of the dark carrying tonight's log one character at a
-  time, green for traffic that passes, red for what burns, and behind them
-  slices of rain fly out of a wandering vanishing point, faster as the
-  weather worsens, until a hurricane is a fall into the sky
+  time, green for traffic that passes, red for what burns, foggy depth
+  layers behind, and a hurricane is a full downpour
 - **Mycelium**: a bioluminescent forest floor from above, where hosts put out
   growing filaments that weave a mat across the loam — permitted traffic runs
   through it as travelling light, habit decides the roads, mushrooms fruit at
@@ -62,8 +61,8 @@ and never touches the network itself.
 | ![aquarium](docs/aquarium.png) | ![aquarium shark](docs/aquarium-shark.png) |
 | **The Gibson** | **The Gibson: target lock** |
 | ![the gibson](docs/gibson.png) | ![gibson target lock](docs/gibson-lock.png) |
-| **The Rain** | **The Rain: flying in** |
-| ![the rain](docs/rain.png) | ![the rain flying in](docs/rain-fly.png) |
+| **The Rain** | **The Rain: depth layers behind the log** |
+| ![the rain](docs/rain.png) | ![the rain depth layers](docs/rain-depth.png) |
 | **Mycelium** | **Mycelium: a blight swarm crawls in** |
 | ![mycelium](docs/mycelium.png) | ![mycelium blight](docs/mycelium-blight.png) |
 | **Undergrowth** | **Undergrowth: deep in the shell** |
@@ -439,7 +438,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: per-event-type visuals, buildings, day/night, rain, lightning, blood, screen shake, move with the music, plus budgets for zombies, blood decals, tents and fog + flashlights. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. The Rain: fall speed, density, trail length, glyph size, colour, depth fog, brightness waves, glyph flicker, camera (static, drift, or fly into the rain), and whether the weather drives the downpour. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, the aurora sky, flight speed, bioluminescence, spore drift, and hypha half-life. FRAGNET: each event's effect, the weapon, gore, patrol speed and traces per level. Substrate: allow cracks, block scars, threat fractures, DNS blooms, DHCP seeds, Wi-Fi drift, host seeding, the pigment wash, crack hairlines, naming the busiest district, a new paper each picture, plus seconds per picture, pigment strength and wander. Slipstream: the circuit (or a home track picked by hostname), whether the camera follows the busiest host or the leader, draft surges, sprint and sponsor board, pit takeovers, oil spins, red shells, boost pads, yellow cautions, speed chevrons, background wobble, corner minimap and race pace |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: per-event-type visuals, buildings, day/night, rain, lightning, blood, screen shake, move with the music, plus budgets for zombies, blood decals, tents and fog + flashlights. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. The Rain: fall speed, density, trail length, glyph size, colour, depth fog, brightness waves, glyph flicker, camera drift, and whether the weather drives the downpour. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, the aurora sky, flight speed, bioluminescence, spore drift, and hypha half-life. FRAGNET: each event's effect, the weapon, gore, patrol speed and traces per level. Substrate: allow cracks, block scars, threat fractures, DNS blooms, DHCP seeds, Wi-Fi drift, host seeding, the pigment wash, crack hairlines, naming the busiest district, a new paper each picture, plus seconds per picture, pigment strength and wander. Slipstream: the circuit (or a home track picked by hostname), whether the camera follows the busiest host or the leader, draft surges, sprint and sponsor board, pit takeovers, oil spins, red shells, boost pads, yellow cautions, speed chevrons, background wobble, corner minimap and race pace |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -960,18 +959,15 @@ the pace of the patrol.
 
 xscreensaver's glmatrix, rebuilt as a shader and pointed at your firewall:
 columns of glyphs fall out of the dark, a white spinner at the head of each
-one and a fading trail behind it, while behind them slices of rain fly out of
-a wandering vanishing point — the classic feeling of moving into the rain.
-But the glyphs are not the matrix — they are tonight's log. Every
+one and a fading trail behind it, with foggy depth layers drifting behind the
+near field. But the glyphs are not the matrix — they are tonight's log. Every
 event becomes a line (`BLOCK 203.0.113.7 < 192.168.1.23`, `LOOKUP github.com`,
 `LEASE kitchen-tv 192.168.1.44`, `IDS sql-injection`) and the columns carry it
 down the screen one character at a time, in the log's own colours: green for
 traffic that passes, red for what gets denied, orange for intrusions. When
 nothing happens the columns fall as hex static — the shape an idle firewall
 makes. The weather is the traffic, so a quiet night is a drizzle of a few
-lazy columns and a hurricane is a full downpour, faster and thicker — and the
-dive into the rain is weather too: even a drizzle creeps forward, while a
-hurricane is a real fall into the sky.
+lazy columns and a hurricane is a full downpour, faster and thicker.
 
 The whole scene is one fragment shader: the CPU only writes glyph indices
 into a small data texture as each spinner falls, and the trail is computed
@@ -992,8 +988,8 @@ crack first, rumble a stride behind — for intrusions.
 
 In F1 → Scene: fall speed, density, trail length, glyph size, colour
 (green-with-red / classic green / ice), depth fog, brightness waves, glyph
-flicker, camera (static / drift / fly into the rain), and whether the weather
-is allowed to drive the downpour.
+flicker, camera drift, and whether the weather is allowed to drive the
+downpour.
 
 ### Mycelium
 

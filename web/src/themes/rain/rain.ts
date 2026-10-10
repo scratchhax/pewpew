@@ -45,9 +45,7 @@ interface RainUniforms {
   uTrail: number;
   uWaves: number;
   uFog: number;
-  uCam: number;
-  uFly: number;
-  uVp: Float32Array;
+  uPan: number;
   uColorMode: number;
   uFar: number;
 }
@@ -80,9 +78,7 @@ export class Rain {
       uTrail: { value: 12, type: 'f32' },
       uWaves: { value: 1, type: 'f32' },
       uFog: { value: 1, type: 'f32' },
-      uCam: { value: 2, type: 'f32' },
-      uFly: { value: 0, type: 'f32' },
-      uVp: { value: new Float32Array([0.5, 0.5]), type: 'vec2<f32>' },
+      uPan: { value: 1, type: 'f32' },
       uColorMode: { value: 0, type: 'f32' },
       uFar: { value: 2, type: 'f32' },
     });
@@ -234,15 +230,13 @@ export class Rain {
     this.u.uWander.set([x, y]);
   }
 
-  uniforms(t: number, o: { trail: number; waves: boolean; fog: boolean; cam: number; fly: number; vpX: number; vpY: number; colorMode: number; farLayers: number }): void {
+  uniforms(t: number, o: { trail: number; waves: boolean; fog: boolean; pan: boolean; colorMode: number; farLayers: number }): void {
     const u = this.u;
     u.uTime = t;
     u.uTrail = o.trail;
     u.uWaves = o.waves ? 1 : 0;
     u.uFog = o.fog ? 1 : 0;
-    u.uCam = o.cam;
-    u.uFly = o.fly;
-    u.uVp.set([o.vpX, o.vpY]);
+    u.uPan = o.pan ? 1 : 0;
     u.uColorMode = o.colorMode;
     u.uFar = o.farLayers;
   }

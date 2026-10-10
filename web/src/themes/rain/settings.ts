@@ -16,7 +16,7 @@ export const RAIN_DEFAULTS = {
   rFog: true,                // depth fog on the far layers
   rWaves: true,              // rolling brightness waves down the columns
   rFlicker: true,            // trail glyphs mutate while they fade
-  rCam: 'fly' as string,     // off | drift | fly (into the rain)
+  rPan: true,                // slow parallax drift between the layers
   rWeather: true,            // traffic weather drives the downpour
 
   // soundtrack
@@ -58,8 +58,7 @@ export const RAIN_CONTROLS = {
     range('rGlyph', 'Glyph size', 10, 28, 1),
     select('rColor', 'Colour', [['event', 'Green, red for blocks'], ['green', 'Classic green'], ['ice', 'Ice']]),
     toggle('rFog', 'Depth fog'), toggle('rWaves', 'Brightness waves'),
-    toggle('rFlicker', 'Glyph flicker'),
-    select('rCam', 'Camera', [['off', 'Static'], ['drift', 'Drift'], ['fly', 'Fly into the rain']]),
+    toggle('rFlicker', 'Glyph flicker'), toggle('rPan', 'Camera drift'),
     toggle('rWeather', 'Weather is traffic'),
   ],
   budgets: [
