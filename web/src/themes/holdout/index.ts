@@ -101,15 +101,16 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     hud.setExtraStat('SURVIVORS DOWN', ++survivorsDown);
     // and the dead don't stay down: they rise where they fell
     if (rising.length < 4) rising.push({ x, y, t: 2.5 + Math.random() * 1.5 });
-    say(pick(CHATTER.down).replace('{side}', sideName(x, y)));
+    say(pick(CHATTER.down).replace('{side}', sideName(x, y)), (x / L.w - 0.5) * 0.6);
   };
   // dread: every rise sinks the night a little deeper, and the score follows
   let dread = 0;
   // radio chatter: the compound narrating its own bad night. Lines queue,
-  // the newest one wins, and the radio rests between transmissions
-  const chatterQ: string[] = [];
+  // the newest one wins, and the radio rests between transmissions - each
+  // one murmuring out of the handset as it lands in the log
+  const chatterQ: Array<{ line: string; pan: number; urgent: boolean }> = [];
   let chatterT = 5;
-  const say = (line: string) => { chatterQ.push(line); };
+  const say = (line: string, pan = 0, urgent = false) => { chatterQ.push({ line, pan, urgent }); };
   const pick = (lines: string[]) => lines[(Math.random() * lines.length) | 0];
   const sideName = (x: number, y: number) =>
     Math.abs(x - L.cx) > Math.abs(y - L.cy) ? (x < L.cx ? 'west' : 'east') : (y < L.cy ? 'north' : 'south');
@@ -408,7 +409,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
         horde.beat = 2;
         horde.beatT = 0;
         zombies.spawnHorde(horde.angle, COLORS.threat);
-        say(pick(CHATTER.horde));
+        say(pick(CHATTER.horde), 0, true);
         alarmKick = 0.7;
       } else if (horde.beat === 2) {
         // Beat 3: watch for breach (handled by hits below)
@@ -434,7 +435,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
       fx.emit(r.x, r.y, 0x9a1010, 8, 55, 0.25, 0.7);
       fx.ring(r.x, r.y, 0x661111, 34 * L.unit, 2, 0.7);
       if (settings.hScreenShake) shake = Math.min(3, shake + 1);
-      say(pick(CHATTER.rise));
+      say(pick(CHATTER.rise), (r.x / L.w - 0.5) * 0.6);
     }
 
     const attacked = zombies.underAttack();
@@ -446,7 +447,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     // breach impact: debris, crack, shake, sound
     for (const b of hits.breaches) {
       audio.sfx('breach', { pan: (b.x / L.w) * 2 - 1 });
-      say(pick(CHATTER.breach).replace('{side}', sideName(b.x, b.y)));
+      say(pick(CHATTER.breach).replace('{side}', sideName(b.x, b.y)), (b.x / L.w - 0.5) * 0.8, true);
       fx.debris(b.x, b.y, 14);
       fx.emit(b.x, b.y, 0x8a1408, 8, 100, 0.3, 0.5);
       compound.addWallCrack(b.x, b.y);
@@ -506,7 +507,9 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     if (!attacked && zombies.count() < 2 && Math.random() < dt * 0.03) say(pick(CHATTER.quiet));
     chatterT -= dtReal;
     if (chatterT <= 0 && chatterQ.length) {
-      hud.say(chatterQ.pop()!);
+      const c = chatterQ.pop()!;
+      hud.say(c.line);
+      audio.sfx('voice', { pan: c.pan, variant: c.urgent ? 'urgent' : undefined });
       chatterQ.length = 0;
       chatterT = 7 + Math.random() * 5;
     }

@@ -528,7 +528,10 @@ survivor going down is the one moment the score lets itself ring: a knock, a
 low cello, two piano notes a semitone apart and a skipped heartbeat. Claws on
 the fence stay a dry scrape — the loud bell is reserved for walls actually
 breaking. And every rise sinks a little dread into the mix, so a losing night
-drifts toward the siege styles even when the horde outside is thin.
+drifts toward the siege styles even when the horde outside is thin. When the
+COMMS LOG picks up radio chatter, a handset murmurs it too — formant-synth
+syllables through a walkie-talkie band with push-to-talk clicks and static,
+never quite words.
 
 ### Midnight Run
 

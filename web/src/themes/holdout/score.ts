@@ -372,6 +372,11 @@ class HoldoutConductor extends Conductor {
       s.piano(this.sfxBus, t + 0.08, c[1] * 2, 0.035, pan, 0.6);
       s.piano(this.sfxBus, t + 0.08, c[1] * 2 * 1.059, 0.028, pan, 0.6);
       this.markHeart(t);
+    } else if (name === 'voice') {
+      // the radio behind the log line: a murmur on the handset, never words
+      const t = this.slot('voice', 6, 0.3);
+      if (t < 0) return;
+      s.voice(this.sfxBus, t, 0.05 * st.gBlock, pan, opts.variant === 'urgent');
     }
   }
 

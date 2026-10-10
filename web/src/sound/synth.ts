@@ -455,6 +455,67 @@ export class Synth {
     this.noiseHit(bus, t, { type: 'lowpass', f: 480, fTo: 260, q: 0.6, g, a: 1.4, h: 0.4, r: 1.8, pan, rev: 0.6 });
   }
 
+  /** Radio murmur: syllables of formant-filtered buzz squeezed through a
+   *  walkie-talkie band, with plosives, a static bed and push-to-talk clicks
+   *  — a transmission you never quite understand. */
+  voice(bus: Bus, t: number, g: number, pan = 0, urgent = false): void {
+    const n = urgent ? 5 + ((Math.random() * 5) | 0) : 3 + ((Math.random() * 5) | 0);
+    const f0 = (urgent ? 150 : 112) * (0.9 + Math.random() * 0.25);
+    const syl = urgent ? 0.085 : 0.115;
+    const gap = urgent ? 0.035 : 0.055;
+    const end = t + n * (syl + gap) + 0.1;
+
+    // the glottal buzz and its vowels: three formants that jump per syllable
+    const o = this.osc('sawtooth', f0, t, end);
+    const buzz = this.gain(0.0001);
+    const f1 = this.filter('bandpass', 500, 7);
+    const f2 = this.filter('bandpass', 1600, 9);
+    const f3 = this.filter('bandpass', 2700, 10);
+    o.connect(buzz);
+    const mix = this.gain(1);
+    buzz.connect(f1).connect(mix);
+    buzz.connect(f2).connect(this.gain(0.5)).connect(mix);
+    buzz.connect(f3).connect(this.gain(0.2)).connect(mix);
+
+    // plosives: one noise source gated into bursts between syllables
+    const hiss = this.noise(t, end, 1);
+    const plos = this.gain(0.0001);
+    hiss.connect(this.filter('bandpass', 1900, 1.4)).connect(plos);
+
+    // the handset: narrow band, a little drive, static under everything
+    const hp = this.filter('highpass', 340, 0.7);
+    const lp = this.filter('lowpass', 3100, 0.7);
+    const grit = this.ctx.createWaveShaper();
+    grit.curve = this.drive() as Float32Array<ArrayBuffer>;
+    const out = this.gain(g);
+    mix.connect(hp).connect(lp).connect(grit).connect(out);
+    plos.connect(out);
+    const stat = this.noise(t - 0.05, end + 0.05, 1);
+    stat.connect(this.filter('bandpass', 1400, 0.8)).connect(this.gain(0.06)).connect(out);
+    this.out(out, bus, pan, 0.12);
+
+    // the transmission itself: syllable envelopes, formant and pitch jumps
+    for (let i = 0; i < n; i++) {
+      const ts = t + i * (syl + gap);
+      buzz.gain.setValueAtTime(0.0001, ts);
+      buzz.gain.linearRampToValueAtTime(1, ts + 0.02);
+      buzz.gain.setValueAtTime(1, ts + syl - 0.03);
+      buzz.gain.exponentialRampToValueAtTime(0.0001, ts + syl);
+      o.frequency.setValueAtTime(f0 * (0.92 + Math.random() * 0.2), ts);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.82, ts + syl);
+      f1.frequency.setValueAtTime(320 + Math.random() * 580, ts);
+      f2.frequency.setValueAtTime(1300 + Math.random() * 1200, ts);
+      if (Math.random() < 0.45) {
+        plos.gain.setValueAtTime(0.0001, ts - 0.012);
+        plos.gain.linearRampToValueAtTime(0.5, ts);
+        plos.gain.exponentialRampToValueAtTime(0.0001, ts + 0.03);
+      }
+    }
+    // push-to-talk: the click of the key at both ends
+    this.noiseHit(bus, t - 0.03, { type: 'bandpass', f: 1800, q: 1.2, g: g * 0.5, r: 0.014, pan });
+    this.noiseHit(bus, end, { type: 'bandpass', f: 1500, q: 1.2, g: g * 0.4, r: 0.018, pan });
+  }
+
   /** Pulsar ping: a pure tone with a long echo tail. */
   ping(bus: Bus, t: number, f: number, g: number, pan = 0): void {
     this.tone(bus, t, f, { g, a: 0.003, r: 0.5, pan, rev: 0.6, echo: 0.6 });
