@@ -8,7 +8,8 @@ import { rainScore } from './score';
 /**
  * The Rain: the firewall log as digital rain, glmatrix style - columns of
  * glyphs falling out of the dark with a white spinner at the head and a
- * fading trail behind it, depth layers drifting behind the near one. The
+ * fading trail behind it, and behind them slices of rain flying out of a
+ * wandering vanishing point, so it feels like moving into the rain. The
  * glyphs are not the matrix: they are tonight's log. Every event writes a
  * line - BLOCK, LOOKUP, LEASE, IDS - and the columns carry it down the
  * screen one character at a time, green for traffic that passes, red for
@@ -84,6 +85,7 @@ async function create(host: ThemeHost<typeof RAIN_DEFAULTS>, init: RendererInit)
   }
 
   let lastW = 0, lastH = 0;
+  let fly = 0; // dive phase: how deep into the rain we are
 
   function frame(f: FrameInfo): void {
     const dt = f.dt;
@@ -98,6 +100,8 @@ async function create(host: ThemeHost<typeof RAIN_DEFAULTS>, init: RendererInit)
     const wet = state.weather === 'hurricane' ? 1 : state.weather === 'storm' ? 0.5 : 0;
     const wSpeed = settings.rWeather ? 1 + wet * 0.7 : 1;
     const wDens = settings.rWeather ? 0.75 + wet * 0.25 : 1;
+    // and the dive into the rain is weather too: drizzle crawls, deluge falls
+    fly += dt * (0.03 + wet * 0.22) * settings.rSpeed;
 
     scene.step(dt, {
       speed: settings.rSpeed,
@@ -111,7 +115,10 @@ async function create(host: ThemeHost<typeof RAIN_DEFAULTS>, init: RendererInit)
       trail: settings.rTrail,
       waves: settings.rWaves,
       fog: settings.rFog,
-      pan: settings.rPan,
+      cam: settings.rCam === 'fly' ? 2 : settings.rCam === 'drift' ? 1 : 0,
+      fly,
+      vpX: 0.5 + Math.sin(f.t * 0.031) * 0.12,
+      vpY: 0.5 + Math.cos(f.t * 0.023) * 0.09,
       colorMode: settings.rColor === 'green' ? 1 : settings.rColor === 'ice' ? 2 : 0,
       farLayers: settings.rFarLayers,
     });

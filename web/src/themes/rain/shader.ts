@@ -10,6 +10,10 @@
  * uCells: cols x rows RGBA8 - R glyph index (ASCII - 32), G event class,
  *         B per-cell seed.
  * uCols:  cols x 1 RGBA8 - RG head (16-bit, in cells), B speed, A class.
+ *
+ * The depth layers behind the log can drift (parallax pan) or fly: slices
+ * of procedural rain expanding out of a wandering vanishing point, which
+ * is what makes it feel like moving into the rain.
  */
 export const RAIN_VERT = /* glsl */`#version 300 es
 in vec2 aPosition;
@@ -37,7 +41,9 @@ uniform float uTime;
 uniform float uTrail;
 uniform float uWaves;
 uniform float uFog;
-uniform float uPan;
+uniform float uCam;
+uniform float uFly;
+uniform vec2 uVp;
 uniform float uColorMode;
 uniform float uFar;
 
@@ -100,6 +106,37 @@ vec3 farLayer(vec2 uv, float k, float fog) {
   return tint * a * fade * fog;
 }
 
+// depth: a slice of procedural rain flying toward the viewer - the dive.
+// The slice's cells expand outward from the vanishing point as it nears,
+// fading in at the horizon and out as they pass the camera. Two slices per
+// layer, half a cycle apart, so the stream never pauses.
+vec3 flyLayer(vec2 uv, float i, float sl, float fog) {
+  float ph = hash1(i * 7.31 + sl * 13.7);
+  float spd = 0.55 + hash1(i * 3.7 + 2.0) * 0.45;
+  float p = fract(uFly * spd + ph + sl * 0.5);
+  float sc = mix(0.06, 1.0, p * p);
+  vec2 vp = uVp + (vec2(hash1(i * 5.1 + sl * 9.0), hash1(i * 11.0 + sl * 3.0)) - 0.5) * 0.1;
+  vec2 uvf = (uv - vp) / sc + vp + vec2(ph, ph * 0.7);
+  vec2 grid = floor(uGrid * (1.7 + i * 0.9));
+  vec2 g = uvf * grid;
+  vec2 cell = floor(g);
+  vec2 f = fract(g);
+  float ph2 = hash1(cell.x * 0.71 + i * 13.0 + sl * 5.0);
+  float spd2 = 0.25 + hash1(cell.x * 1.7 + i * 7.0) * 0.5;
+  float cyc = grid.y + uTrail * 2.0;
+  float head = mod(uTime * grid.y * spd2 * 0.22 + ph2 * cyc, cyc) - uTrail;
+  float d = head - cell.y;
+  if (d < 0.0 || d > uTrail) return vec3(0.0);
+  float gi = hash2(cell.x + i * 31.0, cell.y + floor(uTime * spd2 * 2.0 + ph2 * 100.0));
+  float idx = floor(gi * 95.0);
+  vec2 ac = vec2(mod(idx, 16.0), floor(idx / 16.0));
+  float a = texture(uAtlas, (ac + f) / vec2(16.0, 6.0)).r;
+  float fade = pow(max(0.0, 1.0 - d / uTrail), 1.7);
+  float env = smoothstep(0.0, 0.35, p) * (1.0 - smoothstep(0.72, 1.0, p));
+  vec3 tint = uColorMode > 1.5 ? vec3(0.35, 0.7, 0.95) : vec3(0.2, 0.9, 0.38);
+  return tint * a * fade * fog * env * mix(0.3, 1.0, p);
+}
+
 void main() {
   vec2 uv = vUv;
   // burn-in drift, on a slight overscan so the edges never show
@@ -108,12 +145,16 @@ void main() {
   for (int i = 0; i < 3; i++) {
     float li = float(i);
     if (li >= uFar) break;
-    vec2 uvf = uv;
-    if (uPan > 0.5) {
-      uvf += vec2(sin(uTime * 0.023 + li * 2.0), cos(uTime * 0.017 + li * 3.0)) * 0.018 * (li + 1.0);
-    }
     float fog = mix(0.2, 0.3 / (1.0 + li * 1.5), uFog);
-    col += farLayer(uvf, 1.7 + li * 0.9, fog);
+    if (uCam > 1.5) {
+      col += flyLayer(uv, li, 0.0, fog) + flyLayer(uv, li, 0.5, fog);
+    } else {
+      vec2 uvf = uv;
+      if (uCam > 0.5) {
+        uvf += vec2(sin(uTime * 0.023 + li * 2.0), cos(uTime * 0.017 + li * 3.0)) * 0.018 * (li + 1.0);
+      }
+      col += farLayer(uvf, 1.7 + li * 0.9, fog);
+    }
   }
   finalColor = vec4(col, 1.0);
 }
