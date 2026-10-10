@@ -90,9 +90,25 @@ export class Zombies {
     this.add(angle, color, false, 0, 0, true);
   }
 
-  private add(angle: number, color: number, brute: boolean, horde: number, delay: number, sprinter = false): void {
+  /** The dead don't stay down: a taken survivor rises where they fell, pale
+   *  and fresh. Inside the walls it comes loose as a hunter; on the road it
+   *  joins the shufflers outside. Returns false if the field is full. */
+  spawnConverted(x: number, y: number, color: number): boolean {
     const L = this.compound.L;
-    const start = edgePoint(L.cx, L.cy, L.w, L.h, angle, 1.05);
+    const inside = x > L.x0 + L.wall && x < L.x1 - L.wall && y > L.y0 + L.wall && y < L.y1 - L.wall;
+    this.add(Math.atan2(L.cy - y, L.cx - x), color, false, 0, 0, false, { x, y });
+    const z = this.list[this.list.length - 1];
+    z.s.tint = 0xe8c8c0;   // fresh, pale flesh - it reads as one of ours
+    if (inside) {
+      z.inside = true; z.killAt = null; z.seen = 3;
+      z.sx = x; z.sy = y; z.tx = x; z.ty = y; z.t = 1; z.dur = 1;
+    }
+    return true;
+  }
+
+  private add(angle: number, color: number, brute: boolean, horde: number, delay: number, sprinter = false, from?: Point): void {
+    const L = this.compound.L;
+    const start = from ?? edgePoint(L.cx, L.cy, L.w, L.h, angle, 1.05);
     const end = wallPoint(L, start, 16 * L.unit);
     const dist = Math.hypot(end.x - start.x, end.y - start.y);
     const speed = (sprinter ? 130 : horde ? 48 : 40) * L.unit * (0.85 + Math.random() * 0.3);

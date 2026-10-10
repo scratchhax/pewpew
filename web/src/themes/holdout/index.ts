@@ -90,6 +90,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
   zombies.onWalkIntercept = (x, y) => walkers.killNearestVulnerable(x, y);
   zombies.onWalkDown = (x, y) => walkers.killNearestAny(x, y);
   let survivorsDown = 0;
+  const rising: Array<{ x: number; y: number; t: number }> = [];
   walkers.onWalkedKilled = (x, y) => {
     // the pounce lands: a groan over it, the death knell, the world dips
     audio.sfx('groan', { pan: (x / L.w - 0.5) * 0.5 });
@@ -98,6 +99,8 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     if (settings.hScreenShake) shake = Math.min(5, shake + 3);
     fx.stain(x, y);
     hud.setExtraStat('SURVIVORS DOWN', ++survivorsDown);
+    // and the dead don't stay down: they rise where they fell
+    if (rising.length < 4) rising.push({ x, y, t: 2.5 + Math.random() * 1.5 });
   };
   const sky = new Sky(dark, top, tex.rain, tex.glow);
   // thunder follows its flash after a distance delay, like real storms
@@ -351,6 +354,21 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
 
     const hits = zombies.update(dt, sky.darkness, walkers.positions(), groove.beat, walkers.vulnerablePositions());
     walkers.update(dt, sky.darkness, settings.hNightExtras, zombies.positions());
+
+    // the rise: a few seconds after a survivor goes down, the stain moves
+    for (let i = rising.length - 1; i >= 0; i--) {
+      const r = rising[i];
+      r.t -= dt;
+      if (r.t > 0) continue;
+      rising.splice(i, 1);
+      if (zombies.count() >= settings.hMaxZombies) continue;   // the body stays down
+      zombies.spawnConverted(r.x, r.y, 0xc02828);
+      audio.sfx('groan', { pan: (r.x / L.w - 0.5) * 0.5 });
+      fx.emit(r.x, r.y, 0x9a1010, 8, 55, 0.25, 0.7);
+      fx.ring(r.x, r.y, 0x661111, 34 * L.unit, 2, 0.7);
+      if (settings.hScreenShake) shake = Math.min(3, shake + 1);
+    }
+
     const attacked = zombies.underAttack();
     audio.setThreatActive(attacked);
     alarmKick = Math.max(0, alarmKick - dt * 0.8);

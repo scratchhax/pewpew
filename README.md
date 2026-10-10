@@ -486,7 +486,10 @@ the walls, the internet is everything outside. The HUD is relabelled to match
 **The HUD is the outpost's own paperwork:** notes on hand-cut card taped to the
 wall, stencilled headings, ammo-box gauges and a radio log on ruled paper.
 Every survivor that goes down leaves a stain that never dries and a tally on
-the **SURVIVORS DOWN** line.
+the **SURVIVORS DOWN** line — and the dead don't stay down: a few seconds
+later the stain moves, and what rises is pale, comes back as one of them, and
+hunts where it fell. Inside the walls that means the courtyard eats itself if
+the towers are busy.
 
 **Dead country.** The ground and trees are drained to grey-brown, with old
 bloodstains outside the walls. That happens once when the scene is built, so
