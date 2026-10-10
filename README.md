@@ -149,8 +149,8 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
   and bass, eurobeat and a nu-metal riff on the street; an original chip band in
   Packet Rush; cold-war synth and swung spy jazz in Panopticon; acid house,
   breakbeat and jungle in Mainframe; lounge, bossa and dub in the Aquarium;
-  techno, EBM and cold dark-synth on the Gibson; ambient rainfall that builds
-  from drizzle to deluge on The Rain. The scene's sounds play along on the beat and in key: lasers,
+  techno, EBM and cold dark-synth on the Gibson; trip-hop, big beat and
+  industrial guitar from drizzle to deluge on The Rain. The scene's sounds play along on the beat and in key: lasers,
   gunfire, an engine that shifts gears in time, gem chimes that climb the scale.
   There are no audio files anywhere, though you can upload your own
   [background track](#background-tracks).
@@ -975,18 +975,21 @@ columns fall as hex static — the shape an idle firewall makes.
 Both modes are one fragment shader each: the CPU only keeps the columns and
 a ring buffer of the last 64 log lines, and the text, spinners and trails
 are computed analytically, so nothing leaves residue at any resolution. The
-soundtrack is hydrology: a rain hiss that swells with the weather, droplet
-plinks for DNS, distant thunder for blocks, and lightning — crack first,
-rumble a stride behind — for intrusions.
+soundtrack is the club at the end of the century, and the weather picks the
+style: a calm night is Clubbed-to-Death trip-hop — half-time drums, a reese
+bass breathing under dark strings; a storm is Prodigy big beat — four on the
+floor, clap on the backbeat, stabs off the offbeats, a scratch fill into
+every fourth bar; a hurricane is Dragula industrial — pounding kick, muted
+guitar chugs, section hits. Under it all, a low rain hiss.
 
 | Event | In the rain |
 |-------|-------------|
-| allow | a green `PASS` column falls, and the traffic plays a note |
-| block | a red `BLOCK` column, and thunder rolls somewhere far off |
-| threat | an orange `IDS` column, lightning cracks, and the sky stays lit a while |
-| dns | a green `LOOKUP` column with the domain in it, and a droplet plink |
-| dhcp | a `LEASE` column wearing the device's hostname |
-| wifi | a `JOINED` column with the device, and a glass ripple |
+| allow | a green `PASS` column falls, and the traffic plays a stab |
+| block | a red `BLOCK` column, and a snare crack with a zap — the door is shut |
+| threat | an orange `IDS` column, and the alarm: two-tone siren, crash, blast |
+| dns | a green `LOOKUP` column with the domain in it, and a data blip |
+| dhcp | a `LEASE` column wearing the device's hostname, on a kick thump |
+| wifi | a `JOINED` column with the device, and an open hat |
 | system | a grey `SYS` column; the rain never stops |
 
 In F1 → Scene: fall speed, density, trail length, glyph size, colour

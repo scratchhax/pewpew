@@ -22,7 +22,7 @@ export const RAIN_DEFAULTS = {
 
   // soundtrack
   rMusicStyle: 'auto' as string, // auto | drizzle | shower | deluge
-  rRainAmb: 0.6,                 // rain hiss bed
+  rRainAmb: 0.35,                // rain hiss bed under the beat
 
   // scene budgets = the HIGH preset
   rFarLayers: 2,             // procedural depth layers behind the log (fall mode)
@@ -47,9 +47,9 @@ const select = (key: Key, label: string, options: Array<[string, string]>): Cont
 
 export const RAIN_MUSIC_STYLES: Array<[string, string]> = [
   ['auto', 'Auto (weather)'],
-  ['drizzle', 'Drizzle'],
-  ['shower', 'Shower'],
-  ['deluge', 'Deluge'],
+  ['drizzle', 'Drizzle (trip-hop)'],
+  ['shower', 'Shower (big beat)'],
+  ['deluge', 'Deluge (industrial)'],
 ];
 
 export const RAIN_CONTROLS = {
