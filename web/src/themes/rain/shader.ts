@@ -163,7 +163,12 @@ vec3 glyphColor(float cls) {
 
 void main() {
   vec2 uv = vUv;
-  vec3 col = vec3(0.0);
+  // background fog bank: the far end of the tunnel, denser toward the
+  // vanishing point and mottled so it reads as depth haze, not a vignette
+  vec2 fp = (uv - uVp) * vec2(uAspect, 1.0);
+  float fogBank = (1.0 - smoothstep(0.05, 0.95, length(fp))) * uFog;
+  float mottle = 0.7 + 0.3 * sin(fp.x * 6.0 + uTime * 0.1) * sin(fp.y * 5.0 - uTime * 0.07);
+  vec3 col = vec3(0.028, 0.075, 0.038) * fogBank * mottle;
   for (int i = 0; i < MAXC; i++) {
     float fi = float(i);
     if (fi >= uN) break;
@@ -198,7 +203,7 @@ void main() {
     float a = texture(uAtlas, (ac + f) / vec2(16.0, 6.0)).r;
     // distance haze: far glyphs blur into the fog, so the field reads as
     // a thick volume you are falling through, not a grid of sprites
-    float blur = clamp((z - 1.1) / 3.0, 0.0, 1.0) * 0.18;
+    float blur = clamp((z - 1.0) / 2.8, 0.0, 1.0) * 0.22;
     if (blur > 0.004) {
       vec2 o = vec2(blur, blur * 1.72);
       a = (a
@@ -218,14 +223,19 @@ void main() {
     if (d < 1.0) tint = mix(tint, vec3(0.85, 1.0, 0.92), 1.0 - d);
     float lit2 = lit * fog * near * 1.25;
     // close columns are being drawn on a CRT: scanlines, RGB fringing,
-    // a slow flicker and a little bloom - all ramping in with nearness
+    // a slow flicker and a little bloom - all ramping in with nearness.
+    // at the very front the scanlines go hard: wide black gaps, thin bright
+    // lines, the way a real tube looks when your nose is against the glass
     float crt = 1.0 - smoothstep(0.15, 1.2, z);
+    float front = 1.0 - smoothstep(0.10, 0.42, z);
     if (crt > 0.02) {
       float px = 0.09 * crt;
       float ar = texture(uAtlas, (ac + f + vec2(-px, 0.0)) / vec2(16.0, 6.0)).r;
       float ab = texture(uAtlas, (ac + f + vec2(px, 0.0)) / vec2(16.0, 6.0)).r;
       vec3 rgb = tint * a + vec3(0.55, 0.08, 0.0) * ar * 0.6 + vec3(0.0, 0.12, 0.55) * ab * 0.6;
-      float scan = 1.0 - 0.68 * crt * (0.5 + 0.5 * cos(uv.y * uRes.y * 2.0944));
+      float band = 0.5 + 0.5 * cos(uv.y * uRes.y * 2.0944);
+      band = pow(band, 1.0 + 2.5 * front);
+      float scan = 1.0 - crt * (0.72 + 0.28 * front) * band;
       float flick = 1.0 - 0.05 * crt * sin(uTime * 37.0);
       col += rgb * lit2 * scan * flick * (1.0 + 0.35 * crt);
     } else {
