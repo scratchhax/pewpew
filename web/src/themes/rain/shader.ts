@@ -114,7 +114,7 @@ vec3 flyLayer(vec2 uv, float i, float sl, float fog) {
   float ph = hash1(i * 7.31 + sl * 13.7);
   float spd = 0.55 + hash1(i * 3.7 + 2.0) * 0.45;
   float p = fract(uFly * spd + ph + sl * 0.5);
-  float sc = mix(0.06, 1.0, p * p);
+  float sc = mix(0.05, 1.7, p * p);
   vec2 vp = uVp + (vec2(hash1(i * 5.1 + sl * 9.0), hash1(i * 11.0 + sl * 3.0)) - 0.5) * 0.1;
   vec2 uvf = (uv - vp) / sc + vp + vec2(ph, ph * 0.7);
   vec2 grid = floor(uGrid * (1.7 + i * 0.9));
@@ -134,7 +134,7 @@ vec3 flyLayer(vec2 uv, float i, float sl, float fog) {
   float fade = pow(max(0.0, 1.0 - d / uTrail), 1.7);
   float env = smoothstep(0.0, 0.35, p) * (1.0 - smoothstep(0.72, 1.0, p));
   vec3 tint = uColorMode > 1.5 ? vec3(0.35, 0.7, 0.95) : vec3(0.2, 0.9, 0.38);
-  return tint * a * fade * fog * env * mix(0.3, 1.0, p);
+  return tint * a * fade * fog * env * mix(0.35, 1.3, p);
 }
 
 void main() {

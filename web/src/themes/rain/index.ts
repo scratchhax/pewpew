@@ -100,8 +100,8 @@ async function create(host: ThemeHost<typeof RAIN_DEFAULTS>, init: RendererInit)
     const wet = state.weather === 'hurricane' ? 1 : state.weather === 'storm' ? 0.5 : 0;
     const wSpeed = settings.rWeather ? 1 + wet * 0.7 : 1;
     const wDens = settings.rWeather ? 0.75 + wet * 0.25 : 1;
-    // and the dive into the rain is weather too: drizzle crawls, deluge falls
-    fly += dt * (0.03 + wet * 0.22) * settings.rSpeed;
+    // and the dive into the rain is weather too: drizzle creeps, deluge falls
+    fly = (fly + dt * (0.18 + wet * 0.45) * settings.rSpeed) % 1e5;
 
     scene.step(dt, {
       speed: settings.rSpeed,
@@ -111,16 +111,18 @@ async function create(host: ThemeHost<typeof RAIN_DEFAULTS>, init: RendererInit)
       weatherSpeed: wSpeed,
       weatherDensity: wDens,
     });
+    const cam = settings.rCam === 'fly' ? 2 : settings.rCam === 'drift' ? 1 : 0;
     scene.uniforms(f.t, {
       trail: settings.rTrail,
       waves: settings.rWaves,
       fog: settings.rFog,
-      cam: settings.rCam === 'fly' ? 2 : settings.rCam === 'drift' ? 1 : 0,
+      cam,
       fly,
       vpX: 0.5 + Math.sin(f.t * 0.031) * 0.12,
       vpY: 0.5 + Math.cos(f.t * 0.023) * 0.09,
       colorMode: settings.rColor === 'green' ? 1 : settings.rColor === 'ice' ? 2 : 0,
-      farLayers: settings.rFarLayers,
+      // flying is the show: even the low budget gets at least one layer to fly
+      farLayers: cam === 2 ? Math.max(1, settings.rFarLayers) : settings.rFarLayers,
     });
     scene.wander(f.wanderX / w, f.wanderY / h);
 

@@ -21,6 +21,11 @@ your own traffic. Pick a scene per screen:
   translucent monolith blocks lined in glowing cyan, patrolled at street
   level with sweeping ninety-degree corners, until the camera swings around
   to lock onto a red file and trace the intruder
+- **The Rain**: xscreensaver's glmatrix pointed at the firewall — columns of
+  glyphs fall out of the dark carrying tonight's log one character at a
+  time, green for traffic that passes, red for what burns, and behind them
+  slices of rain fly out of a wandering vanishing point, faster as the
+  weather worsens, until a hurricane is a fall into the sky
 - **Mycelium**: a bioluminescent forest floor from above, where hosts put out
   growing filaments that weave a mat across the loam — permitted traffic runs
   through it as travelling light, habit decides the roads, mushrooms fruit at
@@ -57,6 +62,8 @@ and never touches the network itself.
 | ![aquarium](docs/aquarium.png) | ![aquarium shark](docs/aquarium-shark.png) |
 | **The Gibson** | **The Gibson: target lock** |
 | ![the gibson](docs/gibson.png) | ![gibson target lock](docs/gibson-lock.png) |
+| **The Rain** | **The Rain: flying in** |
+| ![the rain](docs/rain.png) | ![the rain flying in](docs/rain-fly.png) |
 | **Mycelium** | **Mycelium: a blight swarm crawls in** |
 | ![mycelium](docs/mycelium.png) | ![mycelium blight](docs/mycelium-blight.png) |
 | **Undergrowth** | **Undergrowth: deep in the shell** |
@@ -80,6 +87,7 @@ traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew
 [Mainframe](https://scratchhax.github.io/pewpew/?theme=mainframe) ·
 [Aquarium](https://scratchhax.github.io/pewpew/?theme=aquarium) ·
 [The Gibson](https://scratchhax.github.io/pewpew/?theme=gibson) ·
+[The Rain](https://scratchhax.github.io/pewpew/?theme=rain) ·
 [Mycelium](https://scratchhax.github.io/pewpew/?theme=mycelium) ·
 [FRAGNET](https://scratchhax.github.io/pewpew/?theme=fragnet) ·
 [Substrate](https://scratchhax.github.io/pewpew/?theme=substrate) ·
@@ -962,7 +970,7 @@ traffic that passes, red for what gets denied, orange for intrusions. When
 nothing happens the columns fall as hex static — the shape an idle firewall
 makes. The weather is the traffic, so a quiet night is a drizzle of a few
 lazy columns and a hurricane is a full downpour, faster and thicker — and the
-dive into the rain is weather too: the drizzle barely drifts forward, while a
+dive into the rain is weather too: even a drizzle creeps forward, while a
 hurricane is a real fall into the sky.
 
 The whole scene is one fragment shader: the CPU only writes glyph indices
