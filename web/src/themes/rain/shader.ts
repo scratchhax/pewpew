@@ -151,6 +151,19 @@ uniform float uFog;
 uniform float uColorMode;
 
 float hash1(float x) { return fract(sin(x * 127.1) * 43758.5453123); }
+float hash2(float x, float y) { return fract(sin(x * 269.5 + y * 183.3) * 24005.7913); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p), g = fract(p);
+  g = g * g * (3.0 - 2.0 * g);
+  return mix(mix(hash2(i.x, i.y), hash2(i.x + 1.0, i.y), g.x),
+             mix(hash2(i.x, i.y + 1.0), hash2(i.x + 1.0, i.y + 1.0), g.x), g.y);
+}
+// two-octave drifting fog field, full screen
+float fogField(vec2 uv, float t) {
+  float n = vnoise(uv * 3.0 + vec2(t * 0.03, t * 0.02)) * 0.65
+          + vnoise(uv * 7.0 - vec2(t * 0.05, t * 0.01)) * 0.35;
+  return n;
+}
 
 vec3 glyphColor(float cls) {
   if (uColorMode > 1.5) return vec3(0.42, 0.82, 1.0);
@@ -163,12 +176,12 @@ vec3 glyphColor(float cls) {
 
 void main() {
   vec2 uv = vUv;
-  // background fog bank: the far end of the tunnel, denser toward the
-  // vanishing point and mottled so it reads as depth haze, not a vignette
-  vec2 fp = (uv - uVp) * vec2(uAspect, 1.0);
-  float fogBank = (1.0 - smoothstep(0.05, 0.95, length(fp))) * uFog;
-  float mottle = 0.7 + 0.3 * sin(fp.x * 6.0 + uTime * 0.1) * sin(fp.y * 5.0 - uTime * 0.07);
-  vec3 col = vec3(0.028, 0.075, 0.038) * fogBank * mottle;
+  // background fog: a full-screen drifting haze, a touch denser toward the
+  // vanishing point (looking deeper into it), so the whole background is
+  // weather and the far columns emerge from murk rather than from black
+  float fogDepth = 0.55 + 0.45 * (1.0 - smoothstep(0.0, 0.9, length((uv - uVp) * vec2(uAspect, 1.0))));
+  float fogBank = fogField(uv, uTime) * fogDepth * uFog;
+  vec3 col = vec3(0.05, 0.13, 0.07) * fogBank;
   for (int i = 0; i < MAXC; i++) {
     float fi = float(i);
     if (fi >= uN) break;
