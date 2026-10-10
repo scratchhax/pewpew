@@ -13,7 +13,7 @@ import { RAIN_VERT, RAIN3D_FRAG } from './shader';
 const MAXC = 96;
 const RING = 64;
 const LEN = 32;
-const Z_NEAR = 0.06;
+const Z_NEAR = 0.035;
 const Z_FAR = 4.5;
 const FILLER = '0123456789ABCDEF#$%&*+=<>/\\|~^';
 

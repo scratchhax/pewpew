@@ -229,7 +229,7 @@ void main() {
     float lit = 1.0 - 0.55 * (d / float(LEN));
     float depth = mix(1.0, 0.3, clamp((z - 0.3) / 3.5, 0.0, 1.0));
     float fog = mix(1.0, depth, uFog);
-    float near = smoothstep(0.06, 0.16, z);
+    float near = smoothstep(0.03, 0.09, z);
     vec3 tint = glyphColor(c.w);
     if (d < 1.0) tint = mix(tint, vec3(0.85, 1.0, 0.92), 1.0 - d);
     float lit2 = lit * fog * near * 1.25;
@@ -240,15 +240,18 @@ void main() {
     float crt = 1.0 - smoothstep(0.15, 1.2, z);
     float front = 1.0 - smoothstep(0.10, 0.42, z);
     if (crt > 0.02) {
-      float px = 0.09 * crt;
+      float px = (0.09 + 0.1 * front) * crt;
       float ar = texture(uAtlas, (ac + f + vec2(-px, 0.0)) / vec2(16.0, 6.0)).r;
       float ab = texture(uAtlas, (ac + f + vec2(px, 0.0)) / vec2(16.0, 6.0)).r;
       vec3 rgb = tint * a + vec3(0.55, 0.08, 0.0) * ar * 0.6 + vec3(0.0, 0.12, 0.55) * ab * 0.6;
-      float band = 0.5 + 0.5 * cos(uv.y * uRes.y * 2.0944);
-      band = pow(band, 1.0 + 2.5 * front);
-      float scan = 1.0 - crt * (0.72 + 0.28 * front) * band;
+      // at the front the scanlines go fat (3px -> 5px) and near-black,
+      // the way a real tube looks when your nose is against the glass
+      float freq = mix(2.0944, 1.2566, front);
+      float band = 0.5 + 0.5 * cos(uv.y * uRes.y * freq);
+      band = pow(band, 1.0 + 4.0 * front);
+      float scan = 1.0 - crt * (0.72 + 0.26 * front) * band;
       float flick = 1.0 - 0.05 * crt * sin(uTime * 37.0);
-      col += rgb * lit2 * scan * flick * (1.0 + 0.35 * crt);
+      col += rgb * lit2 * scan * flick * (1.0 + 0.5 * crt);
     } else {
       col += tint * a * lit2;
     }
