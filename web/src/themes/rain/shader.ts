@@ -143,6 +143,7 @@ uniform float uTime;
 uniform float uN;
 uniform float uCellH;
 uniform float uAspect;
+uniform vec2 uRes;
 uniform float uSpread;
 uniform vec2 uVp;
 uniform float uTrail;
@@ -202,7 +203,21 @@ void main() {
     float near = smoothstep(0.06, 0.16, z);
     vec3 tint = glyphColor(c.w);
     if (d < 1.0) tint = mix(tint, vec3(0.85, 1.0, 0.92), 1.0 - d);
-    col += tint * a * lit * fog * near * 1.25;
+    float lit2 = lit * fog * near * 1.25;
+    // close columns are being drawn on a CRT: scanlines, RGB fringing,
+    // a slow flicker and a little bloom - all ramping in with nearness
+    float crt = 1.0 - smoothstep(0.15, 1.2, z);
+    if (crt > 0.02) {
+      float px = 0.09 * crt;
+      float ar = texture(uAtlas, (ac + f + vec2(-px, 0.0)) / vec2(16.0, 6.0)).r;
+      float ab = texture(uAtlas, (ac + f + vec2(px, 0.0)) / vec2(16.0, 6.0)).r;
+      vec3 rgb = tint * a + vec3(0.55, 0.08, 0.0) * ar * 0.6 + vec3(0.0, 0.12, 0.55) * ab * 0.6;
+      float scan = 1.0 - 0.5 * crt * (0.5 + 0.5 * cos(uv.y * uRes.y * 2.0944));
+      float flick = 1.0 - 0.05 * crt * sin(uTime * 37.0);
+      col += rgb * lit2 * scan * flick * (1.0 + 0.35 * crt);
+    } else {
+      col += tint * a * lit2;
+    }
   }
   finalColor = vec4(col, 1.0);
 }

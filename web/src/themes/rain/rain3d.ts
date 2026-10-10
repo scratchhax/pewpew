@@ -35,6 +35,7 @@ interface FlyUniforms {
   uN: number;
   uCellH: number;
   uAspect: number;
+  uRes: Float32Array;
   uSpread: number;
   uVp: Float32Array;
   uTrail: number;
@@ -84,6 +85,7 @@ export class Rain3D {
       uN: { value: MAXC, type: 'f32' },
       uCellH: { value: 0.045, type: 'f32' },
       uAspect: { value: 16 / 9, type: 'f32' },
+      uRes: { value: new Float32Array([1920, 1080]), type: 'vec2<f32>' },
       uSpread: { value: 2.2, type: 'f32' },
       uVp: { value: new Float32Array([0.5, 0.5]), type: 'vec2<f32>' },
       uTrail: { value: 12, type: 'f32' },
@@ -174,12 +176,13 @@ export class Rain3D {
     }
   }
 
-  uniforms(t: number, o: { trail: number; fog: boolean; colorMode: number; columns: number; glyph: number; aspect: number; vpX: number; vpY: number; wanderX: number; wanderY: number }): void {
+  uniforms(t: number, o: { trail: number; fog: boolean; colorMode: number; columns: number; glyph: number; aspect: number; resX: number; resY: number; vpX: number; vpY: number; wanderX: number; wanderY: number }): void {
     const u = this.u;
     u.uTime = t;
     u.uN = Math.max(1, Math.min(MAXC, Math.round(o.columns)));
     u.uCellH = 0.045 * (o.glyph / 15);
     u.uAspect = o.aspect;
+    u.uRes.set([o.resX, o.resY]);
     u.uVp.set([o.vpX + o.wanderX, o.vpY + o.wanderY]);
     u.uTrail = o.trail;
     u.uFog = o.fog ? 1 : 0;
