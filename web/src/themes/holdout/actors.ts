@@ -92,10 +92,12 @@ export class Zombies {
 
   /** The dead don't stay down: a taken survivor rises where they fell, pale
    *  and fresh. Inside the walls it comes loose as a hunter; on the road it
-   *  joins the shufflers outside. Returns false if the field is full. */
-  spawnConverted(x: number, y: number, color: number): boolean {
+   *  joins the shufflers - those only up to a small overflow past the cap,
+   *  since the field is usually sitting at it. Returns false if it stays down. */
+  spawnConverted(x: number, y: number, color: number, cap: number): boolean {
     const L = this.compound.L;
     const inside = x > L.x0 + L.wall && x < L.x1 - L.wall && y > L.y0 + L.wall && y < L.y1 - L.wall;
+    if (!inside && this.count() >= cap + 3) return false;
     this.add(Math.atan2(L.cy - y, L.cx - x), color, false, 0, 0, false, { x, y });
     const z = this.list[this.list.length - 1];
     z.s.tint = 0xe8c8c0;   // fresh, pale flesh - it reads as one of ours

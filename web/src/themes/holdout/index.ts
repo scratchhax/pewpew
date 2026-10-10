@@ -361,8 +361,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
       r.t -= dt;
       if (r.t > 0) continue;
       rising.splice(i, 1);
-      if (zombies.count() >= settings.hMaxZombies) continue;   // the body stays down
-      zombies.spawnConverted(r.x, r.y, 0xc02828);
+      if (!zombies.spawnConverted(r.x, r.y, 0xc02828, settings.hMaxZombies)) continue;   // the body stays down
       audio.sfx('groan', { pan: (r.x / L.w - 0.5) * 0.5 });
       fx.emit(r.x, r.y, 0x9a1010, 8, 55, 0.25, 0.7);
       fx.ring(r.x, r.y, 0x661111, 34 * L.unit, 2, 0.7);
