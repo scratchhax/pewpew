@@ -1,4 +1,4 @@
-import { Application, Container } from 'pixi.js';
+import { Application, Container, Sprite } from 'pixi.js';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
 import type { NetEvent } from '../../types';
@@ -101,6 +101,32 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     hud.setExtraStat('SURVIVORS DOWN', ++survivorsDown);
     // and the dead don't stay down: they rise where they fell
     if (rising.length < 4) rising.push({ x, y, t: 2.5 + Math.random() * 1.5 });
+  };
+  // dread: every rise sinks the night a little deeper, and the score follows
+  let dread = 0;
+  // eyes in the treeline: pairs that breathe in the dark beyond the walls
+  const watchers: Array<{ a: Sprite; b: Sprite; age: number; hold: number; blink: number }> = [];
+  let watcherTimer = 4;
+  const spawnWatcher = () => {
+    const m = 30 * L.unit;
+    let x = 0, y = 0;
+    for (let tries = 0; tries < 12; tries++) {
+      x = m + Math.random() * (L.w - 2 * m);
+      y = m + Math.random() * (L.h - 2 * m);
+      if (x < L.x0 - 24 * L.unit || x > L.x1 + 24 * L.unit || y < L.y0 - 24 * L.unit || y > L.y1 + 24 * L.unit) break;
+    }
+    if (x >= L.x0 - 24 * L.unit && x <= L.x1 + 24 * L.unit && y >= L.y0 - 24 * L.unit && y <= L.y1 + 24 * L.unit) return;
+    const gap = 4.5 * L.unit;
+    const mk = (dx: number) => {
+      const e = new Sprite(tex.glow);
+      e.anchor.set(0.5); e.blendMode = 'add'; e.tint = 0xff3a2a;
+      e.scale.set(0.11 * L.unit); e.alpha = 0;
+      e.position.set(x + dx, y);
+      layers.lights.addChild(e);
+      return e;
+    };
+    const hold = 2 + Math.random() * 4;
+    watchers.push({ a: mk(-gap), b: mk(gap), age: 0, hold, blink: 0.5 + Math.random() * Math.max(0.5, hold - 1) });
   };
   const sky = new Sky(dark, top, tex.rain, tex.glow);
   // thunder follows its flash after a distance delay, like real storms
@@ -362,6 +388,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
       if (r.t > 0) continue;
       rising.splice(i, 1);
       if (!zombies.spawnConverted(r.x, r.y, 0xc02828, settings.hMaxZombies)) continue;   // the body stays down
+      dread = Math.min(1, dread + 0.08);
       audio.sfx('groan', { pan: (r.x / L.w - 0.5) * 0.5 });
       fx.emit(r.x, r.y, 0x9a1010, 8, 55, 0.25, 0.7);
       fx.ring(r.x, r.y, 0x661111, 34 * L.unit, 2, 0.7);
@@ -425,10 +452,30 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
     // perimeter lights track zombies
     compound.updatePerimeter(zombies.positions(), dt);
 
-    // pressure to score: bodies at the gate, teeth at the wall, anything loose inside
+    // pressure to score: bodies at the gate, teeth at the wall, anything loose inside,
+    // and the dread of what the compound has already lost
+    dread = Math.max(0, dread - dt * 0.004);
     const clawing = zombies.clawing().length + zombies.insideCount();
-    const pressure = Math.min(1, (zombies.count() / Math.max(1, settings.hMaxZombies)) * 0.4 + (attacked ? 0.45 : 0) + (alarm * 0.3) + Math.min(0.15, clawing * 0.05));
+    const pressure = Math.min(1, (zombies.count() / Math.max(1, settings.hMaxZombies)) * 0.4 + (attacked ? 0.45 : 0) + (alarm * 0.3) + Math.min(0.15, clawing * 0.05) + dread * 0.25);
     (audio as unknown as { setPressure?: (p: number) => void }).setPressure?.(pressure);
+
+    // eyes in the treeline: only in the dark, and the worse the night, the more
+    // of them are watching from beyond the walls
+    watcherTimer -= dt;
+    if (watcherTimer <= 0) {
+      watcherTimer = 3 + Math.random() * 6;
+      if (watchers.length < 3 && sky.darkness > 0.5 && Math.random() < sky.darkness * (0.35 + pressure * 0.5)) spawnWatcher();
+    }
+    for (let i = watchers.length - 1; i >= 0; i--) {
+      const w = watchers[i];
+      w.age += dt;
+      const life = w.hold + 2.5;
+      const blinking = w.age > w.blink && w.age < w.blink + 0.15;
+      const fading = w.age > w.hold + 1.5 ? Math.max(0, life - w.age) : 1;
+      const alpha = blinking ? 0 : Math.min(1, w.age / 1.5) * fading * 0.5 * sky.darkness;
+      w.a.alpha = w.b.alpha = alpha;
+      if (w.age >= life) { w.a.destroy(); w.b.destroy(); watchers.splice(i, 1); }
+    }
 
     // corpses age out
     zombies.updateCorpses(dt);
@@ -515,7 +562,7 @@ async function create(host: ThemeHost<typeof HOLDOUT_DEFAULTS>,
       }
     },
     stats: () => ({ nodes: countNodes(app.stage) }),
-    diag: () => ({ app, compound, zombies, walkers, sky, groove, audio }),
+    diag: () => ({ app, compound, zombies, walkers, sky, groove, audio, watchers, dread: () => dread }),
   };
 }
 
