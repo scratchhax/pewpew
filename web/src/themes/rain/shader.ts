@@ -196,9 +196,22 @@ void main() {
     vec2 ac = vec2(mod(idx, 16.0), floor(idx / 16.0));
     vec2 f = vec2(dx / halfW * 0.5 + 0.5, fy);
     float a = texture(uAtlas, (ac + f) / vec2(16.0, 6.0)).r;
-    if (a < 0.02) continue;
+    // distance haze: far glyphs blur into the fog, so the field reads as
+    // a thick volume you are falling through, not a grid of sprites
+    float blur = clamp((z - 1.1) / 3.0, 0.0, 1.0) * 0.18;
+    if (blur > 0.004) {
+      vec2 o = vec2(blur, blur * 1.72);
+      a = (a
+        + texture(uAtlas, (ac + f + vec2(o.x, 0.0)) / vec2(16.0, 6.0)).r
+        + texture(uAtlas, (ac + f - vec2(o.x, 0.0)) / vec2(16.0, 6.0)).r
+        + texture(uAtlas, (ac + f + vec2(0.0, o.y)) / vec2(16.0, 6.0)).r
+        + texture(uAtlas, (ac + f - vec2(0.0, o.y)) / vec2(16.0, 6.0)).r) * 0.2;
+    }
+    // far columns also bleed a faint glow strip: rain seen through haze
+    float haze = blur * 1.2;
+    if (a < 0.02 && haze < 0.01) continue;
     float lit = 1.0 - 0.55 * (d / float(LEN));
-    float depth = mix(1.0, 0.35, clamp((z - 0.35) / 4.0, 0.0, 1.0));
+    float depth = mix(1.0, 0.3, clamp((z - 0.3) / 3.5, 0.0, 1.0));
     float fog = mix(1.0, depth, uFog);
     float near = smoothstep(0.06, 0.16, z);
     vec3 tint = glyphColor(c.w);
@@ -212,11 +225,11 @@ void main() {
       float ar = texture(uAtlas, (ac + f + vec2(-px, 0.0)) / vec2(16.0, 6.0)).r;
       float ab = texture(uAtlas, (ac + f + vec2(px, 0.0)) / vec2(16.0, 6.0)).r;
       vec3 rgb = tint * a + vec3(0.55, 0.08, 0.0) * ar * 0.6 + vec3(0.0, 0.12, 0.55) * ab * 0.6;
-      float scan = 1.0 - 0.5 * crt * (0.5 + 0.5 * cos(uv.y * uRes.y * 2.0944));
+      float scan = 1.0 - 0.68 * crt * (0.5 + 0.5 * cos(uv.y * uRes.y * 2.0944));
       float flick = 1.0 - 0.05 * crt * sin(uTime * 37.0);
       col += rgb * lit2 * scan * flick * (1.0 + 0.35 * crt);
     } else {
-      col += tint * a * lit2;
+      col += tint * (a * lit2 + haze * fog * near);
     }
   }
   finalColor = vec4(col, 1.0);
