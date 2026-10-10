@@ -225,9 +225,7 @@ void main() {
         + texture(uAtlas, (ac + f + vec2(0.0, o.y)) / vec2(16.0, 6.0)).r
         + texture(uAtlas, (ac + f - vec2(0.0, o.y)) / vec2(16.0, 6.0)).r) * 0.2;
     }
-    // far columns also bleed a faint glow strip: rain seen through haze
-    float haze = blur * 1.2;
-    if (a < 0.02 && haze < 0.01) continue;
+    if (a < 0.02) continue;
     float lit = 1.0 - 0.55 * (d / float(LEN));
     float depth = mix(1.0, 0.3, clamp((z - 0.3) / 3.5, 0.0, 1.0));
     float fog = mix(1.0, depth, uFog);
@@ -252,7 +250,7 @@ void main() {
       float flick = 1.0 - 0.05 * crt * sin(uTime * 37.0);
       col += rgb * lit2 * scan * flick * (1.0 + 0.35 * crt);
     } else {
-      col += tint * (a * lit2 + haze * fog * near);
+      col += tint * a * lit2;
     }
   }
   finalColor = vec4(col, 1.0);
