@@ -71,6 +71,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     { idle: tex.anim('punk', 'idle'), walk: tex.anim('punk', 'walk'), punch: tex.anim('punk', 'punch'),
       hurt: tex.anim('punk', 'hurt') },
     'FIREWALL',
+    { idle: -1 },
   );
   girl.reset(CENTER - 160, 1);
   punk.reset(CENTER + 160, -1);

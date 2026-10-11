@@ -42,6 +42,8 @@ export class Fighter {
   private vy = 0;
   private lift = 0;              // px above the floor (jumps, knockback air)
   private anim: Texture[];
+  private animKey = 'idle';
+  private animDir: Record<string, number>;
   private animT = 0;
   private frame = 0;
   private stateT = 0;
@@ -49,8 +51,9 @@ export class Fighter {
   private hurtDur = 0.42;
   private tintFlash = 0;
 
-  constructor(anims: Record<string, Texture[]>, readonly label: string) {
+  constructor(anims: Record<string, Texture[]>, readonly label: string, dirs: Record<string, number> = {}) {
     this.anims = anims;
+    this.animDir = dirs;
     this.anim = anims.idle;
     this.sprite.texture = this.anim[0];
     this.sprite.anchor.set(0.5, 1);
@@ -66,6 +69,7 @@ export class Fighter {
   attack(kind: keyof typeof ATTACKS, foeX: number): boolean {
     if (this.busy) return false;
     this.atk = ATTACKS[kind];
+    this.animKey = this.anims[this.atk.anim] ? this.atk.anim : 'idle';
     this.anim = this.anims[this.atk.anim] ?? this.anims.idle;
     this.frame = 0;
     this.animT = 0;
@@ -81,6 +85,7 @@ export class Fighter {
     this.state = 'hurt';
     this.stateT = 0;
     this.hurtDur = dur;
+    this.animKey = 'hurt';
     this.anim = this.anims.hurt;
     this.frame = 0;
     this.animT = 0;
@@ -92,6 +97,7 @@ export class Fighter {
   ko(dir: 1 | -1): void {
     this.state = 'ko';
     this.stateT = 0;
+    this.animKey = 'hurt';
     this.anim = this.anims.hurt;
     this.frame = this.anim.length - 1;
     this.sprite.texture = this.anim[this.frame];
@@ -104,6 +110,7 @@ export class Fighter {
     if (this.state === 'ko') return;
     this.state = 'win';
     this.stateT = 0;
+    this.animKey = 'idle';
     this.anim = this.anims.idle;
     this.frame = 0;
   }
@@ -120,6 +127,7 @@ export class Fighter {
     this.sprite.rotation = 0;
     this.sprite.alpha = 1;
     this.sprite.tint = 0xffffff;
+    this.animKey = 'idle';
     this.anim = this.anims.idle;
     this.frame = 0;
   }
@@ -142,8 +150,8 @@ export class Fighter {
     if (this.state === s) return;
     this.state = s;
     const a = this.anims;
-    if (s === 'walk' && a.walk) this.anim = a.walk;
-    else if (s === 'idle' && a.idle) this.anim = a.idle;
+    if (s === 'walk' && a.walk) { this.animKey = 'walk'; this.anim = a.walk; }
+    else if (s === 'idle' && a.idle) { this.animKey = 'idle'; this.anim = a.idle; }
     this.frame = 0;
     this.animT = 0;
   }
@@ -195,7 +203,7 @@ export class Fighter {
       this.frame = looping ? (this.frame + 1) % this.anim.length : Math.min(this.frame + 1, this.anim.length - 1);
     }
     this.sprite.texture = this.anim[Math.min(this.frame, this.anim.length - 1)];
-    this.sprite.scale.set(this.facing * this.baseScale, this.baseScale);
+    this.sprite.scale.set(this.facing * (this.animDir[this.animKey] ?? 1) * this.baseScale, this.baseScale);
     this.root.y = -this.lift;
     return landed;
   }
