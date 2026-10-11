@@ -104,6 +104,9 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
   let combo = 0;
   let comboT = 0;
   let comboWho: Fighter = girl;
+  let comboMax = 0;
+  let comboRuns = 0;
+  let comboOver5 = 0;
   let threatT = 0;
   let boltT = 3;
   let ambientT = 1.5;
@@ -128,7 +131,12 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
   function landHit(att: Fighter, def: Fighter, kind: string): void {
     const a = ATTACKS[kind];
     const dir: 1 | -1 = att.x <= def.x ? 1 : -1;
-    def.takeHit(a.dmg, dir, a.knock, kind === 'super');
+    if (att !== comboWho && combo > 0) { comboRuns++; if (combo > 5) comboOver5++; combo = 0; }
+    const esc0 = 1 + 0.5 * Math.max(0, (att === comboWho ? combo : 0) - 2);
+    if (!def.takeHit(a.dmg, dir, a.knock * esc0, kind === 'super' || (att === comboWho && combo + 1 >= 4))) return;
+    if (att === comboWho) combo++; else { comboWho = att; combo = 1; }
+    comboT = 1.6;
+    comboMax = Math.max(comboMax, combo);
     const hx = def.x - dir * 30;
     const hy = stage.groundY - 130;
     fx.spark(hx, hy, kind === 'super' ? 0xff7a3c : 0xfff2a8, kind === 'super' || kind === 'kick');
@@ -137,8 +145,6 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     stage.shake(kind === 'super' ? 16 : 5 + a.dmg);
     hitstop = kind === 'super' ? 0.12 : 0.06;
     audio.sfx(kind === 'super' || kind === 'divekick' ? 'big' : 'hit', { pan: (def.x / app.screen.width) * 2 - 1 });
-    if (att === comboWho) combo++; else { comboWho = att; combo = 1; }
-    comboT = 2.2;
     if (def.health <= 0) {
       phase = 'ko';
       phaseT = 0;
@@ -288,7 +294,11 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
       if (Math.abs(fb.x - fb.foe.x) < 60 && phase === 'fight') {
         const tgt = fb.foe;
         const att = tgt === girl ? punk : girl;
-        tgt.takeHit(2, Math.sign(fb.vx) as 1 | -1, 60, false, 0.22);
+        if (!tgt.takeHit(1, Math.sign(fb.vx) as 1 | -1, 60, false, 0.22)) {
+          fb.t.destroy();
+          fireballs.splice(i, 1);
+          continue;
+        }
         fx.spark(fb.x, fb.t.y, 0x7ad4ff);
         fx.pow(fb.x, fb.t.y - 40);
         stage.shake(7);
@@ -322,7 +332,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
 
     // ── HUD ──────────────────────────────────────────────────────────────────
     comboT = Math.max(0, comboT - real);
-    if (comboT === 0) combo = 0;
+    if (comboT === 0 && combo > 0) { comboRuns++; if (combo > 5) comboOver5++; combo = 0; }
     threatT = Math.max(0, threatT - real);
     audio.setThreatActive(threatT > 0);
     drawHud(w);
@@ -368,6 +378,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
       if (app.renderer.resolution !== scale) app.renderer.resolution = scale;
     },
     stats: () => ({ round, traffic: Math.round(girl.health), firewall: Math.round(punk.health), combo }),
-    diag: () => ({ app, girl, punk, round, phase, phaseT, hitstop, timeScale, audio }),
+    diag: () => ({ app, girl, punk, round, phase, phaseT, hitstop, timeScale, audio,
+    comboStats: () => ({ max: comboMax, runs: comboRuns, over5: comboOver5 }) }),
   };
 }

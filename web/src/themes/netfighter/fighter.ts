@@ -20,14 +20,14 @@ export interface AttackDef {
 }
 
 export const ATTACKS: Record<string, AttackDef> = {
-  jab:      { anim: 'jab',      fps: 14, dmg: 2,  range: 150, hitAt: 0.13, dur: 0.24, knock: 50,  lunge: 30 },
-  punch:    { anim: 'punch',    fps: 12, dmg: 5,  range: 160, hitAt: 0.17, dur: 0.34, knock: 110, lunge: 60 },
-  kick:     { anim: 'kick',     fps: 14, dmg: 7,  range: 168, hitAt: 0.21, dur: 0.42, knock: 140, lunge: 70 },
-  jumpkick: { anim: 'jumpkick', fps: 12, dmg: 8,  range: 170, hitAt: 0.18, dur: 0.46, knock: 160, lunge: 90 },
-  divekick: { anim: 'divekick', fps: 16, dmg: 9,  range: 172, hitAt: 0.19, dur: 0.5,  knock: 150, lunge: 100 },
-  punch2:   { anim: 'punch',    fps: 11, dmg: 7,  range: 172, hitAt: 0.19, dur: 0.38, knock: 140, lunge: 70 },
-  punch3:   { anim: 'punch',    fps: 10, dmg: 9,  range: 178, hitAt: 0.2,  dur: 0.44, knock: 170, lunge: 80 },
-  super:    { anim: 'punch',    fps: 10, dmg: 16, range: 195, hitAt: 0.22, dur: 0.62, knock: 220, lunge: 120 },
+  jab:      { anim: 'jab',      fps: 14, dmg: 1,  range: 150, hitAt: 0.13, dur: 0.24, knock: 50,  lunge: 30 },
+  punch:    { anim: 'punch',    fps: 12, dmg: 3,  range: 160, hitAt: 0.17, dur: 0.34, knock: 110, lunge: 60 },
+  kick:     { anim: 'kick',     fps: 14, dmg: 5,  range: 168, hitAt: 0.21, dur: 0.42, knock: 140, lunge: 70 },
+  jumpkick: { anim: 'jumpkick', fps: 12, dmg: 5,  range: 170, hitAt: 0.18, dur: 0.46, knock: 160, lunge: 90 },
+  divekick: { anim: 'divekick', fps: 16, dmg: 6,  range: 172, hitAt: 0.19, dur: 0.5,  knock: 150, lunge: 100 },
+  punch2:   { anim: 'punch',    fps: 11, dmg: 5,  range: 172, hitAt: 0.19, dur: 0.38, knock: 140, lunge: 70 },
+  punch3:   { anim: 'punch',    fps: 10, dmg: 6,  range: 178, hitAt: 0.2,  dur: 0.44, knock: 170, lunge: 80 },
+  super:    { anim: 'punch',    fps: 10, dmg: 11, range: 195, hitAt: 0.22, dur: 0.62, knock: 220, lunge: 120 },
 };
 
 export class Fighter {
@@ -51,6 +51,7 @@ export class Fighter {
   private stateT = 0;
   private atk: AttackDef | null = null;
   private hurtDur = 0.42;
+  private downed = false;
   private tintFlash = 0;
 
   constructor(anims: Record<string, Texture[]>, readonly label: string) {
@@ -80,17 +81,20 @@ export class Fighter {
     return true;
   }
 
-  takeHit(dmg: number, dir: 1 | -1, knock: number, big = false, dur = 0.42): void {
+  takeHit(dmg: number, dir: 1 | -1, knock: number, big = false, dur = 0.42): boolean {
+    if (this.downed) return false;
     this.health = Math.max(0, this.health - dmg);
     this.state = 'hurt';
     this.stateT = 0;
-    this.hurtDur = dur;
+    this.hurtDur = big ? 0.75 : dur;
+    this.downed = big;
     this.anim = this.anims.hurt;
     this.frame = 0;
     this.animT = 0;
     this.vx = dir * knock;
     this.vy = big ? 200 : 0;
     this.tintFlash = 0.18;
+    return true;
   }
 
   ko(dir: 1 | -1): void {
@@ -144,6 +148,7 @@ export class Fighter {
   private setState(s: FState): void {
     if (this.state === s) return;
     this.state = s;
+    if (s === 'idle') this.downed = false;
     const a = this.anims;
     if (s === 'walk' && a.walk) this.anim = a.walk;
     else if (s === 'idle' && a.idle) this.anim = a.idle;
