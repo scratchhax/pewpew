@@ -174,6 +174,31 @@ vec3 glyphColor(float cls) {
   return vec3(0.23, 1.0, 0.42);
 }
 
+// distant log rain: procedural columns of hashed static glyphs, far behind
+// the field, so the black between the real columns reads as depth. They
+// scroll down with a trail like the real rain, but they are noise rather
+// than tonight's log - the shape the firewall makes a mile out
+vec3 farRain(vec2 uv, float cellPx, float k, float amt) {
+  vec2 grid = vec2(uRes.x / cellPx, uRes.y / (cellPx * 1.72));
+  vec2 g = uv * grid;
+  vec2 cell = floor(g);
+  vec2 f = fract(g);
+  float ph = hash1(cell.x * 0.71 + k * 13.0);
+  float spd = 0.3 + hash1(cell.x * 1.7 + k * 7.0) * 0.5;
+  float trail = 9.0;
+  float cyc = grid.y + trail * 2.0;
+  float head = mod(uTime * grid.y * spd * 0.22 + ph * cyc, cyc) - trail;
+  float d = head - cell.y;
+  if (d < 0.0 || d > trail) return vec3(0.0);
+  float gi = hash2(cell.x + k * 31.0, cell.y + floor(uTime * spd * 2.0 + ph * 100.0));
+  float idx = floor(gi * 95.0);
+  vec2 ac = vec2(mod(idx, 16.0), floor(idx / 16.0));
+  float a = texture(uAtlas, (ac + f) / vec2(16.0, 6.0)).r;
+  float fade = pow(max(0.0, 1.0 - d / trail), 1.7);
+  vec3 tint = uColorMode > 1.5 ? vec3(0.35, 0.7, 0.95) : vec3(0.2, 0.9, 0.38);
+  return tint * a * fade * amt;
+}
+
 void main() {
   vec2 uv = vUv;
   // background fog: a full-screen drifting haze, a touch denser toward the
@@ -182,6 +207,12 @@ void main() {
   float fogDepth = 0.55 + 0.45 * (1.0 - smoothstep(0.0, 0.9, length((uv - uVp) * vec2(uAspect, 1.0))));
   float fogBank = fogField(uv, uTime) * fogDepth * uFog;
   vec3 col = vec3(0.05, 0.13, 0.07) * fogBank;
+  // the field is sparse, so the gaps are filled with two parallax layers
+  // of distant log rain, thicker where the fog is thick
+  vec2 drift = vec2(sin(uTime * 0.021), cos(uTime * 0.017)) * 0.012;
+  float rainFog = 0.45 + 0.55 * fogBank;
+  col += farRain(uv + drift, 10.0, 1.0, 0.13 * rainFog);
+  col += farRain(uv + drift * 1.8, 14.0, 2.4, 0.09 * rainFog);
   for (int i = 0; i < MAXC; i++) {
     float fi = float(i);
     if (fi >= uN) break;
