@@ -10,7 +10,7 @@ import { RAIN_VERT, RAIN3D_FRAG } from './shader';
  * pixel; this only moves the columns and writes the text.
  */
 
-const MAXC = 96;
+const MAXC = 160;
 const RING = 64;
 const LEN = 32;
 const Z_NEAR = 0.035;
@@ -155,10 +155,12 @@ export class Rain3D {
   }
 
   /** The spinner's cycle length at this depth: screen height + trail, in
-   *  cells. Mirrors the shader's halfH/cyc so head can be integrated here. */
+   *  cells. Mirrors the shader's halfH/cyc (including its cell-height clamp,
+   *  so a whole line always fits on screen) so head can be integrated here. */
   private cyc(z: number, trail: number): number {
     const cellBase = 0.045 * (this.glyphW / 15);
-    return LEN + 2 * (0.5 * z / cellBase + trail);
+    const cellH = Math.min(cellBase / z, 0.85 / LEN);
+    return LEN + 2 * (0.5 / cellH + trail);
   }
 
   step(dt: number, o: FlyOpts): void {

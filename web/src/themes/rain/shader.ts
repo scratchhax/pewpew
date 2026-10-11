@@ -131,7 +131,7 @@ void main() {
  * uCols:  MAXC x 1 rgba32f - x, z, lineId, class.
  */
 export const RAIN3D_FRAG = /* glsl */`#version 300 es
-#define MAXC 96
+#define MAXC 160
 #define LEN 32
 #define RING 64
 in vec2 vUv;
@@ -211,8 +211,8 @@ void main() {
   // of distant log rain, thicker where the fog is thick
   vec2 drift = vec2(sin(uTime * 0.021), cos(uTime * 0.017)) * 0.012;
   float rainFog = 0.45 + 0.55 * fogBank;
-  col += farRain(uv + drift, 10.0, 1.0, 0.13 * rainFog);
-  col += farRain(uv + drift * 1.8, 14.0, 2.4, 0.09 * rainFog);
+  col += farRain(uv + drift, 10.0, 1.0, 0.10 * rainFog);
+  col += farRain(uv + drift * 1.8, 14.0, 2.4, 0.07 * rainFog);
   for (int i = 0; i < MAXC; i++) {
     float fi = float(i);
     if (fi >= uN) break;
@@ -220,7 +220,10 @@ void main() {
     float z = c.y;
     if (z < 0.02) continue;
     float s = 1.0 / z;
-    float cellH = uCellH * s;
+    // cell height grows with nearness, but clamps so a whole 32-cell line
+    // always fits on screen: the line grows as it approaches, then holds a
+    // readable size while the column slides past
+    float cellH = min(uCellH * s, 0.85 / float(LEN));
     float sx = uVp.x + (c.x - 0.5) * uSpread * s;
     float halfW = cellH / (3.44 * uAspect);
     float dx = uv.x - sx;
@@ -249,7 +252,7 @@ void main() {
     float a = texture(uAtlas, (ac + f) / vec2(16.0, 6.0)).r;
     // distance haze: far glyphs blur into the fog, so the field reads as
     // a thick volume you are falling through, not a grid of sprites
-    float blur = clamp((z - 1.0) / 2.8, 0.0, 1.0) * 0.22;
+    float blur = clamp((z - 1.5) / 2.8, 0.0, 1.0) * 0.22;
     if (blur > 0.004) {
       vec2 o = vec2(blur, blur * 1.72);
       a = (a
@@ -260,7 +263,7 @@ void main() {
     }
     if (a < 0.02) continue;
     float lit = 1.0 - 0.55 * (d / float(LEN));
-    float depth = mix(1.0, 0.3, clamp((z - 0.3) / 3.5, 0.0, 1.0));
+    float depth = mix(1.0, 0.42, clamp((z - 0.3) / 3.5, 0.0, 1.0));
     float fog = mix(1.0, depth, uFog);
     float near = smoothstep(0.03, 0.09, z);
     vec3 tint = glyphColor(cls);

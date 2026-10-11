@@ -26,16 +26,16 @@ export const RAIN_DEFAULTS = {
 
   // scene budgets = the HIGH preset
   rFarLayers: 2,             // procedural depth layers behind the log (fall mode)
-  rColumns: 96,              // columns in the 3D field (fly mode)
+  rColumns: 128,             // columns in the 3D field (fly mode)
 };
 
 export type RainSettings = CoreSettings & typeof RAIN_DEFAULTS;
 
 export const RAIN_BUDGETS: Budgets = {
-  low: { rFarLayers: 0, rFlicker: false, rDensity: 0.6, rColumns: 40 },
-  medium: { rFarLayers: 1, rFlicker: true, rDensity: 0.8, rColumns: 64 },
-  high: { rFarLayers: 2, rFlicker: true, rDensity: 1, rColumns: 96 },
-  ultra: { rFarLayers: 3, rFlicker: true, rDensity: 1.2, rColumns: 96 },
+  low: { rFarLayers: 0, rFlicker: false, rDensity: 0.6, rColumns: 48 },
+  medium: { rFarLayers: 1, rFlicker: true, rDensity: 0.8, rColumns: 80 },
+  high: { rFarLayers: 2, rFlicker: true, rDensity: 1, rColumns: 128 },
+  ultra: { rFarLayers: 3, rFlicker: true, rDensity: 1.2, rColumns: 160 },
 };
 
 type Key = keyof typeof RAIN_DEFAULTS;
@@ -67,7 +67,7 @@ export const RAIN_CONTROLS = {
   ],
   budgets: [
     range('rFarLayers', 'Depth layers', 0, 3, 1),
-    range('rColumns', 'Fly columns', 8, 96, 8),
+    range('rColumns', 'Fly columns', 8, 160, 8),
   ],
   color: [] as Control[],
   audio: [
