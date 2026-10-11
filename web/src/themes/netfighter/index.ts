@@ -10,13 +10,15 @@ import { netFighterScore } from './score';
 
 /**
  * Net Fighter: the firewall log as a street fight. Two fighters brawl a
- * night-city block - TRAFFIC, fed by every packet that passes (the vast
- * majority of events, fast jabs and combos), against FIREWALL, fed by
- * everything the network refuses or answers: blocks, lookups, leases,
- * joins. A threat is a super move with lightning; a DNS lookup is a
- * fireball wearing the domain's name; new devices join the crowd on the
- * sidewalk. When one fighter drops, the other poses, the round counter
- * climbs, and the next round starts before the crowd has sat back down.
+ * night-city block - TRAFFIC, a pixel brawler girl, against the FIREWALL,
+ * a street punk. Log lines are dealt to them like hands of cards, strictly
+ * alternating 1:1 whatever their type, so no traffic mix can stack the
+ * deck; what a line *is* decides what the fighter who drew it gets. A
+ * threat is a super move with lightning; a DNS lookup is a fireball
+ * wearing the domain's name, thrown at the other fighter; new devices
+ * join the crowd on the sidewalk. When one fighter drops, the other poses,
+ * the round counter climbs, and the next round starts before the crowd
+ * has sat back down.
  */
 export const netfighter: Theme<typeof NETFIGHTER_DEFAULTS> = {
   id: 'netfighter',
@@ -101,6 +103,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
   let timeScale = 1;
   let combo = 0;
   let comboT = 0;
+  let comboWho: Fighter = girl;
   let threatT = 0;
   let boltT = 3;
   let ambientT = 1.5;
@@ -113,6 +116,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     for (const f of fireballs) f.t.destroy();
     fireballs.length = 0;
     combo = 0;
+    comboWho = girl;
     phase = 'intro';
     phaseT = 0;
     timeScale = 1;
@@ -133,7 +137,8 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     stage.shake(kind === 'super' ? 16 : 5 + a.dmg);
     hitstop = kind === 'super' ? 0.12 : 0.06;
     audio.sfx(kind === 'super' || kind === 'divekick' ? 'big' : 'hit', { pan: (def.x / app.screen.width) * 2 - 1 });
-    if (att === girl) { combo++; comboT = 2.2; }
+    if (att === comboWho) combo++; else { comboWho = att; combo = 1; }
+    comboT = 2.2;
     if (def.health <= 0) {
       phase = 'ko';
       phaseT = 0;
@@ -148,7 +153,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
 
   function chooseAttack(f: Fighter): string {
     if (f === girl) return f.charge >= 4 ? 'divekick' : f.charge >= 3 ? 'kick' : f.charge >= 2 ? 'punch' : 'jab';
-    return f.charge >= 5 ? 'super' : 'punch';
+    return f.charge >= 5 ? 'super' : f.charge >= 4 ? 'punch3' : f.charge >= 3 ? 'punch2' : 'punch';
   }
 
   // Events alternate 1:1 between the fighters, whatever their type: one log
@@ -235,8 +240,8 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
         if (!me.busy) me.facing = foe.x >= me.x ? 1 : -1;
         const kind = chooseAttack(me);
         const a = ATTACKS[kind];
-        if (me.charge >= 1 && dist <= a.range && !me.busy) {
-          me.charge = me === girl ? Math.max(0, me.charge - 1) : 0;
+        if (me.charge >= 2 && dist <= a.range && !me.busy) {
+          me.charge = kind === 'super' ? 0 : Math.max(0, me.charge - 2);
           me.attack(kind, foe.x);
         } else if (dist > a.range * 0.85) {
           me.walkToward(foe.x + Math.sign(me.x - foe.x) * a.range * 0.7, 150, dt);
@@ -348,7 +353,8 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     roundTxt.text = `ROUND ${round}`;
     roundTxt.x = w / 2 - roundTxt.width / 2;
     roundTxt.y = y;
-    comboTxt.text = combo > 1 ? `${combo} HIT COMBO!` : '';
+    comboTxt.text = combo > 1 ? `${comboWho.label} ${combo} HIT COMBO!` : '';
+    comboTxt.style.fill = comboWho === girl ? 0x52ff7a : 0xff4a3c;
     comboTxt.x = 34;
     comboTxt.y = y + hgt + 52;
   }
