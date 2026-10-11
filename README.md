@@ -25,7 +25,10 @@ your own traffic. Pick a scene per screen:
   of log columns the camera flies through: every event becomes a line
   (`BLOCK 203.0.113.7 < 192.168.1.23`, `LOOKUP github.com`) that approaches
   from the dark, grows, and passes you, green for traffic that passes, red
-  for what burns; a hurricane is a fast dive through tonight's log
+  for what burns; a hurricane is a fast dive through tonight's log. A third
+  camera plays the log as Conway's Game of Life: every live cell is a glyph,
+  PASS events glide across as gliders, BLOCKs sit as still lifes, and an IDS
+  alarm drops a glider gun
 - **Mycelium**: a bioluminescent forest floor from above, where hosts put out
   growing filaments that weave a mat across the loam — permitted traffic runs
   through it as travelling light, habit decides the roads, mushrooms fruit at

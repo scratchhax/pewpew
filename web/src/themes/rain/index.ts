@@ -4,14 +4,18 @@ import type { SceneEvent } from '../../events';
 import { RAIN_DEFAULTS, RAIN_BUDGETS, RAIN_CONTROLS, RAIN_HUD } from './settings';
 import { Rain } from './rain';
 import { Rain3D } from './rain3d';
+import { LifeScene } from './life';
 import { rainScore } from './score';
 
 /**
- * The Rain: the firewall log as digital rain, glmatrix style. Two cameras:
+ * The Rain: the firewall log as digital rain, glmatrix style. Three cameras:
  * `fall` is a flat plane of columns with a white spinner at the head and a
  * fading trail, foggy depth layers drifting behind; `fly` is the real thing
  * - a 3D field of log columns the camera moves through, each one carrying a
- * real line that approaches, grows, and passes you. Either way the glyphs
+ * real line that approaches, grows, and passes you; `life` is Conway's
+ * Game of Life where every live cell is a log glyph and events seed the
+ * grid with patterns - PASS glides, BLOCK sits, IDS sprays gliders forever.
+ * Either way the glyphs
  * are tonight's log: every event writes a line - BLOCK, LOOKUP, LEASE, IDS
  * - green for traffic that passes, red for what gets denied, orange for
  * intrusions. When nothing happens the columns fall as static. The weather
@@ -48,13 +52,17 @@ async function create(host: ThemeHost<typeof RAIN_DEFAULTS>, init: RendererInit)
   });
   host.mount.appendChild(app.canvas);
 
-  let mode: 'fall' | 'fly' = settings.rCam === 'fall' ? 'fall' : 'fly';
-  let scene: Rain | Rain3D = build();
+  type Mode = 'fall' | 'fly' | 'life';
+  const modeOf = (cam: string): Mode => (cam === 'fall' ? 'fall' : cam === 'life' ? 'life' : 'fly');
+  let mode: Mode = modeOf(settings.rCam);
+  let scene: Rain | Rain3D | LifeScene = build();
 
-  function build(): Rain | Rain3D {
+  function build(): Rain | Rain3D | LifeScene {
     const s = mode === 'fly'
       ? new Rain3D(app.screen.width, app.screen.height)
-      : new Rain(app.screen.width, app.screen.height);
+      : mode === 'life'
+        ? new LifeScene(app.screen.width, app.screen.height)
+        : new Rain(app.screen.width, app.screen.height);
     s.glyphW = settings.rGlyph;
     s.resize(app.screen.width, app.screen.height);
     app.stage.addChild(s.view);
@@ -89,6 +97,7 @@ async function create(host: ThemeHost<typeof RAIN_DEFAULTS>, init: RendererInit)
   function event(e: SceneEvent): void {
     const { line, cls } = lineFor(e);
     scene.push(line, cls);
+    if (mode === 'life') (scene as LifeScene).seedEvent(e.kind, cls);
     audio.cueSong(e.kind, e.ev.src_ip ?? e.ev.dst_ip ?? undefined);
     if (e.kind === 'threat') threatT = 6;
   }
@@ -98,7 +107,7 @@ async function create(host: ThemeHost<typeof RAIN_DEFAULTS>, init: RendererInit)
   function frame(f: FrameInfo): void {
     const dt = f.dt;
     const w = app.screen.width, h = app.screen.height;
-    const want: 'fall' | 'fly' = settings.rCam === 'fall' ? 'fall' : 'fly';
+    const want: Mode = modeOf(settings.rCam);
     if (want !== mode) {
       mode = want;
       app.stage.removeChild(scene.view);
@@ -131,6 +140,21 @@ async function create(host: ThemeHost<typeof RAIN_DEFAULTS>, init: RendererInit)
         resY: h * app.renderer.resolution,
         vpX: 0.5 + Math.sin(f.t * 0.031) * 0.1,
         vpY: 0.5 + Math.cos(f.t * 0.023) * 0.07,
+        wanderX: f.wanderX / w,
+        wanderY: f.wanderY / h,
+      });
+    } else if (mode === 'life') {
+      const s = scene as LifeScene;
+      s.step(dt, {
+        stepMs: settings.rLifeStep,
+        seed: settings.rLifeSeed,
+        wet: settings.rWeather ? wet : 0,
+      });
+      s.uniforms(f.t, {
+        fog: settings.rFog,
+        colorMode,
+        resX: w * app.renderer.resolution,
+        resY: h * app.renderer.resolution,
         wanderX: f.wanderX / w,
         wanderY: f.wanderY / h,
       });
