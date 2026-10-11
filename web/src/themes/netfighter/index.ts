@@ -71,7 +71,6 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     { idle: tex.anim('punk', 'idle'), walk: tex.anim('punk', 'walk'), punch: tex.anim('punk', 'punch'),
       hurt: tex.anim('punk', 'hurt') },
     'FIREWALL',
-    { idle: -1 },
   );
   girl.reset(CENTER - 160, 1);
   punk.reset(CENTER + 160, -1);
@@ -246,8 +245,10 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     } else if (phase !== 'fight' && dt > 0) {
       girl.walkToward(CENTER - 160, 200, dt);
       punk.walkToward(CENTER + 160, 200, dt);
-      girl.facing = punk.x >= girl.x ? 1 : -1;
-      punk.facing = girl.x >= punk.x ? 1 : -1;
+      // face the way you travel back to the mark; the fight loop snaps facing
+      // to the opponent at FIGHT!
+      girl.facing = girl.state === 'walk' ? (girl.x < CENTER - 160 ? 1 : -1) : (punk.x >= girl.x ? 1 : -1);
+      punk.facing = punk.state === 'walk' ? (punk.x < CENTER + 160 ? 1 : -1) : (girl.x >= punk.x ? 1 : -1);
     }
 
     const landedG = girl.update(dt);
