@@ -240,18 +240,19 @@ void main() {
     float crt = 1.0 - smoothstep(0.15, 1.2, z);
     float front = 1.0 - smoothstep(0.10, 0.42, z);
     if (crt > 0.02) {
-      float px = (0.09 + 0.1 * front) * crt;
+      float px = (0.12 + 0.14 * front) * crt;
       float ar = texture(uAtlas, (ac + f + vec2(-px, 0.0)) / vec2(16.0, 6.0)).r;
       float ab = texture(uAtlas, (ac + f + vec2(px, 0.0)) / vec2(16.0, 6.0)).r;
-      vec3 rgb = tint * a + vec3(0.55, 0.08, 0.0) * ar * 0.6 + vec3(0.0, 0.12, 0.55) * ab * 0.6;
-      // at the front the scanlines go fat (3px -> 5px) and near-black,
-      // the way a real tube looks when your nose is against the glass
-      float freq = mix(2.0944, 1.2566, front);
+      vec3 rgb = tint * a + vec3(0.55, 0.08, 0.0) * ar * 0.75 + vec3(0.0, 0.12, 0.55) * ab * 0.75;
+      // at the front the scanlines go fat (3px -> 6px) and near-black,
+      // the bright slit razor thin, the way a real tube looks when your
+      // nose is against the glass
+      float freq = mix(2.0944, 1.0472, front);
       float band = 0.5 + 0.5 * cos(uv.y * uRes.y * freq);
-      band = pow(band, 1.0 + 4.0 * front);
-      float scan = 1.0 - crt * (0.72 + 0.26 * front) * band;
-      float flick = 1.0 - 0.05 * crt * sin(uTime * 37.0);
-      col += rgb * lit2 * scan * flick * (1.0 + 0.5 * crt);
+      band = pow(band, 1.0 + 6.0 * front);
+      float scan = 1.0 - crt * (0.82 + 0.17 * front) * band;
+      float flick = 1.0 - 0.08 * crt * sin(uTime * 37.0);
+      col += rgb * lit2 * scan * flick * (1.0 + 0.7 * crt);
     } else {
       col += tint * a * lit2;
     }
