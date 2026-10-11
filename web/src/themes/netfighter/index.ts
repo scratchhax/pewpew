@@ -223,6 +223,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
       const dist = Math.abs(girl.x - punk.x);
       for (const [me, foe] of [[girl, punk], [punk, girl]] as const) {
         me.charge = Math.max(0, me.charge - dt * 0.12);
+        if (!me.busy) me.facing = foe.x >= me.x ? 1 : -1;
         const kind = chooseAttack(me);
         const a = ATTACKS[kind];
         if (me.charge >= 1 && dist <= a.range && !me.busy) {
@@ -244,6 +245,8 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     } else if (phase !== 'fight' && dt > 0) {
       girl.walkToward(CENTER - 160, 200, dt);
       punk.walkToward(CENTER + 160, 200, dt);
+      girl.facing = punk.x >= girl.x ? 1 : -1;
+      punk.facing = girl.x >= punk.x ? 1 : -1;
     }
 
     const landedG = girl.update(dt);
