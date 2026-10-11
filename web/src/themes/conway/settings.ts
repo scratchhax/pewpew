@@ -16,7 +16,6 @@ export const CONWAY_DEFAULTS = {
 
   // soundtrack
   lMusicStyle: 'auto' as string, // auto | drizzle | shower | deluge
-  lRainAmb: 0.35,                // rain hiss bed under the beat
 };
 
 export type ConwaySettings = CoreSettings & typeof CONWAY_DEFAULTS;
@@ -54,7 +53,6 @@ export const CONWAY_CONTROLS = {
   color: [] as Control[],
   audio: [
     { kind: 'select', key: 'lMusicStyle', label: 'Music', options: CONWAY_MUSIC_STYLES } as Control,
-    range('lRainAmb', 'Rain hiss', 0, 1, 0.05),
   ],
   colorHint: `The field keeps its own colours: green for traffic that passes,
         red for blocks, orange for intrusions. Hue shift & intensity stay

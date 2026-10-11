@@ -122,15 +122,17 @@ const STYLES: StyleDef[] = [
 ];
 
 class RainConductor extends Conductor {
-  private rain: Bed;
-  private wind: Bed;
+  private rain: Bed | null = null;
+  private wind: Bed | null = null;
   private keys: { music: string; amb: string };
 
-  constructor(e: AudioEngine, keys?: { music: string; amb: string }) {
+  constructor(e: AudioEngine, keys?: { music: string; amb: string }, beds = true) {
     super(e, { styles: STYLES, styleKey: keys?.music ?? 'rMusicStyle', rotateKey: keys?.music ?? 'rMusicStyle' });
     this.keys = keys ?? { music: 'rMusicStyle', amb: 'rRainAmb' };
-    this.rain = this.s.rain(this.amb);
-    this.wind = this.makeWind(this.amb);
+    if (beds) {
+      this.rain = this.s.rain(this.amb);
+      this.wind = this.makeWind(this.amb);
+    }
   }
 
   /** Low wind under the rain: broad, dark, restless but never wavy. */
@@ -158,6 +160,7 @@ class RainConductor extends Conductor {
   }
 
   protected override ambience(_dt: number, state: State, now: number, on: boolean): void {
+    if (!this.rain || !this.wind) return;
     const amb = on ? this.setting<number>(this.keys.amb) : 0;
     const wet = state.weather === 'hurricane' ? 1 : state.weather === 'storm' ? 0.5 : 0;
     this.setBed(this.rain, amb * (0.1 + wet * 0.42), now);
@@ -247,7 +250,8 @@ class RainConductor extends Conductor {
 
 export function rainScore(e: AudioEngine): Score { return new RainConductor(e); }
 
-/** The same score played by another scene with its own setting keys. */
-export function rainScoreFor(e: AudioEngine, music: string, amb: string): Score {
-  return new RainConductor(e, { music, amb });
+/** The same score played by another scene with its own setting keys.
+ *  `beds: false` drops the rain hiss and wind - not every scene is wet. */
+export function rainScoreFor(e: AudioEngine, music: string, amb: string, beds = true): Score {
+  return new RainConductor(e, { music, amb }, beds);
 }

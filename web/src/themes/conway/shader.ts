@@ -72,12 +72,16 @@ void main() {
       float cls = d.g;
       float age = d.b;
       vec2 ac = vec2(mod(idx, 16.0), floor(idx / 16.0));
-      float a = texture(uAtlas, (ac + f) / vec2(16.0, 6.0)).r;
+      float ga = texture(uAtlas, (ac + f) / vec2(16.0, 6.0)).r;
+      // the cell is a solid block so the colony's shape reads at a glance;
+      // the glyph rides inside it, brighter, so up close it is still the log
+      vec2 inset = smoothstep(0.05, 0.16, f) * smoothstep(0.05, 0.16, 1.0 - f);
+      float a = inset.x * inset.y * (0.45 + 0.55 * ga);
       if (a > 0.02) {
         // newborns flash white, elders cool to embers
-        float bright = mix(1.0, 0.32, min(age, 24.0) / 24.0);
+        float bright = mix(1.0, 0.5, min(age, 24.0) / 24.0);
         vec3 tint = mix(glyphColor(cls), vec3(0.85, 1.0, 0.92), age <= 1.0 ? 0.8 : 0.0);
-        bright *= 0.88 + 0.12 * hash2(cell.x + 13.0, cell.y + floor(uTime * 3.0));
+        bright *= 0.9 + 0.1 * hash2(cell.x + 13.0, cell.y + floor(uTime * 3.0));
         col += tint * a * bright;
       }
     }
