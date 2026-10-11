@@ -47,9 +47,9 @@ const select = (key: Key, label: string, options: Array<[string, string]>): Cont
 
 export const RAIN_MUSIC_STYLES: Array<[string, string]> = [
   ['auto', 'Auto (weather)'],
-  ['drizzle', 'Drizzle (trip-hop)'],
-  ['shower', 'Shower (big beat)'],
-  ['deluge', 'Deluge (industrial)'],
+  ['drizzle', 'Drizzle (drone)'],
+  ['shower', 'Shower (dark ambient)'],
+  ['deluge', 'Deluge (cluster)'],
 ];
 
 export const RAIN_CONTROLS = {

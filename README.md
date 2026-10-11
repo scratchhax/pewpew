@@ -155,8 +155,9 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
   and bass, eurobeat and a nu-metal riff on the street; an original chip band in
   Packet Rush; cold-war synth and swung spy jazz in Panopticon; acid house,
   breakbeat and jungle in Mainframe; lounge, bossa and dub in the Aquarium;
-  techno, EBM and cold dark-synth on the Gibson; trip-hop, big beat and
-  industrial guitar from drizzle to deluge on The Rain. The scene's sounds play along on the beat and in key: lasers,
+  techno, EBM and cold dark-synth on the Gibson; dark drones from a single
+  breathing reese to a dissonant cluster from drizzle to deluge on The Rain
+  and Game of Life. The scene's sounds play along on the beat and in key: lasers,
   gunfire, an engine that shifts gears in time, gem chimes that climb the scale.
   There are no audio files anywhere, though you can upload your own
   [background track](#background-tracks).
@@ -981,12 +982,11 @@ columns fall as hex static — the shape an idle firewall makes.
 Both modes are one fragment shader each: the CPU only keeps the columns and
 a ring buffer of the last 64 log lines, and the text, spinners and trails
 are computed analytically, so nothing leaves residue at any resolution. The
-soundtrack is the club at the end of the century, and the weather picks the
-style: a calm night is Clubbed-to-Death trip-hop — half-time drums, a reese
-bass breathing under dark strings; a storm is Prodigy big beat — four on the
-floor, clap on the backbeat, stabs off the offbeats, a scratch fill into
-every fourth bar; a hurricane is Dragula industrial — pounding kick, muted
-guitar chugs, section hits. Under it all, a low rain hiss.
+soundtrack is the red-pilot scene, not the club, and the weather picks the
+style: a calm night is one low drone breathing under a slow minor pad; a
+storm doubles the drone and lets a choir in on the changes; a hurricane is
+a dissonant cluster — root and minor second grinding, chords turning every
+bar. No drums, ever; under it all, a low rain hiss.
 
 | Event | In the rain |
 |-------|-------------|

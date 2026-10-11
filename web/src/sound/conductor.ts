@@ -130,7 +130,7 @@ export abstract class Conductor implements Score {
   private pulseAt = 0;
   private bedLevels = new WeakMap<Bed, number>();
 
-  constructor(protected e: AudioEngine, private cfg: ConductorConfig) {
+  constructor(protected e: AudioEngine, protected cfg: ConductorConfig) {
     const ctx = e.ctx;
     this.s = new Synth(e);
     this.music = new Bus(ctx, e.out, e.reverb, e.echo, 0);

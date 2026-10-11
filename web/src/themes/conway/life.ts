@@ -162,11 +162,21 @@ export class LifeScene {
       },
     });
     this.mesh = new Mesh({ geometry: this.plane(w, h), shader: this.shader });
-    // start already breathing: a few patterns and a handful of soup
-    this.seedEvent('allow', 0);
-    this.seedEvent('dhcp', 0);
-    this.seedEvent('wifi', 0);
-    for (let k = 0; k < 90; k++) this.setCell((Math.random() * LIFE_W) | 0, (Math.random() * LIFE_H) | 0, 0);
+    // a classic opening so the first seconds already read as Life: a gun
+    // in the corner spraying gliders, a pulsar breathing, a few gliders
+    // crossing, and an r-pentomino about to thrash
+    this.seedAt('gun', 6, 6, 0, 'G'.charCodeAt(0) - 32);
+    this.seedAt('pulsar', 96, 24, 0, 'O'.charCodeAt(0) - 32);
+    this.seedAt('pentomino', 60, 20, 2, '%'.charCodeAt(0) - 32);
+    this.seedAt('glider', 30, 8, 0, 'P'.charCodeAt(0) - 32);
+    this.seedAt('glider', 44, 36, 0, 'P'.charCodeAt(0) - 32);
+    this.seedAt('glider', 110, 10, 0, 'P'.charCodeAt(0) - 32);
+    this.seedAt('toad', 20, 38, 0, 'T'.charCodeAt(0) - 32);
+  }
+
+  /** Seed a named pattern at a fixed spot, wearing one glyph. */
+  private seedAt(name: string, x: number, y: number, cls: number, glyph: number): void {
+    for (const [dx, dy] of PATTERNS[name]) this.setCell(x + dx, y + dy, cls, glyph);
   }
 
   private plane(w: number, h: number): PlaneGeometry {
@@ -199,34 +209,37 @@ export class LifeScene {
     for (let i = 0; i < LEN; i++) this.line[i] = FILLER.charCodeAt((Math.random() * FILLER.length) | 0) - 32;
   }
 
-  private setCell(x: number, y: number, cls: number): void {
+  private setCell(x: number, y: number, cls: number, glyph: number): void {
     const px = ((x % LIFE_W) + LIFE_W) % LIFE_W;
     const py = ((y % LIFE_H) + LIFE_H) % LIFE_H;
     const i = py * LIFE_W + px;
     this.grid.set(px, py);
-    this.glyph[i] = this.line[px % LEN];
+    this.glyph[i] = glyph;
     this.cls[i] = cls;
     this.dirty = true;
   }
 
-  /** An event drops a pattern: PASS glides, BLOCK sits, IDS sprays. */
+  /** An event drops a pattern: PASS glides, BLOCK sits, IDS sprays. The
+   *  whole pattern wears one glyph - the first letter of the line - so a
+   *  glider stream reads as a stream of P's, a block colony as B's. */
   seedEvent(kind: string, cls: number): void {
-    // at deluge rates every event would seed a gun: cap the fireworks
-    if (this.seedsThisTick >= 3) return;
+    // at deluge rates every event would seed a gun: one pattern per
+    // generation, and most PASSes pass without one
+    if (this.seedsThisTick >= 1) return;
+    if (kind === 'allow' && Math.random() < 0.6) return;
     this.seedsThisTick++;
     let name = 'glider';
-    let pw = 3;
-    let ph = 3;
-    if (kind === 'threat') { name = 'gun'; pw = 37; ph = 9; }
-    else if (kind === 'block') { name = 'block'; pw = 2; ph = 2; }
-    else if (kind === 'dns') { name = 'blinker'; pw = 3; ph = 1; }
-    else if (kind === 'dhcp') { name = 'toad'; pw = 4; ph = 2; }
-    else if (kind === 'wifi') { name = 'pulsar'; pw = 13; ph = 13; }
-    else if (kind === 'system') { name = 'pentomino'; pw = 3; ph = 3; }
+    if (kind === 'threat') name = 'gun';
+    else if (kind === 'block') name = 'block';
+    else if (kind === 'dns') name = 'blinker';
+    else if (kind === 'dhcp') name = 'toad';
+    else if (kind === 'wifi') name = 'pulsar';
+    else if (kind === 'system') name = 'pentomino';
     const p = PATTERNS[name];
     const cx = (Math.random() * LIFE_W) | 0;
     const cy = (Math.random() * LIFE_H) | 0;
-    for (const [dx, dy] of p) this.setCell(cx + dx, cy + dy, cls);
+    const g = this.line[0] || 16;
+    for (const [dx, dy] of p) this.setCell(cx + dx, cy + dy, cls, g);
   }
 
   step(dt: number, o: LifeOpts): void {
@@ -247,11 +260,27 @@ export class LifeScene {
   private tick(o: LifeOpts): void {
     this.grid.step();
     this.seedsThisTick = 0;
-    const { cur, old, age } = this.grid;
+    const { cur, old, age, w, h } = this.grid;
+    // newborns inherit: a cell is born between exactly three parents, so
+    // it wears the glyph and colour of the first one. Colonies stay
+    // themselves as they grow - a B colony breeds B's, a glider stream
+    // stays a stream
     for (let i = 0; i < cur.length; i++) {
       if (cur[i] && !old[i]) {
-        this.glyph[i] = this.line[i % LIFE_W % LEN];
-        this.cls[i] = this.lineCls;
+        const x = i % w;
+        const y = (i / w) | 0;
+        const l = (x + w - 1) % w;
+        const r = (x + 1) % w;
+        const up = ((y + h - 1) % h) * w;
+        const dn = ((y + 1) % h) * w;
+        const md = y * w;
+        const p = old[up + l] ? up + l : old[up + x] ? up + x : old[up + r] ? up + r
+                : old[md + l] ? md + l : old[md + r] ? md + r
+                : old[dn + l] ? dn + l : old[dn + x] ? dn + x : old[dn + r] ? dn + r : -1;
+        if (p >= 0) {
+          this.glyph[i] = this.glyph[p];
+          this.cls[i] = this.cls[p];
+        }
       }
     }
     // still lifes never die, so the field needs a predator: once it passes
@@ -264,18 +293,16 @@ export class LifeScene {
       this.dirty = true;
       return;
     }
-    // the weather seeds the field: drizzle is sparse, a hurricane is soup.
-    // lone cells die at once, so ambient life arrives as small survivors:
-    // blocks, blinkers and the odd glider
-    const n = Math.round(o.seed * (1 + o.wet * 6));
-    for (let k = 0; k < n; k++) {
+    // ambient life arrives rarely - a survivor every few seconds, more in
+    // a storm - so patterns have time to breed, collide and be recognised
+    if (Math.random() < o.seed * (0.05 + o.wet * 0.18)) {
       const x = (Math.random() * LIFE_W) | 0;
       const y = (Math.random() * LIFE_H) | 0;
       const r = Math.random();
       const p = r < 0.4 ? PATTERNS.block : r < 0.75 ? PATTERNS.blinker : PATTERNS.glider;
-      for (const [dx, dy] of p) this.setCell(x + dx, y + dy, this.lineCls);
+      const g = this.line[0] || 16;
+      for (const [dx, dy] of p) this.setCell(x + dx, y + dy, this.lineCls, g);
     }
-    if (Math.random() < 0.04 + o.wet * 0.22) this.seedEvent('allow', 0);
     this.dirty = true;
   }
 

@@ -4,18 +4,16 @@ import { Conductor, Style, pick, type Mood, type StyleDef } from '../../sound/co
 import type { Bed, Bus } from '../../sound/synth';
 
 /**
- * The Rain's soundtrack: the club at the end of the century. Three styles
- * that follow the traffic instead of a clock, all dark, all loud, all in
- * the key the movie was shot in:
+ * The Rain's soundtrack: the red-pilot scene, not the club. Three drone
+ * styles that follow the traffic instead of a clock - no drums, ever; the
+ * weather changes how dense and how dark the drones are, never adds a beat:
  *
- *   drizzle (calm)      : Clubbed to Death trip-hop. Half-time kick, a
- *                         dragged snare, a reese breathing under dark
- *                         strings, one supersaw sting per phrase.
- *   shower  (storm)     : The Prodigy big beat. Four-on-the-floor, clap on
- *                         the backbeat, reese on the eighths, offbeat
- *                         stabs, a scratch fill into every fourth bar.
- *   deluge  (hurricane) : Dragula industrial. Pounding kick, muted guitar
- *                         chugs, section hits, crash on the change.
+ *   drizzle (calm)      : one low drone breathing under a slow minor pad,
+ *                         a lone high note now and then.
+ *   shower  (storm)     : the drone doubles, a choir joins on the changes,
+ *                         swells drift past.
+ *   deluge  (hurricane) : a dissonant cluster - root and minor second
+ *                         grinding, choir thick, chords turning every bar.
  *
  * The weather is the traffic, so the music follows the weather. Event
  * sounds are hardware, not hydrology: DNS is a data blip, a block is a
@@ -27,10 +25,10 @@ import type { Bed, Bus } from '../../sound/synth';
 const CHORDS = [[0, 3, 7], [0, 3, 7], [-4, 0, 3], [-2, 2, 5]];
 const MINOR = [0, 2, 3, 5, 7, 8, 10];
 
-// ── drizzle: trip-hop ────────────────────────────────────────────────────────
+// ── drizzle: one drone, breathing ────────────────────────────────────────────
 class Drizzle extends Style {
   readonly id = 'drizzle';
-  readonly bpm = 76;
+  readonly bpm = 40;
   readonly root = 55;                                             // A1
   readonly scale = MINOR;
   readonly chords = CHORDS;
@@ -39,32 +37,27 @@ class Drizzle extends Style {
   readonly level = 1.05;
 
   step(i: number, t: number, _m: Mood): void {
-    const s = this.s, b = this.bus, pos = i % 16, bar = Math.floor(i / 16);
+    const s = this.s, b = this.bus;
     const tones = this.tones(i, 1);
-    // half-time: the kick leans back, the snare drags on the 3
-    if (pos === 0 || pos === 10) s.kick(b, t, 0.16);
-    if (pos === 8) s.snare(b, t, 0.085, 0.15);
-    if (pos % 2 === 0) s.hat(b, t, pos % 4 === 0 ? 0.02 : 0.012, pos / 8 - 1);
-    if (pos === 14 && bar % 2 === 1) s.hat(b, t, 0.02, 0.3, true);
     if (this.isChordStart(i)) {
       const hold = this.barsPerChord * 16 * this.stepDur;
-      s.reese(b, t, tones[0] / 2, 0.09, hold * 0.9);
-      s.pad(b, t, tones.map((f) => f * 2), 0.016, hold * 0.95, 500);
-      s.cello(b, t, tones[0] * 2, 0.028, hold * 0.5, -0.2);
-      s.strings(b, t, tones[1] * 4, 0.022, 0.2);
+      s.reese(b, t, tones[0] / 2, 0.05, hold * 0.95);
+      s.pad(b, t, tones.map((f) => f * 2), 0.012, hold, 340);
+      s.cello(b, t, tones[0] * 2, 0.018, hold * 0.6, -0.3);
     }
-    if (pos === 0 && bar % 2 === 1) s.reese(b, t, tones[0] * 0.75, 0.05, 0.4);
-    // the sting, once per phrase, hanging over the change
-    if (pos === 14 && bar % 4 === 3) s.supersaw(b, t, tones[1] * 2, 0.05, 0.3, -0.25);
+    // a lone high note, drifting, rarely
+    if (i % 16 === 8 && Math.random() < 0.12) {
+      s.strings(b, t, tones[pick([1, 2])] * 4, 0.012, (Math.random() - 0.5) * 1.2);
+    }
   }
 
-  lead(t: number, f: number, g: number, pan: number): void { this.s.supersaw(this.bus, t, f * 2, g * 0.5, 0.25, pan); }
+  lead(t: number, f: number, g: number, pan: number): void { this.s.ping(this.bus, t, f * 2, g * 0.3, pan); }
 }
 
-// ── shower: big beat ─────────────────────────────────────────────────────────
+// ── shower: the drone doubles, a choir joins ─────────────────────────────────
 class Shower extends Style {
   readonly id = 'shower';
-  readonly bpm = 108;
+  readonly bpm = 52;
   readonly root = 55;
   readonly scale = MINOR;
   readonly chords = CHORDS;
@@ -75,35 +68,26 @@ class Shower extends Style {
   step(i: number, t: number, _m: Mood): void {
     const s = this.s, b = this.bus, pos = i % 16, bar = Math.floor(i / 16);
     const tones = this.tones(i, 1);
-    // the kick walks, the snare backbeats, the clap doubles it
-    if (pos % 4 === 0) s.kick(b, t, 0.15);
-    if (pos === 14 && bar % 2 === 1) s.kick(b, t, 0.1);
-    if (pos === 4 || pos === 12) { s.snare(b, t, 0.1); s.clap(b, t, 0.07, 0.1); }
-    if (pos % 2 === 0) s.hat(b, t, pos % 4 === 2 ? 0.022 : 0.014, 0.25);
-    if (pos === 14) s.hat(b, t, 0.02, -0.3, true);
-    // the reese engine on the eighths, fifth on the offbeats
-    if (pos % 2 === 0) {
-      const f = tones[0] / 2 * (pos === 6 || pos === 14 ? 1.5 : 1);
-      s.reese(b, t, f, 0.07, this.stepDur * 1.7);
-    }
     if (this.isChordStart(i)) {
-      s.pad(b, t, tones.map((f) => f * 2), 0.018, 2 * 16 * this.stepDur * 0.9, 620);
-      s.cello(b, t, tones[0] * 2, 0.03, 16 * this.stepDur, -0.2);
+      const hold = this.barsPerChord * 16 * this.stepDur;
+      s.reese(b, t, tones[0] / 2, 0.06, hold * 0.95);
+      s.pad(b, t, tones.map((f) => f * 2), 0.014, hold, 420);
+      s.choir(b, t, tones.map((f) => f * 2), 0.01, hold * 0.8);
+      s.cello(b, t, tones[0] * 2, 0.02, hold * 0.5, 0.25);
     }
-    // offbeat stabs, left then right
-    if (pos === 3 || pos === 11) s.supersaw(b, t, tones[2] * 2, 0.045, 0.18, pos === 3 ? -0.3 : 0.3);
-    // the turntable into the fourth bar, crash on the one
-    if (bar % 4 === 3 && pos === 12) s.scratch(b, t, 0.05, 0.3, 0.2);
-    if (pos === 0 && bar % 4 === 0) s.crash(b, t, 0.05, 0.4, tones[0] * 4);
+    // the second drone, a fifth below, breathing against the first
+    if (pos === 0 && bar % 2 === 1) s.reese(b, t, tones[0] * 0.75, 0.04, this.barsPerChord * 16 * this.stepDur * 0.5);
+    // a swell drifting past, off one ear or the other
+    if (pos === 12 && Math.random() < 0.15) s.swell(b, t, tones[1] * 4, 0.012, 2.5, Math.random() < 0.5 ? -0.5 : 0.5);
   }
 
-  lead(t: number, f: number, g: number, pan: number): void { this.s.supersaw(this.bus, t, f * 2, g * 0.5, 0.22, pan); }
+  lead(t: number, f: number, g: number, pan: number): void { this.s.ping(this.bus, t, f * 2, g * 0.3, pan); }
 }
 
-// ── deluge: industrial ───────────────────────────────────────────────────────
+// ── deluge: the cluster ──────────────────────────────────────────────────────
 class Deluge extends Style {
   readonly id = 'deluge';
-  readonly bpm = 128;
+  readonly bpm = 60;
   readonly root = 55;
   readonly scale = MINOR;
   readonly chords = CHORDS;
@@ -112,31 +96,22 @@ class Deluge extends Style {
   readonly level = 0.95;
 
   step(i: number, t: number, _m: Mood): void {
-    const s = this.s, b = this.bus, pos = i % 16, bar = Math.floor(i / 16);
+    const s = this.s, b = this.bus, pos = i % 16;
     const tones = this.tones(i, 1);
     const root = tones[0] / 2;
-    // pounding: kick on the floor every beat, extra kick off the grid
-    if (pos % 4 === 0) s.kick(b, t, 0.17);
-    if (pos === 10) s.kick(b, t, 0.12);
-    if (pos === 4 || pos === 12) { s.snare(b, t, 0.11); s.clap(b, t, 0.08, -0.1); }
-    if (pos % 2 === 0) s.hat(b, t, 0.016, 0.2);
-    // the riff: muted chugs low, open string on the fifth
-    if (pos === 0 || pos === 3 || pos === 6 || pos === 8 || pos === 11 || pos === 14) {
-      const f = pos === 6 || pos === 14 ? root * 1.5 : root;
-      s.guitar(b, t, f, 0.09, true, -0.25);
-      s.guitar(b, t, f, 0.05, true, 0.3);
-    }
     if (this.isChordStart(i)) {
-      s.guitar(b, t, root, 0.1, false, 0);
-      s.reese(b, t, root, 0.09, 16 * this.stepDur * 0.95);
-      s.section(b, t, tones[0] * 2, 0.05, 0.22, -0.2);
-      s.crash(b, t, 0.05, 0.35, tones[0] * 4);
+      const hold = 16 * this.stepDur;
+      // root and minor second grinding: the drone with a blade in it
+      s.reese(b, t, root, 0.07, hold * 0.95);
+      s.reese(b, t, root * 1.0595, 0.035, hold * 0.9);
+      s.pad(b, t, tones.map((f) => f * 2), 0.016, hold, 500);
+      s.choir(b, t, tones.map((f) => f * 2), 0.014, hold * 0.9);
+      s.cello(b, t, tones[0] * 2, 0.025, hold * 0.6, -0.2);
     }
-    if (pos === 8 && bar % 2 === 1) s.section(b, t, tones[1] * 2, 0.04, 0.18, 0.25);
-    if (i % 32 === 28) s.riser(b, t, 16 * this.stepDur, 0.018);
+    if (pos === 8) s.strings(b, t, tones[1] * 4, 0.014, 0.3);
   }
 
-  lead(t: number, f: number, g: number, pan: number): void { this.s.supersaw(this.bus, t, f * 2, g * 0.5, 0.2, pan); }
+  lead(t: number, f: number, g: number, pan: number): void { this.s.ping(this.bus, t, f * 2, g * 0.3, pan); }
 }
 
 // ── the conductor ────────────────────────────────────────────────────────────
@@ -176,7 +151,7 @@ class RainConductor extends Conductor {
 
   /** The weather is the traffic: the sky picks the style. */
   protected override wanted(): string | null {
-    const pinned = this.setting<string>(this.keys.music);
+    const pinned = this.setting<string>(this.cfg.styleKey);
     if (pinned !== 'auto' && this.styles.has(pinned)) return pinned;
     const n = this.mood.night;
     return n < 0.25 ? 'drizzle' : n < 0.6 ? 'shower' : 'deluge';
