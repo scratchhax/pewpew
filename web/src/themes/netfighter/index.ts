@@ -72,6 +72,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
       hurt: tex.anim('punk', 'hurt') },
     'FIREWALL',
   );
+  punk.sheetDir = -1;  // the punk's sheets face left; the girl's face right
   girl.reset(CENTER - 160, 1);
   punk.reset(CENTER + 160, -1);
   floor.addChild(girl.root, punk.root);
@@ -106,7 +107,8 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
   const fireballs: { t: Text; x: number; vx: number }[] = [];
 
   function startRound(): void {
-    girl.reset(CENTER - 160, 1);
+    punk.sheetDir = -1;  // the punk's sheets face left; the girl's face right
+  girl.reset(CENTER - 160, 1);
     punk.reset(CENTER + 160, -1);
     for (const f of fireballs) f.t.destroy();
     fireballs.length = 0;

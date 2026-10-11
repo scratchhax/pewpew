@@ -38,6 +38,8 @@ export class Fighter {
   facing: 1 | -1 = 1;
   hitLanded = false;
   baseScale = 3.5;
+  /** +1 when the sprite sheets face right, -1 when they face left. */
+  sheetDir: 1 | -1 = 1;
   private vx = 0;
   private vy = 0;
   private lift = 0;              // px above the floor (jumps, knockback air)
@@ -194,7 +196,7 @@ export class Fighter {
       this.frame = looping ? (this.frame + 1) % this.anim.length : Math.min(this.frame + 1, this.anim.length - 1);
     }
     this.sprite.texture = this.anim[Math.min(this.frame, this.anim.length - 1)];
-    this.sprite.scale.set(this.facing * this.baseScale, this.baseScale);
+    this.sprite.scale.set(this.facing * this.sheetDir * this.baseScale, this.baseScale);
     this.root.y = -this.lift;
     return landed;
   }
