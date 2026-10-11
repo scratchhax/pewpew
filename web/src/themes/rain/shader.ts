@@ -195,8 +195,6 @@ void main() {
     float dx = uv.x - sx;
     if (abs(dx) > halfW) continue;
     float wy = (uv.y - uVp.y) / cellH;
-    float cell = floor(wy);
-    float fy = fract(wy);
     float lineId = floor(c.z + 0.5);
     float ph = hash1(fi * 13.3 + lineId * 7.1);
     float spd = 0.5 + hash1(fi * 7.7) * 0.35;
@@ -205,14 +203,17 @@ void main() {
     float halfH = 0.5 / cellH + uTrail;
     float cyc = float(LEN) + 2.0 * halfH;
     float head = mod(uTime * spd * 1.2 + ph * cyc, cyc) - halfH;
-    float d = head - cell;
+    // the line rides the spinner continuously: glyphs are sampled at the
+    // fractional distance from the head, so the line glides down the column
+    // instead of stepping one cell at a time
+    float d = head - wy;
     // the whole line rides the column - the spinner just lights its head
     if (d < 0.0 || d >= float(LEN)) continue;
     float ci = float(LEN) - 1.0 - floor(d);
     float ch = texture(uLines, (vec2(ci, lineId) + 0.5) / vec2(float(LEN), float(RING))).r;
     float idx = floor(ch * 255.0 + 0.5);
     vec2 ac = vec2(mod(idx, 16.0), floor(idx / 16.0));
-    vec2 f = vec2(dx / halfW * 0.5 + 0.5, fy);
+    vec2 f = vec2(dx / halfW * 0.5 + 0.5, 1.0 - fract(d));
     float a = texture(uAtlas, (ac + f) / vec2(16.0, 6.0)).r;
     // distance haze: far glyphs blur into the fog, so the field reads as
     // a thick volume you are falling through, not a grid of sprites
