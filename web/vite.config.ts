@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
 import { readdirSync, existsSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 
 /** Theme ids = folders under src/themes with an index.ts (as in registry.ts). */
 const themeIds = readdirSync(new URL('./src/themes', import.meta.url), { withFileTypes: true })
@@ -26,11 +27,22 @@ function themePages(): Plugin {
   };
 }
 
+/** Short git hash of the tree being built, so the on-screen stamp is unambiguous. */
+function gitStamp(): string {
+  try {
+    const hash = execSync('git rev-parse --short HEAD').toString().trim();
+    const dirty = execSync('git status --porcelain').toString().trim() ? '+' : '';
+    return `${hash}${dirty}`;
+  } catch {
+    return 'dev';
+  }
+}
+
 export default defineConfig(({ mode }) => ({
   base: mode === 'demo' ? './' : '/',
   define: {
     __DEMO__: mode === 'demo',
-    __BUILD__: JSON.stringify(new Date().toISOString().slice(5, 16).replace('T', ' ')),
+    __BUILD__: JSON.stringify(`${gitStamp()} ${new Date().toISOString().slice(5, 16).replace('T', ' ')}Z`),
   },
   plugins: [themePages()],
   server: {
