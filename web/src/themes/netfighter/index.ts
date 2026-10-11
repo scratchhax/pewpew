@@ -104,7 +104,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
   let threatT = 0;
   let boltT = 3;
   let ambientT = 1.5;
-  const fireballs: { t: Text; x: number; vx: number }[] = [];
+  const fireballs: { t: Text; x: number; vx: number; foe: Fighter }[] = [];
 
   function startRound(): void {
     punk.sheetDir = -1;  // the punk's sheets face left; the girl's face right
@@ -151,31 +151,38 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     return f.charge >= 5 ? 'super' : 'punch';
   }
 
+  // Events alternate 1:1 between the fighters, whatever their type: one log
+  // line trains Traffic, the next the FIREWALL, so no traffic mix dominates.
+  let turn = 0;
+
   function event(e: SceneEvent): void {
     audio.cueSong(e.kind, e.ev.src_ip ?? e.ev.dst_ip ?? undefined);
     if (phase !== 'fight') return;
+    const me = turn++ % 2 === 0 ? girl : punk;
+    const foe = me === girl ? punk : girl;
+    const cap = me === girl ? 5 : 6;
     switch (e.kind) {
       case 'allow':
-        girl.charge = Math.min(5, girl.charge + 1);
+        me.charge = Math.min(cap, me.charge + 1);
         break;
       case 'block':
-        punk.charge = Math.min(6, punk.charge + 2);
+        me.charge = Math.min(cap, me.charge + 2);
         break;
       case 'threat':
-        punk.charge = Math.min(6, punk.charge + 5);
+        me.charge = Math.min(cap, me.charge + 5);
         stage.lightning();
         threatT = 6;
         break;
       case 'dns': {
-        punk.charge = Math.min(6, punk.charge + 1);
+        me.charge = Math.min(cap, me.charge + 1);
         if (fireballs.length >= 2 || Math.random() < 0.7) break;
         const name = (e.ev.dns_query ?? 'query').toUpperCase().slice(0, 18);
         const t = new Text({ text: name, style: new TextStyle({
           fontFamily: '"Courier New", monospace', fontSize: 20, fontWeight: '900',
-          fill: 0x7ad4ff, stroke: { color: 0x0a2a3a, width: 5 } }) });
+          fill: me === girl ? 0x52ff7a : 0x7ad4ff, stroke: { color: 0x0a2a3a, width: 5 } }) });
         t.anchor.set(0.5);
-        const fromRight = punk.x > girl.x;
-        const fb = { t, x: punk.x + (fromRight ? 60 : -60), vx: fromRight ? -520 : 520 };
+        const dir = foe.x >= me.x ? 1 : -1;
+        const fb = { t, x: me.x + dir * 60, vx: dir * 520, foe };
         t.x = fb.x;
         t.y = stage.groundY - 96;
         stage.worldLayer.addChild(t);
@@ -184,11 +191,11 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
       }
       case 'dhcp':
       case 'wifi':
-        punk.charge = Math.min(6, punk.charge + 1);
+        me.charge = Math.min(cap, me.charge + 1);
         if (stage.crowdCount() < settings.aCrowdMax) stage.addCrowd();
         break;
       default:
-        punk.charge = Math.min(6, punk.charge + 1);
+        me.charge = Math.min(cap, me.charge + 1);
         break;
     }
   }
@@ -273,19 +280,21 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
       fb.x += fb.vx * dt;
       fb.t.x = fb.x;
       fb.t.rotation += dt * 4 * Math.sign(fb.vx);
-      if (Math.abs(fb.x - girl.x) < 60 && phase === 'fight') {
-        girl.takeHit(2, Math.sign(fb.vx) as 1 | -1, 60, false, 0.22);
+      if (Math.abs(fb.x - fb.foe.x) < 60 && phase === 'fight') {
+        const tgt = fb.foe;
+        const att = tgt === girl ? punk : girl;
+        tgt.takeHit(2, Math.sign(fb.vx) as 1 | -1, 60, false, 0.22);
         fx.spark(fb.x, fb.t.y, 0x7ad4ff);
         fx.pow(fb.x, fb.t.y - 40);
         stage.shake(7);
         hitstop = 0.05;
         audio.sfx('hit', { pan: (fb.x / w) * 2 - 1 });
-        if (girl.health <= 0) {
+        if (tgt.health <= 0) {
           phase = 'ko';
           phaseT = 0;
           timeScale = 0.35;
-          girl.ko(Math.sign(fb.vx) as 1 | -1);
-          punk.win();
+          tgt.ko(Math.sign(fb.vx) as 1 | -1);
+          att.win();
           fx.banner('K.O.!', 0xff4a3c, 1.6);
           audio.sfx('ko');
         }

@@ -1312,22 +1312,25 @@ rain, the odd lightning strike, and a camera that follows the action and
 shakes when it lands. It is a real fight with real rounds: health bars,
 charge meters, hitstop, combo counters, slow-motion K.O.s, best of three.
 
-The traffic is her corner; everything the firewall swallows feeds him.
+Log lines are dealt to the fighters like hands of cards — **strictly
+alternating, one to Traffic, one to the FIREWALL**, whatever their type —
+so no kind of traffic can ever stack the deck for one side. What the line
+*is* decides what the fighter who drew it gets:
 
-| Event | In the ring |
-|-------|-------------|
-| allow | Traffic charges up — the vast majority of the log is hers |
-| block | the FIREWALL bulks up; two bars of charge |
-| threat | the FIREWALL surges, lightning cracks the sky, and he throws super |
-| dns | a fireball screams across the street wearing the domain's name |
-| dhcp | a new spectator joins the crowd; a smudge of charge to the FIREWALL |
-| wifi | a spectator cheers; a smudge of charge to the FIREWALL |
-| system | the FIREWALL sneers — and the crowd never stops watching |
+| Event | To whoever drew it |
+|-------|--------------------|
+| allow | one bar of charge |
+| block | two bars of charge |
+| threat | five bars, lightning cracks the sky, and super is coming |
+| dns | a fireball wearing the domain's name, thrown at the other fighter |
+| dhcp | a new spectator joins the crowd, plus a smudge of charge |
+| wifi | a spectator cheers, plus a smudge of charge |
+| system | a smudge of charge from the referee's sneer |
 
-So the book of matches writes itself: a healthy LAN is Traffic stomping a
-punk who keeps getting second wind from every drop; a blocked, IDS-lit
-network is her pinned in the corner eating fireballs all night. Rounds end
-in K.O. and start again — the street fight never ends.
+So a busy night is a slugfest where both corners keep rising together and
+the crowd sees fireballs traded both directions; a quiet night is two
+fighters feeling each other out with jabs. Rounds end in K.O. and start
+again — the street fight never ends.
 
 The soundtrack is three tracks of chiptune-adjacent pub rock — Sparring,
 Intense and Boss — that swap with the FIREWALL's charge, plus synthesized
