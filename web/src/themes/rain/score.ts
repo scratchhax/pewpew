@@ -149,9 +149,11 @@ const STYLES: StyleDef[] = [
 class RainConductor extends Conductor {
   private rain: Bed;
   private wind: Bed;
+  private keys: { music: string; amb: string };
 
-  constructor(e: AudioEngine) {
-    super(e, { styles: STYLES, styleKey: 'rMusicStyle', rotateKey: 'rMusicStyle' });
+  constructor(e: AudioEngine, keys?: { music: string; amb: string }) {
+    super(e, { styles: STYLES, styleKey: keys?.music ?? 'rMusicStyle', rotateKey: keys?.music ?? 'rMusicStyle' });
+    this.keys = keys ?? { music: 'rMusicStyle', amb: 'rRainAmb' };
     this.rain = this.s.rain(this.amb);
     this.wind = this.makeWind(this.amb);
   }
@@ -174,14 +176,14 @@ class RainConductor extends Conductor {
 
   /** The weather is the traffic: the sky picks the style. */
   protected override wanted(): string | null {
-    const pinned = this.setting<string>('rMusicStyle');
+    const pinned = this.setting<string>(this.keys.music);
     if (pinned !== 'auto' && this.styles.has(pinned)) return pinned;
     const n = this.mood.night;
     return n < 0.25 ? 'drizzle' : n < 0.6 ? 'shower' : 'deluge';
   }
 
   protected override ambience(_dt: number, state: State, now: number, on: boolean): void {
-    const amb = on ? this.setting<number>('rRainAmb') : 0;
+    const amb = on ? this.setting<number>(this.keys.amb) : 0;
     const wet = state.weather === 'hurricane' ? 1 : state.weather === 'storm' ? 0.5 : 0;
     this.setBed(this.rain, amb * (0.1 + wet * 0.42), now);
     this.setBed(this.wind, amb * wet * 0.2, now);
@@ -269,3 +271,8 @@ class RainConductor extends Conductor {
 }
 
 export function rainScore(e: AudioEngine): Score { return new RainConductor(e); }
+
+/** The same score played by another scene with its own setting keys. */
+export function rainScoreFor(e: AudioEngine, music: string, amb: string): Score {
+  return new RainConductor(e, { music, amb });
+}

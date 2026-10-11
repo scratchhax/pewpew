@@ -1,10 +1,10 @@
 import { BufferImageSource, Mesh, PlaneGeometry, Shader, TextureSource, UniformGroup } from 'pixi.js';
-import { makeAtlas, GLYPHS } from './atlas';
-import { RAIN_VERT, LIFE_FRAG } from './shader';
+import { makeAtlas, GLYPHS } from '../rain/atlas';
+import { LIFE_VERT, LIFE_FRAG } from './shader';
 
 /**
- * Game of life mode: Conway's automaton on a toroidal grid where every live
- * cell is a log glyph. The automaton is pure CPU - two Uint8 buffers and an
+ * Game of Life: Conway's automaton on a toroidal grid where every live cell
+ * is a log glyph. The automaton is pure CPU - two Uint8 buffers and an
  * age buffer, B3/S23 on a torus - and the GPU only ever sees one float
  * texture per generation: glyph index, colour class and age per cell.
  * Events seed the grid with patterns instead of lines: a PASS is a glider,
@@ -154,7 +154,7 @@ export class LifeScene {
       uColorMode: { value: 0, type: 'f32' },
     });
     this.shader = Shader.from({
-      gl: { vertex: RAIN_VERT, fragment: LIFE_FRAG },
+      gl: { vertex: LIFE_VERT, fragment: LIFE_FRAG },
       resources: {
         uLife: this.src,
         uAtlas: this.atlas.source,

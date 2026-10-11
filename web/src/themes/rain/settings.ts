@@ -16,11 +16,9 @@ export const RAIN_DEFAULTS = {
   rFog: true,                // depth fog on the far layers
   rWaves: true,              // rolling brightness waves down the columns
   rFlicker: true,            // trail glyphs mutate while they fade
-  rCam: 'fly' as string,     // fall (2D plane) | fly (3D field, camera moves) | life (Conway)
+  rCam: 'fly' as string,     // fall (2D plane) | fly (3D field, camera moves)
   rPan: true,                // slow parallax drift between the layers (fall mode)
   rWeather: true,            // traffic weather drives the downpour
-  rLifeStep: 150,            // life mode: ms per generation
-  rLifeSeed: 0.35,           // life mode: ambient seeding, 0..1
 
   // soundtrack
   rMusicStyle: 'auto' as string, // auto | drizzle | shower | deluge
@@ -34,10 +32,10 @@ export const RAIN_DEFAULTS = {
 export type RainSettings = CoreSettings & typeof RAIN_DEFAULTS;
 
 export const RAIN_BUDGETS: Budgets = {
-  low: { rFarLayers: 0, rFlicker: false, rDensity: 0.6, rColumns: 40, rLifeStep: 260, rLifeSeed: 0.25 },
-  medium: { rFarLayers: 1, rFlicker: true, rDensity: 0.8, rColumns: 64, rLifeStep: 200, rLifeSeed: 0.3 },
-  high: { rFarLayers: 2, rFlicker: true, rDensity: 1, rColumns: 96, rLifeStep: 150, rLifeSeed: 0.35 },
-  ultra: { rFarLayers: 3, rFlicker: true, rDensity: 1.2, rColumns: 96, rLifeStep: 120, rLifeSeed: 0.4 },
+  low: { rFarLayers: 0, rFlicker: false, rDensity: 0.6, rColumns: 40 },
+  medium: { rFarLayers: 1, rFlicker: true, rDensity: 0.8, rColumns: 64 },
+  high: { rFarLayers: 2, rFlicker: true, rDensity: 1, rColumns: 96 },
+  ultra: { rFarLayers: 3, rFlicker: true, rDensity: 1.2, rColumns: 96 },
 };
 
 type Key = keyof typeof RAIN_DEFAULTS;
@@ -63,11 +61,9 @@ export const RAIN_CONTROLS = {
     select('rColor', 'Colour', [['event', 'Green, red for blocks'], ['green', 'Classic green'], ['ice', 'Ice']]),
     toggle('rFog', 'Depth fog'), toggle('rWaves', 'Brightness waves'),
     toggle('rFlicker', 'Glyph flicker'),
-    select('rCam', 'Camera', [['fall', 'Falling (2D)'], ['fly', 'Fly through (3D)'], ['life', 'Game of life']]),
+    select('rCam', 'Camera', [['fall', 'Falling (2D)'], ['fly', 'Fly through (3D)']]),
     toggle('rPan', 'Camera drift'),
     toggle('rWeather', 'Weather is traffic'),
-    range('rLifeStep', 'Life: generation (ms)', 40, 500, 10),
-    range('rLifeSeed', 'Life: seeding', 0, 1, 0.05),
   ],
   budgets: [
     range('rFarLayers', 'Depth layers', 0, 3, 1),

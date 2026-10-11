@@ -25,10 +25,10 @@ your own traffic. Pick a scene per screen:
   of log columns the camera flies through: every event becomes a line
   (`BLOCK 203.0.113.7 < 192.168.1.23`, `LOOKUP github.com`) that approaches
   from the dark, grows, and passes you, green for traffic that passes, red
-  for what burns; a hurricane is a fast dive through tonight's log. A third
-  camera plays the log as Conway's Game of Life: every live cell is a glyph,
-  PASS events glide across as gliders, BLOCKs sit as still lifes, and an IDS
-  alarm drops a glider gun
+  for what burns; a hurricane is a fast dive through tonight's log
+- **Game of Life**: Conway's automaton played with the log — every live cell
+  is a glyph, PASS events glide across as gliders, BLOCKs settle into still
+  lifes, an IDS alarm drops a glider gun, and the weather seeds the field
 - **Mycelium**: a bioluminescent forest floor from above, where hosts put out
   growing filaments that weave a mat across the loam — permitted traffic runs
   through it as travelling light, habit decides the roads, mushrooms fruit at
@@ -67,6 +67,8 @@ and never touches the network itself.
 | ![the gibson](docs/gibson.png) | ![gibson target lock](docs/gibson-lock.png) |
 | **The Rain** | **The Rain: depth layers behind the log** |
 | ![the rain](docs/rain.png) | ![the rain depth layers](docs/rain-depth.png) |
+| **Game of Life** | **Game of Life: a deluge seeds the field** |
+| ![game of life](docs/conway.png) | ![game of life gliders](docs/conway-gun.png) |
 | **Mycelium** | **Mycelium: a blight swarm crawls in** |
 | ![mycelium](docs/mycelium.png) | ![mycelium blight](docs/mycelium-blight.png) |
 | **Undergrowth** | **Undergrowth: deep in the shell** |
@@ -91,6 +93,7 @@ traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew
 [Aquarium](https://scratchhax.github.io/pewpew/?theme=aquarium) ·
 [The Gibson](https://scratchhax.github.io/pewpew/?theme=gibson) ·
 [The Rain](https://scratchhax.github.io/pewpew/?theme=rain) ·
+[Game of Life](https://scratchhax.github.io/pewpew/?theme=conway) ·
 [Mycelium](https://scratchhax.github.io/pewpew/?theme=mycelium) ·
 [FRAGNET](https://scratchhax.github.io/pewpew/?theme=fragnet) ·
 [Substrate](https://scratchhax.github.io/pewpew/?theme=substrate) ·
