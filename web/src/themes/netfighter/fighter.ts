@@ -54,6 +54,7 @@ export class Fighter {
     this.anim = anims.idle;
     this.sprite.texture = this.anim[0];
     this.sprite.anchor.set(0.5, 1);
+    this.sprite.scale.set(this.baseScale, this.baseScale);
     this.root.addChild(this.sprite);
   }
 
@@ -194,7 +195,7 @@ export class Fighter {
       this.frame = looping ? (this.frame + 1) % this.anim.length : Math.min(this.frame + 1, this.anim.length - 1);
     }
     this.sprite.texture = this.anim[Math.min(this.frame, this.anim.length - 1)];
-    this.sprite.scale.x = this.facing * this.baseScale;
+    this.sprite.scale.set(this.facing * this.baseScale, this.baseScale);
     this.root.y = -this.lift;
     return landed;
   }

@@ -161,7 +161,7 @@ export class Stage {
     // lightning flash
     if (this.flashT > 0) {
       this.flashT -= dt;
-      this.flashG.alpha = Math.max(0, this.flashT / 0.22) * 0.55;
+      this.flashG.alpha = Math.max(0, this.flashT / 0.22) * 0.3;
     } else if (this.flashG.alpha !== 0) {
       this.flashG.alpha = 0;
     }
