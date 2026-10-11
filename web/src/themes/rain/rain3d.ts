@@ -89,7 +89,7 @@ export class Rain3D {
     const uniforms = new UniformGroup({
       uTime: { value: 0, type: 'f32' },
       uN: { value: MAXC, type: 'f32' },
-      uCellH: { value: 0.045, type: 'f32' },
+      uCellH: { value: 0.016, type: 'f32' },
       uAspect: { value: 16 / 9, type: 'f32' },
       uRes: { value: new Float32Array([1920, 1080]), type: 'vec2<f32>' },
       uSpread: { value: 2.2, type: 'f32' },
@@ -155,12 +155,10 @@ export class Rain3D {
   }
 
   /** The spinner's cycle length at this depth: screen height + trail, in
-   *  cells. Mirrors the shader's halfH/cyc (including its cell-height clamp,
-   *  so a whole line always fits on screen) so head can be integrated here. */
+   *  cells. Mirrors the shader's halfH/cyc so head can be integrated here. */
   private cyc(z: number, trail: number): number {
-    const cellBase = 0.045 * (this.glyphW / 15);
-    const cellH = Math.min(cellBase / z, 0.85 / LEN);
-    return LEN + 2 * (0.5 / cellH + trail);
+    const cellBase = 0.016 * (this.glyphW / 15);
+    return LEN + 2 * (0.5 * z / cellBase + trail);
   }
 
   step(dt: number, o: FlyOpts): void {
@@ -204,7 +202,7 @@ export class Rain3D {
     const u = this.u;
     u.uTime = t;
     u.uN = Math.max(1, Math.min(MAXC, Math.round(o.columns)));
-    u.uCellH = 0.045 * (o.glyph / 15);
+    u.uCellH = 0.016 * (o.glyph / 15);
     u.uAspect = o.aspect;
     u.uRes.set([o.resX, o.resY]);
     u.uVp.set([o.vpX + o.wanderX, o.vpY + o.wanderY]);

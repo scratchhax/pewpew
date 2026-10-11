@@ -220,10 +220,7 @@ void main() {
     float z = c.y;
     if (z < 0.02) continue;
     float s = 1.0 / z;
-    // cell height grows with nearness, but clamps so a whole 32-cell line
-    // always fits on screen: the line grows as it approaches, then holds a
-    // readable size while the column slides past
-    float cellH = min(uCellH * s, 0.85 / float(LEN));
+    float cellH = uCellH * s;
     float sx = uVp.x + (c.x - 0.5) * uSpread * s;
     float halfW = cellH / (3.44 * uAspect);
     float dx = uv.x - sx;
