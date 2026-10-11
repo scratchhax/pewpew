@@ -137,7 +137,6 @@ export class Fighter {
     if (this.busy) return;
     const d = tx - this.x;
     if (Math.abs(d) < 4) { this.setState('idle'); return; }
-    this.facing = d > 0 ? 1 : -1;
     this.x += Math.sign(d) * Math.min(Math.abs(d), speed * dt);
     this.setState('walk');
   }
