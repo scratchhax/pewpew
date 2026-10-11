@@ -1330,13 +1330,18 @@ so no kind of traffic can ever stack the deck for one side. What the line
 So a busy night is a slugfest where both corners keep rising together and
 the crowd sees fireballs traded both directions; a quiet night is two
 fighters feeling each other out with jabs. Rounds end in K.O. and start
-again — the street fight never ends.
+again — and when a fighter drops, their corner doesn't just heal: a random
+**challenger** tags in the next round (palette-swap rivals plus two guest
+NES brawlers, each with their own moves and intro banner), so the street
+fight never faces the same opponent twice on purpose.
 
 The soundtrack is three tracks of chiptune-adjacent pub rock — Sparring,
 Intense and Boss — that swap with the FIREWALL's charge, plus synthesized
 jabs, hits, K.O.s and round bells. Sprites are the CC0 *Streets of Fight*
-pack by Luis Zuno (ansimuz), the first scene to ship with art it didn't
-draw; everything else here is still one shader and one oscillator away.
+pack by Luis Zuno (ansimuz) plus Chasersgaming's CC0 *Renegade* and
+*Soldier* brawler packs for the guest challengers — the first scene to ship
+with art it didn't draw; everything else here is still one shader and one
+oscillator away.
 
 ## Sound
 
@@ -2042,6 +2047,11 @@ Actions** first.
 - Last Outpost sprites: [Top-down Shooter](https://kenney.nl/assets/top-down-shooter)
   by [Kenney](https://kenney.nl) (CC0), packed into
   `web/src/themes/zombie/assets/atlas.png` with its license beside it.
+- Net Fighter sprites: *Streets of Fight* by
+  [Luis Zuno / ansimuz](https://ansimuz.itch.io/) and the *Renegade* and
+  *Soldier* brawler characters by
+  [Chasersgaming](https://chasersgaming.itch.io/), all CC0, sliced from
+  their sheets in `web/src/themes/netfighter/assets/sheets/`.
 - IDS/IPS threat support (the attack rockets, the red core and the threat
   audio) grew out of the CEF security-event parser idea and first
   implementation by [natechit](https://github.com/natechit).

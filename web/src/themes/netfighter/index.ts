@@ -2,7 +2,7 @@ import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
 import { NETFIGHTER_DEFAULTS, NETFIGHTER_BUDGETS, NETFIGHTER_CONTROLS, NETFIGHTER_HUD } from './settings';
-import { loadFightTextures } from './assets';
+import { loadFightTextures, CHAR_SCALE, CHAR_DIR, type CharName } from './assets';
 import { Stage, WORLD_W } from './stage';
 import { Fighter, ATTACKS } from './fighter';
 import { Fx } from './fx';
@@ -17,8 +17,8 @@ import { netFighterScore } from './score';
  * threat is a super move with lightning; a DNS lookup is a fireball
  * wearing the domain's name, thrown at the other fighter; new devices
  * join the crowd on the sidewalk. When one fighter drops, the other poses,
- * the round counter climbs, and the next round starts before the crowd
- * has sat back down.
+ * the round counter climbs, and a random challenger from the fallen
+ * corner's roster tags in before the crowd has sat back down.
  */
 export const netfighter: Theme<typeof NETFIGHTER_DEFAULTS> = {
   id: 'netfighter',
@@ -63,21 +63,42 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
   stage.worldLayer.addChild(fx.world);
   app.stage.addChild(fx.screen);
 
-  const girl = new Fighter(
-    { idle: tex.anim('girl', 'idle'), walk: tex.anim('girl', 'walk'), jab: tex.anim('girl', 'jab'),
-      punch: tex.anim('girl', 'punch'), kick: tex.anim('girl', 'kick'), jumpkick: tex.anim('girl', 'jumpkick'),
-      divekick: tex.anim('girl', 'divekick'), hurt: tex.anim('girl', 'hurt') },
-    'TRAFFIC',
-  );
-  const punk = new Fighter(
-    { idle: tex.anim('punk', 'idle'), walk: tex.anim('punk', 'walk'), punch: tex.anim('punk', 'punch'),
-      hurt: tex.anim('punk', 'hurt') },
-    'FIREWALL',
-  );
-  punk.sheetDir = -1;  // the punk's sheets face left; the girl's face right
-  girl.reset(CENTER - 160, 1);
-  punk.reset(CENTER + 160, -1);
-  floor.addChild(girl.root, punk.root);
+  // ── roster: who shows up for each corner ──────────────────────────────────
+  // The headliners brawl; when one drops, a random challenger from that
+  // corner's roster tags in next round. Hue-rotated palettes and the CC0
+  // NES guest brawlers (Renegade, Soldier) round out the field.
+  interface Challenger { name: string; char: CharName; hue: number; }
+  const TRAFFIC_ROSTER: Challenger[] = [
+    { name: 'TRAFFIC', char: 'girl', hue: 0 },
+    { name: 'GLACIER', char: 'girl', hue: 150 },
+    { name: 'VIOLET', char: 'girl', hue: 260 },
+    { name: 'RECRUIT', char: 'sol', hue: 0 },
+    { name: 'SERGEANT', char: 'sol', hue: 140 },
+  ];
+  const FIREWALL_ROSTER: Challenger[] = [
+    { name: 'FIREWALL', char: 'punk', hue: 0 },
+    { name: 'TOXIC', char: 'punk', hue: 90 },
+    { name: 'MAGMA', char: 'punk', hue: 300 },
+    { name: 'RENEGADE', char: 'ren', hue: 0 },
+    { name: 'RUNAWAY', char: 'ren', hue: 200 },
+  ];
+
+  let girlIdx = 0;
+  let punkIdx = 0;
+  let lastLoser: 'girl' | 'punk' | null = null;
+
+  function makeFighter(side: 'girl' | 'punk', c: Challenger): Fighter {
+    const f = new Fighter(tex.anims(c.char, c.hue), c.name);
+    f.baseScale = CHAR_SCALE[c.char];
+    f.sheetDir = CHAR_DIR[c.char];
+    f.ladder = c.char === 'girl' ? 'girl' : 'brute';
+    f.reset(side === 'girl' ? CENTER - 160 : CENTER + 160, side === 'girl' ? 1 : -1);
+    floor.addChild(f.root);
+    return f;
+  }
+
+  let girl = makeFighter('girl', TRAFFIC_ROSTER[girlIdx]);
+  let punk = makeFighter('punk', FIREWALL_ROSTER[punkIdx]);
 
   // ── HUD: health bars, names, round, combo ─────────────────────────────────
   const hud = new Container();
@@ -91,8 +112,6 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
   const p2Name = label(26, 0xff5a4a);
   const roundTxt = label(30, 0xffe14d);
   const comboTxt = label(24, 0xffe14d);
-  p1Name.text = 'TRAFFIC';
-  p2Name.text = 'FIREWALL';
   hud.addChild(bars, p1Name, p2Name, roundTxt, comboTxt);
 
   // ── fight state ────────────────────────────────────────────────────────────
@@ -113,17 +132,30 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
   const fireballs: { t: Text; x: number; vx: number; foe: Fighter }[] = [];
 
   function startRound(): void {
-    punk.sheetDir = -1;  // the punk's sheets face left; the girl's face right
-  girl.reset(CENTER - 160, 1);
+    if (lastLoser) {
+      // the fallen fighter is replaced by a random challenger from their corner
+      const roster = lastLoser === 'girl' ? TRAFFIC_ROSTER : FIREWALL_ROSTER;
+      const idx = lastLoser === 'girl' ? girlIdx : punkIdx;
+      const next = (idx + 1 + Math.floor(Math.random() * (roster.length - 1))) % roster.length;
+      const c = roster[next];
+      const old = lastLoser === 'girl' ? girl : punk;
+      old.root.destroy({ children: true });
+      const fresh = makeFighter(lastLoser, c);
+      if (lastLoser === 'girl') { girl = fresh; girlIdx = next; } else { punk = fresh; punkIdx = next; }
+      comboWho = girl;
+      fx.banner(`NEXT CHALLENGER: ${c.name}`, lastLoser === 'girl' ? 0x52ff7a : 0xff5a4a, 1.3);
+      lastLoser = null;
+    } else {
+      fx.banner(`ROUND ${round}`, 0xffe14d, 1.1);
+    }
+    girl.reset(CENTER - 160, 1);
     punk.reset(CENTER + 160, -1);
     for (const f of fireballs) f.t.destroy();
     fireballs.length = 0;
     combo = 0;
-    comboWho = girl;
     phase = 'intro';
     phaseT = 0;
     timeScale = 1;
-    fx.banner(`ROUND ${round}`, 0xffe14d, 1.1);
     audio.sfx('round');
   }
   startRound();
@@ -149,6 +181,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
       phase = 'ko';
       phaseT = 0;
       timeScale = 0.35;
+      lastLoser = def === girl ? 'girl' : 'punk';
       def.ko(dir);
       att.win();
       fx.banner('K.O.!', 0xff4a3c, 1.6);
@@ -158,7 +191,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
   }
 
   function chooseAttack(f: Fighter): string {
-    if (f === girl) return f.charge >= 4 ? 'divekick' : f.charge >= 3 ? 'kick' : f.charge >= 2 ? 'punch' : 'jab';
+    if (f.ladder === 'girl') return f.charge >= 4 ? 'divekick' : f.charge >= 3 ? 'kick' : f.charge >= 2 ? 'punch' : 'jab';
     return f.charge >= 5 ? 'super' : f.charge >= 4 ? 'punch3' : f.charge >= 3 ? 'punch2' : 'punch';
   }
 
@@ -308,6 +341,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
           phase = 'ko';
           phaseT = 0;
           timeScale = 0.35;
+          lastLoser = tgt === girl ? 'girl' : 'punk';
           tgt.ko(Math.sign(fb.vx) as 1 | -1);
           att.win();
           fx.banner('K.O.!', 0xff4a3c, 1.6);
@@ -358,6 +392,8 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     bars.rect(31, y + hgt + 8, bw * (girl.charge / 5), 6).fill(0xffe14d);
     bars.rect(w - 34 - bw * (punk.charge / 5), y + hgt + 8, bw * (punk.charge / 5), 6).fill(0xff9a3c);
 
+    p1Name.text = girl.label;
+    p2Name.text = punk.label;
     p1Name.x = 30; p1Name.y = y + hgt + 18;
     p2Name.x = w - 34 - bw; p2Name.y = y + hgt + 18;
     roundTxt.text = `ROUND ${round}`;
@@ -379,6 +415,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     },
     stats: () => ({ round, traffic: Math.round(girl.health), firewall: Math.round(punk.health), combo }),
     diag: () => ({ app, girl, punk, round, phase, phaseT, hitstop, timeScale, audio,
-    comboStats: () => ({ max: comboMax, runs: comboRuns, over5: comboOver5 }) }),
+    comboStats: () => ({ max: comboMax, runs: comboRuns, over5: comboOver5 }),
+    dbg: () => ({ phase, phaseT: +phaseT.toFixed(1), lastLoser, round, g: girl.label, p: punk.label, gH: girl.health, pH: punk.health }) }),
   };
 }

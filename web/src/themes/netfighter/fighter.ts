@@ -27,7 +27,7 @@ export const ATTACKS: Record<string, AttackDef> = {
   divekick: { anim: 'divekick', fps: 16, dmg: 6,  range: 172, hitAt: 0.19, dur: 0.5,  knock: 150, lunge: 100 },
   punch2:   { anim: 'punch',    fps: 11, dmg: 5,  range: 172, hitAt: 0.19, dur: 0.38, knock: 140, lunge: 70 },
   punch3:   { anim: 'punch',    fps: 10, dmg: 6,  range: 178, hitAt: 0.2,  dur: 0.44, knock: 170, lunge: 80 },
-  super:    { anim: 'punch',    fps: 10, dmg: 11, range: 195, hitAt: 0.22, dur: 0.62, knock: 220, lunge: 120 },
+  super:    { anim: 'super',    fps: 10, dmg: 11, range: 195, hitAt: 0.22, dur: 0.62, knock: 220, lunge: 120 },
 };
 
 export class Fighter {
@@ -42,6 +42,8 @@ export class Fighter {
   baseScale = 3.5;
   /** +1 when the sprite sheets face right, -1 when they face left. */
   sheetDir: 1 | -1 = 1;
+  /** which attack ladder this fighter rolls on. */
+  ladder: 'girl' | 'brute' = 'brute';
   private vx = 0;
   private vy = 0;
   private lift = 0;              // px above the floor (jumps, knockback air)
