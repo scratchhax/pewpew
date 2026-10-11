@@ -116,6 +116,16 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
 
   // ── fight state ────────────────────────────────────────────────────────────
   let round = 1;
+  let girlWins = 0;
+  let punkWins = 0;
+  let gDealt = 0;
+  let pDealt = 0;
+  let gAtk = 0;
+  let pAtk = 0;
+  const gLand: Record<string, number> = {};
+  const pLand: Record<string, number> = {};
+  const gTry: Record<string, number> = {};
+  const pTry: Record<string, number> = {};
   let phase: 'intro' | 'fight' | 'ko' = 'intro';
   let phaseT = 0;
   let hitstop = 0;
@@ -127,6 +137,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
   let comboRuns = 0;
   let comboOver5 = 0;
   let threatT = 0;
+  let orderFlip = false;
   let boltT = 3;
   let ambientT = 1.5;
   const fireballs: { t: Text; x: number; vx: number; foe: Fighter }[] = [];
@@ -166,6 +177,9 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     if (att !== comboWho && combo > 0) { comboRuns++; if (combo > 5) comboOver5++; combo = 0; }
     const esc0 = 1 + 0.5 * Math.max(0, (att === comboWho ? combo : 0) - 2);
     if (!def.takeHit(a.dmg, dir, a.knock * esc0, kind === 'super' || (att === comboWho && combo + 1 >= 4))) return;
+    if (att === girl) gDealt += a.dmg; else pDealt += a.dmg;
+    const land = att === girl ? gLand : pLand;
+    land[kind] = (land[kind] ?? 0) + 1;
     if (att === comboWho) combo++; else { comboWho = att; combo = 1; }
     comboT = 1.6;
     comboMax = Math.max(comboMax, combo);
@@ -182,6 +196,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
       phaseT = 0;
       timeScale = 0.35;
       lastLoser = def === girl ? 'girl' : 'punk';
+      if (def === girl) punkWins++; else girlWins++;
       def.ko(dir);
       att.win();
       fx.banner('K.O.!', 0xff4a3c, 1.6);
@@ -274,13 +289,24 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     // ── fighters ─────────────────────────────────────────────────────────────
     if (phase === 'fight' && dt > 0) {
       const dist = Math.abs(girl.x - punk.x);
-      for (const [me, foe] of [[girl, punk], [punk, girl]] as const) {
-        me.charge = Math.max(0, me.charge - dt * 0.12);
+      // whoever is evaluated first attacks first and stun-locks the other,
+      // so the order alternates every frame to keep the duel honest
+      orderFlip = !orderFlip;
+      const pairs = orderFlip
+        ? [[punk, girl], [girl, punk]] as const
+        : [[girl, punk], [punk, girl]] as const;
+      for (const [me, foe] of pairs) {
+        // slow passive build-up so a quiet network still produces a fight
+        // instead of two statues trading looks
+        me.charge = Math.min(me === girl ? 5 : 6, me.charge + dt * 0.45);
         if (!me.busy) me.facing = foe.x >= me.x ? 1 : -1;
         const kind = chooseAttack(me);
         const a = ATTACKS[kind];
         if (me.charge >= 2 && dist <= a.range && !me.busy) {
           me.charge = kind === 'super' ? 0 : Math.max(0, me.charge - 2);
+          if (me === girl) gAtk++; else pAtk++;
+          const try_ = me === girl ? gTry : pTry;
+          try_[kind] = (try_[kind] ?? 0) + 1;
           me.attack(kind, foe.x);
         } else if (dist > a.range * 0.85) {
           me.walkToward(foe.x + Math.sign(me.x - foe.x) * a.range * 0.7, 150, dt);
@@ -308,12 +334,12 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     const landedP = punk.update(dt);
     if (landedG && phase === 'fight') {
       const a = landedG;
-      if (Math.abs(girl.x - punk.x) <= a.range + 26) landHit(girl, punk, a.anim);
-      else if (a.anim === 'jab') audio.sfx('jab', { pan: (girl.x / w) * 2 - 1 });
+      if (Math.abs(girl.x - punk.x) <= a.range + 26) landHit(girl, punk, girl.atkKind);
+      else if (girl.atkKind === 'jab') audio.sfx('jab', { pan: (girl.x / w) * 2 - 1 });
     }
     if (landedP && phase === 'fight') {
       const a = landedP;
-      if (Math.abs(girl.x - punk.x) <= a.range + 26) landHit(punk, girl, a.anim);
+      if (Math.abs(girl.x - punk.x) <= a.range + 26) landHit(punk, girl, punk.atkKind);
     }
     girl.root.x = girl.x;
     punk.root.x = punk.x;
@@ -332,6 +358,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
           fireballs.splice(i, 1);
           continue;
         }
+        if (att === girl) gDealt += 1; else pDealt += 1;
         fx.spark(fb.x, fb.t.y, 0x7ad4ff);
         fx.pow(fb.x, fb.t.y - 40);
         stage.shake(7);
@@ -342,6 +369,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
           phaseT = 0;
           timeScale = 0.35;
           lastLoser = tgt === girl ? 'girl' : 'punk';
+          if (tgt === girl) punkWins++; else girlWins++;
           tgt.ko(Math.sign(fb.vx) as 1 | -1);
           att.win();
           fx.banner('K.O.!', 0xff4a3c, 1.6);
@@ -416,6 +444,6 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     stats: () => ({ round, traffic: Math.round(girl.health), firewall: Math.round(punk.health), combo }),
     diag: () => ({ app, girl, punk, round, phase, phaseT, hitstop, timeScale, audio,
     comboStats: () => ({ max: comboMax, runs: comboRuns, over5: comboOver5 }),
-    dbg: () => ({ phase, phaseT: +phaseT.toFixed(1), lastLoser, round, g: girl.label, p: punk.label, gH: girl.health, pH: punk.health }) }),
+    dbg: () => ({ phase, phaseT: +phaseT.toFixed(1), lastLoser, round, girlWins, punkWins, gDealt, pDealt, gAtk, pAtk, gTry, pTry, gLand, pLand, gC: +girl.charge.toFixed(1), pC: +punk.charge.toFixed(1), g: girl.label, p: punk.label, gH: girl.health, pH: punk.health }) }),
   };
 }

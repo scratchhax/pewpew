@@ -27,7 +27,7 @@ export const ATTACKS: Record<string, AttackDef> = {
   divekick: { anim: 'divekick', fps: 16, dmg: 6,  range: 172, hitAt: 0.19, dur: 0.5,  knock: 150, lunge: 100 },
   punch2:   { anim: 'punch',    fps: 11, dmg: 5,  range: 172, hitAt: 0.19, dur: 0.38, knock: 140, lunge: 70 },
   punch3:   { anim: 'punch',    fps: 10, dmg: 6,  range: 178, hitAt: 0.2,  dur: 0.44, knock: 170, lunge: 80 },
-  super:    { anim: 'super',    fps: 10, dmg: 11, range: 195, hitAt: 0.22, dur: 0.62, knock: 220, lunge: 120 },
+  super:    { anim: 'super',    fps: 10, dmg: 11, range: 195, hitAt: 0.2, dur: 0.62, knock: 220, lunge: 120 },
 };
 
 export class Fighter {
@@ -42,6 +42,8 @@ export class Fighter {
   baseScale = 3.5;
   /** +1 when the sprite sheets face right, -1 when they face left. */
   sheetDir: 1 | -1 = 1;
+  /** which attack kind is currently in flight (for damage lookup). */
+  atkKind = '';
   /** which attack ladder this fighter rolls on. */
   ladder: 'girl' | 'brute' = 'brute';
   private vx = 0;
@@ -73,6 +75,7 @@ export class Fighter {
   attack(kind: keyof typeof ATTACKS, foeX: number): boolean {
     if (this.busy) return false;
     this.atk = ATTACKS[kind];
+    this.atkKind = kind;
     this.anim = this.anims[this.atk.anim] ?? this.anims.idle;
     this.frame = 0;
     this.animT = 0;
@@ -86,6 +89,11 @@ export class Fighter {
   takeHit(dmg: number, dir: 1 | -1, knock: number, big = false, dur = 0.42): boolean {
     if (this.downed) return false;
     this.health = Math.max(0, this.health - dmg);
+    // a committed super eats the trade: it takes the damage but never flinches
+    if (this.state === 'attack' && this.atkKind === 'super') {
+      this.tintFlash = 0.18;
+      return true;
+    }
     this.state = 'hurt';
     this.stateT = 0;
     this.hurtDur = big ? 0.75 : dur;
