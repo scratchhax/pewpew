@@ -231,7 +231,7 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
           me.charge = me === girl ? Math.max(0, me.charge - 1) : 0;
           me.attack(kind, foe.x);
         } else if (dist > a.range * 0.85) {
-          me.walkToward(foe.x - Math.sign(foe.x - me.x) * a.range * 0.7, 150, dt);
+          me.walkToward(foe.x + Math.sign(me.x - foe.x) * a.range * 0.7, 150, dt);
         } else {
           me.idle();
         }
