@@ -13,17 +13,16 @@ export const NETFIGHTER_DEFAULTS = {
   aMusicStyle: 'auto' as string, // auto | sparring | intense | boss
 
   // scene budgets = the HIGH preset
-  aCrowdMax: 26,               // silhouettes that can gather on the sidewalk
   aRain: 1,                    // rain density, 0..1
 };
 
 export type NetFighterSettings = CoreSettings & typeof NETFIGHTER_DEFAULTS;
 
 export const NETFIGHTER_BUDGETS: Budgets = {
-  low: { aCrowdMax: 8, aRain: 0.4 },
-  medium: { aCrowdMax: 16, aRain: 0.7 },
-  high: { aCrowdMax: 26, aRain: 1 },
-  ultra: { aCrowdMax: 34, aRain: 1 },
+  low: { aRain: 0.4 },
+  medium: { aRain: 0.7 },
+  high: { aRain: 1 },
+  ultra: { aRain: 1 },
 };
 
 type Key = keyof typeof NETFIGHTER_DEFAULTS;
@@ -46,7 +45,6 @@ export const NETFIGHTER_CONTROLS = {
     toggle('aWeather', 'Weather is traffic'),
   ],
   budgets: [
-    range('aCrowdMax', 'Crowd size', 0, 34, 2),
     range('aRain', 'Rain density', 0, 1, 0.05),
   ],
   color: [] as Control[],

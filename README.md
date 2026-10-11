@@ -1307,7 +1307,7 @@ and it holds 60 fps on a Raspberry Pi.
 
 Your firewall log as a Scott Pilgrim-meets-arcade street duel: **TRAFFIC**,
 a pixel brawler girl, versus the **FIREWALL**, a street punk, on a wet neon
-strip at 2 a.m. — parallax skyline, a crowd that grows with your network,
+strip at 2 a.m. — parallax skyline,
 rain, the odd lightning strike, and a camera that follows the action and
 shakes when it lands. It is a real fight with real rounds: health bars,
 charge meters, hitstop, combo counters, slow-motion K.O.s, best of three.
@@ -1323,12 +1323,12 @@ so no kind of traffic can ever stack the deck for one side. What the line
 | block | two bars of charge |
 | threat | five bars, lightning cracks the sky, and super is coming |
 | dns | a fireball wearing the domain's name, thrown at the other fighter |
-| dhcp | a new spectator joins the crowd, plus a smudge of charge |
-| wifi | a spectator cheers, plus a smudge of charge |
+| dhcp | a smudge of charge, a new device on the net |
+| wifi | a smudge of charge as the radios churn |
 | system | a smudge of charge from the referee's sneer |
 
 So a busy night is a slugfest where both corners keep rising together and
-the crowd sees fireballs traded both directions; a quiet night is two
+fireballs get traded both directions; a quiet night is two
 fighters feeling each other out with jabs. Rounds end in K.O. and start
 again — and when a fighter drops, their corner doesn't just heal: a random
 **challenger** tags in the next round (palette-swap rivals plus two guest

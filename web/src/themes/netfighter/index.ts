@@ -16,7 +16,7 @@ import { netFighterScore } from './score';
  * deck; what a line *is* decides what the fighter who drew it gets. A
  * threat is a super move with lightning; a DNS lookup is a fireball
  * wearing the domain's name, thrown at the other fighter; new devices
- * join the crowd on the sidewalk. When one fighter drops, the other poses,
+ * charge the drawer. When one fighter drops, the other poses,
  * the round counter climbs, and a random challenger from the fallen
  * corner's roster tags in before the crowd has sat back down.
  */
@@ -251,7 +251,6 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
       case 'dhcp':
       case 'wifi':
         me.charge = Math.min(cap, me.charge + 1);
-        if (stage.crowdCount() < settings.aCrowdMax) stage.addCrowd();
         break;
       default:
         me.charge = Math.min(cap, me.charge + 1);

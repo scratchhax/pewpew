@@ -20,8 +20,6 @@ export class Stage {
   private fore: TilingSprite;
   private ground = new Graphics();
   private props = new Container();
-  private crowd = new Container();
-  private bobs = new Map<Container, number>();
   private rain = new Graphics();
   private flashG = new Graphics();
   private camX = 0;
@@ -39,7 +37,7 @@ export class Stage {
     this.fore = new TilingSprite({ texture: fore, width: WORLD_W + 800, height: fore.height * SCALE });
     this.fore.tileScale.set(SCALE);
     this.root.addChild(this.sky, this.back, this.world, this.fore, this.rain, this.flashG);
-    this.world.addChild(this.ground, this.props, this.crowd);
+    this.world.addChild(this.ground, this.props);
   }
 
   get groundY(): number { return this.h * 0.84; }
@@ -99,23 +97,6 @@ export class Stage {
     }
   }
 
-  /** A dark silhouette joins the crowd and bobs: a new face on the network. */
-  crowdCount(): number { return this.crowd.children.length; }
-
-  addCrowd(): void {
-    if (this.crowd.children.length >= 34) return;
-    const c = new Graphics();
-    const hue = [0x1b2436, 0x241b30, 0x182828][this.crowd.children.length % 3];
-    c.circle(0, -34, 7).fill(hue);
-    c.roundRect(-9, -27, 18, 27, 6).fill(hue);
-    c.x = 80 + Math.random() * (WORLD_W - 160);
-    c.y = this.groundY - 14 - Math.random() * 10;
-    c.alpha = 0.85;
-    c.scale.set(0.8 + Math.random() * 0.35);
-    this.bobs.set(c, Math.random() * 6.28);
-    this.crowd.addChild(c);
-  }
-
   shake(amp: number): void {
     this.shakeAmp = Math.max(this.shakeAmp, amp);
   }
@@ -139,11 +120,6 @@ export class Stage {
     this.fore.x = -this.camX * 1.15 + sx * 1.4;
     this.world.y = sy;
     this.fore.y = this.groundY + 26 + sy * 1.4;
-    // crowd bobs harder when the weather is up
-    for (const c of this.crowd.children) {
-      const b = this.bobs.get(c) ?? 0;
-      c.y += Math.sin(t * (3 + wet * 5) + b) * 0.25 * (1 + wet * 2);
-    }
     // rain: slanted streaks, density with the weather
     this.rainT += dt * (1 + wet * 2);
     this.rain.clear();
