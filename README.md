@@ -1419,7 +1419,10 @@ through their own limiter, so a busy night stays punchy without clipping.
 
 ### Midnight Run's soundtrack
 
-Seven styles take turns, every 6 minutes by default:
+By default Midnight Run rides to *Neon Drift*, an original bundled
+[background track](#background-tracks) (84 BPM, F minor, quiet-loud-quiet);
+pick **None** in F1 → Audio and the seven generated styles below take turns
+instead, every 6 minutes by default:
 
 | Style | Sound |
 |-------|-------|
@@ -1658,6 +1661,13 @@ Play your own music in any scene. In F1 → Audio → **Background track**, uplo
 an MP3, OGG, M4A, WAV or FLAC file. It's stored on the relay, so every screen
 can use it: pick a track per scene, and every screen showing that scene plays
 it within about 20 seconds, the kiosk included.
+
+The relay also ships **bundled default tracks** in `relay/bundled/`: on first
+start it copies them into the track store and hands them to their scenes, with
+tempo and key already known. *Neon Drift* — an original 84 BPM F minor
+instrumental rendered for this project — is Midnight Run's by default. Pick
+**None** to give the scene its generated soundtrack back; delete a bundled
+track and it stays deleted.
 
 - When a track loads, the viewer works out its **tempo, beat position and key**
   (in a background worker, once per track) and saves the result on the relay.

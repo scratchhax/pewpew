@@ -1,0 +1,6 @@
+{
+ "neon-drift.mp3": {
+  "meta": { "bpm": 84.0, "offset": 0.0, "root": 5, "minor": true, "manual": false },
+  "assign": ["racing"]
+ }
+}

@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import time
 
 from aiohttp import web
@@ -44,6 +45,45 @@ class TrackStore:
         self.max_bytes = max_mb * 1024 * 1024
         os.makedirs(self.dir, exist_ok=True)
         self.state_file = os.path.join(self.dir, "tracks.json")
+        self.bundled = os.path.join(HERE, "bundled")
+        self._seed()
+
+    def _seed(self) -> None:
+        """Copy the bundled default tracks in and hand them to their themes, once.
+
+        ``relay/bundled/`` ships committed audio with ``default.json`` saying
+        each track's tempo/key and which themes get it by default. A track is
+        only seeded the first time it is seen, so deleting one from the UI
+        keeps it deleted across restarts.
+        """
+        if not os.path.isdir(self.bundled):
+            return
+        try:
+            with open(os.path.join(self.bundled, "default.json")) as f:
+                defaults = json.load(f)
+        except (OSError, ValueError):
+            defaults = {}
+        state = self._state()
+        seeded = state.setdefault("seeded", [])
+        changed = False
+        for name, spec in defaults.items():
+            if safe_name(name) != name or name in seeded:
+                continue
+            src = os.path.join(self.bundled, name)
+            if not os.path.isfile(src):
+                continue
+            if not os.path.isfile(os.path.join(self.dir, name)):
+                shutil.copy2(src, os.path.join(self.dir, name))
+            meta = spec.get("meta")
+            if meta and name not in state["meta"]:
+                state["meta"][name] = meta
+            for theme in spec.get("assign", []):
+                state["assign"].setdefault(theme, name)
+            seeded.append(name)
+            changed = True
+        if changed:
+            self._save(state)
+            logger.info("seeded bundled tracks: %s", ", ".join(seeded))
 
     def _state(self) -> dict:
         try:
