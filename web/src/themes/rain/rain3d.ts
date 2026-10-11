@@ -26,6 +26,8 @@ export interface FlyOpts {
 interface Col3 {
   x: number;
   z: number;
+  head: number;    // spinner position in cells, integrated on the CPU
+  sweep: number;   // seconds the line takes to cross the visible screen
   lineId: number;
   cls: number;
 }
@@ -60,10 +62,14 @@ export class Rain3D {
 
   constructor(w: number, h: number) {
     for (let i = 0; i < MAXC; i++) {
-      const c: Col3 = { x: Math.random(), z: Z_NEAR + Math.random() * (Z_FAR - Z_NEAR), lineId: 0, cls: 0 };
+      const c: Col3 = {
+        x: Math.random(), z: Z_NEAR + Math.random() * (Z_FAR - Z_NEAR),
+        head: 0, sweep: 4 + Math.random() * 3, lineId: 0, cls: 0,
+      };
       this.take(c);
       // scatter the initial field so the first frame is already mid-dive
       c.z = Z_NEAR + Math.random() * (Z_FAR - Z_NEAR);
+      c.head = Math.random() * this.cyc(c.z, 12);
       this.columns.push(c);
     }
     this.colsSrc = new BufferImageSource({
@@ -148,6 +154,13 @@ export class Rain3D {
     return s;
   }
 
+  /** The spinner's cycle length at this depth: screen height + trail, in
+   *  cells. Mirrors the shader's halfH/cyc so head can be integrated here. */
+  private cyc(z: number, trail: number): number {
+    const cellBase = 0.045 * (this.glyphW / 15);
+    return LEN + 2 * (0.5 * z / cellBase + trail);
+  }
+
   step(dt: number, o: FlyOpts): void {
     const dz = o.flySpeed * dt;
     const active = Math.round(MAXC * Math.min(1, o.density));
@@ -162,12 +175,21 @@ export class Rain3D {
       if (c.z < Z_NEAR) {
         c.z = Z_FAR + Math.random() * 2;
         c.x = Math.random();
+        c.sweep = 4 + Math.random() * 3;
         this.take(c);
+        c.head = Math.random() * this.cyc(c.z, o.trail);
       }
+      // the line rains down the column: it crosses the visible screen in
+      // c.sweep seconds at any depth. Integrated here, not from uTime in
+      // the shader, because the speed depends on z, which changes every
+      // frame - time x speed would jitter.
+      const cyc = this.cyc(c.z, o.trail);
+      c.head += ((cyc - LEN) / c.sweep) * dt;
+      if (c.head >= cyc) c.head -= cyc;
       this.colData[j] = c.x;
       this.colData[j + 1] = c.z;
-      this.colData[j + 2] = c.lineId;
-      this.colData[j + 3] = c.cls;
+      this.colData[j + 2] = c.head;
+      this.colData[j + 3] = c.lineId * 4 + c.cls;
     }
     this.colsSrc.update();
     if (this.linesDirty) {

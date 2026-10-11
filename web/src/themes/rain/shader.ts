@@ -195,17 +195,18 @@ void main() {
     float dx = uv.x - sx;
     if (abs(dx) > halfW) continue;
     float wy = (uv.y - uVp.y) / cellH;
-    float lineId = floor(c.z + 0.5);
-    float ph = hash1(fi * 13.3 + lineId * 7.1);
-    float spd = 0.5 + hash1(fi * 7.7) * 0.35;
+    // line id and colour class share one float: lineId * 4 + cls
+    float lc = c.w;
+    float lineId = floor(lc * 0.25);
+    float cls = lc - 4.0 * lineId;
     // the spinner sweeps the whole screen height at this column's depth,
     // so far columns rain across the frame, not just around the vp
     float halfH = 0.5 / cellH + uTrail;
-    float cyc = float(LEN) + 2.0 * halfH;
-    float head = mod(uTime * spd * 1.2 + ph * cyc, cyc) - halfH;
-    // the line rides the spinner continuously: glyphs are sampled at the
-    // fractional distance from the head, so the line glides down the column
-    // instead of stepping one cell at a time
+    // the line's head, integrated on the CPU: it rains down the column,
+    // crossing the visible screen in a few seconds at any depth, and the
+    // glyphs are sampled at the fractional distance from the head, so the
+    // line glides instead of stepping one cell at a time
+    float head = c.z - halfH;
     float d = head - wy;
     // the whole line rides the column - the spinner just lights its head
     if (d < 0.0 || d >= float(LEN)) continue;
@@ -231,7 +232,7 @@ void main() {
     float depth = mix(1.0, 0.3, clamp((z - 0.3) / 3.5, 0.0, 1.0));
     float fog = mix(1.0, depth, uFog);
     float near = smoothstep(0.03, 0.09, z);
-    vec3 tint = glyphColor(c.w);
+    vec3 tint = glyphColor(cls);
     if (d < 1.0) tint = mix(tint, vec3(0.85, 1.0, 0.92), 1.0 - d);
     float lit2 = lit * fog * near * 1.25;
     // close columns are being drawn on a CRT: scanlines, RGB fringing,
