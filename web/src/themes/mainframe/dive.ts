@@ -148,6 +148,10 @@ export class Dive {
   private burn: BurnLine | null = null;
   private strikeSpeed = 150;
   private get surfaceDur(): number { return 0.9 + (this.ending === 'counter' ? EXIT_CHASE : EXIT); }
+  /** The dive scales with the board's cruise height (mLift): flying high means a higher, wider look at the chip. */
+  private get zoom(): number { return Math.max(1, (this.flight?.lift ?? 62) / 62); }
+  /** The lens fov held over the chip: the classic 44, opened up as the board view is raised. */
+  private get diveFov(): number { return 44 + (this.zoom - 1) * 12; }
 
   constructor(private world: World, private board: Board, private traffic: Traffic, private audio: AudioCues, overlay: HTMLElement) {
     this.el = document.createElement('div');
@@ -189,6 +193,7 @@ export class Dive {
     this.speedFactor = 0.85;
     this.velInit = false;
     this.cruiseAlt = this.world.camera.position.y;
+    this.innerFlight.lift = 30 * this.zoom;
     this.walls = null;
     this.cruiseSpeed = speed;
     // the lid glows with the die as the camera comes down onto it
@@ -257,7 +262,7 @@ export class Dive {
         // a Hermite curve: it leaves with the flight's own velocity and settles gently above the chip
         const s2 = s * s, s3 = s2 * s;
         const h00 = 2 * s3 - 3 * s2 + 1, h10 = s3 - 2 * s2 + s, h01 = -2 * s3 + 3 * s2, h11 = s3 - s2;
-        const ex = chip.x, ey = chip.h + 4.5, ez = chip.z + 3.5;
+        const ex = chip.x, ey = chip.h + 4.5 * this.zoom, ez = chip.z + 3.5;
         camera.position.set(
           this.from.x * h00 + this.vel.x * DUR.descend * h10 + ex * h01,
           this.from.y * h00 + ey * h01 - 5 * h11,
@@ -273,7 +278,7 @@ export class Dive {
         this.look.copy(camera.position).add(this.lookOffset).lerp(top, blend);
         camera.up.copy(this.fromUp).lerp(this.tmp.set(0, 1, 0), Math.min(1, s * 2.5)).normalize();
         camera.lookAt(this.look);
-        camera.fov = this.fromFov + (44 - this.fromFov) * u;
+        camera.fov = this.fromFov + (this.diveFov - this.fromFov) * u;
         camera.updateProjectionMatrix();
         lens.uZoom.value = clamp01((u - 0.4) / 0.6) * 0.9;
         const lid = chip.top!.material as MeshStandardMaterial;
@@ -295,7 +300,7 @@ export class Dive {
           view.controlsCamera = true;
         } else {
           if (!view.inside && this.t - dt < 0.8) {
-            this.innerFlight.alt = 5;
+            this.innerFlight.alt = 5 * this.zoom;
             this.innerBoard!.fill(this.innerCamZ(), 5);
           }
           this.innerStep(dt, camera, wanderX, wanderY, 0.2);
@@ -445,7 +450,7 @@ export class Dive {
     this.corruption!.reset();
     const ip = this.target?.ip ?? '';
     const lid = chip.top?.material as MeshStandardMaterial | undefined;
-    this.exitFrom.set(chip.x, chip.h + 4.5, chip.z + 3.5);
+    this.exitFrom.set(chip.x, chip.h + 4.5 * this.zoom, chip.z + 3.5);
     this.exitTo.set(chip.x, this.cruiseAlt, chip.z + 3.5 - this.cruiseSpeed * EXIT * 0.5);
     if (this.ending === 'purge') {
       this.board.etch(chip, `SECURED ${ip}`, 'safe');
@@ -500,7 +505,7 @@ export class Dive {
     this.look.copy(top).lerp(this.exitLook, swing);
     camera.up.set(0, 1, 0);
     camera.lookAt(this.look);
-    camera.fov = 44 + (pose.fov - 44) * up;
+    camera.fov = this.diveFov + (pose.fov - this.diveFov) * up;
     camera.updateProjectionMatrix();
     lens.uZoom.value = 0.9 * (1 - clamp01(s / 0.6)) ** 2;
     const lid = chip.top?.material as MeshStandardMaterial | undefined;
@@ -537,7 +542,7 @@ export class Dive {
     camera.position.y += (pose.y - this.exitTo.y) * toFlight;
     camera.up.set(0, 1, 0);
     camera.lookAt(this.look);
-    camera.fov = 44 + (pose.fov - 44) * clamp01(s * 1.4);
+    camera.fov = this.diveFov + (pose.fov - this.diveFov) * clamp01(s * 1.4);
     camera.updateProjectionMatrix();
     lens.uZoom.value = 0.55 * Math.sin(Math.PI * clamp01(s * 1.15));
     const lid = chip.top?.material as MeshStandardMaterial | undefined;
@@ -556,7 +561,7 @@ export class Dive {
 
   private innerStep(dt: number, camera: PerspectiveCamera, wanderX: number, wanderY: number, busy: number, speed = 30): void {
     const board = this.innerBoard!, traffic = this.innerTraffic!;
-    this.innerFlight.update(dt, board, camera, { speed, low: 5, wanderX, wanderY });
+    this.innerFlight.update(dt, board, camera, { speed, low: 5 * this.zoom, wanderX, wanderY });
     board.update(this.innerFlight.z, 5);
     const z = this.innerFlight.z;
     this.spawnT -= dt * busy;
