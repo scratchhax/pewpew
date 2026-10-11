@@ -19,6 +19,7 @@ export const MAINFRAME_DEFAULTS = {
   mDiveThreats: 3,       // IDS/IPS threats inside a minute that trigger a dive
   mDiveSweep: 2,         // otherwise, a dive about this often (minutes)
   mFlightSpeed: 1,       // how fast the camera flies
+  mLift: 62,             // cruise height above the board: the zoom
   mMusicVisuals: true,   // LEDs and packets breathe with the music
 
   // soundtrack
@@ -36,10 +37,10 @@ export const MAINFRAME_DEFAULTS = {
 };
 
 export const MAINFRAME_BUDGETS: Budgets = {
-  low: { mMaxPackets: 400, mChunks: 3, mDetail: 768, mBloom: false, mSmooth: false },
-  medium: { mMaxPackets: 650, mChunks: 3, mDetail: 1024, mBloom: true, mSmooth: true },
-  high: { mMaxPackets: 900, mChunks: 4, mDetail: 1280, mBloom: true, mSmooth: true },
-  ultra: { mMaxPackets: 1300, mChunks: 5, mDetail: 2048, mBloom: true, mSmooth: true },
+  low: { mMaxPackets: 400, mChunks: 3, mDetail: 768, mBloom: false, mSmooth: false, mLift: 62 },
+  medium: { mMaxPackets: 650, mChunks: 3, mDetail: 1024, mBloom: true, mSmooth: true, mLift: 62 },
+  high: { mMaxPackets: 900, mChunks: 4, mDetail: 1280, mBloom: true, mSmooth: true, mLift: 78 },
+  ultra: { mMaxPackets: 1300, mChunks: 5, mDetail: 2048, mBloom: true, mSmooth: true, mLift: 92 },
 };
 
 type Key = keyof typeof MAINFRAME_DEFAULTS;
@@ -68,6 +69,7 @@ export const MAINFRAME_CONTROLS = {
   budgets: [
     range('mMaxPackets', 'Packets', 100, 1500, 50),
     range('mChunks', 'Board ahead (sections)', 3, 10, 1),
+    range('mLift', 'Board height', 40, 120, 2),
     { kind: 'select', key: 'mDetail', label: 'Board detail', numeric: true,
       options: [['768', '768'], ['1024', '1024'], ['1536', '1536'], ['2048', '2048']] } as Control,
     toggle('mBloom', 'Bloom'),

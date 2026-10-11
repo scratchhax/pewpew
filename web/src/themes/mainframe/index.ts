@@ -64,6 +64,7 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     dive.maxPackets = Math.round(settings.mMaxPackets * 0.6);
     if (board.detail !== settings.mDetail) board.detail = settings.mDetail;
     dive.detail = settings.mDetail;
+    flight.lift = settings.mLift;
   }
   applyBudgets();
   board.fill(flight.z, settings.mChunks);
