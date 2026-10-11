@@ -29,6 +29,10 @@ your own traffic. Pick a scene per screen:
 - **Game of Life**: Conway's automaton played with the log — every live cell
   is a glyph, PASS events glide across as gliders, BLOCKs settle into still
   lifes, an IDS alarm drops a glider gun, and the weather seeds the field
+- **Net Fighter**: a beat-'em-up duel where your network is the main event —
+  TRAFFIC, a pixel brawler girl, against the FIREWALL, a street punk, on a
+  rainy neon street; accepts train her, everything the firewall eats powers
+  him, and DNS lookups fly across the stage as fireballs wearing domains
 - **Mycelium**: a bioluminescent forest floor from above, where hosts put out
   growing filaments that weave a mat across the loam — permitted traffic runs
   through it as travelling light, habit decides the roads, mushrooms fruit at
@@ -69,6 +73,8 @@ and never touches the network itself.
 | ![the rain](docs/rain.png) | ![the rain depth layers](docs/rain-depth.png) |
 | **Game of Life** | **Game of Life: a deluge seeds the field** |
 | ![game of life](docs/conway.png) | ![game of life gliders](docs/conway-gun.png) |
+| **Net Fighter** | **Net Fighter: K.O. on the neon strip** |
+| ![net fighter](docs/netfighter.png) | ![net fighter hit](docs/netfighter-hit.png) |
 | **Mycelium** | **Mycelium: a blight swarm crawls in** |
 | ![mycelium](docs/mycelium.png) | ![mycelium blight](docs/mycelium-blight.png) |
 | **Undergrowth** | **Undergrowth: deep in the shell** |
@@ -94,6 +100,7 @@ traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew
 [The Gibson](https://scratchhax.github.io/pewpew/?theme=gibson) ·
 [The Rain](https://scratchhax.github.io/pewpew/?theme=rain) ·
 [Game of Life](https://scratchhax.github.io/pewpew/?theme=conway) ·
+[Net Fighter](https://scratchhax.github.io/pewpew/?theme=netfighter) ·
 [Mycelium](https://scratchhax.github.io/pewpew/?theme=mycelium) ·
 [FRAGNET](https://scratchhax.github.io/pewpew/?theme=fragnet) ·
 [Substrate](https://scratchhax.github.io/pewpew/?theme=substrate) ·
@@ -1293,6 +1300,40 @@ Under the hood it's the cheapest pseudo-3D in the house: the ground is one
 multiply chain per pixel into a 270-line buffer (SNES is 224) that CSS
 upscales with hard pixel edges — lighter per frame than FRAGNET's raycaster,
 and it holds 60 fps on a Raspberry Pi.
+
+### Net Fighter
+
+![net fighter](docs/netfighter.png)
+
+Your firewall log as a Scott Pilgrim-meets-arcade street duel: **TRAFFIC**,
+a pixel brawler girl, versus the **FIREWALL**, a street punk, on a wet neon
+strip at 2 a.m. — parallax skyline, a crowd that grows with your network,
+rain, the odd lightning strike, and a camera that follows the action and
+shakes when it lands. It is a real fight with real rounds: health bars,
+charge meters, hitstop, combo counters, slow-motion K.O.s, best of three.
+
+The traffic is her corner; everything the firewall swallows feeds him.
+
+| Event | In the ring |
+|-------|-------------|
+| allow | Traffic charges up — the vast majority of the log is hers |
+| block | the FIREWALL bulks up; two bars of charge |
+| threat | the FIREWALL surges, lightning cracks the sky, and he throws super |
+| dns | a fireball screams across the street wearing the domain's name |
+| dhcp | a new spectator joins the crowd; a smudge of charge to the FIREWALL |
+| wifi | a spectator cheers; a smudge of charge to the FIREWALL |
+| system | the FIREWALL sneers — and the crowd never stops watching |
+
+So the book of matches writes itself: a healthy LAN is Traffic stomping a
+punk who keeps getting second wind from every drop; a blocked, IDS-lit
+network is her pinned in the corner eating fireballs all night. Rounds end
+in K.O. and start again — the street fight never ends.
+
+The soundtrack is three tracks of chiptune-adjacent pub rock — Sparring,
+Intense and Boss — that swap with the FIREWALL's charge, plus synthesized
+jabs, hits, K.O.s and round bells. Sprites are the CC0 *Streets of Fight*
+pack by Luis Zuno (ansimuz), the first scene to ship with art it didn't
+draw; everything else here is still one shader and one oscillator away.
 
 ## Sound
 
