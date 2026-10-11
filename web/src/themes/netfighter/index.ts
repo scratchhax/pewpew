@@ -343,6 +343,21 @@ async function create(host: ThemeHost<typeof NETFIGHTER_DEFAULTS>, init: Rendere
     girl.root.x = girl.x;
     punk.root.x = punk.x;
 
+    // bodies take up space: two fighters never share the same spot, no
+    // matter how they got there (walk-through, knockback, lunge)
+    if (girl.state !== 'ko' && punk.state !== 'ko') {
+      const dx = punk.x - girl.x;
+      const min = 100;
+      const overlap = min - Math.abs(dx);
+      if (overlap > 0) {
+        const push = overlap / 2 * Math.min(1, dt * 14) * (dx >= 0 ? 1 : -1);
+        girl.x = Math.max(60, girl.x - push);
+        punk.x = Math.min(WORLD_W - 60, punk.x + push);
+        girl.root.x = girl.x;
+        punk.root.x = punk.x;
+      }
+    }
+
     // ── fireballs ────────────────────────────────────────────────────────────
     for (let i = fireballs.length - 1; i >= 0; i--) {
       const fb = fireballs[i];
