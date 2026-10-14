@@ -248,7 +248,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
 #settings .row.sld span.lbl { flex: 0 0 96px; opacity: 0.85; cursor: default; }
 #settings .row input[type="range"] { flex: 1; accent-color: var(--accent); min-width: 60px; }
 #settings .val { width: 40px; text-align: right; opacity: 0.7; font-size: 12px; flex: none; }
-#settings select { font-family: inherit; flex: 1; background: rgba(20,44,60,0.7); color: #bfe6ff;
+#settings select { font-family: inherit; flex: 1; min-width: 0; max-width: 100%; background: rgba(20,44,60,0.7); color: #bfe6ff;
   border: 1px solid rgba(70,240,217,0.3); padding: 4px 6px; font-size: 12px; }
 #settings input[type="checkbox"] { accent-color: var(--accent); }
 .set-reset { font-family: inherit; font-size: 12px; letter-spacing: 1px; cursor: pointer;
