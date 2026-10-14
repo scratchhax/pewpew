@@ -10,10 +10,11 @@ import monstersUrl from './assets/monsters.png';
 import { MONSTER_CELL, MONSTER_COUNT } from './assets/monsters';
 
 /*
- * The Mogul Motorways kart art (SewerPancake) is demo-only and git-excluded,
- * so it is pulled in with globs: present locally, invisible to a fresh clone
- * and to CI, where loadKartAtlas() answers null and the renderer falls back
- * to the procedural pixel karts below.
+ * The Mogul Motorways karts (c) SewerPancake, sewerpancake.itch.io, used with
+ * credit and thanks; crowd monsters from the Kenney Monster Builder Pack
+ * (CC0). Both are loaded through globs so a stripped clone (or a build that
+ * opts out of vendored art) still compiles: loadKartAtlas() then answers null
+ * and the renderer falls back to the procedural pixel karts below.
  */
 type MogulData = { MOGUL_COUNTS: number[]; MOGUL_FRAMES: number[][] };
 const mogulPng = (import.meta.glob('./assets/mogul.png', { eager: true, query: '?url', import: 'default' })

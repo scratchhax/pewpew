@@ -2057,6 +2057,14 @@ Actions** first.
 - Last Outpost sprites: [Top-down Shooter](https://kenney.nl/assets/top-down-shooter)
   by [Kenney](https://kenney.nl) (CC0), packed into
   `web/src/themes/zombie/assets/atlas.png` with its license beside it.
+- Slipstream karts: *Mogul Motorways* sprites by
+  [SewerPancake](https://sewerpancake.itch.io/mogul-motorways), used with
+  credit and thanks per the artist's welcome note, baked into
+  `web/src/themes/slipstream/assets/mogul.png`.
+- Slipstream crowd: [Monster Builder
+  Pack](https://kenney.nl/assets/monster-builder-pack) by
+  [Kenney](https://kenney.nl) (CC0), baked into
+  `web/src/themes/slipstream/assets/monsters.png`.
 - Net Fighter sprites: *Streets of Fight* by
   [Luis Zuno / ansimuz](https://ansimuz.itch.io/) and the *Renegade* and
   *Soldier* brawler characters by
