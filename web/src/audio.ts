@@ -401,6 +401,7 @@ export class Audio {
 
   // ── background track ──
   private track: { name: string; el: HTMLAudioElement; node: MediaElementAudioSourceNode | null; gain: GainNode | null; meta: TrackMeta } | null = null;
+  private playlist: { name: string; url: string; meta: TrackMeta }[] | null = null;
 
   /** Name of the background track playing, or null. */
   trackName(): string | null { return this.track?.name ?? null; }
@@ -408,9 +409,11 @@ export class Audio {
   /**
    * Play an uploaded track as the music (null = back to the theme's own
    * soundtrack). The score keeps its effects and ambience and snaps them to
-   * the track's beat and key.
+   * the track's beat and key. With a playlist of 2+, the track plays through
+   * (no loop) and a random other entry takes over when it ends.
    */
-  setTrack(name: string | null, url = '', meta?: TrackMeta): void {
+  setTrack(name: string | null, url = '', meta?: TrackMeta, playlist?: { name: string; url: string; meta: TrackMeta }[]): void {
+    this.playlist = playlist && playlist.length > 1 ? playlist : null;
     if (this.track && (name !== this.track.name)) {
       const old = this.track;
       old.el.pause();
@@ -428,7 +431,13 @@ export class Audio {
       return;
     }
     const el = new window.Audio(url);
-    el.loop = true;
+    el.loop = !this.playlist;
+    el.onended = () => {
+      if (!this.playlist) return;
+      const pool = this.playlist.filter((t) => t.name !== name);
+      const next = pool[Math.floor(Math.random() * pool.length)];
+      this.setTrack(next.name, next.url, next.meta, this.playlist);
+    };
     el.preload = 'auto';
     this.track = { name, el, node: null, gain: null, meta };
     this.wireTrack();

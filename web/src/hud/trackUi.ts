@@ -1,5 +1,5 @@
 import {
-  KEY_NAMES, analyseTrack, assignTrack, deleteTrack, saveMeta, uploadTrack, type TrackListing,
+  KEY_NAMES, analyseTrack, assignTrack, deleteTrack, renameTrack, saveMeta, uploadTrack, type TrackListing,
 } from '../tracks';
 
 export interface TrackUiHost {
@@ -9,6 +9,11 @@ export interface TrackUiHost {
   listing(): TrackListing | null;
   /** Re-read the relay and apply the result (after any change here). */
   refresh(): Promise<void>;
+  /** Tracks baked into the theme, for the no-relay (demo) picker. */
+  bundled?: { name: string }[];
+  /** Which bundled track plays: 'shuffle', a name, or 'none'. */
+  bundledPick(): string;
+  setBundledPick(v: string): void;
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
@@ -21,8 +26,21 @@ export function mountTrackUi(root: HTMLElement, host: TrackUiHost): void {
   const render = (status = '') => {
     const l = host.listing();
     if (!l) {
+      const bundled = host.bundled ?? [];
+      if (!bundled.length) {
+        root.innerHTML = `<p class="grp">Background track</p>
+          <p class="hint">Background tracks are stored on the relay, so they need a relay (not the demo build).</p>`;
+        return;
+      }
+      const pick = host.bundledPick();
       root.innerHTML = `<p class="grp">Background track</p>
-        <p class="hint">Background tracks are stored on the relay, so they need a relay (not the demo build).</p>`;
+        <label class="row sld"><span class="lbl">${esc(host.themeTitle)}</span>
+          <select data-track="bundled">
+            <option value="shuffle"${pick === 'shuffle' ? ' selected' : ''}>Shuffle (all ${bundled.length})</option>
+            ${bundled.map((t) => `<option value="${esc(t.name)}"${pick === t.name ? ' selected' : ''}>${esc(t.name)}</option>`).join('')}
+            <option value="none"${pick === 'none' ? ' selected' : ''}>None (theme soundtrack)</option>
+          </select></label>
+        <p class="hint" data-track="status">${esc(status) || 'These songs are baked into this scene. Shuffled songs play one after another; a relay-uploaded track would override them.'}</p>`;
       return;
     }
     const current = l.assign[host.themeId] ?? '';
@@ -40,11 +58,13 @@ export function mountTrackUi(root: HTMLElement, host: TrackUiHost): void {
       <label class="row sld"><span class="lbl">Tempo (bpm)</span>
         <input type="number" data-track="bpm" min="40" max="240" step="0.5" value="${meta ? meta.bpm : ''}" style="width:5.5em"/>
         <button class="set-small" data-track="redetect">Re-detect</button></label>
+      <button class="set-small" data-track="rename">Rename</button>
       <button class="set-small set-danger" data-track="delete">Delete ${esc(cur.name)}</button>` : ''}
       <label class="row"><button class="set-small" data-track="upload">Upload track…</button>
-        <input type="file" data-track="file" accept="audio/*,.mp3,.ogg,.m4a,.wav,.flac,.opus,.webm" hidden/>
+        <input type="file" data-track="file" accept="audio/*,.mp3,.ogg,.m4a,.wav,.flac,.opus,.webm,.mid,.midi" hidden/>
         <span class="hint" data-track="status">${esc(status)}</span></label>
-      <p class="hint">MP3, OGG, M4A, WAV or FLAC up to ${l.max_mb} MB. Stored on the relay and shared by every
+      <p class="hint">MP3, OGG, M4A, WAV, FLAC — or a MIDI file, which the relay renders with a
+        GM soundfont — up to ${l.max_mb} MB. Stored on the relay and shared by every
         screen; each theme picks its own. While a track plays, the theme's music steps aside and its effects
         and ambience ride on top.</p>`;
   };
@@ -68,6 +88,12 @@ export function mountTrackUi(root: HTMLElement, host: TrackUiHost): void {
     try {
       if (el.dataset.track === 'upload') {
         root.querySelector<HTMLInputElement>('[data-track="file"]')?.click();
+      } else if (el.dataset.track === 'rename' && current) {
+        const want = prompt('New name for this track:', current.replace(/\.[a-z0-9]+$/i, ''));
+        if (!want?.trim() || want.trim() === current) return;
+        await renameTrack(current, want.trim());
+        await host.refresh();
+        render(`Renamed to ${want.trim()}.`);
       } else if (el.dataset.track === 'delete' && current) {
         if (!confirm(`Delete ${current} from the relay? Every screen using it goes back to its theme soundtrack.`)) return;
         await deleteTrack(current);
@@ -86,6 +112,13 @@ export function mountTrackUi(root: HTMLElement, host: TrackUiHost): void {
   root.addEventListener('change', async (e) => {
     const el = e.target as HTMLInputElement | HTMLSelectElement;
     try {
+      if (el.dataset.track === 'bundled') {
+        host.setBundledPick(el.value);
+        await host.refresh();
+        render(el.value === 'shuffle' ? 'Shuffling the bundled songs.'
+          : el.value === 'none' ? 'Back to the theme soundtrack.' : `Playing ${el.value}.`);
+        return;
+      }
       if (el.dataset.track === 'pick') {
         await assignTrack(host.themeId, el.value || null);
         await host.refresh();

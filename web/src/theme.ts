@@ -3,7 +3,7 @@ import type { State } from './state';
 import type { Throttle } from './throttle';
 import type { SceneEvent } from './events';
 import type { Tier } from './perf';
-import type { Cue, MusicPulse, ScoreFactory, SfxOpts } from './audio';
+import type { Cue, MusicPulse, ScoreFactory, SfxOpts, TrackMeta } from './audio';
 import type { HudLabelOverrides } from './hud/hud';
 
 /**
@@ -15,6 +15,9 @@ import type { HudLabelOverrides } from './hud/hud';
  * owns its renderer and scene, turns SceneEvents into visuals, and declares
  * its own settings, panel controls and per-tier scene budgets.
  */
+/** A music track baked into a theme's bundle. */
+export interface BundledTrack { name: string; url: string; meta: TrackMeta }
+
 export interface Theme<T extends ThemeSettings = ThemeSettings> {
   /** Short id, e.g. 'scifi'. */
   id: string;
@@ -41,6 +44,11 @@ export interface Theme<T extends ThemeSettings = ThemeSettings> {
   };
   /** The theme's own music and sound design; without one the built-in (sci-fi) band plays. */
   score?: ScoreFactory;
+  /** Tracks baked into the theme (rendered MIDI, chiptune, whatever). One
+   * loops forever; several shuffle, each playing through before a random
+   * next. A relay-assigned uploaded track overrides them all; demo builds
+   * have no relay, so these are the only music there. */
+  bundledTracks?: BundledTrack[];
   /** Create the renderer inside `host.mount`; resolves once ready to draw. */
   create(host: ThemeHost<T>, init: RendererInit): Promise<ThemeInstance>;
 }

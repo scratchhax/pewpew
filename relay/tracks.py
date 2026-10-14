@@ -12,6 +12,7 @@ each theme plays. Everything here is LAN-local like the rest of the relay.
   GET    /tracks/{name}              the audio file (range requests supported)
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -25,6 +26,8 @@ logger = logging.getLogger("pewpew-relay.tracks")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 AUDIO_EXT = {".mp3", ".ogg", ".oga", ".opus", ".m4a", ".aac", ".wav", ".flac", ".webm"}
+MIDI_EXT = {".mid", ".midi"}
+SF2 = "/usr/share/sounds/sf2/FluidR3_GM.sf2"
 THEME_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
@@ -33,10 +36,49 @@ def safe_name(raw: str) -> str | None:
     base = os.path.basename(raw.replace("\\", "/")).strip()
     stem, ext = os.path.splitext(base)
     ext = ext.lower()
-    if ext not in AUDIO_EXT:
+    if ext not in AUDIO_EXT and ext not in MIDI_EXT:
         return None
     stem = re.sub(r"[^A-Za-z0-9 ._()-]+", "_", stem).strip(" ._") or "track"
     return stem[:96] + ext
+
+
+async def render_midi(src: str, dst: str) -> None:
+    """Render a MIDI file to Opus with the FluidR3 GM soundfont.
+
+    The sequencers that export these MIDIs cap velocities around 50, which
+    GM synths render thin, so notes get a boost; loudnorm glues the result
+    into something that competes with the source players.
+    """
+    prep = src
+    try:
+        import mido
+        m = mido.MidiFile(src, clip=True)
+        for t in m.tracks:
+            for msg in t:
+                if msg.type in ("note_on", "note_aftertouch") and msg.velocity > 0:
+                    msg.velocity = min(127, int(msg.velocity * 2.2))
+        prep = src + ".prep.mid"
+        m.save(prep)
+    except Exception:                       # noqa: BLE001 - mido missing or a file it chokes on
+        logger.warning("mido prep failed, rendering raw midi")
+    wav = dst + ".wav"
+    try:
+        p = await asyncio.create_subprocess_exec(
+            "fluidsynth", "-ni", SF2, prep, "-F", wav, "-r", "44100",
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+        if (await p.wait()) != 0:
+            raise RuntimeError("fluidsynth failed (installed? soundfont at " + SF2 + "?)")
+        p = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-y", "-loglevel", "error", "-i", wav,
+            "-af", "loudnorm=I=-14:TP=-1.5:LRA=9", "-c:a", "libopus", "-b:a", "128k", dst,
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
+        err = (await p.communicate())[1]
+        if p.returncode != 0:
+            raise RuntimeError("ffmpeg failed: " + err.decode(errors="replace")[-200:])
+    finally:
+        for f in (wav, src + ".prep.mid"):
+            if os.path.exists(f):
+                os.remove(f)
 
 
 class TrackStore:
@@ -141,7 +183,11 @@ def add_track_routes(app: web.Application, cfg: dict) -> None:
             raise web.HTTPBadRequest(text="expected a multipart field named 'file'")
         name = safe_name(field.filename)
         if not name:
-            raise web.HTTPUnsupportedMediaType(text="audio files only: " + ", ".join(sorted(AUDIO_EXT)))
+            raise web.HTTPUnsupportedMediaType(
+                text="audio or midi files only: " + ", ".join(sorted(AUDIO_EXT | MIDI_EXT)))
+        is_midi = os.path.splitext(name)[1].lower() in MIDI_EXT
+        if is_midi:
+            name = os.path.splitext(name)[0] + ".ogg"   # what actually gets stored
         tmp = os.path.join(store.dir, f".upload-{int(time.time() * 1000)}")
         size = 0
         try:
@@ -151,7 +197,19 @@ def add_track_routes(app: web.Application, cfg: dict) -> None:
                     if size > store.max_bytes:
                         raise web.HTTPRequestEntityTooLarge(max_size=store.max_bytes, actual_size=size)
                     f.write(chunk)
-            os.replace(tmp, os.path.join(store.dir, name))
+            if is_midi:
+                if not os.path.exists(SF2):
+                    raise web.HTTPInternalServerError(text="no GM soundfont on the relay: " + SF2)
+                rendered = tmp + ".ogg"
+                try:
+                    await render_midi(tmp, rendered)
+                except Exception as err:                # noqa: BLE001
+                    if os.path.exists(rendered):
+                        os.remove(rendered)
+                    raise web.HTTPBadRequest(text=f"could not render this midi: {err}")
+                os.replace(rendered, os.path.join(store.dir, name))
+            else:
+                os.replace(tmp, os.path.join(store.dir, name))
         finally:
             if os.path.exists(tmp):
                 os.remove(tmp)
@@ -207,6 +265,34 @@ def add_track_routes(app: web.Application, cfg: dict) -> None:
         store._save(state)
         return web.json_response({"ok": True})
 
+    async def rename(request: web.Request):
+        name = request.match_info["name"]
+        if not store.path(name):
+            raise web.HTTPNotFound()
+        body = await request.json()
+        want = str(body.get("name", "")).strip()
+        if not want:
+            raise web.HTTPBadRequest(text="expected a name")
+        # keep the current extension unless the new name brings its own,
+        # so "Rainbow Road" stays Rainbow Road.ogg
+        if not os.path.splitext(want)[1]:
+            want += os.path.splitext(name)[1]
+        new = safe_name(want)
+        if not new:
+            raise web.HTTPBadRequest(text="no usable characters in that name")
+        if new == name:
+            return web.json_response({"name": name})
+        if store.path(new):
+            raise web.HTTPConflict(text=f"a track called {new} already exists")
+        os.replace(store.path(name), os.path.join(store.dir, new))
+        state = store._state()
+        if name in state["meta"]:
+            state["meta"][new] = state["meta"].pop(name)
+        state["assign"] = {k: (new if v == name else v) for k, v in state["assign"].items()}
+        store._save(state)
+        logger.info("track renamed: %s -> %s", name, new)
+        return web.json_response({"name": new})
+
     async def serve(request: web.Request):
         p = store.path(request.match_info["name"])
         if not p:
@@ -216,6 +302,7 @@ def add_track_routes(app: web.Application, cfg: dict) -> None:
     app.router.add_get("/api/tracks", list_tracks)
     app.router.add_post("/api/tracks", upload)
     app.router.add_put("/api/tracks/{name}/meta", put_meta)
+    app.router.add_post("/api/tracks/{name}/rename", rename)
     app.router.add_delete("/api/tracks/{name}", delete)
     app.router.add_put("/api/tracks-assign", assign)
     app.router.add_get("/tracks/{name}", serve)

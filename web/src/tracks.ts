@@ -63,6 +63,12 @@ export async function deleteTrack(name: string): Promise<void> {
   await ok(await fetch(`/api/tracks/${encodeURIComponent(name)}`, { method: 'DELETE' }));
 }
 
+export async function renameTrack(name: string, newName: string): Promise<void> {
+  await ok(await fetch(`/api/tracks/${encodeURIComponent(name)}/rename`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }),
+  }));
+}
+
 export async function assignTrack(theme: string, name: string | null): Promise<void> {
   await ok(await fetch('/api/tracks-assign', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme, name }),

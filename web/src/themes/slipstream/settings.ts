@@ -69,8 +69,6 @@ export const SLIP_CONTROLS = {
     range('kPace', 'Race pace', 0.4, 2, 0.05),
   ],
   audio: [
-    { kind: 'select', key: 'kMusicStyle', label: 'Music', options: SLIP_MUSIC } as Control,
-    range('kMusicRotate', 'Rotate every (min)', 1, 30, 0.5),
     range('kSfx', 'Race sounds', 0, 1, 0.05),
     range('kEngine', 'Engine purr', 0, 1, 0.05),
   ],

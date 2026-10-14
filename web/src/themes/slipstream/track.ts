@@ -6,6 +6,9 @@
  */
 
 const SIZE = 1024;
+const BAKE = 2048;   // bitmap pixels: 2 per world unit, so the near ground
+                     // samples texels smaller than a screen pixel and the mip
+                     // chain has something to chew down from
 
 export interface Circuit {
   id: string;
@@ -34,6 +37,9 @@ export interface Track {
   name: string;
   canvas: HTMLCanvasElement;
   px: Uint32Array;                 // the baked bitmap, little-endian RGBA32
+  /** The bitmap plus its halvings (2048, 1024, 512, 256) for the ground mip. */
+  mips: Uint32Array[];
+  mipSizes: number[];
   xs: Float32Array; ys: Float32Array;
   txs: Float32Array; tys: Float32Array;
   cum: Float32Array;               // cumulative arc length at each sample
@@ -125,10 +131,11 @@ function sample(c: Circuit, per = 44): { xs: Float32Array; ys: Float32Array; txs
 
 
 /** Paint the world bitmap: tileable grass, then the road on top. */
-function bake(c: Circuit, s: ReturnType<typeof sample>): { canvas: HTMLCanvasElement; px: Uint32Array } {
+function bake(c: Circuit, s: ReturnType<typeof sample>): { canvas: HTMLCanvasElement; px: Uint32Array; mips: Uint32Array[]; mipSizes: number[] } {
   const cv = document.createElement('canvas');
-  cv.width = cv.height = SIZE;
+  cv.width = cv.height = BAKE;
   const ctx = cv.getContext('2d')!;
+  ctx.scale(BAKE / SIZE, BAKE / SIZE);   // everything below stays in world units
   const rnd = mulberry32(c.id.split('').reduce((a, ch) => a * 31 + ch.charCodeAt(0), 7));
 
   // grass: two checker scales so motion over it reads even at speed
@@ -206,8 +213,22 @@ function bake(c: Circuit, s: ReturnType<typeof sample>): { canvas: HTMLCanvasEle
   };
   for (const f of c.padFr) padAt(f * s.total);
 
-  const img = ctx.getImageData(0, 0, SIZE, SIZE);
-  return { canvas: cv, px: new Uint32Array(img.data.buffer) };
+  const img = ctx.getImageData(0, 0, BAKE, BAKE);
+  const mips = [new Uint32Array(img.data.buffer)];
+  const mipSizes = [BAKE];
+  let src: HTMLCanvasElement = cv;
+  let srcSize = BAKE;
+  for (let size = BAKE / 2; size >= 256; size /= 2) {
+    const mc = document.createElement('canvas');
+    mc.width = mc.height = size;
+    const mctx = mc.getContext('2d')!;
+    mctx.imageSmoothingEnabled = true;
+    mctx.drawImage(src, 0, 0, srcSize, srcSize, 0, 0, size, size);
+    mips.push(new Uint32Array(mctx.getImageData(0, 0, size, size).data.buffer));
+    mipSizes.push(size);
+    src = mc; srcSize = size;
+  }
+  return { canvas: cv, px: mips[0], mips, mipSizes };
 }
 
 /** A stable seed per circuit id, so a track keeps its crowd between reloads. */
@@ -301,7 +322,7 @@ export function buildTrack(sel: string, hostname: string): Track {
   }
   const c = CIRCUITS[id];
   const smp = sample(c);
-  const { canvas, px } = bake(c, smp);
+  const { canvas, px, mips, mipSizes } = bake(c, smp);
 
   // nearest-sample lookup buckets (built once)
   const G = 32, bucket = new Int32Array(G * G).fill(-1);
@@ -328,7 +349,7 @@ export function buildTrack(sel: string, hostname: string): Track {
   };
 
   return {
-    id, name: c.name, canvas, px,
+    id, name: c.name, canvas, px, mips, mipSizes,
     xs: smp.xs, ys: smp.ys, txs: smp.txs, tys: smp.tys, cum: smp.cum, total: smp.total,
     pads: c.padFr.map((f) => f * smp.total), boardS: c.boardFr * smp.total,
     width: c.width, speed: c.speed,

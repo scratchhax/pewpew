@@ -18,6 +18,12 @@ import type { NetEvent } from './types';
 /** How many times this tab has already stepped down after losing the GPU context. */
 const GPU_DROP_KEY = 'pewpew.gpuDrops';
 
+/** Which bundled track a theme plays: 'shuffle' (default), a name, 'none'. */
+function bundledPick(themeId: string, list: { name: string }[]): string {
+  const v = localStorage.getItem(`pewpew.bundled.${themeId}`) ?? 'shuffle';
+  return v === 'none' || v === 'shuffle' || list.some((t) => t.name === v) ? v : 'shuffle';
+}
+
 /**
  * Boot the viewer with a theme. Everything here is theme-independent: the
  * feed, classification, sim state, HUD, audio, settings, quality presets and
@@ -122,7 +128,12 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
     tier: settings.quality === 'custom' ? null : tuner.tier,
     why: bootPerf.why,
     reloadNeeded: settings.antialias !== initAntialias || settings.powerPref !== initPowerPref,
-  }), (el) => mountTrackUi(el, { themeId: theme.id, themeTitle: theme.title, listing: () => trackListing, refresh: syncTracks }));
+  }), (el) => mountTrackUi(el, {
+    themeId: theme.id, themeTitle: theme.title, listing: () => trackListing, refresh: syncTracks,
+    bundled: theme.bundledTracks,
+    bundledPick: () => bundledPick(theme.id, theme.bundledTracks ?? []),
+    setBundledPick: (v) => localStorage.setItem(`pewpew.bundled.${theme.id}`, v),
+  }));
 
   // ── background tracks: the relay says which track this theme plays; every screen follows ──
   let trackListing: TrackListing | null = null;
@@ -131,7 +142,25 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
     trackListing = await listTracks();
     const name = trackListing?.assign[theme.id] ?? null;
     const info = name ? trackListing!.tracks.find((t) => t.name === name) : undefined;
-    if (!name || !info) { audio.setTrack(null); return; }
+    if (!name || !info) {
+      // no relay assignment: fall back to the tracks baked into the theme
+      const list = theme.bundledTracks;
+      if (list?.length) {
+        const pick = bundledPick(theme.id, list);
+        if (pick === 'none') { audio.setTrack(null); return; }
+        const cur = audio.trackName();
+        if (pick === 'shuffle') {
+          const t = list.find((x) => x.name === cur) ?? list[Math.floor(Math.random() * list.length)];
+          audio.setTrack(t.name, t.url, t.meta, list);
+        } else {
+          const t = list.find((x) => x.name === pick) ?? list[0];
+          audio.setTrack(t.name, t.url, t.meta);
+        }
+      } else {
+        audio.setTrack(null);
+      }
+      return;
+    }
     if (!info.meta) {
       // nobody has analysed it yet (e.g. uploaded with curl): do it here, once, and share the result
       if (analysing === name) return;

@@ -8,7 +8,21 @@
  * column, and it wobbles like the real board.
  */
 
-const TEXP = 1024;          // world bitmap side (must be a power of two)
+
+/** Bilinear texel fetch at (tx, ty) in texel space, wrapping at the edges. */
+function bilinear(px: Uint32Array, size: number, tx: number, ty: number): number {
+  const x0 = Math.floor(tx), y0 = Math.floor(ty);
+  const fx = tx - x0, fy = ty - y0;
+  const m = size - 1;
+  const x1 = (x0 + 1) & m, x = x0 & m;
+  const y = (y0 & m) * size, y1 = ((y0 + 1) & m) * size;
+  const p00 = px[y + x], p01 = px[y + x1], p10 = px[y1 + x], p11 = px[y1 + x1];
+  const w00 = (1 - fx) * (1 - fy), w01 = fx * (1 - fy), w10 = (1 - fx) * fy, w11 = fx * fy;
+  const r = (p00 & 255) * w00 + (p01 & 255) * w01 + (p10 & 255) * w10 + (p11 & 255) * w11;
+  const g = ((p00 >>> 8) & 255) * w00 + ((p01 >>> 8) & 255) * w01 + ((p10 >>> 8) & 255) * w10 + ((p11 >>> 8) & 255) * w11;
+  const b = ((p00 >>> 16) & 255) * w00 + ((p01 >>> 16) & 255) * w01 + ((p10 >>> 16) & 255) * w10 + ((p11 >>> 16) & 255) * w11;
+  return (b << 16) | (g << 8) | r;
+}
 
 export interface Cam {
   x: number; y: number;     // position on the world bitmap, texture units
@@ -28,7 +42,7 @@ export class Mode7 {
   /** The focal length the last ground pass actually used, after the speed
    *  widening. Sprites project with this so they stay pinned to the road. */
   drawFocal = 1;
-  readonly camH = 9.2;                 // camera height above the plane, units
+  readonly camH = 11.5;                 // camera height above the plane, units
 
   constructor(private canvas: HTMLCanvasElement, private ctx: CanvasRenderingContext2D) {
     canvas.style.display = 'block';
@@ -84,8 +98,17 @@ export class Mode7 {
   /**
    * Draw sky + ground for this camera. `sky` is the baked strip; its x scrolls
    * with heading so the mountains turn with the board.
+   *
+   * The ground is sampled from a mip chain with bilinear filtering, picking
+   * the level whose texels match the screen-pixel footprint and blending
+   * between neighbours so the switch is invisible. Nearest only when the
+   * ground is magnified (close to the camera), where bilinear would smear
+   * the blocks the 16-bit look lives on. One truncating nearest fetch of a
+   * single 1024 bitmap - the old way - crawled and waved: near it magnified
+   * (blocky), far it undersampled (shimmer), and the truncation made edges
+   * crawl as the camera moved.
    */
-  renderGround(cam: Cam, tex: Uint32Array, sky: HTMLCanvasElement): void {
+  renderGround(cam: Cam, mips: Uint32Array[], mipSizes: number[], sky: HTMLCanvasElement): void {
     const { W, H, px, img } = this;
     if (!px || !img) return;
     const h = cam.heading;
@@ -99,28 +122,56 @@ export class Mode7 {
     const hy = Math.max(1, Math.min(H - 6, Math.round(H * 0.42 + cam.bob)));
     this.horizonY = hy;
 
-    // ground first (raw writes), then the sky slice covers the rows above
-    // the horizon; its x scrolls with heading so the mountains turn with us
+    const NL = mips.length;
     const fogFar = 1500;
     for (let y = hy; y < H; y++) {
       const d = this.camH * f / (y - hy + 0.5);
       const k = d / f;
-      let tw = (cam.x + this.fx * d - this.rx * (W * 0.5 * k)) | 0;
-      let th = (cam.y + this.fy * d - this.ry * (W * 0.5 * k)) | 0;
+      let wx = cam.x + this.fx * d - this.rx * (W * 0.5 * k);
+      let wy = cam.y + this.fy * d - this.ry * (W * 0.5 * k);
       const sx1 = this.rx * k, sy1 = this.ry * k;
+      // one screen pixel spans `step` world units; the base mip has half-unit
+      // texels, so it is exact at step 0.5 and every doubling drops a level
+      const step = Math.hypot(sx1, sy1);
+      let la = 0, lb = 0, w = 0;
+      if (step >= 0.5) {
+        const l = Math.min(NL - 1, Math.log2(step * 2));
+        const li = Math.min(NL - 1, l | 0);
+        la = li; lb = Math.min(NL - 1, li + 1);
+        w = li === lb ? 0 : Math.min(1, l - li);
+      }
+      const sa = mips[la], sb = mips[lb];
+      const na = mipSizes[la], nb = mipSizes[lb];
+      const ca = na / 1024, cb = nb / 1024;
       const fogT = Math.min(0.94, (d / fogFar) * (d / fogFar));
       const inv = 1 - fogT;
       const fr = 26 * fogT, fg = 28 * fogT, fb = 40 * fogT;   // dusk mist
+      // one of three shapes per row - magnified nearest, one-level bilinear,
+      // or a blend of two - decided once here so the pixel loop stays flat
+      const mode = step < 0.5 ? 0 : w === 0 ? 1 : 2;
+      const ma = na - 1, mb = nb - 1;
       let o = y * W;
-      for (let x = 0; x < W; x++, o++) {
-        const t = tex[(th & (TEXP - 1)) * TEXP + (tw & (TEXP - 1))];
-        const r = t & 255, g = (t >>> 8) & 255, b = (t >>> 16) & 255;
+      for (let x = 0; x < W; x++, o++, wx += sx1, wy += sy1) {
+        let r: number, g: number, b: number;
+        if (mode === 0) {
+          const t = sa[(((wy * ca) | 0) & ma) * na + ((((wx * ca) | 0) & ma))];
+          r = t & 255; g = (t >>> 8) & 255; b = (t >>> 16) & 255;
+        } else if (mode === 1) {
+          const ta = bilinear(sa, na, wx * ca, wy * ca);
+          r = ta & 255; g = (ta >>> 8) & 255; b = (ta >>> 16) & 255;
+        } else {
+          const ta = bilinear(sa, na, wx * ca, wy * ca);
+          const tb = bilinear(sb, nb, wx * cb, wy * cb);
+          r = (ta & 255) + (((tb & 255) - (ta & 255)) * w);
+          g = ((ta >>> 8) & 255) + ((((tb >>> 8) & 255) - ((ta >>> 8) & 255)) * w);
+          b = ((ta >>> 16) & 255) + ((((tb >>> 16) & 255) - ((ta >>> 16) & 255)) * w);
+        }
         px[o] = 0xff000000 | ((((b * inv + fb) | 0) & 255) << 16) | ((((g * inv + fg) | 0) & 255) << 8) | ((r * inv + fr) | 0);
-        tw += sx1; th += sy1;
       }
     }
     this.ctx.putImageData(img, 0, 0);
-    const sx = ((h / (Math.PI * 2)) * 2048 * 2) % 2048;
+    // heading may be negative (atan2 range), so wrap the scroll offset twice
+    const sx = ((((h / (Math.PI * 2)) * 2048 * 2) % 2048) + 2048) % 2048;
     const w1 = Math.min(W, 2048 - sx);
     this.ctx.drawImage(sky, sx, 0, w1, 72, 0, 0, w1, hy);
     if (sx + W > 2048) this.ctx.drawImage(sky, 0, 0, sx + W - 2048, 72, 2048 - sx, 0, sx + W - 2048, hy);
@@ -136,6 +187,27 @@ export class Mode7 {
     // the field of view opens
     const k = this.drawFocal / depth;
     return { sx: this.W / 2 + lat * k, baseY: this.horizonY + this.camH * k, depth, k };
+  }
+
+  /**
+   * Draw a sprite pinned to a screen point instead of a world point: bottom
+   * centre at (sx, sy), `hpx` pixels tall. Used for effects that must stay
+   * welded to a billboard (boost flames) - a world-space offset behind a
+   * billboard kart slides off the sprite the moment the kart turns.
+   */
+  drawScreen(spr: HTMLCanvasElement, sx: number, sy: number, hpx: number, alpha = 1): void {
+    if (sy < this.horizonY || hpx < 1) return;
+    const wpx = hpx * (spr.width / spr.height);
+    const ctx = this.ctx;
+    const was = ctx.globalAlpha;
+    if (alpha < 1) ctx.globalAlpha = alpha;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, this.horizonY, this.W, this.H - this.horizonY);
+    ctx.clip();
+    ctx.drawImage(spr, Math.round(sx - wpx / 2), Math.round(sy - hpx), Math.max(1, Math.round(wpx)), Math.max(1, Math.round(hpx)));
+    ctx.restore();
+    ctx.globalAlpha = was;
   }
 
   /**
@@ -156,15 +228,13 @@ export class Mode7 {
     const ctx = this.ctx;
     const was = ctx.globalAlpha;
     if (alpha < 1) ctx.globalAlpha = alpha;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, this.horizonY, this.W, this.H - this.horizonY);
-    ctx.clip();
-    // hard pixel shadow, then the sprite
+    // no horizon clip: a thing taller than the camera legitimately pokes
+    // above the horizon line, and slicing it there guillotines stands and
+    // trees. The base always projects below the horizon, so the sprite can
+    // only ever reach the sky the way a real one does.
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.fillRect(p.sx - sw * 0.34, p.baseY - 1, sw * 0.68, Math.max(1, p.k * 0.18));
     ctx.drawImage(spr, Math.round(p.sx - sw / 2), Math.round(p.baseY - sh - lift * p.k), Math.max(1, Math.round(sw)), Math.max(1, Math.round(sh)));
-    ctx.restore();
     ctx.globalAlpha = was;
     return true;
   }

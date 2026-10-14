@@ -24,7 +24,6 @@ const H_BOX = KART_H * 0.95;       // item box: about as tall as the kart chasin
 const H_SHELL = KART_H * 0.85;
 const H_BANANA = KART_H * 0.62;
 const H_HAZARD = KART_H * 0.5;
-const H_FLAME = KART_H * 0.5;
 const H_SPARK = KART_H * 0.3;      // a drift spark: smaller than a boost flame
 const SPARK_LATV = 4.5;            // how hard a kart must slide sideways to spit sparks
 const H_LABEL = KART_H * 0.17;     // the name tag floating over the helmet
@@ -43,7 +42,7 @@ const H_TYRES = KART_H * 0.62;
  * frame it cannot resolve anyway.
  */
 const propFar = (rows: number): number => 200 + rows * 1.6;
-import { balloons, board as boardSprite, banana, fan, flame, ghost, itemBox, kartFront, kartRear, kartSide, label, marshal, mushroom, oil, shadow, shell, spark, stand, star, tree, tyres, VEH_W, type Character } from './sprites';
+import { balloons, board as boardSprite, banana, fan, ghost, hotTyre, itemBox, kartFront, kartRear, kartSide, label, loadKartAtlas, marshal, mushroom, oil, shadow, shell, spark, stand, star, tree, tyres, VEH_W, type Character } from './sprites';
 import type { ItemKind } from './race';
 import './hud.css';
 
@@ -172,9 +171,11 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
   const bananaSpr = banana();
   const mushroomSpr = mushroom();
   const oilSpr = oil();
-  const flameSpr = flame();
+  const tyreHotA = hotTyre(0), tyreHotB = hotTyre(1);
   const sparkA = spark(0), sparkB = spark(1);
   const shadowSpr = shadow();
+  const atlas = await loadKartAtlas();
+  // procedural fallback for clones without the demo-only mogul art
   const ksprCache = new Map<string, { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement }>();
   const karts = (hue: number, ch: Character, wf = 0): { rear: HTMLCanvasElement; front: HTMLCanvasElement; side: HTMLCanvasElement } => {
     const key = `${hue}|${ch.num}|${ch.pat}|${ch.acc}|${ch.veh}|${wf}`;
@@ -186,11 +187,18 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     }
     return e;
   };
-  const ghostCache = new Map<string, HTMLCanvasElement>();
+  const ghostCache = new Map<number, HTMLCanvasElement>();
+  const ghostKart = (char: number): HTMLCanvasElement => {
+    const key = char;
+    let g = ghostCache.get(key);
+    if (!g) { g = ghost(atlas!.frame(char, 0)); ghostCache.set(key, g); }
+    return g;
+  };
+  const ghostRearCache = new Map<string, HTMLCanvasElement>();
   const ghostRear = (hue: number, ch: Character): HTMLCanvasElement => {
     const key = `${hue}|${ch.num}|${ch.pat}|${ch.acc}|${ch.veh}`;
-    let g = ghostCache.get(key);
-    if (!g) { g = ghost(kartRear(hue, ch)); ghostCache.set(key, g); }
+    let g = ghostRearCache.get(key);
+    if (!g) { g = ghost(kartRear(hue, ch)); ghostRearCache.set(key, g); }
     return g;
   };
   const labelCache = new Map<string, HTMLCanvasElement>();
@@ -314,7 +322,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     // own - so the nominal follow distance is short. Measured: at 13.5 the
     // hero came out 13% of the screen height against the 20% it had when it
     // was pinned to the bottom.
-    const back = 6.5 + hero.speed * 0.03;
+    const back = 15 + hero.speed * 0.05;
     const behind = track.offset(hp.s - back, hero.lat * 0.55);
     const aim = track.atS(hero.s + 7);
     camX += (behind.x - camX) * Math.min(1, dtr * 3.6);
@@ -329,7 +337,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       x: camX + f.wanderX * 0.04, y: camY, heading: camHeading, speedFrac,
       bob: Math.sin(f.t * 0.8) * 1.5 + f.wanderY * 0.02,
     };
-    m7.renderGround(cam, track.px, sky);
+    m7.renderGround(cam, track.mips, track.mipSizes, sky);
 
     // ── sprites, back to front ──
     const draws: Array<{ depth: number; run: () => void }> = [];
@@ -380,35 +388,68 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
       const pr = m7.project(p.x, p.y, cam);
       if (!pr) continue;
       const toR = Math.atan2(p.y - camY, p.x - camX);
-      const relAng = Math.atan2(Math.sin(toR - camHeading), Math.cos(toR - camHeading));
-      // a spinning kart turns: rear, side, front, side, about two turns a second
+      // the rotation atlas carries a full cycle per character: pick the frame
+      // from the kart's heading seen from the camera, so karts steer through
+      // corners and spin-outs pirouette instead of flicking three views
       const spinning = r.spin > 0;
-      const turn = spinning ? ((r.spin * 7.5) | 0) % 4 : -1;
-      const side = spinning ? (turn === 1 || turn === 3) : Math.abs(relAng) > 1.1;
-      const facingBack = spinning ? turn === 2 : Math.cos(p.heading - camHeading) < -0.2;
-      const wf = r.ghost ? 0 : ((f.t * (16 + r.speed * 0.38)) | 0) % 4;
-      const spr = r.ghost ? ghostRear(r.hue, r.char) : side ? karts(r.hue, r.char).side : facingBack ? karts(r.hue, r.char).front : karts(r.hue, r.char, wf).rear;
+      const cid = r.char.drv % 8;
+      let spr: HTMLCanvasElement;
+      if (atlas) {
+        // the rotation atlas carries a full cycle per character: pick the frame
+        // from the kart's heading seen from the camera, so karts steer through
+        // corners and spin-outs pirouette instead of flicking three views
+        const n = atlas.counts[cid] ?? 22;
+        const rel = Math.atan2(Math.sin(p.heading - toR), Math.cos(p.heading - toR));
+        const dir = spinning ? Math.round(r.spin * 30) : Math.round(rel / (Math.PI * 2 / n));
+        spr = r.ghost ? ghostKart(cid) : atlas.frame(cid, dir);
+      } else {
+        // three views, flicked: rear, side, front - the pre-atlas look
+        const relAng = Math.atan2(Math.sin(toR - camHeading), Math.cos(toR - camHeading));
+        const turn = spinning ? ((r.spin * 7.5) | 0) % 4 : -1;
+        const side = spinning ? (turn === 1 || turn === 3) : Math.abs(relAng) > 1.1;
+        const facingBack = spinning ? turn === 2 : Math.cos(p.heading - camHeading) < -0.2;
+        const wf = r.ghost ? 0 : ((f.t * (16 + r.speed * 0.38)) | 0) % 4;
+        spr = r.ghost ? ghostRear(r.hue, r.char)
+          : side ? karts(r.hue, r.char).side
+          : facingBack ? karts(r.hue, r.char).front
+          : karts(r.hue, r.char, wf).rear;
+      }
       const alpha = r.ghost ? 0.42 : r.flash > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(r.flash * 20)) : 1;
       const lift = (r.spin > 0 ? Math.abs(Math.sin(r.spin * 9)) * 0.25 : 0)
         + (r.seat === heroIdx ? speedFrac * 0.035 * Math.sin(f.t * 24) : 0);
       draws.push({ depth: pr.depth + 0.02, run: () => m7.drawSprite(shadowSpr, p.x, p.y, cam, H_SHADOW * VEH_W[r.char.veh], r.ghost ? 0.3 : 1) });
-      if (r.boost > 1 && !r.ghost && pr.depth < 280) {
-        const fl = H_FLAME * VEH_W[r.char.veh] * (((f.t * 26 + r.seat * 7) | 0) % 2 ? 1 : 0.8);
-        const bx = p.x - Math.cos(p.heading) * 1.9, by = p.y - Math.sin(p.heading) * 1.9;
-        draws.push({ depth: pr.depth + 0.01, run: () => m7.drawSprite(flameSpr, bx, by, cam, fl, 0.9, 0.1) });
-      }
+      // flames and sparks are pinned to the sprite, not to a world point
+      // behind the kart: a billboard's rear sits at the sprite's bottom edge
+      // however the kart turns, while a world offset swings off the body in
+      // corners. relH is how far off-from-camera the kart points: sideways
+      // swing follows sin(relH), and the back sinks toward the viewer as it
+      // turns to face us
+      const sh = KART_H * VEH_W[r.char.veh] * pr.k;
+      const relH = p.heading - camHeading;
+      const backX = pr.sx - Math.sin(relH) * sh * 0.42;
+      const backY = pr.baseY + (1 + Math.cos(relH)) * sh * 0.05;
+      // the rear axle is on the far side of the kart when the nose comes
+      // round to face us, so the glow fades out with the view of it
+      const exhaust = (1 + Math.cos(relH)) / 2;
       draws.push({ depth: pr.depth, run: () => m7.drawSprite(spr, p.x, p.y, cam, KART_H * VEH_W[r.char.veh], alpha, lift) });
+      // boost: the rear tyres run white hot - a flickering glow painted over
+      // each rear wheel, pinned to the sprite so it never slides off
+      if (r.boost > 1 && !r.ghost && pr.depth < 280 && exhaust > 0.2) {
+        const th = sh * 0.17 * (((f.t * 22 + r.seat * 7) | 0) % 2 ? 1 : 0.85);
+        const tp = (((f.t * 22 + r.seat * 7) | 0) % 2) ? tyreHotA : tyreHotB;
+        const axle = Math.cos(relH) * sh * 0.22;
+        for (const s of [-1, 1]) {
+          draws.push({ depth: pr.depth - 0.01, run: () => m7.drawScreen(tp, backX + axle * s, pr.baseY, th, 0.95) });
+        }
+      }
       // drift sparks: a kart sliding sideways hard spits a hot burst from each
       // rear tyre — stateless, flickered per frame like the boost flames
-      if (!r.ghost && r.spin <= 0 && Math.abs(r.latV) > SPARK_LATV && r.speed > 30 && pr.depth < 300) {
-        const fx = Math.cos(p.heading), fy = Math.sin(p.heading);
-        const rx = -fy, ry = fx;
-        const bx = p.x - fx * 1.6, by = p.y - fy * 1.6;
+      if (!r.ghost && r.spin <= 0 && Math.abs(r.latV) > SPARK_LATV && r.speed > 30 && pr.depth < 300 && exhaust > 0.15) {
         const sf = H_SPARK * VEH_W[r.char.veh];
         const sp = (((f.t * 24 + r.seat * 5) | 0) % 2) ? sparkA : sparkB;
+        const tyre = Math.cos(relH) * sh * 0.22;
         for (const s of [-1, 1]) {
-          const sx = bx + rx * 0.95 * s, sy = by + ry * 0.95 * s;
-          draws.push({ depth: pr.depth + 0.015, run: () => m7.drawSprite(sp, sx, sy, cam, sf, 0.9, 0) });
+          draws.push({ depth: pr.depth - 0.015, run: () => m7.drawScreen(sp, backX + tyre * s, backY, sf * pr.k, 0.9) });
         }
       }
       // name + position tag floating over the helmet (not your own: the HUD

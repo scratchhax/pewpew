@@ -6,6 +6,92 @@
  * party — you can tell the monster truck from the bike at fifty board units.
  */
 
+import monstersUrl from './assets/monsters.png';
+import { MONSTER_CELL, MONSTER_COUNT } from './assets/monsters';
+
+/*
+ * The Mogul Motorways kart art (SewerPancake) is demo-only and git-excluded,
+ * so it is pulled in with globs: present locally, invisible to a fresh clone
+ * and to CI, where loadKartAtlas() answers null and the renderer falls back
+ * to the procedural pixel karts below.
+ */
+type MogulData = { MOGUL_COUNTS: number[]; MOGUL_FRAMES: number[][] };
+const mogulPng = (import.meta.glob('./assets/mogul.png', { eager: true, query: '?url', import: 'default' })
+  ['./assets/mogul.png'] ?? undefined) as string | undefined;
+const mogulData = (Object.values(import.meta.glob<MogulData>('./assets/mogul.ts', { eager: true }))[0]
+  ?? undefined) as MogulData | undefined;
+
+/**
+ * The crowd monsters: twelve variants baked from the Kenney Monster Builder
+ * Pack (CC0), a uniform grid standing on the cell bottom. stand() and fan()
+ * draw them once loaded; the old pixel heads stay as the pre-load fallback.
+ */
+let monsterCells: HTMLCanvasElement[] | null = null;
+
+export async function loadMonsterAtlas(): Promise<void> {
+  if (monsterCells) return;
+  const img = new Image();
+  await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error('monsters.png failed')); img.src = monstersUrl; });
+  const cells: HTMLCanvasElement[] = [];
+  for (let i = 0; i < MONSTER_COUNT; i++) {
+    const c = document.createElement('canvas');
+    c.width = MONSTER_CELL[0]; c.height = MONSTER_CELL[1];
+    const g = c.getContext('2d')!;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(img, i * MONSTER_CELL[0], 0, MONSTER_CELL[0], MONSTER_CELL[1], 0, 0, MONSTER_CELL[0], MONSTER_CELL[1]);
+    cells.push(c);
+  }
+  monsterCells = cells;
+}
+
+
+/**
+ * The Mogul Motorways rotation atlas: one cycle of hand-drawn NES-style
+ * karts per character, driver baked in, bottom-centre anchored. Demo build
+ * only - the art lives in assets/ (git-excluded), credit SewerPancake.
+ */
+export interface KartAtlas {
+  counts: number[];
+  frame(char: number, dir: number): HTMLCanvasElement;
+}
+
+let kartAtlas: KartAtlas | null = null;
+
+export async function loadKartAtlas(): Promise<KartAtlas | null> {
+  if (kartAtlas) return kartAtlas;
+  if (!mogulPng || !mogulData) return null;      // fresh clone: procedural karts
+  const { MOGUL_COUNTS, MOGUL_FRAMES } = mogulData;
+  const img = new Image();
+  await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error('mogul.png failed')); img.src = mogulPng; });
+  const full = document.createElement('canvas');
+  full.width = img.width; full.height = img.height;
+  full.getContext('2d')!.drawImage(img, 0, 0);
+  const rects = new Map<number, number[]>();
+  for (const f of MOGUL_FRAMES) rects.set(f[0] * 100 + f[1], f);
+  const cache = new Map<number, HTMLCanvasElement>();
+  const counts = [...MOGUL_COUNTS];
+  kartAtlas = {
+    counts,
+    frame(char, dir) {
+      const n = counts[char] ?? counts[0];
+      const d = ((dir % n) + n) % n;
+      const key = char * 100 + d;
+      let c = cache.get(key);
+      if (!c) {
+        const f = rects.get(key)!;
+        c = document.createElement('canvas');
+        c.width = f[4]; c.height = f[5];
+        const g = c.getContext('2d')!;
+        g.imageSmoothingEnabled = false;
+        g.drawImage(full, f[2], f[3], f[4], f[5], 0, 0, f[4], f[5]);
+        cache.set(key, c);
+      }
+      return c;
+    },
+  };
+  return kartAtlas;
+}
+
 const hsl = (h: number, s: number, l: number): string => `hsl(${h}, ${s}%, ${l}%)`;
 
 export interface Character {
@@ -24,12 +110,12 @@ export interface Character {
  * solver used a half-width of 1.98 per kart against art only 2.9 wide, and the
  * pack bounced off each other across a visible gap.
  */
-export const KART_H = 2.9;      // how tall a kart and its driver stand
-export const KART_W = 2.9;      // how wide it is across the tyres
-export const KART_L = 3.9;      // how long it is nose to tail, from the side art
+export const KART_H = 5.0;      // how tall a kart and its driver stand
+export const KART_W = 4.8;      // how wide it is across the tyres
+export const KART_L = 6.4;      // how long it is nose to tail, from the side art
 
 /** Relative kart width per archetype, multiplied into the world size. */
-export const VEH_W = [1.0, 1.12, 0.7, 0.95, 1.24, 1.05];
+export const VEH_W = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
 export const VEH_NAMES = ['STD', 'MUSCLE', 'BIKE', 'BALLOON', 'MONSTER', 'WEDGE'];
 
 /** Avalanche a 32-bit hash, so one changed character changes every field. */
@@ -104,7 +190,7 @@ function paint(c: CanvasRenderingContext2D, map: string[], pal: Record<string, s
 export interface Driver { name: string; skin: string; shade: string; extra: string; map: string[]; cap: string[]; side: string[] }
 
 export const DRIVERS: Driver[] = [
-  { name: 'GREMLIN', skin: '#7fe049', shade: '#3f9622', extra: '#fff05a', map: [
+  { name: 'STANZ', skin: '#7fe049', shade: '#3f9622', extra: '#fff05a', map: [
     '.G.......G.',
     '.GG.....GG.',
     '.GGGGGGGGG.',
@@ -144,7 +230,7 @@ export const DRIVERS: Driver[] = [
     '.AAAAAAAAA.',
     '.AAAAAAAAA.',
   ] },
-  { name: 'RUSTBUCKET', skin: '#c2ccdb', shade: '#6b7486', extra: '#ff5e3a', map: [
+  { name: 'MANGO', skin: '#c2ccdb', shade: '#6b7486', extra: '#ff5e3a', map: [
     '.....N.....',
     '.....r.....',
     '.RRRRRRRRR.',
@@ -184,7 +270,7 @@ export const DRIVERS: Driver[] = [
     '.AAAAAAAAA.',
     '.AAAAAAAAA.',
   ] },
-  { name: 'WHISKERS', skin: '#ffa94d', shade: '#b8611c', extra: '#ffe9c4', map: [
+  { name: 'AIDEN', skin: '#ffa94d', shade: '#b8611c', extra: '#ffe9c4', map: [
     '.GG.....GG.',
     '.GgG...GgG.',
     '.GGGGGGGGG.',
@@ -224,7 +310,7 @@ export const DRIVERS: Driver[] = [
     '.AAAAAAAAA.',
     '.AAAAAAAAA.',
   ] },
-  { name: 'GOGGLES', skin: '#ffc79a', shade: '#b0764a', extra: '#3ee0ff', map: [
+  { name: 'ATRIOC', skin: '#ffc79a', shade: '#b0764a', extra: '#3ee0ff', map: [
     '...........',
     '..aaaaaaa..',
     '.aaaaaaaaa.',
@@ -264,7 +350,7 @@ export const DRIVERS: Driver[] = [
     '..AAAAAAA..',
     '.AAAAAAAAA.',
   ] },
-  { name: 'RATTLE', skin: '#f6f4ec', shade: '#a8a49a', extra: '#ff3d63', map: [
+  { name: 'SLIME', skin: '#f6f4ec', shade: '#a8a49a', extra: '#ff3d63', map: [
     '...........',
     '..GGGGGGG..',
     '.GGGGGGGGG.',
@@ -304,7 +390,7 @@ export const DRIVERS: Driver[] = [
     '..AAAAAAA..',
     '.AAAAAAAAA.',
   ] },
-  { name: 'BLOOP', skin: '#6ff5c0', shade: '#2fae7c', extra: '#e07bff', map: [
+  { name: 'NICK', skin: '#6ff5c0', shade: '#2fae7c', extra: '#e07bff', map: [
     '...........',
     '...GGGGG...',
     '..GGGGGGG..',
@@ -344,7 +430,7 @@ export const DRIVERS: Driver[] = [
     '..AAAAAAA..',
     '.AAAAAAAAA.',
   ] },
-  { name: 'QUACKERS', skin: '#fffdf2', shade: '#c0bdac', extra: '#ff9c00', map: [
+  { name: 'LUD', skin: '#fffdf2', shade: '#c0bdac', extra: '#ff9c00', map: [
     '..AAAAAAA..',
     '.AAAAAAAAA.',
     'AAAAAAAAAAA',
@@ -384,7 +470,7 @@ export const DRIVERS: Driver[] = [
     '..AAAAAAA..',
     '.AAAAAAAAA.',
   ] },
-  { name: 'VISOR', skin: '#f4f1e6', shade: '#a9a69c', extra: '#19e0ff', map: [
+  { name: 'QT', skin: '#f4f1e6', shade: '#a9a69c', extra: '#19e0ff', map: [
     '...........',
     '..AAAAAAA..',
     '.AAAAAAAAA.',
@@ -855,29 +941,46 @@ export function stand(hue: number, wave: number, seed: number): HTMLCanvasElemen
   c.fillStyle = '#171a24'; c.fillRect(-2, 4, W + 4, 7);
   c.fillStyle = hsl(hue, 65, 44); c.fillRect(-2, 4, W + 4, 2);
   for (let x = 4; x < W; x += 20) { c.fillStyle = '#171a24'; c.fillRect(x, 11, 2, H - 19); }
-  // four tiers of heads, back rows higher and dimmer
+  // four tiers of monsters, back rows higher and dimmer; the crowd is a
+  // Kenney menagerie now, and it does the same rolling wave
   let h = seed >>> 0;
   const rnd = (): number => { h = (h * 1664525 + 1013904223) >>> 0; return h / 4294967296; };
   for (let row = 0; row < 4; row++) {
     const y = 14 + row * 7;
     const bob = ((wave + row) % 3 === 0) ? -1 : 0;    // a rolling wave, not a strobe
-    for (let x = 2; x < W - 8; x += 7) {
-      const drv = (rnd() * 8) | 0;
-      const acc = (rnd() * 360) | 0;
-      c.save();
-      c.globalAlpha = 0.55 + row * 0.15;
-      c.translate(x + (rnd() < 0.5 ? 0 : 1), y + bob);
-      c.scale(0.55, 0.55);
-      castHead(c, 0, 0, drv, acc, 9);
-      c.restore();
+    for (let x = 2; x < W - 8; x += 11) {
+      const jump = (rnd() * 3) | 0;
+      if (monsterCells) {
+        const m = monsterCells[(seed + x * 7 + row * 13 + jump) % MONSTER_COUNT];
+        c.save();
+        c.globalAlpha = 0.55 + row * 0.15;
+        c.imageSmoothingEnabled = false;
+        c.drawImage(m, 0, 0, MONSTER_CELL[0], MONSTER_CELL[1], x, y + bob - 9, 8, 9);
+        c.restore();
+      } else {
+        c.save();
+        c.globalAlpha = 0.55 + row * 0.15;
+        c.translate(x + (rnd() < 0.5 ? 0 : 1), y + bob);
+        c.scale(0.55, 0.55);
+        castHead(c, 0, 0, (rnd() * 8) | 0, (rnd() * 360) | 0, 9);
+        c.restore();
+      }
     }
   }
   outline(cv);
   return cv;
 }
 
-/** One fan up against the fence, arms up. */
+/** One monster up against the fence, arms up. */
 export function fan(drv: number, acc: number, up: boolean): HTMLCanvasElement {
+  if (monsterCells) {
+    const [cv, c] = sprite(16, 22);
+    const m = monsterCells[drv % MONSTER_COUNT];
+    c.imageSmoothingEnabled = false;
+    c.drawImage(m, 0, 0, MONSTER_CELL[0], MONSTER_CELL[1], 1, up ? 0 : 2, 14, 20);
+    outline(cv);
+    return cv;
+  }
   const [cv, c] = sprite(16, 22);
   castHead(c, 3, up ? 3 : 4, drv, acc, 12);
   // arms, raised on the up frame
@@ -972,6 +1075,24 @@ export function shadow(): HTMLCanvasElement {
 }
 
 /** Twin boost flames, flickering — every boosted racer announces itself. */
+/**
+ * A boost glow for the rear tyres: a hot patch that sits over the wheel and
+ * flickers between two hues, so a boosting kart looks like its rubber is
+ * burning rather than wearing a torch. Two frames, bottom-centre anchored.
+ */
+export function hotTyre(frame: number): HTMLCanvasElement {
+  const [cv, c] = sprite(10, 8);
+  const cols = frame
+    ? ['#ffd23c', '#ff7a1e', '#c93a14']
+    : ['#ffb347', '#f05423', '#a82810'];
+  for (let y = 0; y < 8; y++) {
+    const w = 10 - Math.abs(y - 6) * 2;
+    c.fillStyle = cols[y < 2 ? 0 : y < 5 ? 1 : 2];
+    c.fillRect(5 - Math.ceil(w / 2), y, w, 1);
+  }
+  return cv;
+}
+
 export function flame(): HTMLCanvasElement {
   const [cv, c] = sprite(16, 12);
   const cols = ['#ffe98a', '#ff8a3c', '#d0432c'];

@@ -179,7 +179,7 @@ export class Race {
       this.racers.push({
         seat: i, ip: '', name: DRIVERS[characterFor(`seat${i}`).drv % DRIVERS.length].name,
         hue: (i * 47 + 20) % 360, char: characterFor(`seat${i}`),
-        s: -i * 7, lat: lineFor(i, track.width), latV: 0, line: lineFor(i, track.width),
+        s: -i * 11, lat: lineFor(i, track.width), latV: 0, line: lineFor(i, track.width),
         pace: paceFor(characterFor(`seat${i}`)), draft: 0, seed: i * 137.31,
         speed: 0, surge: 0, boost: 0, spin: 0, star: 0, glow: 0, flash: 0,
         // one of the cast, racing properly - a ghost is a host that has gone
@@ -478,9 +478,12 @@ export class Race {
       if (r.spin <= 0 && r.star <= 0) {
         const p = this.kartPos(r.seat);
         for (const h of this.hazards) {
-          if (h.cool <= 0 && (h.x - p.x) ** 2 + (h.y - p.y) ** 2 < 9) {
+          if (h.cool <= 0 && (h.x - p.x) ** 2 + (h.y - p.y) ** 2 < 16) {
             this.lastSpin = t;
-            h.cool = 3;   // one kart spins per slip, not every frame it lingers
+            // a banana is spent when it catches a kart - gone, like the game;
+            // oil stays and simmers on its own cooldown
+            if (h.kind === 'banana') this.hazards.splice(this.hazards.indexOf(h), 1);
+            else h.cool = 3;   // one kart spins per slip, not every frame it lingers
             r.spin = 0.8 + Math.random() * 0.4;
             this.hooks.onSpin(r.seat);
             break;
@@ -580,7 +583,7 @@ export class Race {
         // the kart is on the segment the shell just swept, plus its own length
         const reach = halfL(k) + Math.max(0, travelled);
         if (ds > halfL(k) || ds < -reach) continue;
-        if (Math.abs(k.lat - sh.lat) > halfW(k) + 2.4) continue;
+        if (Math.abs(k.lat - sh.lat) > halfW(k) + 3.2) continue;
         hitSeat = k.seat; break;
       }
       if (hitSeat >= 0) {
