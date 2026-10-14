@@ -55,10 +55,8 @@ export function mountTrackUi(root: HTMLElement, host: TrackUiHost): void {
           ${l.tracks.length > 1 ? `<option value="*shuffle"${shuf ? ' selected' : ''}>Shuffle…</option>` : ''}
           ${l.tracks.map((t) => `<option value="${esc(t.name)}"${t.name === current ? ' selected' : ''}>${esc(t.name)}</option>`).join('')}
         </select></label>
-      ${shuf ? `<p class="grp">Shuffle pool</p>
-        ${l.tracks.map((t) => `<label class="row"><input type="checkbox" data-track="pool" value="${esc(t.name)}"${!poolSet || poolSet.has(t.name) ? ' checked' : ''}/> ${esc(t.name)}</label>`).join('')}
-        <p class="hint">Only the ticked songs are shuffled; a random one takes over each time a song ends.
-          Untick everything to shuffle all ${l.tracks.length}.</p>` : ''}
+      ${shuf ? `<p class="hint">Shuffling ${poolSet ? `${poolSet.size} of ${l.tracks.length}` : `all ${l.tracks.length}`} tracks; a random one takes over each time a song ends.</p>
+        <button class="set-small" data-track="pool">Choose songs…</button>` : ''}
       ${cur ? `<p class="hint">${meta
         ? `Locked to <b>${meta.bpm.toFixed(1)} bpm</b>${meta.manual ? ' (set by hand)' : ''}, key <b>${KEY_NAMES[meta.root]} ${meta.minor ? 'minor' : 'major'}</b>. Effects snap to its beat and play in its key.`
         : 'Analysing tempo and key…'}</p>
@@ -74,6 +72,53 @@ export function mountTrackUi(root: HTMLElement, host: TrackUiHost): void {
         GM soundfont — up to ${l.max_mb} MB. Stored on the relay and shared by every
         screen; each theme picks its own. While a track plays, the theme's music steps aside and its effects
         and ambience ride on top.</p>`;
+  };
+
+  /** Popup with a tick-box per track: the songs this theme shuffles through. */
+  const openPool = () => {
+    const l = host.listing();
+    if (!l) return;
+    const current = l.assign[host.themeId] ?? '';
+    const sel = new Set(current.startsWith('*shuffle:')
+      ? current.slice('*shuffle:'.length).split(',') : l.tracks.map((t) => t.name));
+    document.getElementById('pool-modal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'pool-modal';
+    modal.className = 'pool-modal';
+    modal.innerHTML = `<div class="pool-box">
+      <p class="grp">Shuffle pool — ${esc(host.themeTitle)}</p>
+      ${l.tracks.map((t) => `<label class="pool-row"><input type="checkbox" data-pool value="${esc(t.name)}"${sel.has(t.name) ? ' checked' : ''}/> ${esc(t.name)}</label>`).join('')}
+      <p class="hint">Tick the songs this scene shuffles through; a random one takes over each time a song ends.
+        Tick nothing to shuffle all ${l.tracks.length}.</p>
+      <div class="pool-btns">
+        <button class="set-small" data-pool="all">Select all</button>
+        <button class="set-small" data-pool="save">Save</button>
+        <button class="set-small" data-pool="cancel">Cancel</button>
+      </div></div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', async (e) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>('[data-pool]');
+      try {
+        if (!el) { if (e.target === modal) modal.remove(); return; }
+        const what = el.dataset.pool;
+        if (!what || el.tagName === 'INPUT') return;
+        if (what === 'all') {
+          modal.querySelectorAll<HTMLInputElement>('input[data-pool]').forEach((c) => { c.checked = true; });
+        } else if (what === 'cancel') {
+          modal.remove();
+        } else if (what === 'save') {
+          const on = [...modal.querySelectorAll<HTMLInputElement>('input[data-pool]:checked')].map((c) => c.value);
+          const val = !on.length || on.length === l.tracks.length ? '*shuffle' : `*shuffle:${on.join(',')}`;
+          await assignTrack(host.themeId, val);
+          modal.remove();
+          await host.refresh();
+          render(on.length && on.length < l.tracks.length ? `Shuffling ${on.length} selected tracks.` : 'Shuffling all tracks.');
+        }
+      } catch (err) {
+        modal.remove();
+        render(`Failed: ${(err as Error).message}`);
+      }
+    });
   };
 
   const setStatus = (msg: string) => {
@@ -95,6 +140,8 @@ export function mountTrackUi(root: HTMLElement, host: TrackUiHost): void {
     try {
       if (el.dataset.track === 'upload') {
         root.querySelector<HTMLInputElement>('[data-track="file"]')?.click();
+      } else if (el.dataset.track === 'pool') {
+        openPool();
       } else if (el.dataset.track === 'rename' && current) {
         const want = prompt('New name for this track:', current.replace(/\.[a-z0-9]+$/i, ''));
         if (!want?.trim() || want.trim() === current) return;
@@ -126,15 +173,7 @@ export function mountTrackUi(root: HTMLElement, host: TrackUiHost): void {
           : el.value === 'none' ? 'Back to the theme soundtrack.' : `Playing ${el.value}.`);
         return;
       }
-      if (el.dataset.track === 'pool') {
-        const l = host.listing();
-        if (!l) return;
-        const on = [...root.querySelectorAll<HTMLInputElement>('input[data-track="pool"]:checked')].map((c) => c.value);
-        const val = !on.length || on.length === l.tracks.length ? '*shuffle' : `*shuffle:${on.join(',')}`;
-        await assignTrack(host.themeId, val);
-        await host.refresh();
-        render(on.length && on.length < l.tracks.length ? `Shuffling ${on.length} selected tracks.` : 'Shuffling all tracks.');
-      } else if (el.dataset.track === 'pick') {
+      if (el.dataset.track === 'pick') {
         await assignTrack(host.themeId, el.value || null);
         await host.refresh();
         render(el.value === '*shuffle' ? 'Shuffling every track on every screen showing this theme.'
