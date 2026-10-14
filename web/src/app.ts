@@ -140,7 +140,19 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
   let analysing: string | null = null;
   async function syncTracks(): Promise<void> {
     trackListing = await listTracks();
-    const name = trackListing?.assign[theme.id] ?? null;
+    let name = trackListing?.assign[theme.id] ?? null;
+    if (name === '*shuffle') {
+      // shuffle mode: rotate through every analysed track the relay has
+      const pool = (trackListing?.tracks ?? []).filter((t) => t.meta);
+      if (pool.length > 1) {
+        const cur = audio.trackName();
+        const t = pool.find((x) => x.name === cur) ?? pool[Math.floor(Math.random() * pool.length)];
+        const playlist = pool.map((x) => ({ name: x.name, url: trackUrl(x.name), meta: x.meta! }));
+        audio.setTrack(t.name, trackUrl(t.name), t.meta!, playlist);
+        return;
+      }
+      name = pool[0]?.name ?? null;   // not enough to shuffle: play the lone track, else soundtrack
+    }
     const info = name ? trackListing!.tracks.find((t) => t.name === name) : undefined;
     if (!name || !info) {
       // no relay assignment: fall back to the tracks baked into the theme

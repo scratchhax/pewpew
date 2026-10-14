@@ -30,6 +30,9 @@ MIDI_EXT = {".mid", ".midi"}
 SF2 = "/usr/share/sounds/sf2/FluidR3_GM.sf2"
 THEME_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
+# Special assignment value: the theme shuffles through every uploaded track.
+SHUFFLE = "*shuffle"
+
 
 def safe_name(raw: str) -> str | None:
     """A plain file name we're willing to store: no paths, a known audio extension."""
@@ -160,7 +163,7 @@ class TrackStore:
             tracks.append({"name": fn, "size": st.st_size, "mtime": int(st.st_mtime),
                            "meta": state["meta"].get(fn)})
         names = {t["name"] for t in tracks}
-        assign = {k: v for k, v in state["assign"].items() if v in names}
+        assign = {k: v for k, v in state["assign"].items() if v in names or v == SHUFFLE}
         return {"tracks": tracks, "assign": assign, "max_mb": self.max_bytes // (1024 * 1024)}
 
 
@@ -256,7 +259,9 @@ def add_track_routes(app: web.Application, cfg: dict) -> None:
         if not isinstance(theme, str) or not THEME_ID.match(theme):
             raise web.HTTPBadRequest(text="bad theme")
         state = store._state()
-        if name:
+        if name == SHUFFLE:
+            state["assign"][theme] = name
+        elif name:
             if not store.path(name):
                 raise web.HTTPNotFound()
             state["assign"][theme] = name

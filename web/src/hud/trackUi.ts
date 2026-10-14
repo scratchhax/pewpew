@@ -50,8 +50,10 @@ export function mountTrackUi(root: HTMLElement, host: TrackUiHost): void {
       <label class="row sld"><span class="lbl">${esc(host.themeTitle)}</span>
         <select data-track="pick">
           <option value="">None (theme soundtrack)</option>
+          ${l.tracks.length > 1 ? `<option value="*shuffle"${current === '*shuffle' ? ' selected' : ''}>Shuffle (all ${l.tracks.length})</option>` : ''}
           ${l.tracks.map((t) => `<option value="${esc(t.name)}"${t.name === current ? ' selected' : ''}>${esc(t.name)}</option>`).join('')}
         </select></label>
+      ${current === '*shuffle' ? `<p class="hint">Shuffling all ${l.tracks.length} tracks on the relay: a random one takes over each time a song ends.</p>` : ''}
       ${cur ? `<p class="hint">${meta
         ? `Locked to <b>${meta.bpm.toFixed(1)} bpm</b>${meta.manual ? ' (set by hand)' : ''}, key <b>${KEY_NAMES[meta.root]} ${meta.minor ? 'minor' : 'major'}</b>. Effects snap to its beat and play in its key.`
         : 'Analysing tempo and key…'}</p>
@@ -122,7 +124,8 @@ export function mountTrackUi(root: HTMLElement, host: TrackUiHost): void {
       if (el.dataset.track === 'pick') {
         await assignTrack(host.themeId, el.value || null);
         await host.refresh();
-        render(el.value ? 'Playing on every screen showing this theme.' : 'Back to the theme soundtrack.');
+        render(el.value === '*shuffle' ? 'Shuffling every track on every screen showing this theme.'
+          : el.value ? 'Playing on every screen showing this theme.' : 'Back to the theme soundtrack.');
       } else if (el.dataset.track === 'bpm') {
         const l = host.listing(), name = l?.assign[host.themeId], meta = l?.tracks.find((t) => t.name === name)?.meta;
         const bpm = parseFloat(el.value);
