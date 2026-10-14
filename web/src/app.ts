@@ -141,9 +141,10 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
   async function syncTracks(): Promise<void> {
     trackListing = await listTracks();
     let name = trackListing?.assign[theme.id] ?? null;
-    if (name === '*shuffle') {
-      // shuffle mode: rotate through every analysed track the relay has
-      const pool = (trackListing?.tracks ?? []).filter((t) => t.meta);
+    if (name?.startsWith('*shuffle')) {
+      // shuffle mode: rotate through the chosen tracks (bare *shuffle = all analysed ones)
+      const want = name.length > '*shuffle:'.length ? new Set(name.slice('*shuffle:'.length).split(',')) : null;
+      const pool = (trackListing?.tracks ?? []).filter((t) => t.meta && (!want || want.has(t.name)));
       if (pool.length > 1) {
         const cur = audio.trackName();
         const t = pool.find((x) => x.name === cur) ?? pool[Math.floor(Math.random() * pool.length)];

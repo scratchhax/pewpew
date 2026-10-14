@@ -163,7 +163,8 @@ class TrackStore:
             tracks.append({"name": fn, "size": st.st_size, "mtime": int(st.st_mtime),
                            "meta": state["meta"].get(fn)})
         names = {t["name"] for t in tracks}
-        assign = {k: v for k, v in state["assign"].items() if v in names or v == SHUFFLE}
+        keep = lambda v: v in names or v == SHUFFLE or str(v).startswith(SHUFFLE + ":")
+        assign = {k: v for k, v in state["assign"].items() if keep(v)}
         return {"tracks": tracks, "assign": assign, "max_mb": self.max_bytes // (1024 * 1024)}
 
 
@@ -259,7 +260,7 @@ def add_track_routes(app: web.Application, cfg: dict) -> None:
         if not isinstance(theme, str) or not THEME_ID.match(theme):
             raise web.HTTPBadRequest(text="bad theme")
         state = store._state()
-        if name == SHUFFLE:
+        if isinstance(name, str) and (name == SHUFFLE or name.startswith(SHUFFLE + ":")):
             state["assign"][theme] = name
         elif name:
             if not store.path(name):
