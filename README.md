@@ -1293,9 +1293,7 @@ is one bitmap and the board spins and scales it under your kart the way a
 Super Nintendo did — sky scrolling mountains on the horizon, red-and-white
 curbs, a low pixel sun — and this time the race is your traffic. The karts are
 the *Mogul Motorways* sprites by
-[SewerPancake](https://sewerpancake.itch.io/mogul-motorways) (used with credit),
-and the grandstands and fence line are packed with
-[Kenney](https://kenney.nl)'s little monsters.
+[SewerPancake](https://sewerpancake.itch.io/mogul-motorways) (used with credit).
 
 **The grid is eight karts and always eight.** A seat belongs to a host, never
 to an event: the first time the relay sees a host it takes an empty seat and
@@ -2124,10 +2122,6 @@ Actions** first.
   [SewerPancake](https://sewerpancake.itch.io/mogul-motorways), used with
   credit and thanks per the artist's welcome note, baked into
   `web/src/themes/slipstream/assets/mogul.png`.
-- Slipstream crowd: [Monster Builder
-  Pack](https://kenney.nl/assets/monster-builder-pack) by
-  [Kenney](https://kenney.nl) (CC0), baked into
-  `web/src/themes/slipstream/assets/monsters.png`.
 - Net Fighter sprites: *Streets of Fight* by
   [Luis Zuno / ansimuz](https://ansimuz.itch.io/) and the *Renegade* and
   *Soldier* brawler characters by

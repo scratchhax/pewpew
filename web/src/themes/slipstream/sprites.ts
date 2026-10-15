@@ -6,44 +6,17 @@
  * party — you can tell the monster truck from the bike at fifty board units.
  */
 
-import monstersUrl from './assets/monsters.png';
-import { MONSTER_CELL, MONSTER_COUNT } from './assets/monsters';
-
 /*
  * The Mogul Motorways karts (c) SewerPancake, sewerpancake.itch.io, used with
- * credit and thanks; crowd monsters from the Kenney Monster Builder Pack
- * (CC0). Both are loaded through globs so a stripped clone (or a build that
- * opts out of vendored art) still compiles: loadKartAtlas() then answers null
- * and the renderer falls back to the procedural pixel karts below.
+ * credit and thanks. They are loaded through globs so a stripped clone (or a
+ * build that opts out of vendored art) still compiles: loadKartAtlas() then
+ * answers null and the renderer falls back to the procedural pixel karts below.
  */
 type MogulData = { MOGUL_COUNTS: number[]; MOGUL_FRAMES: number[][] };
 const mogulPng = (import.meta.glob('./assets/mogul.png', { eager: true, query: '?url', import: 'default' })
   ['./assets/mogul.png'] ?? undefined) as string | undefined;
 const mogulData = (Object.values(import.meta.glob<MogulData>('./assets/mogul.ts', { eager: true }))[0]
   ?? undefined) as MogulData | undefined;
-
-/**
- * The crowd monsters: twelve variants baked from the Kenney Monster Builder
- * Pack (CC0), a uniform grid standing on the cell bottom. stand() and fan()
- * draw them once loaded; the old pixel heads stay as the pre-load fallback.
- */
-let monsterCells: HTMLCanvasElement[] | null = null;
-
-export async function loadMonsterAtlas(): Promise<void> {
-  if (monsterCells) return;
-  const img = new Image();
-  await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error('monsters.png failed')); img.src = monstersUrl; });
-  const cells: HTMLCanvasElement[] = [];
-  for (let i = 0; i < MONSTER_COUNT; i++) {
-    const c = document.createElement('canvas');
-    c.width = MONSTER_CELL[0]; c.height = MONSTER_CELL[1];
-    const g = c.getContext('2d')!;
-    g.imageSmoothingEnabled = false;
-    g.drawImage(img, i * MONSTER_CELL[0], 0, MONSTER_CELL[0], MONSTER_CELL[1], 0, 0, MONSTER_CELL[0], MONSTER_CELL[1]);
-    cells.push(c);
-  }
-  monsterCells = cells;
-}
 
 
 /**
@@ -942,46 +915,28 @@ export function stand(hue: number, wave: number, seed: number): HTMLCanvasElemen
   c.fillStyle = '#171a24'; c.fillRect(-2, 4, W + 4, 7);
   c.fillStyle = hsl(hue, 65, 44); c.fillRect(-2, 4, W + 4, 2);
   for (let x = 4; x < W; x += 20) { c.fillStyle = '#171a24'; c.fillRect(x, 11, 2, H - 19); }
-  // four tiers of monsters, back rows higher and dimmer; the crowd is a
-  // Kenney menagerie now, and it does the same rolling wave
+  // four tiers of fans, back rows higher and dimmer, doing a rolling wave
   let h = seed >>> 0;
   const rnd = (): number => { h = (h * 1664525 + 1013904223) >>> 0; return h / 4294967296; };
   for (let row = 0; row < 4; row++) {
     const y = 14 + row * 7;
     const bob = ((wave + row) % 3 === 0) ? -1 : 0;    // a rolling wave, not a strobe
     for (let x = 2; x < W - 8; x += 11) {
-      const jump = (rnd() * 3) | 0;
-      if (monsterCells) {
-        const m = monsterCells[(seed + x * 7 + row * 13 + jump) % MONSTER_COUNT];
-        c.save();
-        c.globalAlpha = 0.55 + row * 0.15;
-        c.imageSmoothingEnabled = false;
-        c.drawImage(m, 0, 0, MONSTER_CELL[0], MONSTER_CELL[1], x, y + bob - 9, 8, 9);
-        c.restore();
-      } else {
-        c.save();
-        c.globalAlpha = 0.55 + row * 0.15;
-        c.translate(x + (rnd() < 0.5 ? 0 : 1), y + bob);
-        c.scale(0.55, 0.55);
-        castHead(c, 0, 0, (rnd() * 8) | 0, (rnd() * 360) | 0, 9);
-        c.restore();
-      }
+      rnd();
+      c.save();
+      c.globalAlpha = 0.55 + row * 0.15;
+      c.translate(x + (rnd() < 0.5 ? 0 : 1), y + bob);
+      c.scale(0.55, 0.55);
+      castHead(c, 0, 0, (rnd() * 8) | 0, (rnd() * 360) | 0, 9);
+      c.restore();
     }
   }
   outline(cv);
   return cv;
 }
 
-/** One monster up against the fence, arms up. */
+/** One fan up against the fence, arms up. */
 export function fan(drv: number, acc: number, up: boolean): HTMLCanvasElement {
-  if (monsterCells) {
-    const [cv, c] = sprite(16, 22);
-    const m = monsterCells[drv % MONSTER_COUNT];
-    c.imageSmoothingEnabled = false;
-    c.drawImage(m, 0, 0, MONSTER_CELL[0], MONSTER_CELL[1], 1, up ? 0 : 2, 14, 20);
-    outline(cv);
-    return cv;
-  }
   const [cv, c] = sprite(16, 22);
   castHead(c, 3, up ? 3 : 4, drv, acc, 12);
   // arms, raised on the up frame
