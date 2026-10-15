@@ -83,15 +83,15 @@ and never touches the network itself.
 | ![fragnet](docs/fragnet.png) | ![fragnet demon fragged](docs/fragnet-fight.png) |
 | **Substrate** | **Substrate: the plate part-drawn** |
 | ![substrate](docs/substrate.png) | ![substrate part-drawn](docs/substrate-early.png) |
-| **Slipstream** | **Slipstream: the pack comes through the hairpin** |
-| ![slipstream](docs/slipstream.png) | ![slipstream in motion](docs/slipstream.gif) |
+| **Slipstream** | **Slipstream: item gantry ahead** |
+| ![slipstream](docs/slipstream.png) | ![slipstream gantry](docs/slipstream-gantry.png) |
 
 | Midnight Run | Packet Rush | Last Outpost | Undergrowth | Slipstream |
 |---|---|---|---|---|
 | ![midnight run in motion](docs/racing.gif) | ![packet rush in motion](docs/rush.gif) | ![last outpost in motion](docs/zombie.gif) | ![undergrowth in motion](docs/undergrowth.gif) | ![slipstream in motion](docs/slipstream.gif) |
 
 **[Try the browser demo](https://scratchhax.github.io/pewpew/)** (synthetic
-traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew/?theme=zombie) ·
+traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew/?theme=holdout) ·
 [Midnight Run](https://scratchhax.github.io/pewpew/?theme=racing) ·
 [Packet Rush](https://scratchhax.github.io/pewpew/?theme=rush) ·
 [Panopticon](https://scratchhax.github.io/pewpew/?theme=spy) ·
@@ -102,6 +102,7 @@ traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew
 [Game of Life](https://scratchhax.github.io/pewpew/?theme=conway) ·
 [Net Fighter](https://scratchhax.github.io/pewpew/?theme=netfighter) ·
 [Mycelium](https://scratchhax.github.io/pewpew/?theme=mycelium) ·
+[Undergrowth](https://scratchhax.github.io/pewpew/?theme=undergrowth) ·
 [FRAGNET](https://scratchhax.github.io/pewpew/?theme=fragnet) ·
 [Substrate](https://scratchhax.github.io/pewpew/?theme=substrate) ·
 [Slipstream](https://scratchhax.github.io/pewpew/?theme=slipstream) ·
@@ -113,7 +114,7 @@ Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - [Highlights](#highlights)
 - [Setup](#setup): [Relay](#1-start-the-relay) · [Viewer](#2-build-the-viewer) · [UniFi logging](#3-send-unifi-logs-to-the-relay) · [Check it's working](#4-check-its-working) · [`relay.yaml`](#relayrelayyaml)
 - [Using pewpew](#using-pewpew): [Keys](#keys) · [Switching scenes](#switching-scenes) · [Log inspector](#log-inspector) · [Settings](#settings-f1)
-- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [The Rain](#the-rain) · [Mycelium](#mycelium) · [Undergrowth](#undergrowth) · [FRAGNET](#fragnet) · [Substrate](#substrate) · [Slipstream](#slipstream)
+- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [The Rain](#the-rain) · [Game of Life](#game-of-life) · [Mycelium](#mycelium) · [Undergrowth](#undergrowth) · [FRAGNET](#fragnet) · [Substrate](#substrate) · [Slipstream](#slipstream) · [Net Fighter](#net-fighter)
 - [Sound](#sound)
 - [Performance and quality](#performance-and-quality)
 - [URL parameters](#url-parameters)
@@ -149,9 +150,9 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
 
 ## Highlights
 
-- **Fourteen scenes, one relay.** Every screen picks its own scene, so the kiosk
+- **Sixteen scenes, one relay.** Every screen picks its own scene, so the kiosk
   in the hall and the laptop on your desk can show different worlds at the same
-  time. Six are 2D (PixiJS), six are full 3D (three.js), one is a
+  time. Eight are 2D (PixiJS), six are full 3D (three.js), one is a
   software raycaster and one is a software Mode 7 board; a screen only
   downloads the renderer its scene uses.
 - **A readable picture.** Each event type has one fixed colour in every scene
@@ -166,7 +167,7 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
   breathing reese to a dissonant cluster from drizzle to deluge on The Rain
   and Game of Life. The scene's sounds play along on the beat and in key: lasers,
   gunfire, an engine that shifts gears in time, gem chimes that climb the scale.
-  There are no audio files anywhere, though you can upload your own
+  Nothing you hear is a sample — though you can upload your own
   [background track](#background-tracks).
 - **The scene moves with the music.** The station's core breathes on the beat,
   zombies shamble in time and the city's neon swells on every bar.
@@ -356,7 +357,7 @@ minutes to start logging after a settings change or a relay restart.
 |-----|---------|--------------|
 | `syslog_bind`, `syslog_port` | `0.0.0.0`, `5514` | where syslog (UDP) is received |
 | `http_host`, `http_port` | `0.0.0.0`, `8080` | the viewer, WebSocket and health endpoints |
-| `default_theme` | `scifi` | scene served at `/`: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium`, `undergrowth`, `fragnet`, `substrate` or `slipstream` (every scene is also at `/<id>/`) |
+| `default_theme` | `scifi` | scene served at `/`: `scifi`, `holdout`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `rain`, `conway`, `netfighter`, `mycelium`, `undergrowth`, `fragnet`, `substrate` or `slipstream` (every scene is also at `/<id>/`) |
 | `buffer_size` | `500` | recent events replayed to each newly opened browser |
 | `wan_interfaces` | `[eth8]` | which gateway interfaces count as WAN, for inbound and outbound. `eth8` fits most UDM and UDR setups on copper; `eth9`/`eth10` also turn up, and a DSL line is usually `ppp0`. Look at the `IN=`/`OUT=` fields of your own firewall log lines |
 | `wan_ips`, `vpn_networks` | empty | optional WAN addresses and VPN networks, for direction and VPN badges |
@@ -403,7 +404,7 @@ different screens can show different scenes at once:
 | URL | Scene |
 |-----|-------|
 | `http://<relay-host>:8080/` | this screen's saved pick, or else the relay's `default_theme` |
-| `http://<relay-host>:8080/scifi/`, `/zombie/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/`, `/gibson/`, `/mycelium/`, `/undergrowth/`, `/fragnet/`, `/substrate/`, `/slipstream/` | that scene (unknown names are a 404) |
+| `http://<relay-host>:8080/scifi/`, `/holdout/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/`, `/gibson/`, `/rain/`, `/conway/`, `/netfighter/`, `/mycelium/`, `/undergrowth/`, `/fragnet/`, `/substrate/`, `/slipstream/` | that scene (unknown names are a 404) |
 | any URL + `?theme=racing` | that scene (handy on the Pages demo) |
 
 The viewer checks the URL path, then `?theme=`, then the screen's saved pick,
@@ -458,7 +459,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: per-event-type visuals, buildings, day/night, rain, lightning, blood, screen shake, move with the music, plus budgets for zombies, blood decals, tents and fog + flashlights. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. The Rain: fall speed, density, trail length, glyph size, colour, depth fog, brightness waves, glyph flicker, camera (fly through in 3D, or falling in 2D), and whether the weather drives the downpour. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, the aurora sky, flight speed, bioluminescence, spore drift, and hypha half-life. FRAGNET: each event's effect, the weapon, gore, patrol speed and traces per level. Substrate: allow cracks, block scars, threat fractures, DNS blooms, DHCP seeds, Wi-Fi drift, host seeding, the pigment wash, crack hairlines, naming the busiest district, a new paper each picture, plus seconds per picture, pigment strength and wander. Slipstream: the circuit (or a home track picked by hostname), whether the camera follows the busiest host or the leader, draft surges, sprint and sponsor board, pit takeovers, oil spins, red shells, boost pads, yellow cautions, speed chevrons, background wobble, corner minimap and race pace |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: per-event-type visuals, buildings, day/night, rain, lightning, blood, screen shake, move with the music, plus budgets for zombies, blood decals, tents and fog + flashlights. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. The Rain: fall speed, density, trail length, glyph size, colour, depth fog, brightness waves, glyph flicker, camera (fly through in 3D, or falling in 2D), and whether the weather drives the downpour. Game of Life: generation speed, seeding, colour, fog haze, and whether the weather drives the field. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, the aurora sky, flight speed, bioluminescence, spore drift, and hypha half-life. FRAGNET: each event's effect, the weapon, gore, patrol speed and traces per level. Substrate: allow cracks, block scars, threat fractures, DNS blooms, DHCP seeds, Wi-Fi drift, host seeding, the pigment wash, crack hairlines, naming the busiest district, a new paper each picture, plus seconds per picture, pigment strength and wander. Slipstream: the circuit (or a home track picked by hostname), whether the camera follows the busiest host or the leader, draft surges, sprint and sponsor board, pit takeovers, oil spins, red shells, boost pads, yellow cautions, speed chevrons, background wobble, corner minimap and race pace |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -466,7 +467,7 @@ panel's **Apply & reload**.
 
 ## Scenes
 
-All twelve scenes draw the same events with the same colours. Each has its own
+All sixteen scenes draw the same events with the same colours. Each has its own
 HUD, sound and settings.
 
 ### Orbital Command
@@ -1015,6 +1016,36 @@ In F1 → Scene: fall speed, density, trail length, glyph size, colour
 flicker, camera (fly through in 3D / falling in 2D), and whether the weather
 is allowed to drive the downpour.
 
+### Game of Life
+
+![game of life](docs/conway.png)
+
+Conway's automaton, played with tonight's log. The field is a grid of glyphs —
+every live cell is a character from the current event line, green for traffic
+that passes, red for blocks, orange for intrusions — and the automaton's own
+rules run it: patterns crawl, oscillate and die exactly as Conway wrote them.
+Each event drops a pattern wearing its own letter, so a glider stream reads as
+a stream of P's and a block colony as B's. Newborn cells flash white and die
+in a fading ember, so the field shimmers with births. When the log goes quiet
+the field starves into blinkers and empties; a deluge of traffic seeds it into
+soup — until the population's own predator thins it back down.
+
+| Event | In the field |
+|-------|--------------|
+| allow | a glider crossing the field (most passes pass untouched) |
+| block | a still life dropped right where it lands |
+| threat | a Gosper glider gun, spraying gliders forever, and the alarm |
+| dns | a blinker ticking at the lookup |
+| dhcp | a toad for the new lease |
+| wifi | a pulsar for the join |
+| system | an R-pentomino that churns for a few hundred generations |
+
+The soundtrack follows the weather, and the weather is the traffic: a calm
+night is a single low drone breathing (Drizzle), a busy one a dark ambient pad
+(Shower), a flood a dissonant cluster (Deluge) — or leave **Music** on Auto.
+In F1 → Scene: generation speed, seeding, colour (green-with-red / classic
+green / ice), fog haze, and whether the weather is allowed to drive the field.
+
 ### Mycelium
 
 ![mycelium](docs/mycelium.png)
@@ -1305,9 +1336,9 @@ the technical loop; **Long Lap**, one brutal hairpin after a flat-out
 straight. Or leave the circuit on **Auto** and the hostname decides your home
 track, every LAN its own.
 
-Under the hood it's the cheapest pseudo-3D in the house: the ground is one
-multiply chain per pixel into a 270-line buffer (SNES is 224) that CSS
-upscales with hard pixel edges — lighter per frame than FRAGNET's raycaster,
+Under the hood it's the cheapest pseudo-3D in the house: the ground is a
+mip-mapped bitmap sampled per pixel into a 270-line buffer (SNES is 224) that
+CSS upscales with hard pixel edges — lighter per frame than FRAGNET's raycaster,
 and it holds 60 fps on a Raspberry Pi.
 
 ### Net Fighter
@@ -1733,9 +1764,11 @@ The **Audio** tab is shared by every scene:
   from the feed. 0 is off, 1 is every event.
 - **Reverb**, **echo** and **Music bed** (music against event sounds).
 
-Each scene adds **Music** (rotate, or pin one style; Orbital Command also has
-Classic band and Packet Rush can follow the world), **Rotate every (min)**, and
-two volumes of its own:
+Each scene adds its own controls on top: usually **Music** (rotate, or pin one
+style; Orbital Command also has Classic band and Packet Rush can follow the
+world) and **Rotate every (min)**, plus two volumes of its own. Slipstream is
+the exception — its chip band always rotates, so its tab trades the Music
+controls for **Race sounds** and **Engine purr**:
 
 | Scene | Volumes |
 |-------|---------|
@@ -1747,9 +1780,10 @@ two volumes of its own:
 | Mainframe | **Board sounds**, **Fans & buzz** |
 | Aquarium | **Tank sounds**, **Pump & water** |
 | The Gibson | **Access sounds**, **Hum & static** |
+| The Rain | **Rain hiss** |
 | Mycelium | **Bells**, **Undergrowth & drone** |
 | Undergrowth | **Mycelium's score** (shared garden) **+ pulse whoosh** |
-| Slipstream | **Chip race-pop** (168 bpm) and **sunset organ rock**, + start lights, shells and lap chimes |
+| Slipstream | **Race sounds**, **Engine purr** |
 | FRAGNET | **Riff city**, **Machine god**, **Grave drip** |
 | Substrate | **Drawing** (nib on paper), **Room** (air & drone), **Notes** |
 
@@ -1899,7 +1933,7 @@ been measured on a Pi yet.
 
 | Parameter | Effect |
 |-----------|--------|
-| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `zombie`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `mycelium`, `undergrowth`, `fragnet`, `substrate` or `slipstream` |
+| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `holdout`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `rain`, `conway`, `netfighter`, `mycelium`, `undergrowth`, `fragnet`, `substrate` or `slipstream` |
 | `?demo=1` | synthetic traffic, no relay needed |
 | `?showreel=1` | with the demo: a looping 60-second calm → build → hurricane → cooldown arc |
 | `?rate=40` | with the demo: about 40 events per second |
@@ -1956,10 +1990,12 @@ UDM / UDR / UCG / APs ──syslog UDP :5514──► relay (Python) ──JSON 
   (database and policy dependencies removed), drops known log spam, keeps a
   ring buffer of recent events, broadcasts every event to every browser, and
   stores uploaded background tracks.
-- **`web/`**: Vite and TypeScript. Orbital Command, Last Outpost and Packet
-  Rush render with [PixiJS v8](https://pixijs.com/), Midnight Run,
-  Panopticon, Mainframe, Aquarium and The Gibson with [three.js](https://threejs.org/). The audio and nearly all graphics are
-  generated in code; Last Outpost adds one small sprite atlas.
+- **`web/`**: Vite and TypeScript. Eight scenes render with
+  [PixiJS v8](https://pixijs.com/), six with [three.js](https://threejs.org/),
+  and FRAGNET (raycaster) and Slipstream (Mode 7) with hand-written software
+  renderers. The audio and nearly all graphics are
+  generated in code; Last Outpost, Net Fighter, Slipstream and FRAGNET add
+  small sprite atlases (see [Credits](#credits)).
 - **`deploy/`**: the systemd unit and the kiosk autostart entry.
 
 ### Viewer: core and scenes
@@ -2070,8 +2106,12 @@ Actions** first.
 
 - Syslog parsing vendored from
   [UniFi-Insights-Plus](https://github.com/jmasarweh/UniFi-Insights-Plus) (MIT).
-- [PixiJS v8](https://pixijs.com/) renders Orbital Command, Last Outpost and
-  Packet Rush; [three.js](https://threejs.org/) renders Midnight Run, Panopticon, Mainframe, Aquarium and The Gibson.
+- [PixiJS v8](https://pixijs.com/) renders Orbital Command, Last Outpost,
+  Packet Rush, The Rain,
+  Game of Life, Net Fighter, Mycelium and Substrate;
+  [three.js](https://threejs.org/) renders Midnight Run, Panopticon, Mainframe,
+  Aquarium, The Gibson and Undergrowth; FRAGNET's raycaster and Slipstream's
+  Mode 7 board are hand-written software renderers.
 - Every sound and melody, every Orbital Command texture, Midnight Run's car,
   city and signs, all of Packet Rush's pixel art, Panopticon's planet,
   satellites and surveillance scenes, Mainframe's circuit boards and the
@@ -2079,7 +2119,7 @@ Actions** first.
   Gibson's storage towers, listings and circuit floor are generated in code.
 - Last Outpost sprites: [Top-down Shooter](https://kenney.nl/assets/top-down-shooter)
   by [Kenney](https://kenney.nl) (CC0), packed into
-  `web/src/themes/zombie/assets/atlas.png` with its license beside it.
+  `web/src/themes/holdout/assets/atlas.png` with its license beside it.
 - Slipstream karts: *Mogul Motorways* sprites by
   [SewerPancake](https://sewerpancake.itch.io/mogul-motorways), used with
   credit and thanks per the artist's welcome note, baked into
