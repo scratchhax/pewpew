@@ -204,6 +204,11 @@ the machine runs a firewall, allow UDP 5514 in from your UniFi devices (for
 example `sudo ufw allow 5514/udp`). To run it as a service, see
 [Kiosk on a Raspberry Pi](#kiosk-on-a-raspberry-pi).
 
+To accept **MIDI uploads** as background tracks, also install the renderer's
+system pieces (Debian/Ubuntu:
+`sudo apt install fluidsynth fluid-soundfont-gm ffmpeg`). Without them the
+relay still runs; MIDI uploads just answer with a clear error.
+
 ### 2. Build the viewer
 
 Node 18 or newer, on any machine:
@@ -1255,7 +1260,11 @@ Audio tab set the three levels.
 Your network runs a grand prix on an old 16-bit flip board. The whole circuit
 is one bitmap and the board spins and scales it under your kart the way a
 Super Nintendo did — sky scrolling mountains on the horizon, red-and-white
-curbs, a low pixel sun — and this time the race is your traffic.
+curbs, a low pixel sun — and this time the race is your traffic. The karts are
+the *Mogul Motorways* sprites by
+[SewerPancake](https://sewerpancake.itch.io/mogul-motorways) (used with credit),
+and the grandstands and fence line are packed with
+[Kenney](https://kenney.nl)'s little monsters.
 
 **The grid is eight karts and always eight.** A seat belongs to a host, never
 to an event: the first time the relay sees a host it takes an empty seat and
@@ -1658,9 +1667,19 @@ only for your kart. **Race sounds** and **Engine purr** live on the Audio tab.
 ### Background tracks
 
 Play your own music in any scene. In F1 → Audio → **Background track**, upload
-an MP3, OGG, M4A, WAV or FLAC file. It's stored on the relay, so every screen
-can use it: pick a track per scene, and every screen showing that scene plays
-it within about 20 seconds, the kiosk included.
+an MP3, OGG, M4A, WAV or FLAC file — or a **MIDI file**, which the relay renders
+to audio with a General MIDI soundfont (needs `fluidsynth` and `ffmpeg` on the
+relay host; MIDI uploads answer with a clear error without them). It's stored
+on the relay, so every screen can use it: pick a track per scene, and every
+screen showing that scene plays it within about 20 seconds, the kiosk included.
+**Rename** fixes a filename that arrived out of an upload; the track keeps its
+analysis and every scene using it follows.
+
+Instead of one track, pick **Shuffle…** and **Choose songs…**: a popup lists
+the library, and the ticked songs become that scene's shuffle pool — a random
+one takes over each time a song ends. The pool lives on the relay with the
+assignment, so every screen showing the scene shuffles the same set, and each
+scene keeps its own (race bangers here, doom OST there).
 
 The relay also ships **bundled default tracks** in `relay/bundled/`: on first
 start it copies them into the track store and hands them to their scenes, with
@@ -1684,10 +1703,14 @@ track and it stays deleted.
 The relay API behind it, handy for scripting:
 
 ```bash
-curl -F file=@mytrack.mp3 http://<relay-host>:8080/api/tracks          # upload
+curl -F file=@mytrack.mp3 http://<relay-host>:8080/api/tracks          # upload (audio or .mid)
 curl http://<relay-host>:8080/api/tracks                               # list + assignments
 curl -X PUT -H 'Content-Type: application/json' \
   -d '{"theme":"racing","name":"mytrack.mp3"}' http://<relay-host>:8080/api/tracks-assign
+curl -X PUT -H 'Content-Type: application/json' \
+  -d '{"theme":"racing","name":"*shuffle:song1.mp3,song2.ogg"}' http://<relay-host>:8080/api/tracks-assign
+curl -X POST http://<relay-host>:8080/api/tracks/old-name.mp3/rename \
+  -H 'Content-Type: application/json' -d '{"name":"new-name"}'         # rename
 curl -X DELETE http://<relay-host>:8080/api/tracks/mytrack.mp3         # delete
 ```
 
