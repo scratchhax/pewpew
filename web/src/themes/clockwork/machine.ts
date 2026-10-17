@@ -547,8 +547,13 @@ export class Machine {
   }
 
   // ── camera ───────────────────────────────────────────────────────────────
+  private lastFocus = -9;
   focus(x: number, y: number): void {
     if (location.hash === '#camhold') return;
+    // don't jerk across the machine for every event: only re-aim for a genuinely
+    // different part of it, and not more than once every few seconds
+    if (this.t - this.lastFocus < 3 && Math.hypot(x - this.cam.tx, y - this.cam.ty) < 300) return;
+    this.lastFocus = this.t;
     this.cam.tx = x; this.cam.ty = y;
     this.idleAt = this.t;
   }
@@ -562,7 +567,7 @@ export class Machine {
     const vw = this.vw, vh = this.vh;
     this.cam.tx = Math.max(vw / 2, Math.min(WORLD_W - vw / 2, this.cam.tx));
     this.cam.ty = Math.max(vh / 2, Math.min(WORLD_H - vh / 2, this.cam.ty));
-    const k = Math.min(1, dt * 1.1);
+    const k = Math.min(1, dt * 0.3);
     this.cam.x += (this.cam.tx - this.cam.x) * k;
     this.cam.y += (this.cam.ty - this.cam.y) * k;
   }

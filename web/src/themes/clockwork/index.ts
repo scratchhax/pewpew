@@ -57,11 +57,11 @@ async function create(host: ThemeHost<typeof CLOCKWORK_DEFAULTS>, init: Renderer
   );
   screen.addChild(machine.world);
 
-  // pixel scale: about 260 world pixels tall, whole-number
-  let S = 4, focusX = 640;
+  // pixel scale: about 620 world pixels tall - the machine has to fit on screen
+  let S = 2, focusX = 640;
   function layout(): void {
     const W = app.screen.width, H = app.screen.height;
-    S = Math.max(2, Math.round(H / 300));
+    S = Math.max(2, Math.round(H / 620));
     screen.scale.set(S);
     machine.vw = Math.ceil(W / S);
     machine.vh = Math.ceil(H / S);
