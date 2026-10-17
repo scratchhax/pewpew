@@ -2,7 +2,7 @@ import { Application, Container } from 'pixi.js';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
 import { CLOCKWORK_DEFAULTS, CLOCKWORK_BUDGETS, CLOCKWORK_CONTROLS, CLOCKWORK_HUD } from './settings';
-import { Machine, WORLD_W, WORLD_H } from './machine';
+import { Machine, loadHeroes, WORLD_W, WORLD_H } from './machine';
 import { clockworkScore } from './score';
 
 /**
@@ -53,6 +53,7 @@ async function create(host: ThemeHost<typeof CLOCKWORK_DEFAULTS>, init: Renderer
     settings as unknown as Record<string, any>,
     (name, x) => audio.sfx(name, { pan: Math.max(-0.8, Math.min(0.8, (((x ?? 640) - focusX) / machine.vw) * 1.6 - 0.8)) }),
     (text) => host.hud.say(text),
+    await loadHeroes(),
   );
   screen.addChild(machine.world);
 

@@ -6,6 +6,28 @@ import {
 } from './sprites';
 
 /**
+ * Hero parts atlas: LLM-generated stickers baked by scripts/bake-clockwork.mjs
+ * (see PROMPTS.md). Optional - a fresh clone without assets/machine.png simply
+ * gets the procedural parts.
+ */
+const heroPng = (import.meta.glob('./assets/machine.png', { eager: true, query: '?url', import: 'default' })
+  ['./assets/machine.png'] ?? undefined) as string | undefined;
+const heroData = (Object.values(import.meta.glob<{ MACHINE_FRAMES: Record<string, number[]> }>('./assets/machine.ts', { eager: true }))[0]
+  ?? undefined);
+
+export async function loadHeroes(): Promise<Record<string, Texture>> {
+  const out: Record<string, Texture> = {};
+  if (!heroPng || !heroData) return out;
+  const img = new Image();
+  await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error('hero atlas')); img.src = heroPng; });
+  for (const [name, f] of Object.entries(heroData.MACHINE_FRAMES)) {
+    const c = canvas(f[2], f[3], (x) => x.drawImage(img, f[0], f[1], f[2], f[3], 0, 0, f[2], f[3]));
+    out[name] = tex(c);
+  }
+  return out;
+}
+
+/**
  * The machine itself: one enormous portrait-oriented contraption (1280 x 1600
  * world px) that the camera pans across. Static structure (damask wall,
  * girders, rails, pipes, racks) is baked once into a single canvas; everything
@@ -84,7 +106,7 @@ export class Machine {
   pressure = 0;
   shake = 0;
 
-  constructor(private settings: Record<string, any>, private sfx: SfxFn, private say: SayFn) {
+  constructor(private settings: Record<string, any>, private sfx: SfxFn, private say: SayFn, private heroes: Record<string, Texture> = {}) {
     this.buildStatic();
     this.buildParts();
   }
@@ -211,27 +233,33 @@ export class Machine {
     gear(568, 1258, 8, 26, -1, true, 1.9);
 
     // boiler, furnace, fire, gauge
-    this.world.addChild(Object.assign(new Sprite(tex(boilerTexture(300, 170))), { x: 490, y: 1350 }) as Sprite);
-    this.world.addChild(Object.assign(new Sprite(tex(furnaceTexture(120, 90))), { x: 580, y: 1470 }) as Sprite);
+    const boilerS = new Sprite(this.heroes.boiler ?? tex(boilerTexture(300, 170)));
+    if (this.heroes.boiler) { boilerS.anchor.set(0.5); boilerS.x = 640; boilerS.y = 1435; }
+    else { boilerS.x = 490; boilerS.y = 1350; }
+    this.world.addChild(boilerS);
+    const furnaceS = new Sprite(this.heroes.furnace ?? tex(furnaceTexture(120, 90)));
+    if (this.heroes.furnace) { furnaceS.anchor.set(0.5); furnaceS.x = 640; furnaceS.y = 1515; }
+    else { furnaceS.x = 580; furnaceS.y = 1470; }
+    this.world.addChild(furnaceS);
     for (let i = 0; i < 4; i++) {
       const f = add(tex(flameTexture()), 600 + i * 22, 1520, 0.5, 1);
       this.flames.push(f);
     }
-    add(tex(gaugeTexture(26)), 452, 1392);
+    add(this.heroes.gauge ?? tex(gaugeTexture(26)), 452, 1392);
     this.needle = add(tex(needleTexture(20)), 452, 1392, 0.05, 0.5);
     // the master clutch lever
     const lever = add(tex(canvas(40, 6, (c2) => { c2.fillStyle = P.iron; c2.fillRect(0, 2, 34, 3); c2.fillStyle = P.brass; c2.fillRect(32, 0, 6, 7); })), 830, 1380, 0.05, 0.5);
     lever.rotation = 0.5;
 
     // alarm kit
-    add(tex(whistleTexture()), 330, 1288, 0.5, 1);
+    add(this.heroes.whistle ?? tex(whistleTexture()), 330, 1288, 0.5, 1);
     this.whistle = add(tex(puffTexture()), 330, 1276); this.whistle.alpha = 0;
-    this.lamp = add(tex(lampTexture(P.threat)), 285, 1236); this.lamp.alpha = 0.25;
-    this.cart = add(tex(cartTexture()), CART_RAIL.x0 + 10, CART_RAIL.y - 6);
-    this.bell = add(tex(bellTexture()), 810, 116);
+    this.lamp = add(this.heroes.lamp ?? tex(lampTexture(P.threat)), 285, 1236); this.lamp.alpha = 0.25;
+    this.cart = add(this.heroes.cart ?? tex(cartTexture()), CART_RAIL.x0 + 10, CART_RAIL.y - 6);
+    this.bell = add(this.heroes.bell ?? tex(bellTexture()), 810, 116);
     this.hammer = add(tex(hammerTexture()), 372, 356, 0.05, 0.5);
-    this.stampArm = add(tex(canvas(10, 34, (c2) => { c2.fillStyle = P.iron; c2.fillRect(3, 0, 4, 26); c2.fillStyle = P.brass; c2.fillRect(0, 26, 10, 8); })), 372, 330, 0.5, 0);
-    this.clampArm = add(tex(canvas(46, 8, (c2) => { c2.fillStyle = P.oakLight; c2.fillRect(0, 3, 34, 3); c2.fillStyle = P.brass; c2.fillRect(32, 0, 12, 8); })), 900, 520, 0.05, 0.5);
+    this.stampArm = add(this.heroes.stamp ?? tex(canvas(10, 34, (c2) => { c2.fillStyle = P.iron; c2.fillRect(3, 0, 4, 26); c2.fillStyle = P.brass; c2.fillRect(0, 26, 10, 8); })), 372, 330, 0.5, 0);
+    this.clampArm = add(this.heroes.clamp ?? tex(canvas(46, 8, (c2) => { c2.fillStyle = P.oakLight; c2.fillRect(0, 3, 34, 3); c2.fillStyle = P.brass; c2.fillRect(32, 0, 12, 8); })), 900, 520, 0.05, 0.5);
     this.gate = add(tex(canvas(10, 30, (c2) => { c2.fillStyle = P.iron; c2.fillRect(0, 0, 10, 30); c2.fillStyle = P.block; c2.fillRect(0, 0, 10, 4); c2.fillStyle = P.ironDark; for (let j = 6; j < 28; j += 6) c2.fillRect(0, j, 10, 2); })), 640, 1000, 0.5, 0);
     this.gate.y = 1006; // stowed above the rail
     // the directory sheet (redrawn as mail arrives)
