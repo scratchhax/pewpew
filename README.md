@@ -1352,10 +1352,12 @@ and it holds 60 fps on a Raspberry Pi.
 
 ![clockwork](docs/clockwork.png)
 
-Your network as one enormous steam-powered Rube Goldberg machine, taller than
-the screen: the camera pans down the frame to whatever just fired and drifts
-over the boiler when the network is quiet. Every event works a mechanism, and
-a fired mechanism may tug a trip cord and wake its neighbour — chain reactions.
+Your network as one enormous steam-powered Rube Goldberg machine, all of it on
+screen at once and the camera never moving: directory and nameplate rack up
+top, the ball run switchback across the middle, and the gear towers, alarm
+shelf and boiler along the bottom. Every event works a mechanism somewhere in
+the frame, and a fired mechanism may tug a trip cord and wake its neighbour —
+chain reactions.
 
 **The event law, in brass.** Allowed traffic drops a ball bearing from the
 chute; it rolls the switchback rail past the safety gate and lands in the
