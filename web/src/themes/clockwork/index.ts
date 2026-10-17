@@ -51,17 +51,17 @@ async function create(host: ThemeHost<typeof CLOCKWORK_DEFAULTS>, init: Renderer
 
   const machine = new Machine(
     settings as unknown as Record<string, any>,
-    (name, x) => audio.sfx(name, { pan: Math.max(-0.8, Math.min(0.8, (((x ?? 640) - focusX) / machine.vw) * 1.6 - 0.8)) }),
+    (name, x) => audio.sfx(name, { pan: Math.max(-0.8, Math.min(0.8, ((x ?? 950) - WORLD_W / 2) / 420)) }),
     (text) => host.hud.say(text),
     await loadHeroes(),
   );
   screen.addChild(machine.world);
 
-  // pixel scale: about 620 world pixels tall - the machine has to fit on screen
-  let S = 2, focusX = 640;
+  // pixel scale: the whole machine on screen at once, camera fixed
+  let S = 1;
   function layout(): void {
     const W = app.screen.width, H = app.screen.height;
-    S = Math.max(2, Math.round(H / 620));
+    S = Math.max(1, Math.floor(Math.min(W / WORLD_W, H / WORLD_H)));
     screen.scale.set(S);
     machine.vw = Math.ceil(W / S);
     machine.vh = Math.ceil(H / S);
@@ -112,9 +112,6 @@ async function create(host: ThemeHost<typeof CLOCKWORK_DEFAULTS>, init: Renderer
         machine.fire('system');
         break;
     }
-    const a = machine.anchorFor(se.kind);
-    focusX = a.x;
-    machine.focus(a.x, a.y);
   }
 
   function frame(f: FrameInfo): void {
