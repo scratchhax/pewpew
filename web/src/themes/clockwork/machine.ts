@@ -70,7 +70,7 @@ const CART_RAIL = { x0: 880, x1: 1160, y: 1252 };
 
 export class Machine {
   world = new Container();
-  private cam = { x: 320, y: 1180, tx: 320, ty: 1180 };
+  private cam = { x: 640, y: 1420, tx: 640, ty: 1420 };
   private gears: Array<{ s: Sprite; r: number; dir: number; base: number }> = [];
   private needle!: Sprite;
   private flames: Sprite[] = [];
@@ -548,6 +548,7 @@ export class Machine {
 
   // ── camera ───────────────────────────────────────────────────────────────
   focus(x: number, y: number): void {
+    if (location.hash === '#camhold') return;
     this.cam.tx = x; this.cam.ty = y;
     this.idleAt = this.t;
   }
