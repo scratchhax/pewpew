@@ -127,8 +127,7 @@ async function create(host: ThemeHost<typeof CLOCKWORK_DEFAULTS>, init: Renderer
     pressure += (target - pressure) * Math.min(1, dtReal * 0.4);
 
     machine.update(dt, pressure);
-    const sh = Math.sin(t * 47) * (machine.shake > 0 ? 1 : 0);
-    machine.applyCamera(sh * machine.shake, Math.cos(t * 39) * machine.shake);
+    machine.applyCamera();
 
     // the HUD reads the gauges
     host.hud.setExtraStat('PRESSURE', `${Math.round(pressure * 100)}%`);

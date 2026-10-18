@@ -28,23 +28,29 @@ export async function loadHeroes(): Promise<Record<string, Texture>> {
 }
 
 /**
- * The machine itself: one enormous landscape-oriented contraption that fits
- * the whole screen at once - directory and nameplate rack up top, the ball
- * run switchback across the middle, and the gear towers, alarm shelf and
- * boiler along the bottom. The camera never moves; you take the machine in
- * as a whole and watch it work. Static structure (damask wall, girders,
- * rails, pipes, racks) is baked once into a single canvas; everything that
- * moves is a sprite the mechanisms drive. Fired mechanisms may tug a trip
- * cord and wake their neighbours - that's the chain reactions.
+ * The machine itself: one enormous landscape contraption that fits the whole
+ * screen at once - directory and nameplate rack up top, the ball run
+ * switchback across the middle, and the great boiler dominating the bottom
+ * with gear trains that actually mesh beside and above it. The camera never
+ * moves; you take the machine in as a whole and watch it work. Static
+ * structure is baked once into a single canvas; everything that moves is a
+ * sprite the mechanisms drive. Fired mechanisms may tug a trip cord and wake
+ * their neighbours - that's the chain reactions.
  */
 
 export const WORLD_W = 1900;
 export const WORLD_H = 1040;
 
+/** Gear trains: every gear's radius comes from its tooth count at one shared
+ *  pitch, so meshing gears interlock. r = teeth * PITCH / 2PI. */
+const PITCH = 16;
+const gearR = (teeth: number) => (teeth * PITCH) / (Math.PI * 2);
+
 type SfxFn = (name: string, x?: number) => void;
 type SayFn = (text: string) => void;
 
 interface Particle { s: Sprite; vx: number; vy: number; life: number; max: number; grav: number; }
+interface GearNode { x: number; y: number; teeth: number; ratio: number; phase: number; }
 
 /** A polyline the balls and envelopes ride. */
 class Path {
@@ -67,13 +73,13 @@ class Path {
 }
 
 // ── the machine's geography ────────────────────────────────────────────────
-const RUN = new Path([[1750, 560], [200, 600], [1700, 655], [250, 700], [215, 736]]);
-const TUBE = new Path([[1350, 640], [1350, 300], [950, 300], [900, 218]]);
-const CART_RAIL = { x0: 1150, x1: 1420, y: 800 };
+const RUN = new Path([[1750, 470], [240, 505], [1700, 540], [280, 570], [245, 598]]);
+const TUBE = new Path([[1350, 660], [1350, 300], [950, 300], [900, 208]]);
+const CART_RAIL = { x0: 1240, x1: 1470, y: 720 };
 
 export class Machine {
   world = new Container();
-  private gears: Array<{ s: Sprite; r: number; dir: number; base: number }> = [];
+  private train: Array<{ s: Sprite; ratio: number; phase: number }> = [];
   private needle!: Sprite;
   private flames: Sprite[] = [];
   private lamp!: Sprite;
@@ -105,7 +111,6 @@ export class Machine {
   private t = 0;
   private r = rng(0x57);
   pressure = 0;
-  shake = 0;
 
   constructor(private settings: Record<string, any>, private sfx: SfxFn, private say: SayFn, private heroes: Record<string, Texture> = {}) {
     this.buildStatic();
@@ -134,7 +139,7 @@ export class Machine {
         const ry = gy + Math.floor(gh / 2) - 1;
         for (let i = gx + 6; i < gx + gw - 4; i += 18) x.fillRect(i, ry, 2, 2);
       };
-      girder(0, 250, WORLD_W, 14); girder(0, 760, WORLD_W, 12);
+      girder(0, 240, WORLD_W, 14); girder(0, 770, WORLD_W, 12);
       girder(40, 0, 16, WORLD_H); girder(WORLD_W - 56, 0, 16, WORLD_H);
 
       // the ball run: grooved rails
@@ -148,14 +153,14 @@ export class Machine {
           if (i % 22 === 0) { x.fillStyle = P.brassDark; x.fillRect(px - 3, py + 7, 6, 3); }
         }
       }
-      // counter tray (bottom left, where the run comes to rest)
-      x.fillStyle = P.brass; x.fillRect(185, 730, 60, 6); x.fillRect(181, 718, 6, 18); x.fillRect(243, 718, 6, 18);
-      x.fillStyle = P.brassHi; x.fillRect(185, 730, 60, 2);
-      drawText(x, 'COUNTED', 189, 742, P.brassLight, null);
-      // the chute it drops from (top right)
-      x.fillStyle = P.iron; x.fillRect(1730, 520, 44, 30);
-      x.fillStyle = P.ironDark; x.fillRect(1736, 526, 32, 18);
-      drawText(x, 'IN', 1744, 510, P.ironHi, null);
+      // counter tray (left, where the run comes to rest)
+      x.fillStyle = P.brass; x.fillRect(185, 592, 60, 6); x.fillRect(181, 580, 6, 18); x.fillRect(243, 580, 6, 18);
+      x.fillStyle = P.brassHi; x.fillRect(185, 592, 60, 2);
+      drawText(x, 'COUNTED', 189, 604, P.brassLight, null);
+      // the chute it drops from (right)
+      x.fillStyle = P.iron; x.fillRect(1730, 430, 44, 30);
+      x.fillStyle = P.ironDark; x.fillRect(1736, 436, 32, 18);
+      drawText(x, 'IN', 1744, 418, P.ironHi, null);
 
       // the pneumatic tube
       for (let k = 0; k < TUBE.pts.length - 1; k++) {
@@ -163,55 +168,80 @@ export class Machine {
         const steps = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 2);
         for (let i = 0; i <= steps; i++) {
           const f = i / steps, px = x0 + (x1 - x0) * f, py = y0 + (y1 - y0) * f;
-          x.fillStyle = P.copper; x.fillRect(px - 5, py - 5, 10, 10);
-          x.fillStyle = P.copperLight; x.fillRect(px - 5, py - 5, 3, 10);
-          if (i % 40 === 0 && i > 0 && i < steps) { x.fillStyle = P.brass; x.fillRect(px - 7, py - 7, 14, 14); x.fillStyle = P.copper; x.fillRect(px - 5, py - 5, 10, 10); x.fillStyle = P.copperLight; x.fillRect(px - 5, py - 5, 3, 10); }
+          x.fillStyle = P.copper; x.fillRect(px - 6, py - 6, 12, 12);
+          x.fillStyle = P.copperLight; x.fillRect(px - 6, py - 6, 4, 12);
+          if (i % 40 === 0 && i > 0 && i < steps) { x.fillStyle = P.brass; x.fillRect(px - 8, py - 8, 16, 16); x.fillStyle = P.copper; x.fillRect(px - 6, py - 6, 12, 12); x.fillStyle = P.copperLight; x.fillRect(px - 6, py - 6, 4, 12); }
         }
       }
       // mail dispatch hopper
-      x.fillStyle = P.iron; x.fillRect(1326, 640, 48, 26);
-      x.fillStyle = P.ironDark; x.fillRect(1332, 646, 36, 14);
-      x.fillStyle = P.dns; x.fillRect(1344, 648, 12, 3);
-      drawText(x, 'MAIL IN', 1328, 670, P.ironHi, null);
+      x.fillStyle = P.iron; x.fillRect(1326, 660, 48, 26);
+      x.fillStyle = P.ironDark; x.fillRect(1332, 666, 36, 14);
+      x.fillStyle = P.dns; x.fillRect(1344, 668, 12, 3);
+      drawText(x, 'MAIL IN', 1328, 690, P.ironHi, null);
 
       // nameplate rack: a frame of slots
-      x.fillStyle = P.oak; x.fillRect(120, 300, 460, 190);
-      x.fillStyle = P.oakLight; x.fillRect(124, 304, 452, 4);
-      x.fillStyle = '#120f18'; x.fillRect(132, 312, 436, 170);
+      x.fillStyle = P.oak; x.fillRect(120, 270, 460, 180);
+      x.fillStyle = P.oakLight; x.fillRect(124, 274, 452, 4);
+      x.fillStyle = '#120f18'; x.fillRect(132, 282, 436, 160);
       for (let row = 0; row < 5; row++) {
-        x.fillStyle = P.brassDark; x.fillRect(132, 344 + row * 34, 436, 3);
-        for (let i = 138; i < 566; i += 10) { x.fillStyle = P.brass; x.fillRect(i, 340 + row * 34, 3, 5); }
+        x.fillStyle = P.brassDark; x.fillRect(132, 312 + row * 30, 436, 3);
+        for (let i = 138; i < 566; i += 10) { x.fillStyle = P.brass; x.fillRect(i, 308 + row * 30, 3, 5); }
       }
-      drawText(x, 'THE RACK', 138, 306, P.brassLight, null);
+      drawText(x, 'THE RACK', 138, 276, P.brassLight, null);
 
       // directory board
-      x.fillStyle = P.oak; x.fillRect(660, 60, 420, 150);
-      x.fillStyle = P.oakLight; x.fillRect(664, 64, 412, 4);
-      x.fillStyle = P.paper; x.fillRect(674, 76, 392, 122);
-      x.fillStyle = P.paperDark; x.fillRect(674, 76, 392, 3);
-      drawText(x, 'DIRECTORY', 682, 84, '#5a4a2a', null);
+      x.fillStyle = P.oak; x.fillRect(660, 50, 420, 150);
+      x.fillStyle = P.oakLight; x.fillRect(664, 54, 412, 4);
+      x.fillStyle = P.paper; x.fillRect(674, 66, 392, 122);
+      x.fillStyle = P.paperDark; x.fillRect(674, 66, 392, 3);
+      drawText(x, 'DIRECTORY', 682, 74, '#5a4a2a', null);
 
       // coupling station: a hose stub and manifold
-      x.fillStyle = P.iron; x.fillRect(1560, 330, 60, 40);
-      x.fillStyle = P.ironDark; x.fillRect(1566, 336, 48, 28);
-      x.fillStyle = P.copper; x.fillRect(1520, 344, 44, 12);
-      x.fillStyle = P.wifi; x.fillRect(1572, 342, 8, 8);
-      drawText(x, 'COUPLING', 1542, 376, P.ironHi, null);
+      x.fillStyle = P.iron; x.fillRect(1560, 300, 60, 40);
+      x.fillStyle = P.ironDark; x.fillRect(1566, 306, 48, 28);
+      x.fillStyle = P.copper; x.fillRect(1520, 314, 44, 12);
+      x.fillStyle = P.wifi; x.fillRect(1572, 312, 8, 8);
+      drawText(x, 'COUPLING', 1542, 346, P.ironHi, null);
 
       // coal rail + the hopper it dumps into
       x.fillStyle = P.iron; x.fillRect(CART_RAIL.x0, CART_RAIL.y, CART_RAIL.x1 - CART_RAIL.x0, 3);
       for (let px = CART_RAIL.x0; px <= CART_RAIL.x1; px += 12) { x.fillStyle = P.ironDark; x.fillRect(px, CART_RAIL.y + 3, 3, 4); }
-      x.fillStyle = P.iron; x.fillRect(1420, 816, 60, 40);
-      x.fillStyle = '#0d0a12'; x.fillRect(1426, 822, 48, 20);
-      drawText(x, 'COAL', 1438, 846, P.ironHi, null);
+      x.fillStyle = P.iron; x.fillRect(1470, 736, 60, 40);
+      x.fillStyle = '#0d0a12'; x.fillRect(1476, 742, 48, 20);
+      drawText(x, 'COAL', 1488, 766, P.ironHi, null);
 
       // boiler brick surround
-      x.fillStyle = '#3a2418'; x.fillRect(750, 800, 400, 230);
+      x.fillStyle = '#3a2418'; x.fillRect(660, 580, 580, 450);
       x.fillStyle = '#2a1a10';
-      for (let j = 804; j < 1026; j += 12) for (let i = 754; i < 1146; i += 26) x.fillRect(i + ((j / 12) % 2 ? 13 : 0), j, 24, 10);
+      for (let j = 584; j < 1026; j += 12) for (let i = 664; i < 1236; i += 26) x.fillRect(i + ((j / 12) % 2 ? 13 : 0), j, 24, 10);
     });
     const bg = new Sprite(tex(c));
     this.world.addChild(bg);
+  }
+
+  /** Add a gear; with a parent it meshes: centre distance = r1+r2, speed
+   *  ratio -r1/r2, and a phase that slots its teeth into the parent's gaps. */
+  private addGear(x: number, y: number, teeth: number, brass: boolean, parent?: GearNode): GearNode {
+    const r = gearR(teeth);
+    let ratio = 1, phase = 0;
+    if (parent) {
+      const rp = gearR(parent.teeth);
+      const alpha = Math.atan2(parent.y - y, parent.x - x);
+      ratio = -(rp / r) * parent.ratio;
+      phase = -(rp / r) * parent.phase + alpha * (1 + rp / r) + Math.PI + Math.PI / teeth;
+    }
+    const s = new Sprite(tex(gearTexture(teeth, r, brass)));
+    s.anchor.set(0.5); s.x = x; s.y = y;
+    this.world.addChild(s);
+    this.train.push({ s, ratio, phase });
+    return { x, y, teeth, ratio, phase };
+  }
+
+  /** Place a gear meshing with `parent`, at `deg` from its centre. */
+  private meshAt(parent: GearNode, teeth: number, deg: number, brass: boolean): GearNode {
+    const a = (deg * Math.PI) / 180;
+    const d = gearR(parent.teeth) + gearR(teeth);
+    return this.addGear(parent.x + Math.cos(a) * d, parent.y + Math.sin(a) * d, teeth, brass, parent);
   }
 
   private buildParts(): void {
@@ -221,57 +251,56 @@ export class Machine {
       this.world.addChild(s);
       return s;
     };
-    const gear = (x: number, y: number, teeth: number, r: number, dir: number, brass: boolean, base: number) => {
-      const s = add(tex(gearTexture(teeth, r, brass)), x, y);
-      this.gears.push({ s, r, dir, base });
-    };
 
-    // gear towers either side + the master clutch trio over the boiler
-    gear(690, 890, 16, 62, 1, true, 1);
-    gear(690, 764, 12, 44, -1, false, 1.4);
-    gear(1500, 900, 16, 62, -1, true, 1);
-    gear(1500, 774, 12, 44, 1, false, 1.4);
-    gear(950, 780, 12, 40, 1, false, 1.2);
-    gear(1022, 748, 8, 26, -1, true, 1.9);
-    gear(878, 748, 8, 26, -1, true, 1.9);
+    // gear trains: one over the boiler crank, one tower each side
+    const crank = this.addGear(950, 545, 20, true);
+    this.meshAt(crank, 13, 168, false);
+    this.meshAt(crank, 13, 12, false);
+    const lt = this.addGear(450, 690, 26, true);
+    this.meshAt(lt, 13, -35, false);
+    const rt = this.addGear(1520, 880, 26, true);
+    const rt2 = this.meshAt(rt, 16, -90, false);
+    this.meshAt(rt2, 10, -90, true);
 
-    // boiler, furnace, fire, gauge
-    const boilerS = new Sprite(this.heroes.boiler ?? tex(boilerTexture(300, 170)));
-    if (this.heroes.boiler) { boilerS.anchor.set(0.5); boilerS.x = 950; boilerS.y = 905; }
-    else { boilerS.x = 800; boilerS.y = 820; }
+    // the great boiler, its furnace and fire, the gauge
+    const boilerS = new Sprite(this.heroes.boiler ?? tex(boilerTexture(520, 300)));
+    if (this.heroes.boiler) { boilerS.anchor.set(0.5); boilerS.x = 950; boilerS.y = 800; }
+    else { boilerS.x = 690; boilerS.y = 650; }
     this.world.addChild(boilerS);
-    const furnaceS = new Sprite(this.heroes.furnace ?? tex(furnaceTexture(120, 90)));
-    if (this.heroes.furnace) { furnaceS.anchor.set(0.5); furnaceS.x = 950; furnaceS.y = 985; }
-    else { furnaceS.x = 890; furnaceS.y = 940; }
+    const furnaceS = new Sprite(this.heroes.furnace ?? tex(furnaceTexture(170, 130)));
+    if (this.heroes.furnace) { furnaceS.anchor.set(0.5); furnaceS.x = 950; furnaceS.y = 950; }
+    else { furnaceS.x = 865; furnaceS.y = 885; }
     this.world.addChild(furnaceS);
-    for (let i = 0; i < 4; i++) {
-      const f = add(tex(flameTexture()), 910 + i * 22, 990, 0.5, 1);
+    for (let i = 0; i < 5; i++) {
+      const f = add(tex(flameTexture()), 890 + i * 30, 995, 0.5, 1);
+      f.scale.set(2.2);
       this.flames.push(f);
     }
-    add(this.heroes.gauge ?? tex(gaugeTexture(26)), 762, 862);
-    this.needle = add(tex(needleTexture(20)), 762, 862, 0.05, 0.5);
+    add(this.heroes.gauge ?? tex(gaugeTexture(60)), 640, 680);
+    this.needle = add(tex(needleTexture(46)), 640, 680, 0.05, 0.5);
     // the master clutch lever
-    const lever = add(tex(canvas(40, 6, (c2) => { c2.fillStyle = P.iron; c2.fillRect(0, 2, 34, 3); c2.fillStyle = P.brass; c2.fillRect(32, 0, 6, 7); })), 1140, 850, 0.05, 0.5);
+    const lever = add(tex(canvas(64, 8, (c2) => { c2.fillStyle = P.iron; c2.fillRect(0, 3, 54, 4); c2.fillStyle = P.brass; c2.fillRect(52, 0, 10, 9); })), 1240, 640, 0.05, 0.5);
     lever.rotation = 0.5;
 
-    // alarm kit
-    add(this.heroes.whistle ?? tex(whistleTexture()), 1230, 250, 0.5, 1);
-    this.whistle = add(tex(puffTexture()), 1230, 238); this.whistle.alpha = 0;
-    this.lamp = add(this.heroes.lamp ?? tex(lampTexture(P.threat)), 1160, 244); this.lamp.alpha = 0.25;
-    this.cart = add(this.heroes.cart ?? tex(cartTexture()), CART_RAIL.x0 + 10, CART_RAIL.y - 6);
-    this.bell = add(this.heroes.bell ?? tex(bellTexture()), 870, 50);
-    this.hammer = add(tex(hammerTexture()), 350, 262, 0.05, 0.5);
-    this.stampArm = add(this.heroes.stamp ?? tex(canvas(10, 34, (c2) => { c2.fillStyle = P.iron; c2.fillRect(3, 0, 4, 26); c2.fillStyle = P.brass; c2.fillRect(0, 26, 10, 8); })), 350, 236, 0.5, 0);
-    this.clampArm = add(this.heroes.clamp ?? tex(canvas(46, 8, (c2) => { c2.fillStyle = P.oakLight; c2.fillRect(0, 3, 34, 3); c2.fillStyle = P.brass; c2.fillRect(32, 0, 12, 8); })), 1470, 350, 0.05, 0.5);
-    this.gate = add(tex(canvas(10, 30, (c2) => { c2.fillStyle = P.iron; c2.fillRect(0, 0, 10, 30); c2.fillStyle = P.block; c2.fillRect(0, 0, 10, 4); c2.fillStyle = P.ironDark; for (let j = 6; j < 28; j += 6) c2.fillRect(0, j, 10, 2); })), 975, 566, 0.5, 0);
-    this.gate.y = 572; // stowed above the rail
+    // alarm kit up on the girder and along the coal rail
+    add(this.heroes.whistle ?? tex(whistleTexture()), 1230, 240, 0.5, 1);
+    this.whistle = add(tex(puffTexture()), 1230, 226); this.whistle.alpha = 0;
+    this.lamp = add(this.heroes.lamp ?? tex(lampTexture(P.threat)), 1160, 232); this.lamp.alpha = 0.25;
+    this.cart = add(this.heroes.cart ?? tex(cartTexture()), CART_RAIL.x0 + 14, CART_RAIL.y - 8);
+    if (this.heroes.hopper) add(this.heroes.hopper, 1350, 668);
+    this.bell = add(this.heroes.bell ?? tex(bellTexture()), 870, 26);
+    this.hammer = add(tex(hammerTexture()), 350, 240, 0.05, 0.5);
+    this.hammer.scale.set(1.6);
+    this.stampArm = add(this.heroes.stamp ?? tex(canvas(16, 54, (c2) => { c2.fillStyle = P.iron; c2.fillRect(5, 0, 6, 40); c2.fillStyle = P.brass; c2.fillRect(0, 40, 16, 14); })), 350, 216, 0.5, 0);
+    this.clampArm = add(this.heroes.clamp ?? tex(canvas(70, 12, (c2) => { c2.fillStyle = P.oakLight; c2.fillRect(0, 5, 50, 4); c2.fillStyle = P.brass; c2.fillRect(48, 0, 20, 12); })), 1470, 320, 0.05, 0.5);
+    this.gate = add(tex(canvas(14, 44, (c2) => { c2.fillStyle = P.iron; c2.fillRect(0, 0, 14, 44); c2.fillStyle = P.block; c2.fillRect(0, 0, 14, 6); c2.fillStyle = P.ironDark; for (let j = 10; j < 42; j += 8) c2.fillRect(0, j, 14, 3); })), 995, 481, 0.5, 0);
     // the directory sheet (redrawn as mail arrives)
     const dc = canvas(392, 100, (c2) => { c2.fillStyle = 'rgba(0,0,0,0)'; c2.fillRect(0, 0, 392, 100); });
     this.directoryCtx = dc.getContext('2d')!;
     this.directoryTex = tex(dc);
-    this.directory = add(this.directoryTex, 674, 98, 0, 0);
+    this.directory = add(this.directoryTex, 674, 88, 0, 0);
     // rack slot anchors (5 rows x 8 cols)
-    for (let row = 0; row < 5; row++) for (let col = 0; col < 8; col++) this.rackSlots.push({ x: 142 + col * 55, y: 320 + row * 34 });
+    for (let row = 0; row < 5; row++) for (let col = 0; col < 8; col++) this.rackSlots.push({ x: 142 + col * 55, y: 298 + row * 30 });
   }
 
   // ── particles ────────────────────────────────────────────────────────────
@@ -279,7 +308,7 @@ export class Machine {
     if (this.parts.length >= (this.settings.kMaxParticles ?? 400)) return;
     const s = this.partPool.pop() ?? new Sprite(this.puffTex);
     s.texture = this.puffTex;
-    s.anchor.set(0.5); s.x = x; s.y = y; s.scale.set(0.4);
+    s.anchor.set(0.5); s.x = x; s.y = y; s.scale.set(0.7 * scale);
     s.tint = color ?? 0xffffff; s.alpha = 0.8;
     this.world.addChild(s);
     this.parts.push({ s, vx: (this.r() - 0.5) * 18, vy, life: 0, max: 0.9 + this.r() * 0.5, grav: -6 });
@@ -289,7 +318,7 @@ export class Machine {
       if (this.parts.length >= (this.settings.kMaxParticles ?? 400)) return;
       const s = this.partPool.pop() ?? new Sprite();
       s.texture = this.puffTex;
-      s.anchor.set(0.5); s.x = x; s.y = y; s.scale.set(0.12 + this.r() * 0.1);
+      s.anchor.set(0.5); s.x = x; s.y = y; s.scale.set(0.2 + this.r() * 0.14);
       s.tint = color; s.alpha = 1;
       this.world.addChild(s);
       this.parts.push({ s, vx: (this.r() - 0.5) * 130, vy: -this.r() * up, life: 0, max: 0.4 + this.r() * 0.4, grav: 190 });
@@ -319,8 +348,8 @@ export class Machine {
   private dropBall(): void {
     if (this.balls.length >= (this.settings.kMaxBalls ?? 24)) return;
     const s = new Sprite(this.ballTex);
-    s.anchor.set(0.5);
-    const p = RUN.at(0); s.x = p.x; s.y = p.y - 30;
+    s.anchor.set(0.5); s.scale.set(1.6);
+    const p = RUN.at(0); s.x = p.x; s.y = p.y - 34;
     this.world.addChild(s);
     this.balls.push({ s, u: 0, v: 0 });
     this.sfx('release', p.x);
@@ -329,8 +358,8 @@ export class Machine {
 
   private slamGate(): void {
     this.gateFired = true;
-    this.sfx('gate', 975);
-    this.spark(975, 596, 0xff6b6b, 5, 40);
+    this.sfx('gate', 995);
+    this.spark(995, 520, 0xff6b6b, 5, 40);
     this.chain(['gate', 'mail']);
   }
   private gateFired = false; private gateT = 9;
@@ -338,7 +367,7 @@ export class Machine {
   private sendMail(domain: string): void {
     if (this.mails.length >= 6) return;
     const s = new Sprite(this.mailTex);
-    s.anchor.set(0.5);
+    s.anchor.set(0.5); s.scale.set(1.8);
     const p = TUBE.at(0); s.x = p.x; s.y = p.y;
     this.world.addChild(s);
     this.mails.push({ s, u: 0 });
@@ -372,8 +401,8 @@ export class Machine {
 
   private clutchDrop(): void {
     this.shudder = 1;
-    this.shake = 1;
     this.sfx('shudder', 950);
+    for (let i = 0; i < 6; i++) this.puff(760 + this.r() * 380, 640 + this.r() * 120, 1.2);
     this.say('MASTER CLUTCH DROPPED — REENGAGING');
   }
 
@@ -381,16 +410,16 @@ export class Machine {
   update(dt: number, pressure: number): void {
     this.t += dt;
     this.pressure = pressure;
-    const speed = (0.25 + pressure * 1.9) * (1 - this.shudder * 0.95);
-    this.gearPhase += dt * speed;
-    for (const g of this.gears) g.s.rotation = this.gearPhase * g.dir * g.base * (16 / g.r);
+    const speed = 0.25 + pressure * 1.9;
+    this.gearPhase += dt * speed * (1 - this.shudder * 0.95);
+    for (const g of this.train) g.s.rotation = this.gearPhase * g.ratio + g.phase;
 
     // furnace fire flickers with pressure
     for (let i = 0; i < this.flames.length; i++) {
       const f = this.flames[i];
       const fl = 0.55 + pressure * 0.6 + Math.sin(this.t * (9 + i * 2.3) + i) * 0.18;
       f.alpha = Math.min(1, fl);
-      f.scale.set(0.8 + pressure * 0.5 + Math.sin(this.t * 13 + i * 2) * 0.12);
+      f.scale.set(2 + pressure * 0.9 + Math.sin(this.t * 13 + i * 2) * 0.25);
     }
     // gauge needle
     this.needle.rotation = -Math.PI * 0.75 + Math.PI * 1.5 * pressure + Math.sin(this.t * 7) * 0.02;
@@ -399,7 +428,7 @@ export class Machine {
     this.steamAt -= dt * (this.settings.kSteam ? (0.6 + pressure * 2.2) * (this.settings.kSteamDensity ?? 1) : 0);
     if (this.steamAt <= 0) {
       this.steamAt = 0.5;
-      if (this.settings.kSteam) this.puff(this.r() < 0.5 ? 1230 : 1520, this.r() < 0.5 ? 230 : 344, 0.7);
+      if (this.settings.kSteam) this.puff(this.r() < 0.5 ? 1230 : 1520, this.r() < 0.5 ? 226 : 314, 0.9);
     }
 
     // balls roll the run
@@ -408,11 +437,11 @@ export class Machine {
       b.v = Math.min(0.42, b.v + dt * 0.28);
       b.u += (b.v * dt) / 4.2;
       const p = RUN.at(b.u);
-      b.s.x = p.x; b.s.y = p.y + 2; b.s.rotation += dt * b.v * 9;
+      b.s.x = p.x; b.s.y = p.y + 3; b.s.rotation += dt * b.v * 9;
       if (b.u >= 1) {
         this.world.removeChild(b.s); this.balls.splice(i, 1);
-        this.sfx('clack', 215);
-        this.spark(215, 728, 0xe8eef8, 3, 50);
+        this.sfx('clack', 245);
+        this.spark(245, 588, 0xe8eef8, 3, 50);
         this.chain(['ball']);
       }
     }
@@ -424,7 +453,7 @@ export class Machine {
       if (this.gateT > 1.4) { this.gateFired = false; this.gateT = 0; }
     }
     const gk = this.gateT < 1 ? this.gateT : 2 - Math.min(2, this.gateT);
-    this.gate.y = 572 + Math.max(0, Math.min(1, gk)) * 34;
+    this.gate.y = 481 + Math.max(0, Math.min(1, gk)) * 46;
 
     // envelopes ride the tube
     for (let i = this.mails.length - 1; i >= 0; i--) {
@@ -439,7 +468,7 @@ export class Machine {
     if (this.stampT < 1) {
       this.stampT += dt * 2.6;
       const k = Math.sin(Math.min(1, this.stampT) * Math.PI);
-      this.stampArm.y = 236 + k * 26;
+      this.stampArm.y = 216 + k * 30;
       if (this.stampT >= 1) this.addPlate(this.stampName);
     }
     // hammer idles with a tick now and then
@@ -450,32 +479,31 @@ export class Machine {
       const k = Math.sin(Math.min(1, this.clampT / 1.6) * Math.PI);
       this.clampArm.rotation = -0.9 + k * 0.9;
       if (this.clampT >= 1.6) this.clampArm.rotation = 0;
-      if (this.clampT > 0.5 && this.clampT < 0.7 && this.r() < 0.4) this.puff(1520, 344, 0.6, 0xc08cff, -18);
+      if (this.clampT > 0.5 && this.clampT < 0.7 && this.r() < 0.4) this.puff(1520, 314, 0.8, 0xc08cff, -18);
     }
     // whistle + lamp + cart
     if (this.whistleT < 1.4) {
       this.whistleT += dt * 1.6;
       this.whistle.alpha = Math.max(0, 1 - this.whistleT / 1.4) * 0.9;
-      this.whistle.scale.set(0.6 + this.whistleT * 1.6);
-      if (this.r() < 0.6) this.puff(1230, 230, 0.9, 0xffffff, -60);
+      this.whistle.scale.set(1 + this.whistleT * 1.8);
+      if (this.r() < 0.6) this.puff(1230, 218, 1.2, 0xffffff, -60);
     }
     const lampOn = this.t - this.lampAt < 3;
     this.lamp.alpha = lampOn ? (Math.sin(this.t * 14) > 0 ? 1 : 0.25) : 0.25;
     if (this.cartT < 2.2) {
       this.cartT += dt * 1.4;
       const k = Math.min(1, this.cartT);
-      this.cart.x = CART_RAIL.x0 + 10 + k * (CART_RAIL.x1 - CART_RAIL.x0 - 20);
+      this.cart.x = CART_RAIL.x0 + 14 + k * (CART_RAIL.x1 - CART_RAIL.x0 - 28);
       if (this.cartT >= 1.4 && this.cartT - dt * 1.4 < 1.4) {
-        this.sfx('coal', 1440);
-        this.spark(1440, 820, 0xff7a2a, 10, 80);
+        this.sfx('coal', 1490);
+        this.spark(1490, 740, 0xff7a2a, 10, 80);
       }
-      if (this.cartT >= 2.2) this.cart.x = CART_RAIL.x0 + 10;
+      if (this.cartT >= 2.2) this.cart.x = CART_RAIL.x0 + 14;
     }
     // bell swing
     this.bell.rotation = Math.max(0, Math.sin(this.t * 22)) * 0.4 * (this.t - this.bellAt < 0.8 ? 1 : 0);
-    // shudder decay
+    // shudder decay (the clutch, not the camera: the gears stall, the frame stays put)
     this.shudder = Math.max(0, this.shudder - dt * 1.4);
-    this.shake = Math.max(0, this.shake - dt * 2.2);
 
     // pending chains / delayed bits
     for (let i = this.pending.length - 1; i >= 0; i--) {
@@ -525,8 +553,8 @@ export class Machine {
     const max = this.settings.kRack ?? 24;
     const name = (hostname || 'ANON').slice(0, 11);
     const s = new Sprite(tex(plateTexture(name)));
-    s.anchor.set(0, 0.5);
-    s.x = 350; s.y = 292;
+    s.anchor.set(0, 0.5); s.scale.set(1.2);
+    s.x = 350; s.y = 258;
     this.world.addChild(s);
     const slot = this.rackSlots[this.rackCol % this.rackSlots.length];
     this.rackCol++;
@@ -549,9 +577,8 @@ export class Machine {
 
   /** The camera is fixed: the whole machine is framed, centred, once. */
   vw = 1920; vh = 1080;
-  applyCamera(shakeX: number, shakeY: number): void {
-    const sh = this.shake * 6;
-    this.world.x = (this.vw - WORLD_W) / 2 + shakeX * sh;
-    this.world.y = (this.vh - WORLD_H) / 2 + shakeY * sh;
+  applyCamera(): void {
+    this.world.x = (this.vw - WORLD_W) / 2;
+    this.world.y = (this.vh - WORLD_H) / 2;
   }
 }

@@ -89,38 +89,56 @@ export function drawText(ctx: CanvasRenderingContext2D, text: string, x: number,
 
 // ── parts ──────────────────────────────────────────────────────────────────
 
-/** A gear: chunky teeth on the rim, four spokes, a brass hub. Rotates in code. */
+/**
+ * A gear with real trapezoid teeth. `teeth` must come from the train maths
+ * (r = teeth * PITCH / 2PI) so gears with the same pitch actually mesh.
+ * Rotates in code; tooth 0 points along +x at rotation 0.
+ */
 export function gearTexture(teeth: number, r: number, brass: boolean): HTMLCanvasElement {
-  const s = Math.ceil(r * 2 + 8);
+  const s = Math.ceil(r * 2 + 20);
   return canvas(s, s, (c) => {
     const cx = s / 2, cy = s / 2;
     const dark = brass ? P.brassDark : P.ironDark;
     const mid = brass ? P.brass : P.iron;
     const lite = brass ? P.brassLight : P.ironLight;
-    // teeth
-    c.fillStyle = mid;
+    const th = Math.max(5, r * 0.13);            // tooth height
+    const wr = (Math.PI / teeth) * 0.62;         // half-width at the root
+    const wt = (Math.PI / teeth) * 0.34;         // half-width at the tip
+    // teeth as trapezoids
     for (let i = 0; i < teeth; i++) {
-      const a = (i / teeth) * Math.PI * 2;
-      const tw = Math.max(2, (Math.PI * 2 * r) / teeth * 0.42);
-      c.save(); c.translate(cx, cy); c.rotate(a);
-      c.fillRect(-tw / 2, -r - 2, tw, 5);
+      c.save(); c.translate(cx, cy); c.rotate((i / teeth) * Math.PI * 2);
+      c.beginPath();
+      c.moveTo(Math.cos(-wr) * (r - 1), Math.sin(-wr) * (r - 1));
+      c.lineTo(Math.cos(-wt) * (r + th), Math.sin(-wt) * (r + th));
+      c.lineTo(Math.cos(wt) * (r + th), Math.sin(wt) * (r + th));
+      c.lineTo(Math.cos(wr) * (r - 1), Math.sin(wr) * (r - 1));
+      c.closePath();
+      c.fillStyle = mid; c.fill();
+      // lit flank
+      c.beginPath();
+      c.moveTo(Math.cos(-wr) * (r - 1), Math.sin(-wr) * (r - 1));
+      c.lineTo(Math.cos(-wt) * (r + th), Math.sin(-wt) * (r + th));
+      c.lineTo(Math.cos(-wt) * (r + th * 0.4), Math.sin(-wt) * (r + th * 0.4));
+      c.closePath();
+      c.fillStyle = lite; c.fill();
       c.restore();
     }
-    // rim + body
+    // body
     c.beginPath(); c.arc(cx, cy, r, 0, 7); c.fillStyle = mid; c.fill();
-    c.beginPath(); c.arc(cx, cy, r - 1.5, 0, 7); c.fillStyle = dark; c.fill();
-    c.beginPath(); c.arc(cx, cy, r - 2.5, 0, 7); c.fillStyle = mid; c.fill();
+    c.beginPath(); c.arc(cx, cy, r - 2, 0, 7); c.fillStyle = dark; c.fill();
+    c.beginPath(); c.arc(cx, cy, r - 4, 0, 7); c.fillStyle = mid; c.fill();
+    // rim highlight (top-left, flat 16-bit lighting)
+    c.beginPath(); c.arc(cx, cy, r - 3, Math.PI * 1.05, Math.PI * 1.6);
+    c.strokeStyle = lite; c.lineWidth = 2; c.stroke();
     // spokes
-    c.strokeStyle = dark; c.lineWidth = Math.max(2, r * 0.16);
+    c.strokeStyle = dark; c.lineWidth = Math.max(3, r * 0.16);
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + 0.4;
-      c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * (r - 3), cy + Math.sin(a) * (r - 3)); c.stroke();
+      c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * (r - 5), cy + Math.sin(a) * (r - 5)); c.stroke();
     }
     // hub
-    c.beginPath(); c.arc(cx, cy, Math.max(2.5, r * 0.22), 0, 7); c.fillStyle = lite; c.fill();
-    c.beginPath(); c.arc(cx, cy, Math.max(1.2, r * 0.1), 0, 7); c.fillStyle = dark; c.fill();
-    // a highlight chip so the rotation reads
-    c.fillStyle = lite; c.fillRect(cx + r * 0.45, cy - 1, 3, 2);
+    c.beginPath(); c.arc(cx, cy, Math.max(3, r * 0.2), 0, 7); c.fillStyle = lite; c.fill();
+    c.beginPath(); c.arc(cx, cy, Math.max(1.5, r * 0.09), 0, 7); c.fillStyle = dark; c.fill();
   });
 }
 

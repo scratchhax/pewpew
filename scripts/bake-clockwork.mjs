@@ -20,8 +20,8 @@ const PORT = 9333;
 
 /** name -> target height in world pixels. */
 const PARTS = {
-  boiler: 170, furnace: 90, gauge: 56, stamp: 40, cart: 26,
-  whistle: 32, lamp: 28, clamp: 20, bell: 20, hopper: 40,
+  boiler: 360, furnace: 170, gauge: 120, stamp: 100, cart: 64,
+  whistle: 80, lamp: 64, clamp: 56, bell: 52, hopper: 90,
 };
 
 /** The scene palette (sprites.ts) - everything quantises to this. */
