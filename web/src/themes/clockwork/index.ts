@@ -3,6 +3,7 @@ import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '.
 import type { SceneEvent } from '../../events';
 import { CLOCKWORK_DEFAULTS, CLOCKWORK_BUDGETS, CLOCKWORK_CONTROLS, CLOCKWORK_HUD } from './settings';
 import { Machine, WORLD_W, WORLD_H, type Kind } from './machine';
+import { loadParts } from './art';
 
 /**
  * Clockwork: the network as one steam-powered Rube Goldberg machine.
@@ -50,6 +51,7 @@ async function create(host: ThemeHost<typeof CLOCKWORK_DEFAULTS>, init: Renderer
   const machine = new Machine(
     settings as unknown as Record<string, unknown>,
     (name, x) => audio.sfx(name, { pan: Math.max(-0.8, Math.min(0.8, ((x ?? WORLD_W / 2) - WORLD_W / 2) / 260)) }),
+    await loadParts(),
   );
   screen.addChild(machine.world);
 

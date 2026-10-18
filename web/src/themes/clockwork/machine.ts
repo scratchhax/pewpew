@@ -1,39 +1,41 @@
 import { Container, Graphics } from 'pixi.js';
+import { frameAt, PartSprite, type Parts } from './art';
 
 /**
  * The machine: one continuous causal run that every event travels end to end.
  *
- * The last attempt at this scene was a room with handsome machines standing
+ * The first attempt at this scene was a room with handsome machines standing
  * about in it, and it was deleted. The failure was not the art - the baked
  * stickers were good - it was that you could not see a chain. The linkages
  * were one-pixel lines on black, half the frame was empty, and two screenshots
  * eight seconds apart showed the machine in the same pose.
  *
- * So this one is built path-first. There is exactly one run. It enters top
- * left, cascades down and right through nine legs, and ends in the firebox
- * under the boiler. Every event is a bearing that physically walks that whole
- * path; the differences between event kinds are what the bearing sets off on
- * the way past, never a different route.
+ * So this one is built path-first, and it was staged in flat grey boxes before
+ * any art went near it. There is exactly one run. It enters top left, cascades
+ * down and right through nine legs, and ends in the firebox under the boiler.
+ * Every event is a bearing that physically walks that whole path; the
+ * differences between event kinds are what the bearing sets off on the way
+ * past, never a different route.
+ *
+ * The art hangs off that skeleton. Every part that moves is a baked sprite
+ * whose frames were derived by rotating one still about its pivot, so the
+ * dominoes topple, the see-saw tips, the cart tilts and the gears turn in the
+ * same chunky pixel language the rails and ropes are drawn in.
  */
 
 /** 16:9, and an exact integer scale on every common display: 1920/640 = 3. */
 export const WORLD_W = 640;
 export const WORLD_H = 360;
 
-/**
- * The size language. Everything is measured against the bearing, the way
- * slipstream measures everything against a kart. The old scene had a 380px
- * boiler sharing a frame with 12px dominoes and no rule connecting them.
- */
+/** The size language: everything is measured against the bearing. */
 export const BEARING = 8;
 const U = BEARING;
 
 export type Kind = 'allow' | 'block' | 'dns' | 'dhcp' | 'wifi' | 'threat' | 'system';
 
-/** What a bearing looks like per event kind: the only thing that varies. */
 const TINT: Record<Kind, number> = {
-  allow: 0x5ce6a4, block: 0xff6b6b, dns: 0x55b5ff, dhcp: 0xc08cff,
-  wifi: 0xffd84d, threat: 0xff7a2a, system: 0x9aa4b8,
+  allow: 0x9effc8, block: 0xff9a9a, dns: 0x9ad2ff, dhcp: 0xdcb4ff,
+  wifi: 0xffe88a, threat: 0xffb07a, system: 0xd8dde8,
 };
 
 type Motion = 'roll' | 'fly' | 'drop' | 'ride';
@@ -50,8 +52,7 @@ interface Leg {
  * THE RUN, hand-placed around the HUD. The shared panels occupy roughly
  * x<62 y<100 (top left), x>540 y<147 (top right), x<193 y>233 (bottom left)
  * and x>543 y>247 (bottom right) in world units; nothing load-bearing goes
- * in those corners. The cascade uses the full height on purpose - the first
- * version kept everything above y=240 and left the bottom third dead.
+ * in those corners.
  */
 export const RUN: Leg[] = [
   { name: 'intake', motion: 'drop', x0: 78, y0: 16, x1: 78, y1: 32, secs: 0.35 },
@@ -61,65 +62,70 @@ export const RUN: Leg[] = [
   { name: 'flight', motion: 'fly', x0: 302, y0: 104, x1: 334, y1: 84, secs: 0.7, arc: 24 },
   { name: 'funnel', motion: 'roll', x0: 334, y0: 84, x1: 340, y1: 96, secs: 0.3 },
   { name: 'standpipe', motion: 'drop', x0: 340, y0: 96, x1: 348, y1: 190, secs: 0.75 },
-  { name: 'cart', motion: 'ride', x0: 354, y0: 198, x1: 446, y1: 262, secs: 1.3 },
-  { name: 'firebox', motion: 'drop', x0: 452, y0: 266, x1: 476, y1: 284, secs: 0.4 },
+  { name: 'cart', motion: 'ride', x0: 354, y0: 198, x1: 462, y1: 254, secs: 1.3 },
+  { name: 'firebox', motion: 'drop', x0: 468, y0: 258, x1: 506, y1: 276, secs: 0.4 },
 ];
 
-/**
- * Fixed furniture. The boiler sits to the RIGHT of the cart's descent with the
- * firebox tucked under its left shoulder, overlapping the drum by a couple of
- * units so the two read as one object: in the first layout they were six units
- * apart and looked like two unrelated boxes.
- */
 export const BOILER = { x: 452, y: 174, w: 122, h: 78 };
-export const FIREBOX = { x: 458, y: 250, w: 62, h: 46 };
-export const FLYWHEEL = { x: 602, y: 210, r: 28 };
 /**
- * The rack: DHCP leases hang a nameplate here. It exists mostly to fill the
- * middle of the frame, which the first layout left as a void the eye fell
- * into on its way from the dominoes to the boiler.
+ * The firebox sits BETWEEN the boiler's legs, overlapping the drum by a few
+ * units. Placed below and to the left it read as a separate brick arch that
+ * happened to be nearby, which is how the first version looked too.
  */
-export const RACK = { x: 196, y: 168, w: 118, h: 86 };
-/** The gear train on the left wall, driven off the flywheel by a belt. */
+export const FIREBOX = { x: 480, y: 242, w: 62, h: 46 };
+export const FLYWHEEL = { x: 602, y: 210, r: 28 };
+export const RACK = { x: 196, y: 172, w: 110, h: 72 };
 export const GEARS = [
-  { x: 96, y: 168, r: 30, teeth: 14, dir: 1 },
-  { x: 150, y: 196, r: 25, teeth: 12, dir: -1 },
-  { x: 118, y: 232, r: 18, teeth: 9, dir: 1 },
+  { x: 96, y: 168, s: 1.0, dir: 1 },
+  { x: 150, y: 196, s: 0.82, dir: -1 },
+  { x: 118, y: 232, s: 0.6, dir: 1 },
 ];
 export const DOMINO_N = 9;
+/** Where a nameplate hangs on the rack: four rails, five slots each. */
+const PLATE_SLOTS = 20;
 
-interface Token { kind: Kind; leg: number; u: number; test: boolean; dead: boolean }
+interface Token { kind: Kind; leg: number; u: number; test: boolean; dead: boolean; roll: number }
 interface Puff { x: number; y: number; vx: number; vy: number; life: number; max: number; col: number }
 
 export type SfxFn = (name: string, x?: number) => void;
 
 export class Machine {
   readonly world = new Container();
-  private gBack = new Graphics();
-  private gMech = new Graphics();
-  private gTok = new Graphics();
+  private gBack = new Graphics();        // room, rails, pipes, ropes
+  private cFurniture = new Container();  // rack, boiler, firebox, gears, flywheel
+  private gRails = new Graphics();       // rails and the standpipe, over the furniture
+  private cMovers = new Container();     // dominoes, see-saw, cart, gate, bell
+  private cTokens = new Container();     // bearings
+  private gFx = new Graphics();          // particles and the firebox glow
   private gGuide = new Graphics();
 
   private tokens: Token[] = [];
   private puffs: Puff[] = [];
   private t = 0;
-  /** Seconds since a real event last entered the run. */
   private sinceReal = 99;
 
   pressure = 0;
-  /** 0 standing .. 1 flat. */
   private dominoes = new Float32Array(DOMINO_N);
-  /** Seconds a flattened domino waits before the stagehand stands it up. */
   private domHold = new Float32Array(DOMINO_N);
   private seesaw = 0;
   private spin = 0;
   private gate = 0; private bell = 0; private whistle = 0;
-  /** Nameplates hung on the rack by DHCP leases, 0..20. */
   private plates = 0;
   private cartU = 0; private cartTip = 0;
 
-  constructor(private settings: Record<string, unknown>, private sfx: SfxFn) {
-    this.world.addChild(this.gBack, this.gMech, this.gTok, this.gGuide);
+  // sprites, built once
+  private sBoiler!: PartSprite; private sFirebox!: PartSprite; private sRack!: PartSprite;
+  private sHopper!: PartSprite; private sFunnel!: PartSprite; private sFlywheel!: PartSprite;
+  private sSeesaw!: PartSprite; private sCart!: PartSprite; private sGate!: PartSprite;
+  private sBell!: PartSprite; private sWhistle!: PartSprite;
+  private sGears: PartSprite[] = [];
+  private sDominoes: PartSprite[] = [];
+  private sPlates: PartSprite[] = [];
+  private pool: PartSprite[] = [];
+
+  constructor(private settings: Record<string, unknown>, private sfx: SfxFn, private parts: Parts) {
+    this.world.addChild(this.gBack, this.cFurniture, this.gRails, this.cMovers, this.cTokens, this.gFx, this.gGuide);
+    this.build();
   }
 
   private get<T>(key: string, fallback: T): T {
@@ -127,7 +133,59 @@ export class Machine {
     return (v === undefined ? fallback : v) as T;
   }
 
-  /** An event arrives: one bearing enters the top of the run. */
+  private mk(name: string): PartSprite { return new PartSprite(this.parts[name]); }
+
+  /** Build every sprite once; update() only moves them and swaps frames. */
+  private build(): void {
+    this.sRack = this.mk('rack');
+    this.sRack.place(0, RACK.x + RACK.w / 2, RACK.y + RACK.h / 2);
+    this.cFurniture.addChild(this.sRack);
+
+    for (const g of GEARS) {
+      const s = this.mk('gear');
+      s.scale.set(g.s);
+      this.sGears.push(s);
+      this.cFurniture.addChild(s);
+    }
+    this.sFlywheel = this.mk('flywheel');
+    this.cFurniture.addChild(this.sFlywheel);
+
+    this.sBoiler = this.mk('boiler');
+    this.sBoiler.place(0, BOILER.x + BOILER.w / 2, BOILER.y + BOILER.h / 2);
+    this.sFirebox = this.mk('firebox');
+    this.sFirebox.place(0, FIREBOX.x + FIREBOX.w / 2, FIREBOX.y + FIREBOX.h / 2);
+    this.cFurniture.addChild(this.sFirebox, this.sBoiler);
+
+    // nameplates hung on the rack by DHCP leases
+    for (let i = 0; i < PLATE_SLOTS; i++) {
+      const s = this.mk('plate');
+      const row = Math.floor(i / 5), col = i % 5;
+      s.place(0, RACK.x + 16 + col * 20, RACK.y + 14 + row * 16);
+      s.visible = false;
+      this.sPlates.push(s);
+      this.cFurniture.addChild(s);
+    }
+
+    this.sHopper = this.mk('hopper');
+    this.sHopper.place(0, RUN[0].x0, RUN[0].y0 - 6);
+    this.sFunnel = this.mk('funnel');
+    this.sFunnel.place(0, RUN[5].x0, RUN[5].y0 - 2);
+    this.cMovers.addChild(this.sHopper, this.sFunnel);
+
+    for (let i = 0; i < DOMINO_N; i++) {
+      const s = this.mk('domino');
+      this.sDominoes.push(s);
+      this.cMovers.addChild(s);
+    }
+    this.sSeesaw = this.mk('seesaw');
+    this.sCart = this.mk('cart');
+    this.sGate = this.mk('gate');
+    this.sBell = this.mk('bell');
+    this.sWhistle = this.mk('whistle');
+    this.sWhistle.place(0, BOILER.x + 58, BOILER.y + 2);
+    this.cMovers.addChild(this.sSeesaw, this.sCart, this.sGate, this.sBell, this.sWhistle);
+  }
+
   fire(kind: Kind): void {
     this.sinceReal = 0;
     this.release(kind, false);
@@ -136,7 +194,7 @@ export class Machine {
   private release(kind: Kind, test: boolean): void {
     const cap = this.get('kMaxTokens', 14);
     if (this.tokens.length >= cap) this.tokens.shift();
-    this.tokens.push({ kind, leg: 0, u: 0, test, dead: false });
+    this.tokens.push({ kind, leg: 0, u: 0, test, dead: false, roll: 0 });
     this.sfx('drop', RUN[0].x0);
   }
 
@@ -160,11 +218,8 @@ export class Machine {
     this.pressure = pressure;
     const rate = 0.55 + pressure * 1.25;
 
-    /**
-     * An idle machine is a dead machine. On a quiet network the run keeps
-     * turning over on test bearings, so the scene is never the still life the
-     * first version was.
-     */
+    // an idle machine is a dead machine: the run keeps turning over on test
+    // bearings, so a quiet network is never the still life the first one was
     if (this.sinceReal > 4 && this.tokens.length === 0) this.release('system', true);
 
     this.spin += dt * rate * 3.4;
@@ -172,16 +227,17 @@ export class Machine {
     this.bell = Math.max(0, this.bell - dt * 1.4);
     this.whistle = Math.max(0, this.whistle - dt * 0.9);
     this.seesaw += (0 - this.seesaw) * Math.min(1, dt * 3);
+
     /**
      * Toppling and standing back up are separate states. Running both off one
      * number did not work: the reset dropped the value below 1, which put it
-     * back inside the toppling test, which drove it to 1 again, so the whole
-     * run sat permanently flat and read on screen as a white smear.
+     * back inside the toppling test, which drove it to 1 again, so the run sat
+     * permanently flat and read on screen as a white smear.
      */
     for (let i = 0; i < DOMINO_N; i++) {
       if (this.domHold[i] > 0) {
         this.domHold[i] -= dt;
-        if (this.domHold[i] <= 0) this.dominoes[i] = 0;          // the stagehand
+        if (this.domHold[i] <= 0) this.dominoes[i] = 0;
       } else if (this.dominoes[i] > 0) {
         this.dominoes[i] += dt * 5;
         if (this.dominoes[i] >= 1) { this.dominoes[i] = 1; this.domHold[i] = 0.5 + i * 0.07; }
@@ -191,8 +247,11 @@ export class Machine {
 
     for (const tok of this.tokens) {
       const L = RUN[tok.leg];
+      const before = this.at(tok);
       tok.u += dt * rate / L.secs;
       this.onLeg(tok, L);
+      const after = this.at(tok);
+      tok.roll += Math.hypot(after.x - before.x, after.y - before.y);
       while (tok.u >= 1) {
         tok.u -= 1;
         tok.leg++;
@@ -212,16 +271,20 @@ export class Machine {
       if (p.life >= p.max) this.puffs.splice(i, 1);
     }
     if (this.get('kSteam', true) && Math.random() < dt * 2.2 * this.get('kSteamDensity', 1)) {
-      this.puff(BOILER.x + 20, BOILER.y - 2, 0xd8c9a0);
+      this.puff(BOILER.x + 24, BOILER.y - 4, 0xd8c9a0);
     }
 
-    this.draw();
+    this.layout();
+    this.drawLines();
   }
 
   private onLeg(tok: Token, L: Leg): void {
     if (L.name === 'dominoes' && this.get('kDominoes', true)) {
       const i = Math.min(DOMINO_N - 1, Math.floor(tok.u * DOMINO_N));
-      if (this.dominoes[i] === 0) { this.dominoes[i] = 0.001; this.sfx('clack', L.x0 + (L.x1 - L.x0) * tok.u); }
+      if (this.dominoes[i] === 0 && this.domHold[i] <= 0) {
+        this.dominoes[i] = 0.001;
+        this.sfx('clack', L.x0 + (L.x1 - L.x0) * tok.u);
+      }
     }
     if (L.name === 'seesaw') this.seesaw = -1 + tok.u * 2;
   }
@@ -237,14 +300,14 @@ export class Machine {
         if (tok.kind === 'block') { this.gate = 1; this.sfx('gate', FIREBOX.x); }
         if (tok.kind === 'dns') { this.bell = 1; this.sfx('bell', FIREBOX.x); }
         if (tok.kind === 'threat') { this.whistle = 1; this.sfx('whistle', FIREBOX.x); }
-        if (tok.kind === 'dhcp') { this.plates = Math.min(20, this.plates + 1); this.sfx('stamp', RACK.x); }
+        if (tok.kind === 'dhcp') { this.plates = Math.min(PLATE_SLOTS, this.plates + 1); this.sfx('stamp', RACK.x); }
       }
     }
   }
 
   private arrive(tok: Token): void {
     this.sfx('stoke', FIREBOX.x);
-    for (let i = 0; i < 6; i++) this.puff(FIREBOX.x + FIREBOX.w / 2, FIREBOX.y + 10, TINT[tok.kind], 60);
+    for (let i = 0; i < 6; i++) this.puff(FIREBOX.x + FIREBOX.w / 2, FIREBOX.y + 14, TINT[tok.kind], 60);
   }
 
   private puff(x: number, y: number, col: number, up = 26): void {
@@ -255,119 +318,95 @@ export class Machine {
     });
   }
 
-  // ── drawing: flat boxes, so the staging can be judged before any art ──
-  private draw(): void {
-    const b = this.gBack, m = this.gMech, k = this.gTok, gd = this.gGuide;
-    b.clear(); m.clear(); k.clear(); gd.clear();
+  /** Move the sprites and swap their frames. */
+  private layout(): void {
+    for (let i = 0; i < GEARS.length; i++) {
+      const g = GEARS[i];
+      this.sGears[i].place(Math.floor(this.spin * g.dir * 1.4) & 7, g.x, g.y);
+    }
+    this.sFlywheel.place(Math.floor(this.spin * 1.1) & 7, FLYWHEEL.x, FLYWHEEL.y);
+
+    for (let i = 0; i < PLATE_SLOTS; i++) this.sPlates[i].visible = i < this.plates;
+
+    const dom = RUN[2];
+    const showDom = this.get('kDominoes', true);
+    for (let i = 0; i < DOMINO_N; i++) {
+      const s = this.sDominoes[i];
+      s.visible = showDom;
+      if (!showDom) continue;
+      const x = dom.x0 + ((i + 0.5) / DOMINO_N) * (dom.x1 - dom.x0);
+      s.place(frameAt(this.dominoes[i], s.count), x, dom.y0 + 2);
+    }
+
+    const see = RUN[3];
+    this.sSeesaw.place(frameAt((this.seesaw + 1) / 2, this.sSeesaw.count),
+      (see.x0 + see.x1) / 2, (see.y0 + see.y1) / 2 + 4);
+
+    const cart = RUN[7];
+    const showCart = this.get('kCart', true);
+    this.sCart.visible = showCart;
+    if (showCart) {
+      this.sCart.place(frameAt(this.cartTip, this.sCart.count),
+        cart.x0 + (cart.x1 - cart.x0) * this.cartU,
+        cart.y0 + (cart.y1 - cart.y0) * this.cartU + 4);
+    }
+
+    const fx = this.get('kSideEffects', true);
+    this.sGate.visible = fx && this.gate > 0.02;
+    if (this.sGate.visible) this.sGate.place(0, FIREBOX.x - 14, FIREBOX.y - 30 + 30 * (1 - this.gate));
+    this.sBell.visible = fx;
+    // on the boiler's near shoulder, not off its right edge, where it was
+    // drawing straight on top of the flywheel
+    this.sBell.place(frameAt((Math.sin(this.t * 26) * this.bell + 1) / 2, this.sBell.count),
+      BOILER.x + 18, BOILER.y - 4);
+    this.sWhistle.visible = fx;
+
+    // bearings, pooled
+    while (this.pool.length < this.tokens.length) {
+      const s = this.mk('bearing');
+      this.pool.push(s);
+      this.cTokens.addChild(s);
+    }
+    for (let i = 0; i < this.pool.length; i++) {
+      const s = this.pool[i];
+      const tok = this.tokens[i];
+      s.visible = !!tok;
+      if (!tok) continue;
+      const p = this.at(tok);
+      s.tint = tok.test ? 0x8a8f9e : TINT[tok.kind];
+      s.alpha = tok.test ? 0.75 : 1;
+      s.place(Math.floor(tok.roll / 2) & 7, p.x, p.y);
+    }
+  }
+
+  /** The bits that are drawn rather than baked: structure, rails, particles. */
+  private drawLines(): void {
+    const b = this.gBack, r = this.gRails, f = this.gFx, gd = this.gGuide;
+    b.clear(); r.clear(); f.clear(); gd.clear();
 
     b.rect(0, 0, WORLD_W, WORLD_H).fill(0x191621);
     b.rect(0, 306, WORLD_W, WORLD_H - 306).fill(0x211c2c);
+    // the belt from the flywheel to the gear train, so the train has a driver
+    b.moveTo(GEARS[1].x, GEARS[1].y - 22).lineTo(FLYWHEEL.x, FLYWHEEL.y - 24)
+      .stroke({ width: 2, color: 0x2a2336 });
 
-    // the gear train on the left wall: furniture that fills the frame and,
-    // more to the point, visibly turns
-    for (const g of GEARS) {
-      b.circle(g.x, g.y, g.r).stroke({ width: 2, color: 0x3a3d4d });
-      for (let i = 0; i < g.teeth; i++) {
-        const a = this.spin * g.dir * (12 / g.teeth) + (i / g.teeth) * Math.PI * 2;
-        b.circle(g.x + Math.cos(a) * g.r, g.y + Math.sin(a) * g.r, 2).fill(0x565a6e);
-      }
-      b.circle(g.x, g.y, 3).fill(0x565a6e);
-    }
-    // the belt back to the flywheel, so the train has a visible driver
-    b.moveTo(GEARS[1].x, GEARS[1].y - GEARS[1].r)
-      .lineTo(FLYWHEEL.x, FLYWHEEL.y - FLYWHEEL.r).stroke({ width: 2, color: 0x2a2336 });
+    const rail = RUN[1], dom = RUN[2], fun = RUN[5], pipe = RUN[6], cart = RUN[7];
+    r.rect(RUN[0].x0 - 5, RUN[0].y0, 10, RUN[0].y1 - RUN[0].y0 + 4).fill(0x3a3d4d);
+    r.moveTo(rail.x0, rail.y0).lineTo(rail.x1, rail.y1).stroke({ width: 3, color: 0x565a6e });
+    r.moveTo(dom.x0, dom.y0 + 3).lineTo(dom.x1 + 36, dom.y1 + 3).stroke({ width: 3, color: 0x565a6e });
+    r.rect(pipe.x0 - 6, fun.y0 + 4, 12, pipe.y1 - fun.y0 + 6).fill(0x4a3320);
+    r.rect(pipe.x0 - 6, fun.y0 + 4, 3, pipe.y1 - fun.y0 + 6).fill(0x6b4a2e);
+    r.moveTo(cart.x0 - 7, cart.y0 + 10).lineTo(cart.x1 + 12, cart.y1 + 10)
+      .stroke({ width: 3, color: 0x565a6e });
 
-    // the rack, standing in the middle of the frame where the void was
-    b.rect(RACK.x, RACK.y, RACK.w, RACK.h).fill(0x211c2c);
-    b.rect(RACK.x, RACK.y, RACK.w, RACK.h).stroke({ width: 2, color: 0x4a3320 });
-    for (let r = 0; r < 4; r++) {
-      b.rect(RACK.x + 5, RACK.y + 10 + r * 19, RACK.w - 10, 2).fill(0x3a3d4d);
-      for (let c = 0; c < 5; c++) {
-        const lit = (r * 5 + c) < this.plates;
-        b.rect(RACK.x + 8 + c * 21, RACK.y + 13 + r * 19, 16, 9)
-          .fill(lit ? 0xc08cff : 0x2a2336);
-      }
-    }
-
-    // boiler, firebox, flywheel: the destination
+    // the fire in the box, breathing with pressure
     const heat = 0.3 + this.pressure * 0.7;
-    b.rect(BOILER.x, BOILER.y, BOILER.w, BOILER.h).fill(0x565a6e);
-    b.rect(BOILER.x + 4, BOILER.y + 4, BOILER.w - 8, BOILER.h - 8).fill(0x3a3d4d);
-    b.rect(FIREBOX.x, FIREBOX.y, FIREBOX.w, FIREBOX.h).fill(0x3a3d4d);
-    b.rect(FIREBOX.x + 6, FIREBOX.y + 10, FIREBOX.w - 12, FIREBOX.h - 16)
-      .fill({ color: 0xff7a2a, alpha: 0.25 + heat * 0.6 });
+    f.rect(FIREBOX.x + 14, FIREBOX.y + 20, FIREBOX.w - 28, 16)
+      .fill({ color: 0xff7a2a, alpha: 0.2 + heat * 0.45 });
 
-    b.circle(FLYWHEEL.x, FLYWHEEL.y, FLYWHEEL.r).stroke({ width: 3, color: 0x565a6e });
-    for (let i = 0; i < 6; i++) {
-      const a = this.spin + (i / 6) * Math.PI * 2;
-      b.moveTo(FLYWHEEL.x, FLYWHEEL.y)
-        .lineTo(FLYWHEEL.x + Math.cos(a) * FLYWHEEL.r, FLYWHEEL.y + Math.sin(a) * FLYWHEEL.r)
-        .stroke({ width: 2, color: 0x767b92 });
-    }
-
-    const rail = RUN[1], dom = RUN[2], see = RUN[3], fly = RUN[4], fun = RUN[5], pipe = RUN[6], cart = RUN[7];
-
-    m.rect(RUN[0].x0 - 11, RUN[0].y0 - 13, 22, 14).fill(0x565a6e);
-    m.rect(RUN[0].x0 - 5, RUN[0].y0, 10, RUN[0].y1 - RUN[0].y0 + 4).fill(0x3a3d4d);
-    m.moveTo(rail.x0, rail.y0).lineTo(rail.x1, rail.y1).stroke({ width: 3, color: 0x565a6e });
-    m.moveTo(dom.x0, dom.y0 + 2).lineTo(dom.x1 + 36, dom.y1 + 2).stroke({ width: 3, color: 0x565a6e });
-
-    if (this.get('kDominoes', true)) {
-      for (let i = 0; i < DOMINO_N; i++) {
-        const x = dom.x0 + ((i + 0.5) / DOMINO_N) * (dom.x1 - dom.x0);
-        const a = this.dominoes[i] * Math.PI * 0.46;
-        const h = U * 2.2, w = 2.5;
-        const dx = Math.sin(a) * h, dy = h - Math.cos(a) * h;
-        m.poly([x - w, dom.y0 + 1, x + w, dom.y0 + 1, x + w + dx, dom.y0 + 1 - h + dy, x - w + dx, dom.y0 + 1 - h + dy])
-          .fill(0x9aa4b8);
-      }
-    }
-
-    // see-saw, and the spring launcher it throws the bearing off
-    const sa = this.seesaw * 0.22;
-    const sx = (see.x0 + see.x1) / 2, sy = (see.y0 + see.y1) / 2 + 3;
-    m.poly([
-      sx - 21 * Math.cos(sa), sy - 21 * Math.sin(sa) - 2,
-      sx + 21 * Math.cos(sa), sy + 21 * Math.sin(sa) - 2,
-      sx + 21 * Math.cos(sa), sy + 21 * Math.sin(sa) + 1,
-      sx - 21 * Math.cos(sa), sy - 21 * Math.sin(sa) + 1,
-    ]).fill(0xa87c2a);
-    m.poly([sx - 4, sy + 11, sx + 4, sy + 11, sx, sy]).fill(0x565a6e);
-    m.rect(fly.x0 - 3, fly.y0 - 1, 10, 7).fill(0x8f4f2e);
-
-    // funnel and standpipe, drawn as one piece: the first pass left fourteen
-    // units of nothing between the funnel's throat and the top of the pipe
-    m.poly([fun.x0 - 15, fun.y0 - 9, fun.x0 + 15, fun.y0 - 9, fun.x0 + 6, fun.y0 + 7, fun.x0 - 6, fun.y0 + 7])
-      .fill(0x6e4f1d);
-    m.rect(pipe.x0 - 6, fun.y0 + 5, 12, pipe.y1 - fun.y0 + 4).fill(0x4a3320);
-    m.rect(pipe.x0 - 6, fun.y0 + 5, 3, pipe.y1 - fun.y0 + 4).fill(0x6b4a2e);
-
-    // cart rail and the cart riding it
-    m.moveTo(cart.x0 - 7, cart.y0 + 8).lineTo(cart.x1 + 12, cart.y1 + 8).stroke({ width: 3, color: 0x565a6e });
-    if (this.get('kCart', true)) {
-      const cx = cart.x0 + (cart.x1 - cart.x0) * this.cartU;
-      const cy = cart.y0 + (cart.y1 - cart.y0) * this.cartU;
-      const tip = this.cartTip * 0.5;
-      m.poly([cx - 10, cy - 6 + tip * 7, cx + 10, cy - 6 - tip * 7, cx + 8, cy + 4, cx - 8, cy + 4])
-        .fill(0xa87c2a);
-      m.circle(cx - 6, cy + 7, 3).fill(0x3a3d4d);
-      m.circle(cx + 6, cy + 7, 3).fill(0x3a3d4d);
-    }
-
-    if (this.gate > 0) m.rect(FIREBOX.x - 12, FIREBOX.y - 28, 6, 28 * this.gate).fill(0xff6b6b);
-    if (this.bell > 0) m.circle(BOILER.x + BOILER.w + 6, BOILER.y + 12, 5 + this.bell * 3).fill(0x55b5ff);
-    if (this.whistle > 0) m.rect(BOILER.x + 56, BOILER.y - 16, 6, 16).fill(0xff7a2a);
-
-    // ── the travelling bearings: the brightest thing on screen ──
-    for (const tok of this.tokens) {
-      const p = this.at(tok);
-      const col = tok.test ? 0x767b92 : TINT[tok.kind];
-      k.circle(p.x, p.y, U / 2 + 2).fill({ color: col, alpha: tok.test ? 0.12 : 0.24 });
-      k.circle(p.x, p.y, U / 2).fill(col);
-    }
     for (const p of this.puffs) {
       const a = 1 - p.life / p.max;
-      k.circle(p.x, p.y, 1 + a * 2.6).fill({ color: p.col, alpha: a * 0.5 });
+      f.circle(p.x, p.y, 1 + a * 2.6).fill({ color: p.col, alpha: a * 0.5 });
     }
 
     if (this.get('kGuide', false)) {
@@ -378,7 +417,6 @@ export class Machine {
     }
   }
 
-  /** For the diag probe: how many bearings are on each leg right now. */
   census(): Record<string, number> {
     const out: Record<string, number> = {};
     for (const L of RUN) out[L.name] = 0;
