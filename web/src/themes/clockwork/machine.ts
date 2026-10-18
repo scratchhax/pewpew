@@ -360,9 +360,12 @@ export class Machine {
     // the safety gate across the long run
     this.gate = add(tex(canvas(14, 44, (c2) => { c2.fillStyle = P.iron; c2.fillRect(0, 0, 14, 44); c2.fillStyle = P.block; c2.fillRect(0, 0, 14, 6); c2.fillStyle = P.ironDark; for (let j = 10; j < 42; j += 8) c2.fillRect(0, j, 14, 3); })), 950, 452, 0.5, 0);
 
-    // the coal cart on its ramp
-    this.cart = add(this.heroes.cart ?? tex(cartTexture()), RAMP.x0 - 20, RAMP.y0 - 8);
-    this.cart.scale.x = -1; this.cart.rotation = 0.65;
+    // the coal cart on its ramp (mirrored to face downhill; the negative
+    // x-scale mirrors the rotation too, so the tilt is -0.65)
+    this.cart = add(this.heroes.cart ?? tex(cartTexture()), 0, 0);
+    this.cart.scale.x = -1; this.cart.rotation = -0.65;
+    const cp = this.cartPos(0.05);
+    this.cart.x = cp.x; this.cart.y = cp.y;
 
     // stamp, hammer, bell over the rack and directory
     this.hammer = add(tex(hammerTexture()), 470, 496, 0.05, 0.5);
@@ -513,10 +516,17 @@ export class Machine {
   private whistleT = 9;
 
   private rollCart(): void {
-    if (this.cartT >= 0 && this.cartT < 2.6) return;
+    if (this.cartT >= 0 && this.cartT < 4.4) return;
     this.cartT = 0;
   }
   private cartT = 9;
+
+  /** A point on the coal ramp at fraction s, lifted onto the rail. */
+  private cartPos(s: number): { x: number; y: number } {
+    const dx = RAMP.x1 - RAMP.x0, dy = RAMP.y1 - RAMP.y0;
+    const len = Math.hypot(dx, dy), ux = dx / len, uy = dy / len;
+    return { x: RAMP.x0 + ux * s * len - uy * 14, y: RAMP.y0 + uy * s * len + ux * 14 };
+  }
 
   private clutchDrop(): void {
     this.shudder = 1;
@@ -657,17 +667,38 @@ export class Machine {
     }
     const lampOn = this.t - this.lampAt < 3;
     this.lamp.alpha = lampOn ? (Math.sin(this.t * 14) > 0 ? 1 : 0.25) : 0.25;
-    // the coal cart rolls its ramp and dumps into the firebox
-    if (this.cartT < 2.6) {
-      this.cartT += dt * 1.1;
-      const k = Math.min(1, this.cartT / 1.6);
-      this.cart.x = RAMP.x0 - 20 + k * (RAMP.x1 - RAMP.x0 + 40);
-      this.cart.y = RAMP.y0 - 8 + k * (RAMP.y1 - RAMP.y0);
-      if (this.cartT >= 1.6 && this.cartT - dt * 1.1 < 1.6) {
+    // the coal cart: rolls down, tips its load into the firebox, rolls back
+    if (this.cartT < 4.4) {
+      const was = this.cartT;
+      this.cartT += dt;
+      const t = this.cartT;
+      let s = 0.05, tip = 0;
+      if (t < 1.6) {
+        const k = t / 1.6;
+        s = 0.05 + 0.92 * (k * k * (3 - 2 * k));
+      } else if (t < 2.6) {
+        s = 0.97;
+        tip = Math.min(1, (t - 1.6) / 0.35);
+      } else if (t < 3.0) {
+        s = 0.97;
+        tip = 1 - (t - 2.6) / 0.4;
+      } else {
+        const k = (t - 3.0) / 1.4;
+        s = 0.97 - 0.92 * (k * k * (3 - 2 * k));
+      }
+      const cp = this.cartPos(s);
+      this.cart.x = cp.x; this.cart.y = cp.y;
+      this.cart.rotation = -0.65 - tip * 0.85;
+      if (was < 1.6 && t >= 1.6) {
         this.sfx('coal', 1250);
         this.spark(1230, 918, 0xff7a2a, 12, 90);
       }
-      if (this.cartT >= 2.6) { this.cartT = 9; this.cart.x = RAMP.x0 - 20; this.cart.y = RAMP.y0 - 8; }
+      if (t >= 4.4) {
+        this.cartT = 9;
+        const p0 = this.cartPos(0.05);
+        this.cart.x = p0.x; this.cart.y = p0.y;
+        this.cart.rotation = -0.65;
+      }
     }
     // bell swing
     this.bell.rotation = Math.max(0, Math.sin(this.t * 22)) * 0.4 * (this.t - this.bellAt < 0.8 ? 1 : 0);
