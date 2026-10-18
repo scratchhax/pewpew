@@ -83,7 +83,14 @@ export const GEARS = [
 export const DOMINO_N = 9;
 /** The overhead line shaft's height, in world units. */
 const SHAFT_Y = 150;
+/** How many bearings the coal cart carries in one trip. */
+const CART_SEATS = 6;
 /** The blast gate's housing: it rides between these, and the frame is always drawn. */
+// A bearing is 8 units across. 7.5 overlaps by half a pixel, which is not
+// visible, and it is what lets the pipe hold thirteen - with the one standing
+// at the rail head that is the whole fourteen-bearing cap, so the stack never
+// has to clamp two bearings onto the same pixel at the pipe mouth.
+const QUEUE_GAP = 7.5;
 const GATE_X = 436, GATE_TOP = 208, GATE_DROP = 30;
 /** Where a nameplate hangs on the rack: four rails, five slots each. */
 const PLATE_SLOTS = 20;
@@ -158,7 +165,11 @@ function rope(g: Graphics, x0: number, y0: number, x1: number, y1: number, taut:
   g.moveTo(x0, y0).quadraticCurveTo(mx, my, x1, y1).stroke({ width: 1.5, color: 0xa89772 });
 }
 
-interface Token { kind: Kind; leg: number; u: number; test: boolean; dead: boolean; roll: number }
+interface Token {
+  kind: Kind; leg: number; u: number; test: boolean; dead: boolean; roll: number;
+  /** Parked at an explicit point, overriding the leg: see board(). */
+  hold?: [number, number];
+}
 interface Puff { x: number; y: number; vx: number; vy: number; life: number; max: number; col: number }
 
 export type SfxFn = (name: string, x?: number) => void;
@@ -203,7 +214,15 @@ export class Machine {
    */
   private cartPos = 0;
   private cartState: 'idle' | 'down' | 'tip' | 'up' = 'idle';
-  private cartRider: Token | null = null;
+  /**
+   * The cart is a bucket, not a taxi. Carrying one bearing at a time made it a
+   * single-server queue at the foot of the standpipe, and the run delivers
+   * faster than one round trip - so there was permanently a bearing parked
+   * there waiting, which reads as one ball stuck at the bottom of the pipe
+   * being collected over and over.
+   */
+  private cartRiders: Token[] = [];
+  private cartDwell = 0;
   private cartTip = 0;
 
   // sprites, built once
@@ -304,6 +323,7 @@ export class Machine {
   }
 
   private at(tok: Token): { x: number; y: number } {
+    if (tok.hold) return { x: tok.hold[0], y: tok.hold[1] };
     const L = RUN[tok.leg];
     const u = tok.u;
     let x = L.x0 + (L.x1 - L.x0) * u;
@@ -369,7 +389,7 @@ export class Machine {
       }
     }
     this.tokens = this.tokens.filter((k) => !k.dead);
-    if (this.cartRider?.dead) this.cartRider = null;
+
 
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const p = this.puffs[i];
@@ -385,42 +405,78 @@ export class Machine {
     this.drawLines();
   }
 
-  /** The cart's own cycle: wait at the top, run down loaded, tip, come back. */
+  /** The cart's cycle: load at the top, run down, tip the lot, come back. */
   private runCart(dt: number, rate: number): void {
+    // the cart is the only station that makes bearings wait, so it does not
+    // get to be as slow as a cold boiler: the queues were all measured at
+    // low pressure, where the run still fed it at full speed
+    rate = Math.max(1.15, rate);
+    this.cartRiders = this.cartRiders.filter((r) => !r.dead);
     switch (this.cartState) {
+      case 'idle':
+        // a short dwell so a few bearings can climb aboard together, rather
+        // than the first one leaving and the rest queueing on the spot
+        if (this.cartRiders.length > 0) {
+          this.cartDwell -= dt;
+          if (this.cartDwell <= 0 || this.cartRiders.length >= CART_SEATS) this.cartState = 'down';
+        }
+        break;
       case 'down':
-        this.cartPos = Math.min(1, this.cartPos + dt * rate * 0.85);
+        this.cartPos = Math.min(1, this.cartPos + dt * rate * 2.1);
         if (this.cartPos >= 1) {
           this.cartState = 'tip';
           this.cartTip = 1;
           this.sfx('tip', RUN[7].x1);
-          // the rider is thrown clear, into the firebox
-          const r = this.cartRider;
-          if (r) { r.leg = RUN.length - 1; r.u = 0; this.enter(r, RUN[r.leg]); }
-          this.cartRider = null;
+          for (const r of this.cartRiders) { r.hold = undefined; r.leg = RUN.length - 1; r.u = 0; this.enter(r, RUN[r.leg]); }
+          this.cartRiders = [];
         }
         break;
       case 'tip':
-        this.cartTip = Math.max(0, this.cartTip - dt * 2.2);
+        this.cartTip = Math.max(0, this.cartTip - dt * 3.4);
         if (this.cartTip <= 0) this.cartState = 'up';
         break;
       case 'up':
-        this.cartPos = Math.max(0, this.cartPos - dt * rate * 1.15);
+        this.cartPos = Math.max(0, this.cartPos - dt * rate * 3);
         if (this.cartPos <= 0) this.cartState = 'idle';
-        break;
-      default:
         break;
     }
   }
 
-  /** A bearing waits at the top of the rail until the cart is back for it. */
+  /** A bearing boards the cart, or queues back up the rail behind it. */
   private board(tok: Token): void {
-    if (this.cartRider === tok) { tok.u = this.cartPos; return; }
-    tok.u = 0;
-    if (this.cartRider === null && this.cartState === 'idle') {
-      this.cartRider = tok;
-      this.cartState = 'down';
+    const seat = this.cartRiders.indexOf(tok);
+    if (seat >= 0) { tok.u = this.cartPos; return; }
+    if (this.cartState === 'idle' && this.cartRiders.length < CART_SEATS) {
+      this.cartRiders.push(tok);
+      tok.hold = undefined;
+      if (this.cartRiders.length === 1) this.cartDwell = 0.3;
+      tok.u = this.cartPos;
       this.sfx('cart', RUN[7].x0);
+      return;
+    }
+    /**
+     * Everyone else waits ON the rail behind the cart, spaced out. Parking
+     * them all at u = 0 stacked every waiting bearing on one pixel, which is
+     * what looked like a single ball permanently stuck at the pipe's foot.
+     */
+    let q = 0;
+    for (const o of this.tokens) {
+      if (o === tok) break;
+      if (RUN[o.leg]?.name === 'cart' && !this.cartRiders.includes(o)) q++;
+    }
+    // clamped: at 0.07 each, the tenth bearing landed at u = -0.77, which
+    // extrapolates back off the rail and floats in the middle of the frame
+    // Back up into the standpipe above, 9px apart. The first waiter stands at
+    // the head of the cart rail where the cart will come to meet it; the rest
+    // stack up the pipe, which holds ten before the top one stops rising.
+    tok.u = 0;
+    if (q === 0) {
+      tok.hold = [RUN[7].x0, RUN[7].y0 - 2];
+    } else {
+      const P = RUN[6];                                    // the standpipe
+      const y = Math.max(P.y0 + 3, P.y1 - (q - 1) * QUEUE_GAP);
+      const x = P.x0 + (P.x1 - P.x0) * ((y - P.y0) / (P.y1 - P.y0));
+      tok.hold = [x, y];
     }
   }
 
@@ -634,6 +690,32 @@ export class Machine {
         gd.circle(L.x0, L.y0, 2).fill({ color: 0xffd84d, alpha: 0.8 });
       }
     }
+  }
+
+  /** Drawn positions of the bearings waiting for the cart, in rail order. */
+  cartQueue(): [number, number][] {
+    const out: [number, number][] = [];
+    for (const tok of this.tokens) {
+      if (RUN[tok.leg]?.name !== 'cart' || this.cartRiders.includes(tok)) continue;
+      const p = this.at(tok);
+      out.push([p.x, p.y]);
+    }
+    return out.sort((a, b) => a[0] - b[0]);
+  }
+
+  /** Why the queue is where it is: state, seats, and who is parked. */
+  cartDiag(): Record<string, unknown> {
+    const waiting = this.tokens.filter(
+      (t) => RUN[t.leg]?.name === 'cart' && !this.cartRiders.includes(t),
+    );
+    return {
+      state: this.cartState,
+      pos: +this.cartPos.toFixed(3),
+      riders: this.cartRiders.length,
+      waiting: waiting.length,
+      parked: waiting.filter((t) => !!t.hold).length,
+      us: waiting.map((t) => +t.u.toFixed(3)),
+    };
   }
 
   census(): Record<string, number> {

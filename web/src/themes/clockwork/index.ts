@@ -137,6 +137,6 @@ async function create(host: ThemeHost<typeof CLOCKWORK_DEFAULTS>, init: Renderer
     // pixel-art scene whose whole point is the integer upscale.
     setResolution() {},
     stats: () => ({ world: `${WORLD_W}x${WORLD_H}` }),
-    diag: () => ({ app, machine, census: () => machine.census() }),
+    diag: () => ({ app, machine, census: () => machine.census(), cartQueue: () => machine.cartQueue(), cartDiag: () => machine.cartDiag() }),
   };
 }
