@@ -70,9 +70,12 @@ async function create(host: ThemeHost<typeof CLOCKWORK_DEFAULTS>, init: Renderer
    */
   function layout(): void {
     const W = window.innerWidth, H = window.innerHeight;
-    const q = Math.max(1, Math.min(Math.floor(W / WORLD_W), Math.floor(H / WORLD_H)));
-    app.canvas.style.width = `${WORLD_W * q}px`;
-    app.canvas.style.height = `${WORLD_H * q}px`;
+    // fractional, not floored: a whole-number scale is pixel-exact but only
+    // fills a display whose height is an exact multiple of 360, so every other
+    // size - and every unmaximised window - got black bars
+    const q = Math.min(W / WORLD_W, H / WORLD_H);
+    app.canvas.style.width = `${Math.round(WORLD_W * q)}px`;
+    app.canvas.style.height = `${Math.round(WORLD_H * q)}px`;
     app.canvas.style.display = 'block';
     app.canvas.style.margin = `${Math.max(0, (H - WORLD_H * q) / 2)}px auto`;
   }

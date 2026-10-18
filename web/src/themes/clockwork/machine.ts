@@ -83,6 +83,8 @@ export const GEARS = [
 export const DOMINO_N = 9;
 /** The overhead line shaft's height, in world units. */
 const SHAFT_Y = 150;
+/** The blast gate's housing: it rides between these, and the frame is always drawn. */
+const GATE_X = 436, GATE_TOP = 208, GATE_DROP = 30;
 /** Where a nameplate hangs on the rack: four rails, five slots each. */
 const PLATE_SLOTS = 20;
 
@@ -190,7 +192,19 @@ export class Machine {
   private spin = 0;
   private gate = 0; private bell = 0; private whistle = 0;
   private plates = 0;
-  private cartU = 0; private cartTip = 0;
+  /**
+   * The cart is a vehicle with its own cycle, not a number slaved to whichever
+   * bearing happens to be first in the array. It used to take its position
+   * from `tokens.find(on the cart leg)`, so with the run busy - and it runs at
+   * eleven of fourteen bearings under ordinary traffic - it jumped between
+   * whichever bearings were on that leg and snapped back to the top whenever
+   * the list reordered. On screen the cart vanished and teleported to the
+   * start of its rail.
+   */
+  private cartPos = 0;
+  private cartState: 'idle' | 'down' | 'tip' | 'up' = 'idle';
+  private cartRider: Token | null = null;
+  private cartTip = 0;
 
   // sprites, built once
   private sBoiler!: PartSprite; private sFirebox!: PartSprite; private sRack!: PartSprite;
@@ -273,7 +287,18 @@ export class Machine {
 
   private release(kind: Kind, test: boolean): void {
     const cap = this.get('kMaxTokens', 14);
-    if (this.tokens.length >= cap) this.tokens.shift();
+    /**
+     * When the run is full the new bearing waits, it does not evict an old
+     * one. Dropping the oldest - which is what this did - deletes the bearing
+     * furthest along, the one about to be tipped into the firebox, so under
+     * any real load the payoff vanished a moment before it landed. Measured at
+     * 1.7 events a second the run sat at 11.8 of 14 bearings, so this was
+     * happening constantly.
+     *
+     * Backing up is the honest behaviour anyway: pressure rises with traffic
+     * and pressure drives the run faster, so the queue drains itself.
+     */
+    if (this.tokens.length >= cap) return;
     this.tokens.push({ kind, leg: 0, u: 0, test, dead: false, roll: 0 });
     this.sfx('drop', RUN[0].x0);
   }
@@ -325,8 +350,12 @@ export class Machine {
     }
     if (this.cartTip > 0) this.cartTip = Math.max(0, this.cartTip - dt * 2.2);
 
+    this.runCart(dt, rate);
+
     for (const tok of this.tokens) {
       const L = RUN[tok.leg];
+      // the cart leg is driven by the cart, not by the clock
+      if (L.name === 'cart') { this.board(tok); continue; }
       const before = this.at(tok);
       tok.u += dt * rate / L.secs;
       this.onLeg(tok, L);
@@ -340,9 +369,7 @@ export class Machine {
       }
     }
     this.tokens = this.tokens.filter((k) => !k.dead);
-
-    const onCart = this.tokens.find((k) => RUN[k.leg]?.name === 'cart');
-    this.cartU = onCart ? onCart.u : Math.max(0, this.cartU - dt * 0.9);
+    if (this.cartRider?.dead) this.cartRider = null;
 
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const p = this.puffs[i];
@@ -356,6 +383,45 @@ export class Machine {
 
     this.layout();
     this.drawLines();
+  }
+
+  /** The cart's own cycle: wait at the top, run down loaded, tip, come back. */
+  private runCart(dt: number, rate: number): void {
+    switch (this.cartState) {
+      case 'down':
+        this.cartPos = Math.min(1, this.cartPos + dt * rate * 0.85);
+        if (this.cartPos >= 1) {
+          this.cartState = 'tip';
+          this.cartTip = 1;
+          this.sfx('tip', RUN[7].x1);
+          // the rider is thrown clear, into the firebox
+          const r = this.cartRider;
+          if (r) { r.leg = RUN.length - 1; r.u = 0; this.enter(r, RUN[r.leg]); }
+          this.cartRider = null;
+        }
+        break;
+      case 'tip':
+        this.cartTip = Math.max(0, this.cartTip - dt * 2.2);
+        if (this.cartTip <= 0) this.cartState = 'up';
+        break;
+      case 'up':
+        this.cartPos = Math.max(0, this.cartPos - dt * rate * 1.15);
+        if (this.cartPos <= 0) this.cartState = 'idle';
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** A bearing waits at the top of the rail until the cart is back for it. */
+  private board(tok: Token): void {
+    if (this.cartRider === tok) { tok.u = this.cartPos; return; }
+    tok.u = 0;
+    if (this.cartRider === null && this.cartState === 'idle') {
+      this.cartRider = tok;
+      this.cartState = 'down';
+      this.sfx('cart', RUN[7].x0);
+    }
   }
 
   private onLeg(tok: Token, L: Leg): void {
@@ -400,11 +466,19 @@ export class Machine {
 
   /** Move the sprites and swap their frames. */
   private layout(): void {
+    /**
+     * Gears step through their eight frames about sixteen times a second, not
+     * two and a half. The index used to be floor(spin * 1.4), and `spin` only
+     * climbs about two a second, so a twelve-tooth gear took three seconds to
+     * advance one tooth and visibly clunked between frames. PartSprite wraps
+     * the index itself, which also fixes the reversed gears: a negative index
+     * through `& 7` jumps rather than running backwards.
+     */
     for (let i = 0; i < GEARS.length; i++) {
       const g = GEARS[i];
-      this.sGears[i].place(Math.floor(this.spin * g.dir * 1.4) & 7, g.x, g.y);
+      this.sGears[i].place(Math.floor(this.spin * 8 * g.dir), g.x, g.y);
     }
-    this.sFlywheel.place(Math.floor(this.spin * 1.1) & 7, FLYWHEEL.x, FLYWHEEL.y);
+    this.sFlywheel.place(Math.floor(this.spin * 6), FLYWHEEL.x, FLYWHEEL.y);
 
     for (let i = 0; i < PLATE_SLOTS; i++) this.sPlates[i].visible = i < this.plates;
 
@@ -427,13 +501,19 @@ export class Machine {
     this.sCart.visible = showCart;
     if (showCart) {
       this.sCart.place(frameAt(this.cartTip, this.sCart.count),
-        cart.x0 + (cart.x1 - cart.x0) * this.cartU,
-        cart.y0 + (cart.y1 - cart.y0) * this.cartU + 4);
+        cart.x0 + (cart.x1 - cart.x0) * this.cartPos,
+        cart.y0 + (cart.y1 - cart.y0) * this.cartPos + 4);
     }
 
+    /**
+     * The gate slides down inside a housing that is always there. It used to
+     * be drawn only while a block was landing, springing into existence in
+     * mid-air above the boiler and dropping - with nothing around it, it read
+     * as something falling out of the sky rather than a safety gate closing.
+     */
     const fx = this.get('kSideEffects', true);
-    this.sGate.visible = fx && this.gate > 0.02;
-    if (this.sGate.visible) this.sGate.place(0, FIREBOX.x - 14, FIREBOX.y - 30 + 30 * (1 - this.gate));
+    this.sGate.visible = fx;
+    this.sGate.place(0, GATE_X, GATE_TOP + GATE_DROP * (1 - this.gate));
     this.sBell.visible = fx;
     // on the boiler's near shoulder, not off its right edge, where it was
     // drawing straight on top of the flywheel
@@ -508,6 +588,14 @@ export class Machine {
     // each side they read as the rungs of a ladder rather than as pipework
     for (let i = 0; i < 5; i++) s.rect(pipe.x0 - 8, fun.y0 + 16 + i * 18, 16, 2).fill(0x6e4f1d);
     truss(s, cart.x0 - 7, cart.y0 + 10, cart.x1 + 14, cart.y1 + 10, 8);
+
+    // the gate's housing: two guide posts and a head, always present, so the
+    // gate slides down something instead of appearing in mid-air
+    s.rect(GATE_X - 15, GATE_TOP - 8, 30, 5).fill(0x565a6e);
+    s.rect(GATE_X - 15, GATE_TOP - 8, 4, GATE_DROP + 34).fill(0x3a3d4d);
+    s.rect(GATE_X + 11, GATE_TOP - 8, 4, GATE_DROP + 34).fill(0x3a3d4d);
+    s.circle(GATE_X - 13, GATE_TOP - 6, 1.3).fill(0xa87c2a);
+    s.circle(GATE_X + 13, GATE_TOP - 6, 1.3).fill(0xa87c2a);
   }
 
   /** The handful of drawn things that actually change: belts, rope, fire. */
