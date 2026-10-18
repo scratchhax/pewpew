@@ -81,8 +81,80 @@ export const GEARS = [
   { x: 118, y: 232, s: 0.6, dir: 1 },
 ];
 export const DOMINO_N = 9;
+/** The overhead line shaft's height, in world units. */
+const SHAFT_Y = 150;
 /** Where a nameplate hangs on the rack: four rails, five slots each. */
 const PLATE_SLOTS = 20;
+
+/**
+ * The linkages, drawn rather than baked.
+ *
+ * This is the part the first version of the scene got most wrong. It promised
+ * "dominoes tip levers, levers yank strings, every chain ends at the boiler"
+ * and then drew those strings as one-pixel lines on a black background, so the
+ * causal chain - the entire idea - was invisible. Anything that joins two
+ * stations here is structural: a truss you can count the braces on, a belt
+ * with seams that travel, a rope that visibly hangs slack and snaps taut.
+ */
+
+/** A riveted truss: two rails, zigzag bracing, brass rivets along the top. */
+function truss(g: Graphics, x0: number, y0: number, x1: number, y1: number, d = 7): void {
+  const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy);
+  if (len < 2) return;
+  const nx = -dy / len, ny = dx / len;
+  const ax = x0 + nx * d, ay = y0 + ny * d, bx = x1 + nx * d, by = y1 + ny * d;
+  const n = Math.max(2, Math.round(len / 12));
+  for (let i = 0; i < n; i++) {
+    const u0 = i / n, u1 = (i + 1) / n;
+    g.moveTo(x0 + dx * u0, y0 + dy * u0).lineTo(ax + (bx - ax) * u1, ay + (by - ay) * u1)
+      .stroke({ width: 1.5, color: 0x3a3d4d });
+    g.moveTo(ax + (bx - ax) * u0, ay + (by - ay) * u0).lineTo(x0 + dx * u1, y0 + dy * u1)
+      .stroke({ width: 1.5, color: 0x3a3d4d });
+  }
+  g.moveTo(ax, ay).lineTo(bx, by).stroke({ width: 2.5, color: 0x4a4f5a });
+  g.moveTo(x0, y0).lineTo(x1, y1).stroke({ width: 3, color: 0x767b92 });
+  for (let i = 0; i <= n; i++) {
+    const u = i / n;
+    g.circle(x0 + dx * u, y0 + dy * u, 1.3).fill(0xa87c2a);
+  }
+}
+
+/**
+ * A drive belt between two pulleys, with seams that travel along it.
+ *
+ * The two runs are drawn parallel at the narrower pulley's radius rather than
+ * as true tangents. Geometrically a belt between a 7-unit pulley and a 26-unit
+ * flywheel really is a wedge, but at this size it reads as a sling rather than
+ * as a belt, and the convention is what the eye wants.
+ */
+function belt(g: Graphics, x0: number, y0: number, r0: number,
+  x1: number, y1: number, r1: number, phase: number): void {
+  const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy);
+  if (len < 2) return;
+  const nx = -dy / len, ny = dx / len;
+  const w = Math.max(3, Math.min(r0, r1) * 0.85);
+  for (const s of [1, -1]) {
+    g.moveTo(x0 + nx * w * s, y0 + ny * w * s).lineTo(x1 + nx * w * s, y1 + ny * w * s)
+      .stroke({ width: 2.5, color: 0x2a2336 });
+  }
+  const n = Math.max(3, Math.round(len / 10));
+  for (let i = 0; i < n; i++) {
+    const u = ((i / n) + phase) % 1;
+    const px = x0 + dx * u, py = y0 + dy * u;
+    g.moveTo(px + nx * w, py + ny * w).lineTo(px + nx * (w - 3), py + ny * (w - 3))
+      .stroke({ width: 1.5, color: 0x4a3320 });
+    g.moveTo(px - nx * w, py - ny * w).lineTo(px - nx * (w - 3), py - ny * (w - 3))
+      .stroke({ width: 1.5, color: 0x4a3320 });
+  }
+}
+
+/** A rope that hangs slack and snaps taut: `taut` 0 slack .. 1 straight. */
+function rope(g: Graphics, x0: number, y0: number, x1: number, y1: number, taut: number): void {
+  const sag = (1 - taut) * 14;
+  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2 + sag;
+  g.moveTo(x0, y0).quadraticCurveTo(mx, my + 1, x1, y1).stroke({ width: 3, color: 0x4a3320 });
+  g.moveTo(x0, y0).quadraticCurveTo(mx, my, x1, y1).stroke({ width: 1.5, color: 0xa89772 });
+}
 
 interface Token { kind: Kind; leg: number; u: number; test: boolean; dead: boolean; roll: number }
 interface Puff { x: number; y: number; vx: number; vy: number; life: number; max: number; col: number }
@@ -91,7 +163,14 @@ export type SfxFn = (name: string, x?: number) => void;
 
 export class Machine {
   readonly world = new Container();
-  private gBack = new Graphics();        // room, rails, pipes, ropes
+  /**
+   * The room, the piers, the line shaft and every truss are drawn ONCE. They
+   * never change, and rebuilding them each frame cost about a third of the
+   * frame rate: 35.8 fps at 1920x1080 against the 60 the other scenes hold.
+   * Only the belts, the rope and the fire are redrawn.
+   */
+  private gStatic = new Graphics();
+  private gBack = new Graphics();        // belts and the rope, redrawn
   private cFurniture = new Container();  // rack, boiler, firebox, gears, flywheel
   private gRails = new Graphics();       // rails and the standpipe, over the furniture
   private cMovers = new Container();     // dominoes, see-saw, cart, gate, bell
@@ -124,8 +203,9 @@ export class Machine {
   private pool: PartSprite[] = [];
 
   constructor(private settings: Record<string, unknown>, private sfx: SfxFn, private parts: Parts) {
-    this.world.addChild(this.gBack, this.cFurniture, this.gRails, this.cMovers, this.cTokens, this.gFx, this.gGuide);
+    this.world.addChild(this.gStatic, this.gBack, this.cFurniture, this.gRails, this.cMovers, this.cTokens, this.gFx, this.gGuide);
     this.build();
+    this.drawStatic();
   }
 
   private get<T>(key: string, fallback: T): T {
@@ -379,25 +459,76 @@ export class Machine {
     }
   }
 
-  /** The bits that are drawn rather than baked: structure, rails, particles. */
+  /** The room and every fixed girder: drawn once, never rebuilt. */
+  private drawStatic(): void {
+    const s = this.gStatic;
+    s.clear();
+    s.rect(0, 0, WORLD_W, WORLD_H).fill(0x191621);
+    s.rect(0, 306, WORLD_W, WORLD_H - 306).fill(0x211c2c);
+
+    // the shop floor: brick piers carrying the run, so the machine is standing
+    // in a room instead of floating in one
+    for (let i = 0; i < 7; i++) {
+      const px = 36 + i * 92;
+      s.rect(px, 306, 26, 54).fill(0x2a2336);
+      s.rect(px, 306, 26, 3).fill(0x3a3d4d);
+    }
+    s.rect(0, 303, WORLD_W, 4).fill(0x3a3d4d);
+    // a steam main running the length of the floor
+    s.rect(0, 316, WORLD_W, 7).fill(0x3a3d4d);
+    s.rect(0, 316, WORLD_W, 2).fill(0x565a6e);
+    for (let i = 0; i < 12; i++) s.rect(18 + i * 54, 314, 5, 11).fill(0x4a3320);
+
+    /**
+     * An overhead line shaft drives the room, the way a mill actually did it.
+     * The belt used to run flat across to the flywheel, straight through the
+     * rack, whose own gaps let it show through; dropping it to a floor pulley
+     * instead just hid it behind the log panel. Up here it has a clear lane
+     * between the domino rail and the top of the rack, and it ties the gear
+     * train and the flywheel into one machine.
+     */
+    s.rect(74, SHAFT_Y - 2, 540, 5).fill(0x4a4f5a);
+    s.rect(74, SHAFT_Y - 2, 540, 2).fill(0x767b92);
+    for (let x = 90; x < 610; x += 76) {
+      s.rect(x - 2, SHAFT_Y - 12, 4, 10).fill(0x3a3d4d);
+      s.rect(x - 7, SHAFT_Y - 14, 14, 3).fill(0x565a6e);
+    }
+    for (const g of [GEARS[0], { x: FLYWHEEL.x }]) {
+      s.circle(g.x, SHAFT_Y, 12).fill(0x565a6e);
+      s.circle(g.x, SHAFT_Y, 5).fill(0x3a3d4d);
+    }
+
+    const rail = RUN[1], dom = RUN[2], fun = RUN[5], pipe = RUN[6], cart = RUN[7];
+    s.rect(RUN[0].x0 - 5, RUN[0].y0, 10, RUN[0].y1 - RUN[0].y0 + 4).fill(0x3a3d4d);
+    truss(s, rail.x0, rail.y0, rail.x1, rail.y1);
+    truss(s, dom.x0, dom.y0 + 3, dom.x1 + 36, dom.y1 + 3);
+    s.rect(pipe.x0 - 7, fun.y0 + 4, 14, pipe.y1 - fun.y0 + 6).fill(0x4a3320);
+    s.rect(pipe.x0 - 7, fun.y0 + 4, 4, pipe.y1 - fun.y0 + 6).fill(0x6b4a2e);
+    // joint bands, kept inside the pipe's own width: proud of it by two units
+    // each side they read as the rungs of a ladder rather than as pipework
+    for (let i = 0; i < 5; i++) s.rect(pipe.x0 - 8, fun.y0 + 16 + i * 18, 16, 2).fill(0x6e4f1d);
+    truss(s, cart.x0 - 7, cart.y0 + 10, cart.x1 + 14, cart.y1 + 10, 8);
+  }
+
+  /** The handful of drawn things that actually change: belts, rope, fire. */
   private drawLines(): void {
     const b = this.gBack, r = this.gRails, f = this.gFx, gd = this.gGuide;
     b.clear(); r.clear(); f.clear(); gd.clear();
 
-    b.rect(0, 0, WORLD_W, WORLD_H).fill(0x191621);
-    b.rect(0, 306, WORLD_W, WORLD_H - 306).fill(0x211c2c);
-    // the belt from the flywheel to the gear train, so the train has a driver
-    b.moveTo(GEARS[1].x, GEARS[1].y - 22).lineTo(FLYWHEEL.x, FLYWHEEL.y - 24)
-      .stroke({ width: 2, color: 0x2a2336 });
+    const phase = (this.spin * 0.08) % 1;
+    belt(b, GEARS[0].x, SHAFT_Y, 12, GEARS[0].x, GEARS[0].y, 28, phase);
+    belt(b, FLYWHEEL.x, SHAFT_Y, 12, FLYWHEEL.x, FLYWHEEL.y, 26, phase);
 
-    const rail = RUN[1], dom = RUN[2], fun = RUN[5], pipe = RUN[6], cart = RUN[7];
-    r.rect(RUN[0].x0 - 5, RUN[0].y0, 10, RUN[0].y1 - RUN[0].y0 + 4).fill(0x3a3d4d);
-    r.moveTo(rail.x0, rail.y0).lineTo(rail.x1, rail.y1).stroke({ width: 3, color: 0x565a6e });
-    r.moveTo(dom.x0, dom.y0 + 3).lineTo(dom.x1 + 36, dom.y1 + 3).stroke({ width: 3, color: 0x565a6e });
-    r.rect(pipe.x0 - 6, fun.y0 + 4, 12, pipe.y1 - fun.y0 + 6).fill(0x4a3320);
-    r.rect(pipe.x0 - 6, fun.y0 + 4, 3, pipe.y1 - fun.y0 + 6).fill(0x6b4a2e);
-    r.moveTo(cart.x0 - 7, cart.y0 + 10).lineTo(cart.x1 + 12, cart.y1 + 10)
-      .stroke({ width: 3, color: 0x565a6e });
+    const see = RUN[3], fun = RUN[5], pipe = RUN[6];
+
+    /**
+     * The one linkage the run does not carry itself: the see-saw's rope. It
+     * hangs slack while the bearing rolls the dominoes, then snaps taut as the
+     * plank tips, which is the beat that throws the bearing at the funnel.
+     */
+    const taut = Math.max(0, this.seesaw);
+    rope(r, see.x1 + 10, see.y1 + 4, pipe.x0 - 8, fun.y0 + 20, taut);
+    r.circle(see.x1 + 10, see.y1 + 4, 2).fill(0xa87c2a);
 
     // the fire in the box, breathing with pressure
     const heat = 0.3 + this.pressure * 0.7;

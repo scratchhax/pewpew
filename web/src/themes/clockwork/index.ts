@@ -32,13 +32,15 @@ async function create(host: ThemeHost<typeof CLOCKWORK_DEFAULTS>, init: Renderer
   const { settings, state, throttle, audio } = host;
   const app = new Application();
   await app.init({
-    resizeTo: window,
+    // exactly the world, not the window: see layout() below
+    width: WORLD_W,
+    height: WORLD_H,
     background: '#0d0a12',
     antialias: false,
     roundPixels: true,
     powerPreference: init.powerPref === 'default' ? undefined : init.powerPref,
-    resolution: init.resolution,
-    autoDensity: true,
+    resolution: 1,
+    autoDensity: false,
     autoStart: false,
     sharedTicker: false,
   });
@@ -56,20 +58,26 @@ async function create(host: ThemeHost<typeof CLOCKWORK_DEFAULTS>, init: Renderer
   screen.addChild(machine.world);
 
   /**
-   * The world is 640x360 so the scale is a whole number on every common
-   * display (1920/640 = 3, 1280/640 = 2, 2560/640 = 4) and the machine fills
-   * the frame exactly. The previous version used 1500x850, which lands on
-   * scale 1 at 1080p and left a fifth of the screen empty down the right.
+   * The renderer draws 640x360 and CSS blows it up by a whole number, which is
+   * pixel-exact at 1280x720, 1920x1080 and 2560x1440 (640 divides all three)
+   * and costs a ninth of the fill at 1080p. Scaling the stage instead, which
+   * is what this did first, resamples every sprite every frame and held the
+   * scene to 34.8 fps.
+   *
+   * The previous version of this scene used a 1500x850 world, which lands on
+   * integer scale 1 at 1080p and left a fifth of the screen empty down the
+   * right.
    */
   function layout(): void {
-    const W = app.screen.width, H = app.screen.height;
-    const S = Math.max(1, Math.min(W / WORLD_W, H / WORLD_H));
-    const q = S >= 1 ? Math.floor(S) : S;
-    screen.scale.set(q);
-    screen.position.set(Math.round((W - WORLD_W * q) / 2), Math.round((H - WORLD_H * q) / 2));
+    const W = window.innerWidth, H = window.innerHeight;
+    const q = Math.max(1, Math.min(Math.floor(W / WORLD_W), Math.floor(H / WORLD_H)));
+    app.canvas.style.width = `${WORLD_W * q}px`;
+    app.canvas.style.height = `${WORLD_H * q}px`;
+    app.canvas.style.display = 'block';
+    app.canvas.style.margin = `${Math.max(0, (H - WORLD_H * q) / 2)}px auto`;
   }
   layout();
-  app.renderer.on('resize', layout);
+  window.addEventListener('resize', layout);
 
   // traffic rate -> boiler pressure, on the wall clock so a slow frame is not a spike
   let arrivals = 0, rateFast = 0, rateSlow = 0, lastWall = performance.now() / 1000;
@@ -122,7 +130,9 @@ async function create(host: ThemeHost<typeof CLOCKWORK_DEFAULTS>, init: Renderer
     frame,
     applyBudgets() {},
     settingsChanged() {},
-    setResolution(scale) { if (app.renderer.resolution !== scale) app.renderer.resolution = scale; },
+    // The buffer is the world, fixed. A render-scale knob would only blur a
+    // pixel-art scene whose whole point is the integer upscale.
+    setResolution() {},
     stats: () => ({ world: `${WORLD_W}x${WORLD_H}` }),
     diag: () => ({ app, machine, census: () => machine.census() }),
   };
