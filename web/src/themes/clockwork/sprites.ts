@@ -71,20 +71,20 @@ const GLYPHS: Record<string, string[]> = {
   "/": ["..#","..#",".#.","#..","#.."], " ": ["...","...","...","...","..."],
 };
 
-export function drawText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, outline: string | null = P.ink): number {
+export function drawText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, outline: string | null = P.ink, scale = 1): number {
   const s = text.toUpperCase();
   const put = (ox: number, oy: number, col: string) => {
     ctx.fillStyle = col;
     for (let k = 0; k < s.length; k++) {
       const g = GLYPHS[s[k]] ?? GLYPHS[' '];
       for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) {
-        if (g[j][i] === '#') ctx.fillRect(x + k * 4 + i + ox, y + j + oy, 1, 1);
+        if (g[j][i] === '#') ctx.fillRect(x + (k * 4 + i) * scale + ox, y + j * scale + oy, scale, scale);
       }
     }
   };
-  if (outline) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) put(dx, dy, outline);
+  if (outline) for (const [dx, dy] of [[-scale, 0], [scale, 0], [0, -scale], [0, scale]]) put(dx, dy, outline);
   put(0, 0, color);
-  return s.length * 4;
+  return s.length * 4 * scale;
 }
 
 // ── parts ──────────────────────────────────────────────────────────────────
@@ -318,6 +318,77 @@ export function bellTexture(): HTMLCanvasElement {
     c.beginPath(); c.moveTo(6, 1); c.quadraticCurveTo(11, 6, 10, 9); c.lineTo(2, 9); c.quadraticCurveTo(1, 6, 6, 1); c.fill();
     c.fillStyle = P.brassHi; c.fillRect(4, 3, 2, 4);
     c.fillStyle = P.brassDark; c.fillRect(5, 9, 2, 2);
+  });
+}
+
+// ── chain-reaction parts ───────────────────────────────────────────────────
+
+/** A domino: iron tile with a brass pip, pivot at the bottom centre. */
+export function dominoTexture(): HTMLCanvasElement {
+  return canvas(8, 20, (c) => {
+    c.fillStyle = P.ironDark; c.fillRect(0, 0, 8, 20);
+    c.fillStyle = P.ironLight; c.fillRect(1, 1, 3, 18);
+    c.fillStyle = P.iron; c.fillRect(4, 1, 3, 18);
+    c.fillStyle = P.brassLight; c.fillRect(3, 4, 2, 2); c.fillRect(3, 12, 2, 2);
+  });
+}
+
+/** A brass funnel the bearings drop into, mouth up. */
+export function funnelTexture(): HTMLCanvasElement {
+  return canvas(70, 46, (c) => {
+    c.fillStyle = P.brassDark;
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(70, 0); c.lineTo(44, 30); c.lineTo(44, 46); c.lineTo(26, 46); c.lineTo(26, 30); c.closePath(); c.fill();
+    c.fillStyle = P.brass;
+    c.beginPath(); c.moveTo(3, 3); c.lineTo(67, 3); c.lineTo(42, 29); c.lineTo(42, 44); c.lineTo(28, 44); c.lineTo(28, 29); c.closePath(); c.fill();
+    c.fillStyle = P.brassHi;
+    c.beginPath(); c.moveTo(3, 3); c.lineTo(24, 3); c.lineTo(30, 27); c.lineTo(28, 29); c.closePath(); c.fill();
+    c.fillStyle = '#0d0a12'; c.fillRect(4, 3, 62, 4);
+  });
+}
+
+/** A flywheel: spoked iron rim with paddles and a brass crank pin. */
+export function flywheelTexture(r: number): HTMLCanvasElement {
+  const s = Math.ceil(r * 2 + 10);
+  return canvas(s, s, (c) => {
+    const cx = s / 2;
+    c.strokeStyle = P.iron; c.lineWidth = 7;
+    c.beginPath(); c.arc(cx, cx, r, 0, 7); c.stroke();
+    c.strokeStyle = P.ironHi; c.lineWidth = 2;
+    c.beginPath(); c.arc(cx, cx, r + 3, Math.PI * 1.1, Math.PI * 1.7); c.stroke();
+    c.strokeStyle = P.ironDark; c.lineWidth = 5;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      c.beginPath(); c.moveTo(cx, cx); c.lineTo(cx + Math.cos(a) * (r - 3), cx + Math.sin(a) * (r - 3)); c.stroke();
+    }
+    c.fillStyle = P.brass; c.beginPath(); c.arc(cx, cx, r * 0.2, 0, 7); c.fill();
+    c.fillStyle = P.brassHi; c.beginPath(); c.arc(cx, cx, r * 0.09, 0, 7); c.fill();
+    // crank pin
+    c.fillStyle = P.brassLight; c.beginPath(); c.arc(cx + r * 0.62, cx, 4, 0, 7); c.fill();
+  });
+}
+
+/** A steam vane wheel: eight brass blades on a hub. */
+export function vaneTexture(): HTMLCanvasElement {
+  const s = 60;
+  return canvas(s, s, (c) => {
+    const cx = s / 2;
+    for (let i = 0; i < 8; i++) {
+      c.save(); c.translate(cx, cx); c.rotate((i / 8) * Math.PI * 2);
+      c.fillStyle = i % 2 ? P.brass : P.brassLight;
+      c.beginPath(); c.moveTo(0, -3); c.lineTo(26, -7); c.lineTo(26, 3); c.lineTo(0, 3); c.closePath(); c.fill();
+      c.restore();
+    }
+    c.fillStyle = P.iron; c.beginPath(); c.arc(cx, cx, 6, 0, 7); c.fill();
+    c.fillStyle = P.brassHi; c.beginPath(); c.arc(cx, cx, 2.5, 0, 7); c.fill();
+  });
+}
+
+/** A lever: oak plank with an iron cap, pivot at the left end. */
+export function leverTexture(): HTMLCanvasElement {
+  return canvas(44, 8, (c) => {
+    c.fillStyle = P.oakLight; c.fillRect(0, 2, 36, 4);
+    c.fillStyle = P.iron; c.fillRect(34, 0, 10, 8);
+    c.fillStyle = P.ironHi; c.fillRect(34, 0, 10, 2);
   });
 }
 

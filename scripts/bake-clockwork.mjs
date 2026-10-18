@@ -18,10 +18,11 @@ const assets = path.join(here, '..', 'web', 'src', 'themes', 'clockwork', 'asset
 const raw = path.join(assets, 'raw');
 const PORT = 9333;
 
-/** name -> target height in world pixels. */
+/** name -> target height in world pixels (role sizes: the boiler is the goal
+ *  everything connects to; fittings are sized against it). */
 const PARTS = {
-  boiler: 360, furnace: 170, gauge: 120, stamp: 100, cart: 64,
-  whistle: 80, lamp: 64, clamp: 56, bell: 52, hopper: 90,
+  boiler: 380, furnace: 180, gauge: 130, stamp: 110, cart: 80,
+  whistle: 90, lamp: 70, clamp: 60, bell: 60, hopper: 90,
 };
 
 /** The scene palette (sprites.ts) - everything quantises to this. */

@@ -3,5 +3,5 @@
  * palette-quantised and packed by scripts/bake-clockwork.mjs.
  * frames[name] = [x, y, w, h] into machine.png, trimmed, at world scale.
  */
-export const MACHINE_SIZE = [1024, 310] as const;
-export const MACHINE_FRAMES: Record<string, number[]> = {"boiler":[0,0,349,310],"furnace":[351,0,160,146],"gauge":[513,0,96,112],"stamp":[611,0,82,95],"cart":[695,0,62,53],"whistle":[759,0,44,76],"lamp":[805,0,44,60],"clamp":[851,0,54,45],"bell":[907,0,41,46],"hopper":[950,0,68,85]};
+export const MACHINE_SIZE = [1024, 414] as const;
+export const MACHINE_FRAMES: Record<string, number[]> = {"boiler":[0,0,367,327],"furnace":[369,0,168,154],"gauge":[539,0,104,122],"stamp":[645,0,90,104],"cart":[737,0,78,66],"whistle":[817,0,50,85],"lamp":[869,0,50,64],"clamp":[921,0,58,49],"bell":[0,329,48,54],"hopper":[50,329,68,85]};
