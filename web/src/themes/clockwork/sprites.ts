@@ -325,11 +325,31 @@ export function bellTexture(): HTMLCanvasElement {
 
 /** A domino: iron tile with a brass pip, pivot at the bottom centre. */
 export function dominoTexture(): HTMLCanvasElement {
-  return canvas(8, 20, (c) => {
-    c.fillStyle = P.ironDark; c.fillRect(0, 0, 8, 20);
-    c.fillStyle = P.ironLight; c.fillRect(1, 1, 3, 18);
-    c.fillStyle = P.iron; c.fillRect(4, 1, 3, 18);
-    c.fillStyle = P.brassLight; c.fillRect(3, 4, 2, 2); c.fillRect(3, 12, 2, 2);
+  return canvas(12, 32, (c) => {
+    c.fillStyle = P.ironDark; c.fillRect(0, 0, 12, 32);
+    c.fillStyle = P.ironLight; c.fillRect(1, 1, 4, 30);
+    c.fillStyle = P.iron; c.fillRect(5, 1, 6, 30);
+    c.fillStyle = P.brassLight; c.fillRect(5, 6, 3, 3); c.fillRect(5, 20, 3, 3);
+  });
+}
+
+/** A soft radial glow, white; tint + add-blend it in the scene. */
+export function glowTexture(size: number): HTMLCanvasElement {
+  return canvas(size, size, (c) => {
+    const g = c.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.4, 'rgba(255,255,255,0.35)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g; c.fillRect(0, 0, size, size);
+  });
+}
+
+/** A pendulum: slim rod with a brass bob, pivot at the top centre. */
+export function pendulumTexture(): HTMLCanvasElement {
+  return canvas(16, 130, (c) => {
+    c.fillStyle = P.brassDark; c.fillRect(7, 0, 2, 112);
+    c.fillStyle = P.brass; c.beginPath(); c.arc(8, 118, 11, 0, 7); c.fill();
+    c.fillStyle = P.brassHi; c.beginPath(); c.arc(5, 114, 4, 0, 7); c.fill();
   });
 }
 

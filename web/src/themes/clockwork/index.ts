@@ -51,7 +51,7 @@ async function create(host: ThemeHost<typeof CLOCKWORK_DEFAULTS>, init: Renderer
 
   const machine = new Machine(
     settings as unknown as Record<string, any>,
-    (name, x) => audio.sfx(name, { pan: Math.max(-0.8, Math.min(0.8, ((x ?? 950) - WORLD_W / 2) / 420)) }),
+    (name, x) => audio.sfx(name, { pan: Math.max(-0.8, Math.min(0.8, ((x ?? 750) - WORLD_W / 2) / 330)) }),
     (text) => host.hud.say(text),
     await loadHeroes(),
   );

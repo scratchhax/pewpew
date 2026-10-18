@@ -48,11 +48,13 @@ window.bake = async (names) => {
     // scale to target height
     const s = PARTS[name] / img.naturalHeight;
     const w = Math.max(4, Math.round(img.naturalWidth * s)), h = PARTS[name];
-    let c = document.createElement('canvas'); c.width = w; c.height = h;
-    let x = c.getContext('2d'); x.imageSmoothingEnabled = true;
-    x.drawImage(img, 0, 0, w, h);
-    // chroma key + quantise
-    const d = x.getImageData(0, 0, w, h);
+    // PIXELATE: render at half size, quantise there, blow back up with hard
+    // pixels - the stickers must share the procedural parts' chunky language.
+    const pw = Math.max(4, Math.round(w * 0.5)), ph = Math.max(4, Math.round(h * 0.5));
+    let sm = document.createElement('canvas'); sm.width = pw; sm.height = ph;
+    let sx = sm.getContext('2d'); sx.imageSmoothingEnabled = true;
+    sx.drawImage(img, 0, 0, pw, ph);
+    const d = sx.getImageData(0, 0, pw, ph);
     for (let i = 0; i < d.data.length; i += 4) {
       const r = d.data[i], g = d.data[i + 1], b = d.data[i + 2];
       const magenta = Math.abs(r - 255) + g + Math.abs(b - 255);
@@ -66,11 +68,15 @@ window.bake = async (names) => {
       }
       d.data[i] = PALETTE[best][0]; d.data[i + 1] = PALETTE[best][1]; d.data[i + 2] = PALETTE[best][2]; d.data[i + 3] = 255;
     }
-    x.putImageData(d, 0, 0);
+    sx.putImageData(d, 0, 0);
+    let c = document.createElement('canvas'); c.width = w; c.height = h;
+    let x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+    x.drawImage(sm, 0, 0, w, h);
+    const d2 = x.getImageData(0, 0, w, h);
     // trim
     let x0 = w, y0 = h, x1 = -1, y1 = -1;
     for (let j = 0; j < h; j++) for (let i2 = 0; i2 < w; i2++) {
-      if (d.data[(j * w + i2) * 4 + 3] > 8) { if (i2 < x0) x0 = i2; if (i2 > x1) x1 = i2; if (j < y0) y0 = j; if (j > y1) y1 = j; }
+      if (d2.data[(j * w + i2) * 4 + 3] > 8) { if (i2 < x0) x0 = i2; if (i2 > x1) x1 = i2; if (j < y0) y0 = j; if (j > y1) y1 = j; }
     }
     if (x1 < 0) throw new Error(name + ': fully keyed out - is the background magenta?');
     const tw = x1 - x0 + 1, th = y1 - y0 + 1;
