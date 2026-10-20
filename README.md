@@ -52,10 +52,11 @@ your own traffic. Pick a scene per screen:
   quiet karts to new drivers, blocks leave oil, Wi-Fi joins light the boost
   pads, and when the IDS barks a red shell screams off the back of the pack
   for the leader
-- **Bridge**: your network as the LCARS console of a starship — events land as
-  coloured blips on the long-range sweep and scroll down the intrusion log as
-  a proper table, Wi-Fi joins light the docking ports, blocks chip the force
-  field, and a threat throws the whole deck into a steady red alert
+- **Bridge**: your network as the LCARS console of a starship — events drift
+  through the long-range scan as contacts the sensor keeps locking onto, the
+  intrusion log scrolls as a proper table, Wi-Fi joins light the docking
+  ports, blocks chip the force field, and a threat throws the whole deck into
+  a steady red alert
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -1353,15 +1354,16 @@ and it holds 60 fps on a Raspberry Pi.
 Your network as the LCARS console of a starship, laid out like a classic
 master systems display: a big title bar with end-caps, a column of pill
 buttons down the left, a gold rail of codes, and one rounded frame holding
-the working panels. The long-range sweep is the main viewer — every event
-lands as a coloured blip where its host sits on the scope and fades as the
-arm passes. The intrusion log is a real table (timestamp, source, destination,
+the working panels. The long-range scan is the main viewer — every event
+arrives as a coloured contact drifting through space, and the sensor keeps
+picking one up in a corner-bracket target lock. The intrusion log is a real table (timestamp, source, destination,
 protocol, action, threat level) with the rows coloured by the event law; the
 threat analyser charts the last thirty seconds and the docking-uplink ports
 light for Wi-Fi joins. Force field, shields and impulse power ride the gauge
 row with their percentages knocked out at the bar ends. Blocks chip the force
 field and turn the harmonics red; a threat throws the deck into a **steady**
-red alert — the frame goes red and stays red, nothing strobes. The console
+red alert — the frame goes red and stays red, nothing strobes and the screen
+brightness never changes. The console
 *is* the HUD: the generic panels hide themselves, and every pill, rail and
 elbow is vector geometry that re-flows to any window and stays crisp from
 720p to 4K.

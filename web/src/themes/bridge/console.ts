@@ -19,7 +19,7 @@ import { L, EV, label, hbar, vbar, pip } from './sprites';
 const KINDS = ['allow', 'block', 'dns', 'dhcp', 'wifi', 'threat', 'system'] as const;
 type Kind = typeof KINDS[number];
 
-interface Blip { ang: number; dist: number; t0: number; color: number; }
+interface Obj { x: number; y: number; vx: number; vy: number; t0: number; color: number; }
 interface LogRow { kind: Kind; time: string; src: string; dst: string; proto: string; action: string; lvl: string; y: number; }
 interface HistEv { kind: Kind; }
 
@@ -74,8 +74,10 @@ export class Console {
 
   private lay!: Lay;
   private t = 0;
-  private sweep = 0;
-  private blips: Blip[] = [];
+  private objs: Obj[] = [];
+  private target = -1;
+  private targetUntil = -9;
+  private nextTarget = 3;
   private rows: LogRow[] = [];
   private rowPool: Array<{ txt: Text }> = [];
   private hist: HistEv[] = [];
@@ -84,7 +86,6 @@ export class Console {
   private portI = 0;
   private ffFlash = 0;
   private blockFlash = 0;
-  private powerT = 9;
   private alertUntil = -9;
   private alertOn = false;
   private phase = 0;
@@ -103,6 +104,7 @@ export class Console {
   private hLog = label('INTRUSION DETECTION & FIREWALL LOG', 26, L.orange, 700);
   private hSweep = label('LONG RANGE SCAN', 16, L.paleblue, 600);
   private hThreat = label('THREAT ANALYSIS', 16, L.salmon, 600);
+  private lockT = label('', 14, L.salmon, 600);
   private colT: Text[] = [];
   private cellT: Text[][] = [];
   private gaugeT: Text[] = [];
@@ -111,7 +113,7 @@ export class Console {
 
   constructor(private layer: Container, private settings: Record<string, any>) {
     layer.addChild(this.chrome, this.leftG, this.gaugeG, this.sweepG, this.threatG, this.lcdG, this.rowsG, this.texts);
-    this.texts.addChild(this.titleL, this.titleR, this.stardateT, this.clockT, this.alertT, this.hLog, this.hSweep, this.hThreat);
+    this.texts.addChild(this.titleL, this.titleR, this.stardateT, this.clockT, this.alertT, this.hLog, this.hSweep, this.hThreat, this.lockT);
     for (let i = 0; i < SIDEBAR.length; i++) {
       const name = label(SIDEBAR[i][0], 24, '#000000', 700, 'center');
       const code = label(SIDEBAR[i][1], 13, '#000000', 600, 'right');
@@ -148,6 +150,7 @@ export class Console {
       this.texts.addChild(c, v);
     }
     this.alertT.visible = false;
+    this.lockT.visible = false;
   }
 
   // ── layout ───────────────────────────────────────────────────────────────
@@ -290,8 +293,10 @@ export class Console {
   // ── events ───────────────────────────────────────────────────────────────
   event(kind: Kind, src: string, ev?: { dst?: string; port?: string; proto?: string }): void {
     if (this.settings.bBlips !== false) {
-      if (this.blips.length >= (this.settings.bMaxBlips ?? 60)) this.blips.shift();
-      this.blips.push({ ang: Math.random() * Math.PI * 2, dist: 0.25 + Math.random() * 0.7, t0: this.t, color: EV[kind] });
+      if (this.objs.length >= (this.settings.bMaxBlips ?? 60)) this.objs.shift();
+      const a = Math.random() * Math.PI * 2, sp = 0.004 + Math.random() * 0.01;
+      this.objs.push({ x: Math.random(), y: Math.random(), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, t0: this.t, color: EV[kind] });
+      if (kind === 'threat') this.target = this.objs.length - 1, this.targetUntil = this.t + 3;
     }
     if (this.settings.bFeed !== false) {
       // at demo traffic the log would blur into noise: one row per 0.12s
@@ -304,7 +309,7 @@ export class Console {
           src: (src || '?').toUpperCase().slice(0, 15),
           dst: ((ev?.dst ?? '') + (ev?.port ? ':' + ev.port : '') || '—').toUpperCase().slice(0, 15),
           proto: (ev?.proto || (kind === 'dns' ? 'DNS' : kind === 'dhcp' ? 'DHCP' : kind === 'wifi' ? 'WPA' : '—')).toUpperCase().slice(0, 6),
-          action: ACTION[kind], lvl: LVL[kind], y: 40,
+          action: ACTION[kind], lvl: LVL[kind], y: -40,
         });
         const max = Math.min(20, this.settings.bFeedRows ?? 12);
         while (this.rows.length > max + 2) this.rows.shift();
@@ -322,7 +327,6 @@ export class Console {
     if (kind === 'wifi' && this.settings.bPorts !== false) {
       this.ports[this.portI % 8] = this.t; this.portI++;
     }
-    if (kind === 'system') this.powerT = 0;
   }
   private lastLog = -9;
 
@@ -344,12 +348,6 @@ export class Console {
     }
     this.alertT.visible = alert;
 
-    // power dropout (system): one smooth dip, no random flicker
-    if (this.powerT < 1.2) {
-      this.powerT += dt;
-      this.layer.alpha = 0.55 + 0.45 * Math.min(1, this.powerT / 1.2);
-    } else this.layer.alpha = 1;
-
     this.ffFlash = Math.max(0, this.ffFlash - dt * 1.6);
     this.blockFlash = Math.max(0, this.blockFlash - dt * 2.2);
 
@@ -360,7 +358,7 @@ export class Console {
     this.clockT.text = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}:${String(now.getUTCSeconds()).padStart(2, '0')} UTC`;
 
     this.drawGauges(u);
-    this.drawSweep(dt, t, u);
+    this.drawSpace(dt, t, u);
     this.drawThreat(t, u);
     this.drawLog(u);
     this.drawLcd(u);
@@ -395,9 +393,8 @@ export class Console {
       const vt = this.gaugeT[i * 2 + 1];
       vt.text = `${Math.round((v as number) * 100)}%`;
       vt.scale.set(Math.max(0.55, Math.min(2.2, u)) * 0.95);
-      vt.position.set(x + w - 10 * u, y + 3 * u);
+      vt.position.set(x + w - 10 * u - vt.width, y + 3 * u);
       vt.style.fill = (v as number) > 0.82 ? '#000000' : L.peach;
-      vt.style.align = 'right';
     });
     // shield harmonics: a segmented meter riding the activity
     const hx = gauges.x, hy = gauges.y + 22 * u + 3 * 38 * u - 8 * u;
@@ -412,37 +409,56 @@ export class Console {
     ht.position.set(hx + segs * 12 * u + 14 * u, hy + 1 * u);
   }
 
-  private drawSweep(dt: number, t: number, u: number): void {
+  private drawSpace(dt: number, t: number, u: number): void {
     const g = this.sweepG;
     g.clear();
     if (this.settings.bSweep === false) return;
     const { sweep } = this.lay;
-    const cx = sweep.x + sweep.w / 2, cy = sweep.y + sweep.h / 2 + 10 * u;
-    const R = Math.min(sweep.w, sweep.h - 20 * u) * 0.44;
-    this.sweep += dt * (0.55 + this.activity * 0.7);
-    for (let i = 1; i <= 3; i++) g.circle(cx, cy, R * i / 3).stroke({ width: 1.5 * u, color: L.deepblue, alpha: 0.55 });
-    g.moveTo(cx - R, cy).lineTo(cx + R, cy).stroke({ width: 1.5 * u, color: L.deepblue, alpha: 0.4 });
-    g.moveTo(cx, cy - R).lineTo(cx, cy + R).stroke({ width: 1.5 * u, color: L.deepblue, alpha: 0.4 });
-    const steps = 18;
-    for (let i = 0; i < steps; i++) {
-      const a0 = this.sweep - (i + 1) * 0.055, a1 = this.sweep - i * 0.055;
-      g.moveTo(cx, cy)
-        .lineTo(cx + Math.cos(a0) * R, cy + Math.sin(a0) * R)
-        .lineTo(cx + Math.cos(a1) * R, cy + Math.sin(a1) * R)
-        .closePath().fill({ color: L.cyan, alpha: 0.05 * (1 - i / steps) + 0.008 });
+    const x = sweep.x + 10 * u, y = sweep.y + 26 * u;
+    const w = sweep.w - 20 * u, h = sweep.h - 36 * u;
+
+    // objects drift slowly through the frame and wrap at the edges
+    for (const o of this.objs) {
+      o.x += o.vx * dt * 6; o.y += o.vy * dt * 6;
+      if (o.x < 0.02) o.x += 0.96; if (o.x > 0.98) o.x -= 0.96;
+      if (o.y < 0.03) o.y += 0.94; if (o.y > 0.97) o.y -= 0.94;
     }
-    g.moveTo(cx, cy).lineTo(cx + Math.cos(this.sweep) * R, cy + Math.sin(this.sweep) * R)
-      .stroke({ width: 2 * u, color: L.cyan, alpha: 0.9 });
-    g.circle(cx, cy, 4 * u).fill(L.peach);
-    for (let i = this.blips.length - 1; i >= 0; i--) {
-      const b = this.blips[i];
-      const age = t - b.t0;
-      if (age > 6) { this.blips.splice(i, 1); continue; }
-      const bx = cx + Math.cos(b.ang) * R * b.dist, by = cy + Math.sin(b.ang) * R * b.dist;
-      const al = age < 0.15 ? age / 0.15 : Math.max(0, 1 - (age - 0.15) / 5.8);
-      g.circle(bx, by, 3.4 * u).fill({ color: b.color, alpha: al });
-      if (age < 0.9) g.circle(bx, by, (3.4 + age * 22) * u).stroke({ width: 1.5 * u, color: b.color, alpha: al * 0.5 * (1 - age / 0.9) });
+
+    // the sensor occasionally locks onto one contact and rides it for a while
+    if (t > this.nextTarget && this.objs.length) {
+      this.target = Math.floor(Math.random() * this.objs.length);
+      this.targetUntil = t + 2.5 + Math.random() * 2;
+      this.nextTarget = this.targetUntil + 2 + Math.random() * 5;
     }
+    if (t > this.targetUntil) this.target = -1;
+    if (this.target >= this.objs.length) this.target = -1;
+
+    for (let i = 0; i < this.objs.length; i++) {
+      const o = this.objs[i];
+      const px = x + o.x * w, py = y + o.y * h;
+      const age = t - o.t0;
+      const al = Math.min(1, age / 0.4);
+      g.circle(px, py, 3 * u).fill({ color: o.color, alpha: al });
+      if (age < 0.9) g.circle(px, py, (3 + age * 14) * u).stroke({ width: 1.5 * u, color: o.color, alpha: al * 0.5 * (1 - age / 0.9) });
+      if (i === this.target) {
+        // LCARS target lock: corner brackets + a tracking ring
+        const r = (10 + 2 * Math.sin(t * 3)) * u;
+        g.circle(px, py, r + 4 * u).stroke({ width: 1.5 * u, color: L.salmon, alpha: 0.9 });
+        for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+          g.moveTo(px + sx * r, py + sy * r - sy * 5 * u).lineTo(px + sx * r, py + sy * r).lineTo(px + sx * r - sx * 5 * u, py + sy * r)
+            .stroke({ width: 2.5 * u, color: L.salmon, alpha: 1 });
+        }
+      }
+    }
+    // lock readout
+    const lt = this.lockT;
+    if (this.target >= 0) {
+      const o = this.objs[this.target];
+      lt.visible = true;
+      lt.scale.set(Math.max(0.55, Math.min(2.2, u)) * 0.85);
+      lt.position.set(x + 6 * u, y + h - 18 * u);
+      lt.text = `TARGET LOCK · CONTACT ${String(this.target).padStart(2, '0')} · TRACKING`;
+    } else lt.visible = false;
   }
 
   private drawThreat(t: number, u: number): void {
