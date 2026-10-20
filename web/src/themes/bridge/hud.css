@@ -16,7 +16,7 @@ body[data-theme="bridge"] #scanlines { display: none !important; }
 
 body[data-theme="bridge"] #hint {
   font-family: 'Antonio', 'Arial Narrow', sans-serif;
-  letter-spacing: 2px; color: #ff9966; opacity: 0.75;
+  letter-spacing: 2px; color: #ff8a45; opacity: 0.75;
 }
 body[data-theme="bridge"] #demo-badge {
   font-family: 'Antonio', 'Arial Narrow', sans-serif;
@@ -26,20 +26,20 @@ body[data-theme="bridge"] #demo-badge {
 /* the settings panel: peach chrome, black plates, Antonio labels */
 body[data-theme="bridge"] #settings {
   background: #000;
-  border: 3px solid #ff9966;
+  border: 3px solid #ff8a45;
   border-radius: 18px;
-  color: #ffcc66;
+  color: #ffc93f;
   font-family: 'Antonio', 'Arial Narrow', sans-serif;
   letter-spacing: 1px;
 }
-body[data-theme="bridge"] .set-top { border-bottom-color: #ff9966; }
+body[data-theme="bridge"] .set-top { border-bottom-color: #ff8a45; }
 body[data-theme="bridge"] .set-tab {
-  color: #000; background: #cc99cc; border-color: #000; border-radius: 8px;
+  color: #000; background: #d080d8; border-color: #000; border-radius: 8px;
 }
-body[data-theme="bridge"] .set-tab.active { background: #ff9966; }
+body[data-theme="bridge"] .set-tab.active { background: #ff8a45; }
 body[data-theme="bridge"] #settings select {
-  background: #26224a; color: #ffcc66; border-color: #9999ff;
+  background: #26224a; color: #ffc93f; border-color: #8b8bff;
 }
 body[data-theme="bridge"] .set-reset { color: #000; background: #ff9933; border-radius: 8px; }
-body[data-theme="bridge"] input[type="range"] { accent-color: #ff9966; }
-body[data-theme="bridge"] input[type="checkbox"] { accent-color: #ff9966; }
+body[data-theme="bridge"] input[type="range"] { accent-color: #ff8a45; }
+body[data-theme="bridge"] input[type="checkbox"] { accent-color: #ff8a45; }

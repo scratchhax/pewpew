@@ -31,7 +31,7 @@ export const SCENES: Record<string, { title: string; blurb: string; accent: stri
   fragnet: { title: 'FRAGNET', blurb: 'Your network is Hell: a first-person patrol of a procedural maze where intruders are demons, allowed traffic is ammunition, and five traces open the exit.', accent: '#ff7a2a' },
   substrate: { title: 'Substrate', blurb: 'Your network draws on paper: every flow is a crack leaving the last one at right angles, hosts plant the seeds the plan grows from, and pigment washes the spaces between. A picture every couple of minutes, then a fresh one.', accent: '#b08050' },
   slipstream: { title: 'Slipstream', blurb: 'An eight-kart Mode 7 grand prix in 16-bit: every seat is a host and traffic is the draft, DHCP hands the quiet karts to new drivers, blocks leave oil, Wi-Fi joins light the boost pads, and threats fire red shells at the leader.', accent: '#ffd23f' },
-  bridge: { title: 'Bridge', blurb: 'Your network as a starship LCARS console: events land as blips on the long-range sweep and scroll down the intrusion log table, Wi-Fi lights the docking ports, and threats throw the deck into red alert.', accent: '#ff9966' },
+  bridge: { title: 'Bridge', blurb: 'Your network as a starship LCARS console: events land as blips on the long-range sweep and scroll down the intrusion log table, Wi-Fi lights the docking ports, and threats throw the deck into red alert.', accent: '#ff8a45' },
 };
 /** Themes in picker order: the known scenes first (as the README lists them), then any others. */
 export const SCENE_ORDER = [...Object.keys(SCENES).filter((id) => THEME_IDS.includes(id)), ...THEME_IDS.filter((id) => !(id in SCENES))];

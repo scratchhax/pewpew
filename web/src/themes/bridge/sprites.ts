@@ -10,12 +10,13 @@ import { Graphics, Text, type TextStyleFontWeight } from 'pixi.js';
 /** The canonical LCARS palette (structure), plus the fixed event law (data). */
 export const L = {
   black: '#000000',
-  // The classic LCARS chart colours: warm, saturated, flat on black.
-  red: '#CC6666', dkred: '#993333',
-  orange: '#FF9966', peach: '#FFCC99', tan: '#CC9966', yellow: '#FFCC66',
-  salmon: '#FF9999', lilac: '#CC99CC', purple: '#CC99FF',
-  blue: '#9999FF', deepblue: '#6666CC', paleblue: '#9999CC',
-  cyan: '#66CCCC', green: '#99FF99',
+  // The classic LCARS chart colours, pushed a step more saturated so they
+  // sing against true black.
+  red: '#E14B4B', dkred: '#B23131',
+  orange: '#FF8A45', peach: '#FFC177', tan: '#D6953F', yellow: '#FFC93F',
+  salmon: '#FF8787', lilac: '#D080D8', purple: '#C080FF',
+  blue: '#8B8BFF', deepblue: '#5E5EE6', paleblue: '#8F8FE8',
+  cyan: '#35C9DC', green: '#5CF05C',
   gray: '#999999', white: '#FFFFFF',
 };
 
