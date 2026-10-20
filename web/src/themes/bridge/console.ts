@@ -20,7 +20,7 @@ const KINDS = ['allow', 'block', 'dns', 'dhcp', 'wifi', 'threat', 'system'] as c
 type Kind = typeof KINDS[number];
 
 interface Obj { x: number; y: number; vx: number; vy: number; t0: number; color: number; }
-interface LogRow { kind: Kind; time: string; src: string; dst: string; proto: string; action: string; lvl: string; y: number; }
+interface LogRow { kind: Kind; time: string; src: string; dst: string; proto: string; action: string; lvl: string; y: number; t0: number; }
 interface HistEv { kind: Kind; }
 
 interface Rect { x: number; y: number; w: number; h: number; }
@@ -185,6 +185,7 @@ export class Console {
       log: { x: ix, y: iy + gaugeH + midH + 28 * u, w: iw, h: logH },
       lcd: { x: ix, y: iy + ih - lcdH, w: iw, h: lcdH },
     };
+    this.slots = Math.max(4, Math.min(this.cellT.length, this.settings.bFeedRows ?? 12, Math.floor((this.lay.log.h - 70 * u) / (24 * u))));
     this.buildChrome();
     this.placeTexts();
   }
@@ -208,16 +209,6 @@ export class Console {
     hbar(g, sub.x, sb, sub.w * 0.42, sub.h, a ? L.dkred : L.tan);
     hbar(g, sub.x + sub.w * 0.42 + 8 * u, sb, sub.w * 0.24, sub.h, a ? L.red : L.salmon);
     hbar(g, sub.x + sub.w * 0.66 + 8 * u, sb, sub.w * 0.34, sub.h, a ? L.dkred : L.paleblue);
-
-    // sidebar pills
-    const n = SIDEBAR.length;
-    const gap = 14 * u;
-    const ph = (side.h - gap * (n - 1)) / n;
-    for (let i = 0; i < n; i++) {
-      const py = side.y + i * (ph + gap);
-      const col = SIDEBAR[i][2] === L.red && a ? '#FF2222' : SIDEBAR[i][2];
-      g.roundRect(side.x, py, side.w, ph, Math.min(ph / 2, 26 * u)).fill(col);
-    }
 
     // gold code rail: segments with black codes knocked out
     const segH = rail.h / RAIL_CODES.length;
@@ -258,15 +249,6 @@ export class Console {
     this.alertT.scale.set(k);
     this.alertT.position.set((title.x + title.w / 2 + frame.x) / 2, sub.y + 1 * u);
 
-    const n = SIDEBAR.length, gap = 14 * u;
-    const ph = (side.h - gap * (n - 1)) / n;
-    for (let i = 0; i < n; i++) {
-      const py = side.y + i * (ph + gap);
-      this.sideT[i].scale.set(k * 0.95);
-      this.sideT[i].position.set(side.x + side.w / 2, py + ph / 2 - 14 * u);
-      this.sideC[i].scale.set(k * 0.9);
-      this.sideC[i].position.set(side.x + side.w - 16 * u, py + ph - 22 * u);
-    }
     const segH = rail.h / RAIL_CODES.length;
     for (let i = 0; i < RAIL_CODES.length; i++) {
       this.railC[i].scale.set(k * 0.9);
@@ -309,10 +291,9 @@ export class Console {
           src: (src || '?').toUpperCase().slice(0, 15),
           dst: ((ev?.dst ?? '') + (ev?.port ? ':' + ev.port : '') || '—').toUpperCase().slice(0, 15),
           proto: (ev?.proto || (kind === 'dns' ? 'DNS' : kind === 'dhcp' ? 'DHCP' : kind === 'wifi' ? 'WPA' : '—')).toUpperCase().slice(0, 6),
-          action: ACTION[kind], lvl: LVL[kind], y: -40,
+          action: ACTION[kind], lvl: LVL[kind], y: -40, t0: this.t,
         });
-        const max = Math.min(20, this.settings.bFeedRows ?? 12);
-        while (this.rows.length > max + 2) this.rows.shift();
+        while (this.rows.length > this.slots + 2) this.rows.shift();
       }
     }
     if (this.settings.bBars !== false) {
@@ -323,14 +304,26 @@ export class Console {
       while (a.length && this.t - a[0] > 30) a.shift();
       this.counts.set(kind, a);
     }
-    if (kind === 'block') { this.blockFlash = 1; this.ffFlash = 1; }
+    if (kind === 'block') {
+      this.blockFlash = 1; this.ffFlash = 1;
+      const i = this.pillOrder.indexOf(2);
+      if (i > 0) { [this.pillOrder[i], this.pillOrder[i - 1]] = [this.pillOrder[i - 1], this.pillOrder[i]]; }
+    }
     if (kind === 'wifi' && this.settings.bPorts !== false) {
       this.ports[this.portI % 8] = this.t; this.portI++;
     }
   }
   private lastLog = -9;
+  private slots = 12;
+  private pillOrder = SIDEBAR.map((_, i) => i);
+  private pillCur: number[] = SIDEBAR.map(() => 0);
+  private nextShuffle = 7;
 
   alert(): void { this.alertUntil = this.t + 3; }
+  raiseAlertPill(): void {
+    const i = this.pillOrder.indexOf(4);
+    if (i > 0) { this.pillOrder.splice(i, 1); this.pillOrder.unshift(4); }
+  }
 
   // ── per-frame ────────────────────────────────────────────────────────────
   update(dt: number, t: number, activity: number, stats?: ConsoleStats): void {
@@ -347,6 +340,7 @@ export class Console {
       this.placeTexts();
     }
     this.alertT.visible = alert;
+    if (alert) this.alertT.alpha = 0.7 + 0.3 * Math.abs(Math.sin(t * 2.4));
 
     this.ffFlash = Math.max(0, this.ffFlash - dt * 1.6);
     this.blockFlash = Math.max(0, this.blockFlash - dt * 2.2);
@@ -362,7 +356,7 @@ export class Console {
     this.drawThreat(t, u);
     this.drawLog(u);
     this.drawLcd(u);
-    this.drawLeftColumn(t, u);
+    this.drawSidebar(dt, t, u);
   }
 
   private drawGauges(u: number): void {
@@ -395,6 +389,7 @@ export class Console {
       vt.scale.set(Math.max(0.55, Math.min(2.2, u)) * 0.95);
       vt.position.set(x + w - 10 * u - vt.width, y + 3 * u);
       vt.style.fill = (v as number) > 0.82 ? '#000000' : L.peach;
+      vt.alpha = (v as number) < 0.35 ? 0.55 + 0.45 * Math.abs(Math.sin(this.t * 2.8)) : 1;
     });
     // shield harmonics: a segmented meter riding the activity
     const hx = gauges.x, hy = gauges.y + 22 * u + 3 * 38 * u - 8 * u;
@@ -458,6 +453,7 @@ export class Console {
       lt.scale.set(Math.max(0.55, Math.min(2.2, u)) * 0.85);
       lt.position.set(x + 6 * u, y + h - 18 * u);
       lt.text = `TARGET LOCK · CONTACT ${String(this.target).padStart(2, '0')} · TRACKING`;
+      lt.alpha = 0.65 + 0.35 * Math.abs(Math.sin(t * 2.6));
     } else lt.visible = false;
   }
 
@@ -495,7 +491,7 @@ export class Console {
   private drawLog(u: number): void {
     const { log } = this.lay;
     const cols = [0, 0.17, 0.40, 0.55, 0.68, 0.83];
-    const rows = Math.min(20, this.settings.bFeedRows ?? 12);
+    const rows = this.slots;
     const rh = (log.h - 70 * u) / rows;
     const k = Math.max(0.55, Math.min(2.2, u)) * 0.95;
     const bottom = log.y + log.h;
@@ -512,9 +508,13 @@ export class Console {
       const show = yTop > log.y + 66 * u && yTop < bottom;
       const vals = [row.time, row.src, row.dst, row.proto, row.action, row.lvl];
       const col = hex(EV[row.kind]);
+      // a fresh row breathes gently for its first seconds (slow, never dark)
+      const fresh = this.t - row.t0 < 2.5;
+      const pulse = fresh ? 0.62 + 0.38 * Math.abs(Math.sin(this.t * 3)) : 1;
       for (let c = 0; c < 6; c++) {
         const cell = cells[c];
         cell.visible = show;
+        cell.alpha = c >= 4 ? pulse : 1;
         cell.scale.set(k);
         cell.position.set(log.x + log.w * cols[c], yTop);
         cell.text = vals[c];
@@ -562,10 +562,33 @@ export class Console {
     }
   }
 
-  private drawLeftColumn(t: number, u: number): void {
-    // the sidebar pill for ALERT LOG glows steady red while the deck is at alert
-    void t; void u;
-    this.leftG.clear();
+  private drawSidebar(dt: number, t: number, u: number): void {
+    const g = this.leftG;
+    g.clear();
+    const { side } = this.lay;
+    const n = SIDEBAR.length, gap = 14 * u;
+    const ph = (side.h - gap * (n - 1)) / n;
+    const r = Math.min(ph / 2, 26 * u);
+    const k = Math.max(0.55, Math.min(2.2, u));
+    // the console re-patches itself now and then: two adjacent pills trade slots
+    if (t > this.nextShuffle) {
+      const i = Math.floor(Math.random() * (n - 1));
+      [this.pillOrder[i], this.pillOrder[i + 1]] = [this.pillOrder[i + 1], this.pillOrder[i]];
+      this.nextShuffle = t + 6 + Math.random() * 8;
+    }
+    for (let slot = 0; slot < n; slot++) {
+      const pill = this.pillOrder[slot];
+      const target = side.y + slot * (ph + gap);
+      if (this.pillCur[pill] === 0) this.pillCur[pill] = target;
+      this.pillCur[pill] += (target - this.pillCur[pill]) * Math.min(1, dt * 6);
+      const py = this.pillCur[pill];
+      const col = pill === 4 && this.alertOn ? '#FF2222' : SIDEBAR[pill][2];
+      g.roundRect(side.x, py, side.w, ph, r).fill(col);
+      this.sideT[pill].scale.set(k * 0.95);
+      this.sideT[pill].position.set(side.x + side.w / 2, py + ph / 2 - 14 * u);
+      this.sideC[pill].scale.set(k * 0.9);
+      this.sideC[pill].position.set(side.x + side.w - 16 * u, py + ph - 22 * u);
+    }
   }
 }
 
