@@ -53,10 +53,9 @@ your own traffic. Pick a scene per screen:
   pads, and when the IDS barks a red shell screams off the back of the pack
   for the leader
 - **Bridge**: your network as the LCARS console of a starship — events land as
-  coloured blips on the long-range sweep, the log scrolls down the subspace
-  feed, DHCP leases sign the crew manifest, Wi-Fi joins light the docking
-  ports, blocks chip the force field, and a threat throws the whole deck into
-  red alert
+  coloured blips on the long-range sweep and scroll down the intrusion log as
+  a proper table, Wi-Fi joins light the docking ports, blocks chip the force
+  field, and a threat throws the whole deck into a steady red alert
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -1351,16 +1350,21 @@ and it holds 60 fps on a Raspberry Pi.
 
 ![bridge](docs/bridge.png)
 
-Your network as the LCARS console of a starship. The main viewer is a
-long-range sensor sweep: every event lands as a coloured blip where its host
-sits on the scope and fades as the arm passes. The subspace data feed scrolls
-the log down the frame, DHCP leases sign the crew manifest, DNS lookups light
-the library computer, and Wi-Fi joins light the docking-uplink ports down the
-left column. Blocks chip the force-field gauge and push the shield harmonics
-red; a threat throws the whole deck into a strobing red alert until it passes.
-The stardate ticks, the bar bank breathes with traffic, and the console *is*
-the HUD — the generic panels hide themselves, and every elbow and rail is
-vector geometry that re-flows to any window and stays crisp from 720p to 4K.
+Your network as the LCARS console of a starship, laid out like a classic
+master systems display: a big title bar with end-caps, a column of pill
+buttons down the left, a gold rail of codes, and one rounded frame holding
+the working panels. The long-range sweep is the main viewer — every event
+lands as a coloured blip where its host sits on the scope and fades as the
+arm passes. The intrusion log is a real table (timestamp, source, destination,
+protocol, action, threat level) with the rows coloured by the event law; the
+threat analyser charts the last thirty seconds and the docking-uplink ports
+light for Wi-Fi joins. Force field, shields and impulse power ride the gauge
+row with their percentages knocked out at the bar ends. Blocks chip the force
+field and turn the harmonics red; a threat throws the deck into a **steady**
+red alert — the frame goes red and stays red, nothing strobes. The console
+*is* the HUD: the generic panels hide themselves, and every pill, rail and
+elbow is vector geometry that re-flows to any window and stays crisp from
+720p to 4K.
 
 ![bridge alert](docs/bridge-alert.png)
 

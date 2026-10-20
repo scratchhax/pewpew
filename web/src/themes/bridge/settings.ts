@@ -41,7 +41,7 @@ const range = (key: Key, label: string, min: number, max: number, step: number):
 export const BRIDGE_CONTROLS = {
   scene: [
     toggle('bSweep', 'Long-range sweep'), toggle('bBlips', 'Sensor blips'),
-    toggle('bFeed', 'Subspace data feed'), toggle('bBars', 'Bar bank'),
+    toggle('bFeed', 'Intrusion log'), toggle('bBars', 'Threat analysis'),
     toggle('bWave', 'Shield harmonics'), toggle('bAlert', 'Red alert (threats)'),
     toggle('bPorts', 'Docking uplink ports (Wi-Fi)'),
   ],

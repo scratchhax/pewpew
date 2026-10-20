@@ -24,13 +24,13 @@ export class State {
     return this.stamps.length;
   }
 
-  private blocks30s(): number {
+  blocks30s(): number {
     const cutoff = performance.now() - 30_000;
     while (this.blockStamps.length && this.blockStamps[0] < cutoff) this.blockStamps.shift();
     return this.blockStamps.length;
   }
 
-  private threats30s(): number {
+  threats30s(): number {
     const cutoff = performance.now() - 30_000;
     while (this.threatStamps.length && this.threatStamps[0] < cutoff) this.threatStamps.shift();
     return this.threatStamps.length;

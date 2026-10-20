@@ -68,18 +68,18 @@ async function create(host: ThemeHost<typeof BRIDGE_DEFAULTS>, init: RendererIni
     const ip = ev.src_ip ?? '?';
     switch (se.kind) {
       case 'allow':
-        console_.event('allow', ev.dst_ip ? `${ip} → ${ev.dst_ip}${ev.dst_port ? ':' + ev.dst_port : ''}` : ip);
+        console_.event('allow', ip, { dst: ev.dst_ip ?? undefined, port: ev.dst_port ? String(ev.dst_port) : undefined, proto: ev.protocol ?? undefined });
         if (now() - lastBeep > 0.15) { lastBeep = now(); audio.sfx('beep'); }
         audio.cueSong('allow', ip);
         break;
       case 'block':
-        console_.event('block', `DENIED ${ip}${ev.dst_port ? ' → :' + ev.dst_port : ''}`);
+        console_.event('block', ip, { dst: ev.dst_ip ?? undefined, port: ev.dst_port ? String(ev.dst_port) : undefined, proto: ev.protocol ?? undefined });
         audio.sfx('force');
         audio.cueSong('block', ip);
         break;
       case 'threat': {
         const sig = (ev.rule_desc || ev.rule_name || `INTRUSION ${ip}`).replace(/^ET\s+/i, '').slice(0, 30);
-        console_.event('threat', `ALERT ${sig}`);
+        console_.event('threat', ip, { dst: sig, proto: 'IDS' });
         console_.alert();
         if (settings.bAlert !== false) {
           alertUntil = now() + 3;
@@ -90,36 +90,41 @@ async function create(host: ThemeHost<typeof BRIDGE_DEFAULTS>, init: RendererIni
       }
       case 'dns':
         if (!throttle.allow(`dns|${ev.dns_query}`, 4) || !ev.dns_query) break;
-        console_.event('dns', ev.dns_query);
+        console_.event('dns', ip, { dst: ev.dns_query, proto: 'DNS' });
         audio.cueSong('dns', ip);
         break;
       case 'dhcp': {
         if (!throttle.allow(`dhcp|${ev.syslog_host}|${ev.hostname}`, 5)) break;
         const name = ev.hostname || (ev.mac_address ? `DEV-${ev.mac_address.replace(/:/g, '').slice(-4)}` : ip);
-        console_.event('dhcp', name);
+        console_.event('dhcp', name, { dst: ip, proto: 'DHCP' });
         audio.sfx('confirm');
         audio.cueSong('dhcp');
         break;
       }
       case 'wifi':
         if (!throttle.allow(`wifi|${ev.syslog_host}|${ev.wifi_event}`, 4)) break;
-        console_.event('wifi', `${ev.syslog_host ?? 'CLIENT'} ${se.wifi === 'bad' ? 'REJECTED' : 'DOCKED'}`);
+        console_.event('wifi', ev.syslog_host ?? 'CLIENT', { dst: se.wifi === 'bad' ? 'REJECTED' : 'DOCKED', proto: 'WPA' });
         audio.sfx('port');
         audio.cueSong('wifi');
         break;
       case 'system':
         if (!throttle.allow(`sys|${ev.syslog_host}`, 4)) break;
-        console_.event('system', `POWER ${ev.syslog_host ?? 'CORE'}`);
+        console_.event('system', ev.syslog_host ?? 'CORE', { dst: 'CORE', proto: 'SYS' });
         audio.sfx('powerdown');
         audio.cueSong('system');
         break;
     }
   }
 
+  const t0 = performance.now() / 1000;
+
   function frame(f: FrameInfo): void {
     const { dt, t } = f;
     const activity = Math.min(1, state.rate30s / 600);
-    console_.update(dt, t, activity);
+    console_.update(dt, t, activity, {
+      rate: state.rate30s, denied: state.blocks30s(), threats: state.threats30s(),
+      threat: state.threat, energy: state.energy, uptime: t - t0,
+    });
     audio.setThreatActive(now() < alertUntil);
     screen.position.set(Math.round(f.wanderX * 0.2), Math.round(f.wanderY * 0.2));
     app.render();
