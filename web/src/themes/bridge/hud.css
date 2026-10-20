@@ -1,0 +1,45 @@
+/* Bridge: the LCARS console draws its own interface on the canvas, so the
+   stock HUD panels step aside. Antonio (OFL, see fonts/OFL.txt) is the house
+   font; the settings panel gets the ready-room treatment. */
+@font-face {
+  font-family: 'Antonio';
+  src: url('./fonts/antonio-latin.woff2') format('woff2');
+  font-weight: 100 700;
+  font-style: normal;
+  font-display: block;
+}
+
+body[data-theme="bridge"] { background: #000; }
+body[data-theme="bridge"] #hud .panel { display: none; }
+body[data-theme="bridge"] .corner { display: none; }
+body[data-theme="bridge"] #scanlines { display: none !important; }
+
+body[data-theme="bridge"] #hint {
+  font-family: 'Antonio', 'Arial Narrow', sans-serif;
+  letter-spacing: 2px; color: #ff9966; opacity: 0.75;
+}
+body[data-theme="bridge"] #demo-badge {
+  font-family: 'Antonio', 'Arial Narrow', sans-serif;
+  letter-spacing: 2px; background: #ff9933; color: #000; border-radius: 8px;
+}
+
+/* the settings panel: peach chrome, black plates, Antonio labels */
+body[data-theme="bridge"] #settings {
+  background: #000;
+  border: 3px solid #ff9966;
+  border-radius: 18px;
+  color: #ffcc66;
+  font-family: 'Antonio', 'Arial Narrow', sans-serif;
+  letter-spacing: 1px;
+}
+body[data-theme="bridge"] .set-top { border-bottom-color: #ff9966; }
+body[data-theme="bridge"] .set-tab {
+  color: #000; background: #cc99cc; border-color: #000; border-radius: 8px;
+}
+body[data-theme="bridge"] .set-tab.active { background: #ff9966; }
+body[data-theme="bridge"] #settings select {
+  background: #26224a; color: #ffcc66; border-color: #9999ff;
+}
+body[data-theme="bridge"] .set-reset { color: #000; background: #ff9933; border-radius: 8px; }
+body[data-theme="bridge"] input[type="range"] { accent-color: #ff9966; }
+body[data-theme="bridge"] input[type="checkbox"] { accent-color: #ff9966; }

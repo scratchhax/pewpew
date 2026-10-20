@@ -32,6 +32,7 @@ export const SCENES: Record<string, { title: string; blurb: string; accent: stri
   substrate: { title: 'Substrate', blurb: 'Your network draws on paper: every flow is a crack leaving the last one at right angles, hosts plant the seeds the plan grows from, and pigment washes the spaces between. A picture every couple of minutes, then a fresh one.', accent: '#b08050' },
   clockwork: { title: 'Clockwork', blurb: 'Your network as one steam-powered Rube Goldberg machine: every event is a ball bearing dropped in at the top that rolls the rail, runs the dominoes, tips the see-saw, flies to the funnel, rides the coal cart down and is tipped into the firebox. Traffic is pressure, and pressure drives the whole run faster.', accent: '#d9a94a' },
   slipstream: { title: 'Slipstream', blurb: 'An eight-kart Mode 7 grand prix in 16-bit: every seat is a host and traffic is the draft, DHCP hands the quiet karts to new drivers, blocks leave oil, Wi-Fi joins light the boost pads, and threats fire red shells at the leader.', accent: '#ffd23f' },
+  bridge: { title: 'Bridge', blurb: 'Your network as a starship LCARS console: events land as blips on the long-range sweep, the log scrolls down the subspace feed, DHCP signs the crew manifest, Wi-Fi lights the docking ports, and threats throw the deck into red alert.', accent: '#ff9966' },
 };
 /** Themes in picker order: the known scenes first (as the README lists them), then any others. */
 export const SCENE_ORDER = [...Object.keys(SCENES).filter((id) => THEME_IDS.includes(id)), ...THEME_IDS.filter((id) => !(id in SCENES))];
