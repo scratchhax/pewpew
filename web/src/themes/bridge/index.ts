@@ -40,7 +40,9 @@ async function create(host: ThemeHost<typeof BRIDGE_DEFAULTS>, init: RendererIni
     background: '#000000',
     antialias: true,
     powerPreference: init.powerPref === 'default' ? undefined : init.powerPref,
-    resolution: init.resolution,
+    // pure vector: adaptive downscaling only blurs it (and shifts the
+    // edge-flush chrome), so the canvas always renders at native resolution
+    resolution: 1,
     autoDensity: true,
     autoStart: false,
     sharedTicker: false,
@@ -128,7 +130,7 @@ async function create(host: ThemeHost<typeof BRIDGE_DEFAULTS>, init: RendererIni
     frame,
     applyBudgets() {},
     settingsChanged() {},
-    setResolution(scale) { if (app.renderer.resolution !== scale) app.renderer.resolution = scale; },
+    setResolution() {}, // vector at native res; runtime rescaling shifts the chrome
     stats: () => ({ chrome: 'vector', sweep: settings.bSweep ? 'on' : 'off' }),
     diag: () => ({ app, console: console_ }),
   };

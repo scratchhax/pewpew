@@ -28,6 +28,8 @@ interface Lay {
 
 const hex = (n: number) => '#' + n.toString(16).padStart(6, '0');
 
+const RAIL_TOKENS = ['35-1', '47-2', '22-3', '09-4', '7-5', '12-6', '5-7', '3-8', '41-9', '14-A', '6-B', '2-C'];
+
 export class Console {
   private chrome = new Graphics();
   private leftG = new Graphics();
@@ -46,6 +48,8 @@ export class Console {
   private crewT: Text[] = []; private crewC: Graphics[] = [];
   private libT: Text[] = []; private libC: Graphics[] = [];
   private hist: HistEv[] = [];
+  private railPills: Array<{ x: number; y: number; w: number; h: number }> = [];
+  private railT: Text[] = [];
   private lastFeed = -9;
   private crew: string[] = [];
   private lib: string[] = [];
@@ -102,12 +106,18 @@ export class Console {
       this.libC.push(cap); this.libT.push(txt);
     }
     this.alertT.visible = false;
+    for (let i = 0; i < 12; i++) {
+      const t = label('', 12, '#000000', 700, 'center');
+      t.visible = false;
+      this.railT.push(t);
+      this.texts.addChild(t);
+    }
   }
 
   // ── layout ───────────────────────────────────────────────────────────────
   resize(W: number, H: number): void {
     const u = Math.max(0.5, Math.min(2.4, Math.min(W / 1920, H / 1080)));
-    const bw = 30 * u;
+    const bw = 34 * u;
     const er = 190 * u, er2 = 80 * u;
     const g0 = 12 * u;
     const x0 = bw + g0, y0 = bw + g0, x1 = W - bw - g0, y1 = H - bw - g0;
@@ -132,9 +142,9 @@ export class Console {
     const { W, H, u, bw, er, er2 } = this.lay;
     const g = this.chrome;
     g.clear();
-    const c1 = this.alertOn ? L.red : L.peach;
-    const c2 = this.alertOn ? L.dkred : L.orange;
-    const c3 = this.alertOn ? L.dkred : L.lilac;
+    const c1 = this.alertOn ? L.red : L.orange;
+    const c2 = this.alertOn ? L.dkred : L.peach;
+    const c3 = this.alertOn ? L.dkred : L.purple;
 
     hbar(g, er, 0, W - er, bw, c1);
     elbow(g, er, er, er, er - bw, c1);
@@ -155,12 +165,15 @@ export class Console {
     }
     for (let x = er + 60 * u, n = 0; x < W - bw - 40 * u; x += 120 * u, n++) {
       notch(x, 0, 4 * u, bw);
-      pip(g, x + 10 * u, 3 * u, 40 * u, bw - 6 * u, n % 2 ? L.tan : L.blue);
+      pip(g, x + 10 * u, 3 * u, 40 * u, bw - 6 * u, n % 2 ? L.yellow : L.blue);
       notch(x + 58 * u, 0, 4 * u, bw);
     }
+    this.railPills = [];
     for (let y = 40 * u, n = 0; y < H - 40 * u; y += 84 * u, n++) {
       notch(W - bw, y, bw, 4 * u);
-      pip(g, W - bw + 3 * u, y + 10 * u, bw - 6 * u, 22 * u, n % 2 ? L.peach : L.salmon);
+      const px = W - bw + 3 * u, py = y + 10 * u, pw = bw - 6 * u, ph = 22 * u;
+      pip(g, px, py, pw, ph, n % 2 ? L.peach : L.salmon);
+      this.railPills.push({ x: px, y: py, w: pw, h: ph });
       notch(W - bw, y + 40 * u, bw, 4 * u);
     }
 
@@ -169,9 +182,9 @@ export class Console {
     const hh = 22 * u;
     hbar(g, viewer.x, viewer.y, viewer.w, hh, L.blue);
     hbar(g, viewer.x + viewer.w - 130 * u, viewer.y, 130 * u, hh, L.paleblue);
-    hbar(g, wave.x, wave.y, wave.w, hh, L.tan);
+    hbar(g, wave.x, wave.y, wave.w, hh, L.yellow);
     hbar(g, bank.x, bank.y, bank.w, hh, L.lilac);
-    hbar(g, feed.x, feed.y, feed.w, hh, L.peach);
+    hbar(g, feed.x, feed.y, feed.w, hh, L.orange);
     hbar(g, crew.x, crew.y, crew.w, hh, L.blue);
     hbar(g, lib.x, lib.y, lib.w, hh, L.lilac);
     g.rect(viewer.x, viewer.y + hh, viewer.w, viewer.h - hh).fill('#02040a');
@@ -216,6 +229,15 @@ export class Console {
     this.hPorts.rotation = Math.PI / 2;
     this.hPorts.anchor.set(0, 0);
     this.hPorts.position.set(6 * u, er + 70 * u + 190 * u + 8 * 22 * u + 14 * u);
+    this.railT.forEach((t, i) => {
+      const p = this.railPills[i];
+      t.visible = !!p;
+      if (p) {
+        t.scale.set(k * 0.9);
+        t.text = RAIL_TOKENS[i % RAIL_TOKENS.length];
+        t.position.set(p.x + p.w / 2, p.y + 4 * u);
+      }
+    });
     const bwid = bank.w / KINDS.length;
     KINDS.forEach((_, i) => {
       const t = this.kindT[i];
@@ -283,19 +305,19 @@ export class Console {
     this.activity = activity;
     const u = this.lay.u;
 
-    // red alert strobe: the whole frame flips red twice a second
+    // red alert: the frame goes red and stays red - no strobing, no flicker.
     const alert = t < this.alertUntil && this.settings.bAlert !== false;
     if (alert !== this.alertOn) {
       this.alertOn = alert;
       this.buildChrome();
       this.placeTexts();
     }
-    this.alertT.visible = alert && Math.sin(t * 12) > -0.2;
+    this.alertT.visible = alert;
 
-    // power dropout flicker (system)
+    // power dropout (system): one smooth dip, no random flicker
     if (this.powerT < 1.2) {
       this.powerT += dt;
-      this.layer.alpha = 0.45 + 0.55 * (Math.random() < 0.3 ? 0.5 : 1);
+      this.layer.alpha = 0.55 + 0.45 * Math.min(1, this.powerT / 1.2);
     } else this.layer.alpha = 1;
 
     this.ffFlash = Math.max(0, this.ffFlash - dt * 1.6);
@@ -441,7 +463,7 @@ export class Console {
       });
     };
     fill(this.lay.crew, this.crew, this.crewT, this.crewC, 0xffffff);
-    fill(this.lay.lib, this.lib, this.libT, this.libC, 0x99ccff);
+    fill(this.lay.lib, this.lib, this.libT, this.libC, 0x9999cc);
   }
 
   private drawLeftColumn(t: number, u: number): void {
