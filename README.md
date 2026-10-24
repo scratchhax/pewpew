@@ -121,6 +121,7 @@ Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - [Quick start](#quick-start)
 - [Highlights](#highlights)
 - [Setup](#setup): [Relay](#1-start-the-relay) · [Viewer](#2-build-the-viewer) · [UniFi logging](#3-send-unifi-logs-to-the-relay) · [Check it's working](#4-check-its-working) · [`relay.yaml`](#relayrelayyaml)
+- [Upgrading](#upgrading)
 - [Using pewpew](#using-pewpew): [Keys](#keys) · [Switching scenes](#switching-scenes) · [Log inspector](#log-inspector) · [Settings](#settings-f1)
 - [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [The Rain](#the-rain) · [Game of Life](#game-of-life) · [Mycelium](#mycelium) · [Undergrowth](#undergrowth) · [FRAGNET](#fragnet) · [Substrate](#substrate) · [Slipstream](#slipstream) · [Bridge](#bridge) · [Net Fighter](#net-fighter)
 - [Sound](#sound)
@@ -380,6 +381,69 @@ The relay understands both the classic iptables-style firewall log and the CEF
 security events from gateways on the CyberSecure/Enhanced tier (IDS/IPS threats
 included). `python3 relay/test_cef.py` self-checks the CEF parser, and
 `pewpew_relay.py --demo` generates fake events on the server side.
+
+## Upgrading
+
+pewpew is a git checkout, so an upgrade is three steps: pull, rebuild the
+viewer, and restart the relay only if the relay actually changed.
+
+```bash
+cd pewpew
+git pull
+cd web && npm ci && npm run build
+```
+
+`npm ci` rather than `npm install`, so you get the locked dependency versions.
+The relay serves `web/dist/` with no-cache headers, so the next browser refresh
+picks up the new viewer: a viewer-only update needs no restart.
+
+If the pull touched `relay/`, update its dependencies and restart it:
+
+```bash
+cd relay
+.venv/bin/pip install -r requirements.txt
+sudo systemctl restart pewpew-relay
+```
+
+UniFi devices take one to three minutes to resume logging after a relay
+restart, so skip it when only `web/` changed. `git log --oneline -- relay`
+tells you whether it did.
+
+### Your settings and your uploads
+
+`relay/relay.yaml` is tracked in git. Most setups edit it, usually for
+`wan_interfaces` or `drop_patterns`, and those edits will collide with a pull.
+Look before you pull, and reapply afterwards:
+
+```bash
+git diff relay/relay.yaml
+```
+
+Uploaded background tracks (`relay/tracks/`) and the FRAGNET art WAD
+(`relay/wads/`) are git-ignored, so a pull leaves them alone. They are also the
+only things here that exist nowhere else, so they are what a backup is for.
+
+### When the relay runs on a Pi
+
+A Pi running only the relay doesn't need Node. Build on another machine and
+copy the viewer across:
+
+```bash
+cd web && npm ci && npm run build
+rsync -a --delete dist/ pi@<relay-host>:pewpew-ui/web/dist/
+```
+
+The destination must end in `web/dist/`. `--delete` removes anything at the
+destination that is not in the source, so pointed at the checkout root it takes
+`relay/` and your uploads with it.
+
+### Confirming it landed
+
+The viewer's bottom-right corner shows the build it is running, for example
+`build c63b627 10-24 18:02Z`. If that hasn't changed, hard refresh with
+Ctrl+Shift+R. A `+` after the hash means the build came from a working tree
+with uncommitted changes. `curl localhost:8080/healthz` confirms the relay is
+up and ingesting.
 
 ## Using pewpew
 

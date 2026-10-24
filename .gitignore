@@ -12,5 +12,6 @@ desktop.ini
 
 *.log
 
-# uploaded background tracks (local media, never committed)
+# uploaded background tracks and FRAGNET art WAD (local media, never committed)
 relay/tracks/
+relay/wads/
