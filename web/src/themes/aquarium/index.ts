@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Color, Vector3 } from 'three';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -24,9 +25,9 @@ import './hud.css';
  */
 export const aquarium: Theme<typeof AQUARIUM_DEFAULTS> = {
   id: 'aquarium',
-  title: 'AQUARIUM',
+  title: meta.title,
   hud: AQUARIUM_HUD,
-  accentHue: 192,
+  accentHue: meta.accentHue,
   defaults: AQUARIUM_DEFAULTS,
   budgets: AQUARIUM_BUDGETS,
   controls: AQUARIUM_CONTROLS,
@@ -63,7 +64,6 @@ async function create(host: ThemeHost<typeof AQUARIUM_DEFAULTS>, init: RendererI
     W.uSunBase.value = settings.qCaustics ? 0.55 : 0.85;
   }
   applyBudgets();
-  window.addEventListener('resize', () => world.resize(window.innerWidth, window.innerHeight));
 
   // ── labels: names and addresses that follow a fish or a bubble ──
   const labels: Label[] = [];
@@ -268,6 +268,7 @@ async function create(host: ThemeHost<typeof AQUARIUM_DEFAULTS>, init: RendererI
     applyBudgets,
     settingsChanged() { applyBudgets(); },
     setResolution(scale) { world.setPixelRatio(scale); },
+    resize(width, height) { world.resize(width, height); },
     stats: () => ({ calls: world.renderer.info.render.calls, tris: world.renderer.info.render.triangles, fish: life.fish.length, bubbles: bubbles.count, ...life.counts }),
     diag: () => ({ renderer: world.renderer, scene: world.scene, camera: world.camera, world, reef, life, bubbles, W, audio, cam: (...v: number[]) => { camFix = v.length ? v : null; } }),
   };

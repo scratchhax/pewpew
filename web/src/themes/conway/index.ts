@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Application } from 'pixi.js';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -17,9 +18,9 @@ import { conwayScore } from './score';
  */
 export const conway: Theme<typeof CONWAY_DEFAULTS> = {
   id: 'conway',
-  title: 'GAME OF LIFE',
+  title: meta.title,
   hud: CONWAY_HUD,
-  accentHue: 130,
+  accentHue: meta.accentHue,
   defaults: CONWAY_DEFAULTS,
   budgets: CONWAY_BUDGETS,
   controls: CONWAY_CONTROLS,

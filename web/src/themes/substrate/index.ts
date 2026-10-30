@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Application } from 'pixi.js';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -27,9 +28,9 @@ import './hud.css';
  */
 export const substrate: Theme<typeof SUBSTRATE_DEFAULTS> = {
   id: 'substrate',
-  title: 'SUBSTRATE',
+  title: meta.title,
   hud: SUBSTRATE_HUD,
-  accentHue: 28,
+  accentHue: meta.accentHue,
   defaults: SUBSTRATE_DEFAULTS,
   budgets: SUBSTRATE_BUDGETS,
   controls: SUBSTRATE_CONTROLS,

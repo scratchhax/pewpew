@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Application, Container } from 'pixi.js';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -18,9 +19,9 @@ import './hud.css';
  */
 export const bridge: Theme<typeof BRIDGE_DEFAULTS> = {
   id: 'bridge',
-  title: 'BRIDGE',
+  title: meta.title,
   hud: BRIDGE_HUD,
-  accentHue: 25,
+  accentHue: meta.accentHue,
   defaults: BRIDGE_DEFAULTS,
   budgets: BRIDGE_BUDGETS,
   controls: BRIDGE_CONTROLS,

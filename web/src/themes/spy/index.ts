@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Vector3 } from 'three';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -30,9 +31,9 @@ import './hud.css';
  */
 export const spy: Theme<typeof SPY_DEFAULTS> = {
   id: 'spy',
-  title: 'PANOPTICON',
+  title: meta.title,
   hud: SPY_HUD,
-  accentHue: 44,
+  accentHue: meta.accentHue,
   defaults: SPY_DEFAULTS,
   budgets: SPY_BUDGETS,
   controls: SPY_CONTROLS,
@@ -83,7 +84,6 @@ async function create(host: ThemeHost<typeof SPY_DEFAULTS>, init: RendererInit):
     }
   }
   applyBudgets();
-  window.addEventListener('resize', () => world.resize(window.innerWidth, window.innerHeight));
 
   // ── intelligence: who is doing what, for the eye's triggers and dossier ──
   const intel = new Map<string, Intel>();
@@ -299,6 +299,7 @@ async function create(host: ThemeHost<typeof SPY_DEFAULTS>, init: RendererInit):
     applyBudgets,
     settingsChanged() { applyBudgets(); },
     setResolution(scale) { world.setPixelRatio(scale); },
+    resize(width, height) { world.resize(width, height); },
     stats: () => ({ calls: world.renderer.info.render.calls, tris: world.renderer.info.render.triangles, eye: eye.phase, ...orbit.counts() }),
     diag: () => ({
       renderer: world.renderer, scene: world.scene, camera: world.camera, planet, orbit, eye, geo, intel, audio,

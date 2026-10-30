@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Application } from 'pixi.js';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -23,9 +24,9 @@ import './hud.css';
  */
 export const mycelium: Theme<typeof MYCELIUM_DEFAULTS> = {
   id: 'mycelium',
-  title: 'MYCELIUM',
+  title: meta.title,
   hud: MYCELIUM_HUD,
-  accentHue: 155,
+  accentHue: meta.accentHue,
   defaults: MYCELIUM_DEFAULTS,
   budgets: MYCELIUM_BUDGETS,
   score: myceliumScore,

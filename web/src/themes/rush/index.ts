@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Application, Container, Sprite } from 'pixi.js';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -22,9 +23,9 @@ import './hud.css';
  */
 export const rush: Theme<typeof RUSH_DEFAULTS> = {
   id: 'rush',
-  title: 'PACKET RUSH',
+  title: meta.title,
   hud: RUSH_HUD,
-  accentHue: 205,
+  accentHue: meta.accentHue,
   defaults: RUSH_DEFAULTS,
   budgets: RUSH_BUDGETS,
   controls: RUSH_CONTROLS,

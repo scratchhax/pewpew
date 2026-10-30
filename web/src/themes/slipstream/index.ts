@@ -1,3 +1,4 @@
+import meta from './meta';
 import type { SceneEvent } from '../../events';
 import type { FrameInfo, RendererInit, Theme, ThemeHost, ThemeInstance } from '../../theme';
 import { SLIP_BUDGETS, SLIP_CONTROLS, SLIP_DEFAULTS, SLIP_HUD } from './settings';
@@ -59,9 +60,9 @@ import './hud.css';
  */
 export const slipstream: Theme<typeof SLIP_DEFAULTS> = {
   id: 'slipstream',
-  title: 'Slipstream',
+  title: meta.title,
   hud: SLIP_HUD,
-  accentHue: 50,
+  accentHue: meta.accentHue,
   defaults: SLIP_DEFAULTS,
   budgets: SLIP_BUDGETS,
   controls: SLIP_CONTROLS,
@@ -233,11 +234,10 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     mapT = null;
   }
 
-  const resize = (): void => {
-    m7.resize(window.innerWidth, window.innerHeight, Math.max(120, settings.kRows * (init.resolution || 1)));
+  const resize = (width = window.innerWidth, height = window.innerHeight): void => {
+    m7.resize(width, height, Math.max(120, settings.kRows * (init.resolution || 1)));
     mapT = null;
   };
-  window.addEventListener('resize', resize);
   resize();
 
   const flags = (replay: boolean) => ({
@@ -565,6 +565,7 @@ async function create(host: ThemeHost<typeof SLIP_DEFAULTS>, init: RendererInit)
     },
     applyBudgets: () => resize(),
     setResolution: (scale: number) => { init.resolution = scale; m7.resize(window.innerWidth, window.innerHeight, Math.max(120, settings.kRows * scale)); },
+    resize,
     stats: () => ({
       TRACK: track.name,
       POS: `P${race.order.indexOf(race.heroIdx) + 1}/${SEATS}`,

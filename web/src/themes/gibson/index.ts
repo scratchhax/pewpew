@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Vector3 } from 'three';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -25,9 +26,9 @@ import './hud.css';
  */
 export const gibson: Theme<typeof GIBSON_DEFAULTS> = {
   id: 'gibson',
-  title: 'THE GIBSON',
+  title: meta.title,
   hud: GIBSON_HUD,
-  accentHue: 232,
+  accentHue: meta.accentHue,
   defaults: GIBSON_DEFAULTS,
   budgets: GIBSON_BUDGETS,
   controls: GIBSON_CONTROLS,
@@ -90,7 +91,6 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
     }
   }
   applyBudgets();
-  window.addEventListener('resize', () => world.resize(window.innerWidth, window.innerHeight));
 
   // the film's signs are rare, punctuation not wallpaper: minutes apart
   let nextDeny = 0, nextGrant = 0, flyT = Math.random() * 100;
@@ -293,6 +293,7 @@ async function create(host: ThemeHost<typeof GIBSON_DEFAULTS>, init: RendererIni
     applyBudgets,
     settingsChanged() { applyBudgets(); },
     setResolution(scale) { world.setPixelRatio(scale); },
+    resize(width, height) { world.resize(width, height); },
     stats: () => ({ calls: world.renderer.info.render.calls, tris: world.renderer.info.render.triangles, towers: towers.count, red: towers.redCount(), lock: lockOn ? 'ON' : 'off', signs: billboards.count }),
     diag: () => ({
       renderer: world.renderer, scene: world.scene, camera: world.camera, atlas, towers, ground, billboards, audio,

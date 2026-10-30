@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Application } from 'pixi.js';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -20,9 +21,9 @@ import { rainScore } from './score';
  */
 export const rain: Theme<typeof RAIN_DEFAULTS> = {
   id: 'rain',
-  title: 'THE RAIN',
+  title: meta.title,
   hud: RAIN_HUD,
-  accentHue: 130,
+  accentHue: meta.accentHue,
   defaults: RAIN_DEFAULTS,
   budgets: RAIN_BUDGETS,
   controls: RAIN_CONTROLS,

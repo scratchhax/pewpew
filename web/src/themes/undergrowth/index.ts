@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Vector3 } from 'three';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -22,9 +23,9 @@ import './hud.css';
  */
 export const undergrowth: Theme<typeof UNDERGROWTH_DEFAULTS> = {
   id: 'undergrowth',
-  title: 'UNDERGROWTH',
+  title: meta.title,
   hud: UNDERGROWTH_HUD,
-  accentHue: 155,
+  accentHue: meta.accentHue,
   defaults: UNDERGROWTH_DEFAULTS,
   budgets: UNDERGROWTH_BUDGETS,
   controls: UNDERGROWTH_CONTROLS,
@@ -67,16 +68,15 @@ async function create(host: ThemeHost<typeof UNDERGROWTH_DEFAULTS>, init: Render
   }
   applyBudgets();
 
-  function setPx(): void {
+  function setPx(height = window.innerHeight): void {
     const pr = world.renderer.getPixelRatio();
-    view.setPx(window.innerHeight * pr / 1080);
+    view.setPx(height * pr / 1080);
   }
-  function resize(): void {
-    world.resize(window.innerWidth, window.innerHeight);
-    setPx();
+  function resize(width = window.innerWidth, height = window.innerHeight): void {
+    world.resize(width, height);
+    setPx(height);
   }
   resize();
-  window.addEventListener('resize', resize);
 
   // ── the event law (the same law as the garden seen from above) ────────────
   let simT = 0;
@@ -266,6 +266,7 @@ async function create(host: ThemeHost<typeof UNDERGROWTH_DEFAULTS>, init: Render
         setPx();
       }
     },
+    resize,
     stats: () => ({
       ...view.stats(sim),
       flight: `${cam.pos.x.toFixed(0)},${cam.pos.z.toFixed(0)}`,

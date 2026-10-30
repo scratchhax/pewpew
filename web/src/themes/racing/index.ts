@@ -1,3 +1,4 @@
+import meta from './meta';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
 import { RACING_BUDGETS, RACING_CONTROLS, RACING_DEFAULTS, RACING_HUD } from './settings';
@@ -41,9 +42,9 @@ const WINDOW_COLORS: Record<string, Color> = Object.fromEntries(
  */
 export const racing: Theme<typeof RACING_DEFAULTS> = {
   id: 'racing',
-  title: 'MIDNIGHT RUN',
+  title: meta.title,
   hud: RACING_HUD,
-  accentHue: 318,
+  accentHue: meta.accentHue,
   defaults: RACING_DEFAULTS,
   budgets: RACING_BUDGETS,
   controls: RACING_CONTROLS,
@@ -79,8 +80,6 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
     world.blur.enabled = settings.rMotionBlur > 0.01;
   }
   applyBudgets();
-
-  window.addEventListener('resize', () => world.resize(window.innerWidth, window.innerHeight));
 
   // ── driving state ──
   let speed = 30, travelled = 0, wet = 0.45, rain = 0, nitro = 0;
@@ -245,6 +244,7 @@ async function create(host: ThemeHost<typeof RACING_DEFAULTS>, init: RendererIni
     applyBudgets,
     settingsChanged() { applyBudgets(); },
     setResolution(scale) { world.setPixelRatio(scale); },
+    resize(width, height) { world.resize(width, height); },
     stats: () => ({ calls: world.renderer.info.render.calls, tris: world.renderer.info.render.triangles }),
     diag: () => ({ renderer: world.renderer, scene, camera, traffic, city, audio }),
   };

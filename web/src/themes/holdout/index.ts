@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Application, Container, Sprite } from 'pixi.js';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -34,9 +35,9 @@ const COLORS = {
  */
 export const holdout: Theme<typeof HOLDOUT_DEFAULTS> = {
   id: 'holdout',
-  title: 'LAST OUTPOST',
+  title: meta.title,
   hud: HOLDOUT_HUD,
-  accentHue: 40,
+  accentHue: meta.accentHue,
   defaults: HOLDOUT_DEFAULTS,
   budgets: HOLDOUT_BUDGETS,
   score: holdoutScore,

@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Color } from 'three';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -26,9 +27,9 @@ import './hud.css';
  */
 export const mainframe: Theme<typeof MAINFRAME_DEFAULTS> = {
   id: 'mainframe',
-  title: 'MAINFRAME',
+  title: meta.title,
   hud: MAINFRAME_HUD,
-  accentHue: 186,
+  accentHue: meta.accentHue,
   defaults: MAINFRAME_DEFAULTS,
   budgets: MAINFRAME_BUDGETS,
   controls: MAINFRAME_CONTROLS,
@@ -68,7 +69,6 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
   }
   applyBudgets();
   board.fill(flight.z, settings.mChunks);
-  window.addEventListener('resize', () => world.resize(window.innerWidth, window.innerHeight));
 
   // ── intelligence for the dive's triggers and trace panel ──
   const intel = new Map<string, Intel>();
@@ -254,6 +254,7 @@ async function create(host: ThemeHost<typeof MAINFRAME_DEFAULTS>, init: Renderer
     applyBudgets,
     settingsChanged() { applyBudgets(); },
     setResolution(scale) { world.setPixelRatio(scale); },
+    resize(width, height) { world.resize(width, height); },
     stats: () => ({ calls: world.renderer.info.render.calls, tris: world.renderer.info.render.triangles, dive: dive.phase, ...traffic.counts() }),
     diag: () => ({
       renderer: world.renderer, scene: world.scene, camera: world.camera, board, traffic, flight, dive, intel, audio,

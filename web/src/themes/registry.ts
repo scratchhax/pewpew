@@ -1,4 +1,4 @@
-import type { Theme } from '../theme';
+import type { SceneMeta, Theme } from '../theme';
 
 /**
  * Every folder under themes/ with an index.ts (default-exporting a Theme) is
@@ -7,35 +7,33 @@ import type { Theme } from '../theme';
  * is how the relay knows what to serve at /<id>/.
  */
 const modules = import.meta.glob<{ default: Theme<any> }>('./*/index.ts');
+const metas = import.meta.glob<SceneMeta>('./*/meta.ts', { eager: true, import: 'default' });
 
 export const THEME_IDS = Object.keys(modules).map((p) => p.split('/')[1]).sort();
 
 /** Used when neither the URL nor the relay names a theme. */
 export const BUILTIN_DEFAULT = 'scifi';
 
-/** What the scene picker shows for each theme (kept here so picking never downloads every theme). */
-export const SCENES: Record<string, { title: string; blurb: string; accent: string }> = {
-  scifi: { title: 'Orbital Command', blurb: 'A space station defending your network: asteroids, lasers and constellations.', accent: '#46f0d9' },
-  holdout: { title: 'Last Outpost', blurb: 'A walled compound under siege: zombies press the walls, turrets hold the line, supply drops come in on parachutes, and the horde comes when the lights flicker.', accent: '#ff6a30' },
-  racing: { title: 'Midnight Run', blurb: 'A neon street race: traffic, roadblocks, rivals and police chases.', accent: '#ff3fb4' },
-  rush: { title: 'Packet Rush', blurb: 'A 16-bit runner: gems, stompable baddies, query blocks, rivals and a hunter drone.', accent: '#41a6f6' },
-  spy: { title: 'Panopticon', blurb: 'A made-up planet under watch: signal arcs, satellites, and an eye of god that zooms in on the people behind the traffic.', accent: '#e8c26a' },
-  mainframe: { title: 'Mainframe', blurb: 'A god\'s-eye flight over a glowing circuit board at night: traffic races the traces, and dives into chips trace intruders.', accent: '#7ef3ff' },
-  aquarium: { title: 'Aquarium', blurb: 'A reef tank: schools of fish for your traffic, pufferfish for blocks, a shark for threats, and bubbles for DNS lookups.', accent: '#6fe6ff' },
-  gibson: { title: 'The Gibson', blurb: 'The storage wall from the movie: translucent cyan monoliths lining the corridor, a DHCP lease rewrites one, and the camera locks onto red intruder files.', accent: '#5fd6ff' },
-  rain: { title: 'The Rain', blurb: 'The firewall log as digital rain: real queries, blocks and leases fall down the screen in readable columns, green for what passes, red for what burns, and the weather is your traffic.', accent: '#3dff70' },
-  conway: { title: 'Game of Life', blurb: 'Conway\'s automaton played with your log: every live cell is a glyph, PASS events glide across as gliders, BLOCKs sit as still lifes, and an IDS alarm drops a glider gun.', accent: '#3dff70' },
-  netfighter: { title: 'Net Fighter', blurb: 'The log as a street fight: Traffic, fed by every packet that passes, brawls Firewall, fed by every refusal - blocks, lookups and alarms land as jabs, fireballs and supers on a rain-slick night block.', accent: '#ffd23f' },
-  mycelium: { title: 'Mycelium', blurb: 'Your network as a forest floor at night: permitted traffic grows a glowing web between hosts, DNS pushes up mushrooms wearing the domain, threats are a blight the web burns off.', accent: '#5ff0cf' },
-  undergrowth: { title: 'Undergrowth', blurb: 'Fly through the living mat: your traffic as bioluminescent threads you travel between, mushroom groves at the junctions, and a blight that creeps the web before the web burns it off.', accent: '#8fe6b0' },
-  fragnet: { title: 'FRAGNET', blurb: 'Your network is Hell: a first-person patrol of a procedural maze where intruders are demons, allowed traffic is ammunition, and five traces open the exit.', accent: '#ff7a2a' },
-  substrate: { title: 'Substrate', blurb: 'Your network draws on paper: every flow is a crack leaving the last one at right angles, hosts plant the seeds the plan grows from, and pigment washes the spaces between. A picture every couple of minutes, then a fresh one.', accent: '#b08050' },
-  slipstream: { title: 'Slipstream', blurb: 'An eight-kart Mode 7 grand prix in 16-bit: every seat is a host and traffic is the draft, DHCP hands the quiet karts to new drivers, blocks leave oil, Wi-Fi joins light the boost pads, and threats fire red shells at the leader.', accent: '#ffd23f' },
-  bridge: { title: 'Bridge', blurb: 'Your network as a starship LCARS console: events land as blips on the long-range sweep and scroll down the intrusion log table, Wi-Fi lights the docking ports, and threats throw the deck into red alert.', accent: '#ff8a45' },
+/** Scene metadata is eager (tiny modules); the full theme stays lazy. */
+const metaEntries = Object.entries(metas).map(([path, meta]) => {
+  const id = path.split('/')[1];
+  return [id, meta] as const;
+});
+
+export const SCENES: Record<string, SceneMeta> = Object.fromEntries(metaEntries);
+
+/** Themes in picker order: known scenes by `order`, then any unlisted theme folders. */
+export const SCENE_ORDER = [
+  ...metaEntries
+    .filter(([id]) => THEME_IDS.includes(id))
+    .sort(([a, ma], [b, mb]) => (ma.order ?? Infinity) - (mb.order ?? Infinity) || a.localeCompare(b))
+    .map(([id]) => id),
+  ...THEME_IDS.filter((id) => !(id in SCENES)),
+];
+
+export const sceneInfo = (id: string): SceneMeta => SCENES[id] ?? {
+  title: id.toUpperCase(), blurb: '', accent: '#9fdcff', accentHue: 172,
 };
-/** Themes in picker order: the known scenes first (as the README lists them), then any others. */
-export const SCENE_ORDER = [...Object.keys(SCENES).filter((id) => THEME_IDS.includes(id)), ...THEME_IDS.filter((id) => !(id in SCENES))];
-export const sceneInfo = (id: string) => SCENES[id] ?? { title: id.toUpperCase(), blurb: '', accent: '#9fdcff' };
 
 /** This screen's own pick, from the scene picker (per browser, so a kiosk keeps it across reboots). */
 const SCENE_KEY = 'pewpew.scene';

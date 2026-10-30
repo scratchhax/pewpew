@@ -18,6 +18,19 @@ import type { HudLabelOverrides } from './hud/hud';
 /** A music track baked into a theme's bundle. */
 export interface BundledTrack { name: string; url: string; meta: TrackMeta }
 
+export interface SceneMeta {
+  /** Display name used by the scene picker and settings panel. */
+  title: string;
+  /** One-line description shown in the scene picker. */
+  blurb: string;
+  /** Accent colour shown on the scene-picker card. */
+  accent: string;
+  /** Base hue of the HUD accent, before the hue-shift knob. */
+  accentHue: number;
+  /** Scene-picker order; scenes without one sort at the end. */
+  order?: number;
+}
+
 export interface Theme<T extends ThemeSettings = ThemeSettings> {
   /** Short id, e.g. 'scifi'. */
   id: string;
@@ -65,6 +78,10 @@ export interface ThemeInstance {
   applyBudgets(): void;
   /** Canvas pixels per CSS pixel, applied live. */
   setResolution(scale: number): void;
+  /** Optional: the viewport changed. The core owns the resize listener. */
+  resize?(width: number, height: number): void;
+  /** Optional: release renderer, listeners and scene resources. */
+  destroy?(): void;
   /** Debug overlay extras, e.g. scene node count. */
   stats(): Record<string, string | number>;
   /** Objects exposed on `window.__diag` with `?diag`. */

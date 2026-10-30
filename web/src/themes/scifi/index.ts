@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Application, Container } from 'pixi.js';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -60,7 +61,8 @@ const STARFIELD_KEYS = new Set(['starfield', 'nebula', 'hueShift', 'colorSat',
 /** Orbital Command: the network as a space battle around a command station. */
 export const sciFi: Theme<typeof SCIFI_DEFAULTS> = {
   id: 'scifi',
-  title: 'ORBITAL COMMAND',
+  title: meta.title,
+  accentHue: meta.accentHue,
   defaults: SCIFI_DEFAULTS,
   budgets: SCIFI_BUDGETS,
   score: scifiScore,

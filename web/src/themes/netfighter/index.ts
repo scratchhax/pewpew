@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { Theme, ThemeHost, RendererInit, ThemeInstance, FrameInfo } from '../../theme';
 import type { SceneEvent } from '../../events';
@@ -22,9 +23,9 @@ import { netFighterScore } from './score';
  */
 export const netfighter: Theme<typeof NETFIGHTER_DEFAULTS> = {
   id: 'netfighter',
-  title: 'NET FIGHTER',
+  title: meta.title,
   hud: NETFIGHTER_HUD,
-  accentHue: 42,
+  accentHue: meta.accentHue,
   defaults: NETFIGHTER_DEFAULTS,
   budgets: NETFIGHTER_BUDGETS,
   controls: NETFIGHTER_CONTROLS,

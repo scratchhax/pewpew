@@ -52,6 +52,15 @@ export async function boot<T extends ThemeSettings>(theme: Theme<T>): Promise<vo
     { settings, state, throttle, audio, mount: document.getElementById('app')!, hud: { setExtraStat: (l, v) => hud.setExtraStat(l, v), say: (t) => hud.say(t) } },
     { antialias: settings.antialias, powerPref: settings.powerPref, resolution: settings.renderScale },
   );
+  let resizeQueued = false;
+  window.addEventListener('resize', () => {
+    if (resizeQueued) return;
+    resizeQueued = true;
+    requestAnimationFrame(() => {
+      resizeQueued = false;
+      scene.resize?.(window.innerWidth, window.innerHeight);
+    });
+  });
   if (params.has('diag')) (window as any).__diag = { ...scene.diag?.() };
 
   // A scene that asks for more than the GPU can hold loses its WebGL context,

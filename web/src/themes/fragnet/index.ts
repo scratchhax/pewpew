@@ -1,3 +1,4 @@
+import meta from './meta';
 import { Groove } from '../../sound/groove';
 import type { SceneEvent } from '../../events';
 import type { RendererInit, Theme, ThemeHost, ThemeInstance, FrameInfo } from '../../theme';
@@ -34,9 +35,9 @@ const SPAWN_PAD = 0.45;
  */
 export const fragnet: Theme<typeof FRAGNET_DEFAULTS> = {
   id: 'fragnet',
-  title: 'FRAGNET',
+  title: meta.title,
   hud: FRAGNET_HUD,
-  accentHue: 17,
+  accentHue: meta.accentHue,
   defaults: FRAGNET_DEFAULTS,
   budgets: FRAGNET_BUDGETS,
   controls: FRAGNET_CONTROLS,
@@ -611,14 +612,18 @@ async function create(host: ThemeHost<typeof FRAGNET_DEFAULTS>, init: RendererIn
     }
   }
   applyBudgets();
-  window.addEventListener('resize', () => renderer.setPixRes(settings.dPixRes));
+  let renderScale = 1;
 
   return {
     event,
     frame,
     applyBudgets,
     settingsChanged() { applyBudgets(); },
-    setResolution(scale) { renderer.setPixRes(settings.dPixRes * scale); },
+    setResolution(scale) {
+      renderScale = scale;
+      renderer.setPixRes(settings.dPixRes * scale);
+    },
+    resize() { renderer.setPixRes(settings.dPixRes * renderScale); },
     stats: () => ({ level: `E1M${levelNo}`, frags, health: Math.round(health), ammo, demons: actors.demonCount, art: artSource }),
     diag: () => ({
       renderer, level, actors, gun,
