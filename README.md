@@ -2130,9 +2130,14 @@ scene's `frame()`. All settings live in one saved object, so HUD and audio
 preferences carry across scenes.
 
 **Adding a scene:** create `web/src/themes/<id>/index.ts` with a default
-export of a `Theme` (defaults, per-tier budgets, panel controls, `create()`).
-The registry finds it on its own; add an entry to `SCENES` in
-`themes/registry.ts` to give it a title and blurb in the scene picker.
+export of a `Theme` (defaults, per-tier budgets, panel controls, `create()`),
+and `web/src/themes/<id>/meta.ts` with its picker metadata: `title`, `blurb`,
+`accent`, `accentHue` and `order`. The registry discovers both files on its
+own; `order` controls its place in the scene picker, and no registry edit is
+needed. The theme's own `title` and `accentHue` (usually `meta.title` and
+`meta.accentHue`) drive the settings panel and HUD accent. Add optional
+`resize(width, height)` / `destroy()` to the returned `ThemeInstance` if the
+scene needs viewport or teardown work; the core owns the window resize listener.
 The build writes `dist/<id>/index.html` and the relay serves it at `/<id>/`.
 To give it its own music, set `score` to a function that receives the shared
 `AudioEngine` (context, output, reverb and echo sends, settings) and returns a

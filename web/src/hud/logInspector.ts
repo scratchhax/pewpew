@@ -30,6 +30,8 @@ export class LogInspector {
   private pauseAt = 0;
   private version = -1;
   private dirty = true;
+  private viewDirty = true;
+  private lastSeenId = 0;
   private timer: number | undefined;
   private searchTimer: number | undefined;
   private previousFocus: HTMLElement | null = null;
@@ -105,7 +107,7 @@ export class LogInspector {
     this.list.addEventListener('pointerdown', e => {
       if (e.target === this.list || e.target === this.space) this.pause();
     });
-    this.list.addEventListener('scroll', () => { this.dirty = true; });
+    this.list.addEventListener('scroll', () => { this.viewDirty = true; });
     this.list.addEventListener('keydown', e => {
       if (!['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageUp', 'PageDown', 'Enter', ' '].includes(e.key)) return;
       e.preventDefault(); this.pause();
@@ -182,49 +184,99 @@ export class LogInspector {
     if (!this.isOpen) return;
     const changed = this.version !== this.store.version;
     const oldFirst = this.ids[Math.floor(this.list.scrollTop / ROW)];
-    if (changed || this.dirty) {
-      this.ids = [];
-      for (const record of this.store.records.values()) {
-        if ((!this.following && record.id > this.pauseAt) || !matches(record, this.filter)) continue;
-        this.ids.push(record.id);
-      }
+    let indexed = false;
+
+    if (this.dirty) {
+      this.rebuildIds();
+      indexed = true;
+    } else if (changed) {
+      const pruned = this.pruneIds();
+      const appended = this.following ? this.appendNewIds() : false;
+      if (pruned || appended) indexed = true;
+      this.lastSeenId = this.store.lastId;
+    }
+
+    if (indexed) {
       this.space.style.height = `${Math.max(this.ids.length * ROW, 1)}px`;
       if (this.following) this.list.scrollTop = this.list.scrollHeight;
       else if (changed && oldFirst != null) {
         const index = this.ids.indexOf(oldFirst);
         if (index >= 0) this.list.scrollTop = index * ROW + this.list.scrollTop % ROW;
       }
-      const start = Math.max(0, Math.floor(this.list.scrollTop / ROW) - 4);
-      const end = Math.min(this.ids.length, start + Math.ceil(this.list.clientHeight / ROW) + 9);
-      this.rows.style.transform = `translateY(${start * ROW}px)`;
-      const fragment = document.createDocumentFragment();
-      for (let i = start; i < end; i++) {
-        const record = this.store.records.get(this.ids[i])!;
-        const ev = record.event;
-        const row = element('div', '', `log-row ${eventClass(ev)}${record.id === this.selected ? ' selected' : ''}`);
-        row.dataset.id = String(record.id); row.id = `log-event-${record.id}`;
-        row.setAttribute('role', 'option'); row.setAttribute('aria-selected', String(record.id === this.selected));
-        row.setAttribute('aria-posinset', String(i + 1)); row.setAttribute('aria-setsize', String(this.ids.length));
-        row.append(element('time', ev.timestamp.slice(11, 19) || '—'),
-          element('span', ev.threat ? 'THREAT' : (ev.rule_action || ev.log_type).toUpperCase(), 'log-badge'),
-          element('span', summary(ev), 'log-summary'));
-        fragment.append(row);
-      }
-      if (!this.ids.length) fragment.append(element('p', this.store.records.size ? 'No matching events in this view.' : 'Waiting for events…', 'log-empty'));
-      this.rows.replaceChildren(fragment);
-      this.rows.classList.toggle('arriving', changed && this.following);
-      if (this.selected != null && this.rows.querySelector(`#log-event-${this.selected}`))
-        this.list.setAttribute('aria-activedescendant', `log-event-${this.selected}`);
-      else this.list.removeAttribute('aria-activedescendant');
-      this.renderChips();
-      this.version = this.store.version; this.dirty = false;
+      this.viewDirty = true;
     }
+
+    if (indexed || this.viewDirty) {
+      this.renderRows(changed && this.following && indexed);
+      this.viewDirty = false;
+    }
+
+    this.version = this.store.version;
+    this.dirty = false;
+
     const pending = this.following ? 0 : this.store.lastId - this.pauseAt;
     this.liveButton.textContent = this.following ? 'Pause' : `Follow live · ${pending} new`;
     const status = `${this.following ? 'LIVE' : 'PAUSED'} · ${this.ids.length} matching / ${this.store.records.size} retained · ${(this.store.bytes / 1024 / 1024).toFixed(2)} MiB text`;
     if (this.status.textContent !== status) this.status.textContent = status;
     this.renderDetails(); this.drawSpark();
   }
+
+  private rebuildIds(): void {
+    this.ids = [];
+    for (const record of this.store.records.values()) {
+      if ((!this.following && record.id > this.pauseAt) || !matches(record, this.filter)) continue;
+      this.ids.push(record.id);
+    }
+    this.lastSeenId = this.store.lastId;
+  }
+
+  private appendNewIds(): boolean {
+    let added = false;
+    for (let id = this.lastSeenId + 1; id <= this.store.lastId; id++) {
+      const record = this.store.records.get(id);
+      if (record && matches(record, this.filter)) {
+        this.ids.push(id);
+        added = true;
+      }
+    }
+    return added;
+  }
+
+  private pruneIds(): boolean {
+    let removed = false;
+    while (this.ids.length && !this.store.records.has(this.ids[0])) {
+      this.ids.shift();
+      removed = true;
+    }
+    return removed;
+  }
+
+  private renderRows(arriving = false): void {
+    const start = Math.max(0, Math.floor(this.list.scrollTop / ROW) - 4);
+    const end = Math.min(this.ids.length, start + Math.ceil(this.list.clientHeight / ROW) + 9);
+    this.rows.style.transform = `translateY(${start * ROW}px)`;
+    const fragment = document.createDocumentFragment();
+    for (let i = start; i < end; i++) {
+      const record = this.store.records.get(this.ids[i])!;
+      const ev = record.event;
+      const row = element('div', '', `log-row ${eventClass(ev)}${record.id === this.selected ? ' selected' : ''}`);
+      row.dataset.id = String(record.id); row.id = `log-event-${record.id}`;
+      row.setAttribute('role', 'option'); row.setAttribute('aria-selected', String(record.id === this.selected));
+      row.setAttribute('aria-posinset', String(i + 1)); row.setAttribute('aria-setsize', String(this.ids.length));
+      row.append(element('time', ev.timestamp.slice(11, 19) || '—'),
+        element('span', ev.threat ? 'THREAT' : (ev.rule_action || ev.log_type).toUpperCase(), 'log-badge'),
+        element('span', summary(ev), 'log-summary'));
+      fragment.append(row);
+    }
+    if (!this.ids.length) fragment.append(element('p', this.store.records.size ? 'No matching events in this view.' : 'Waiting for events…', 'log-empty'));
+    this.rows.replaceChildren(fragment);
+    this.rows.classList.toggle('arriving', arriving);
+    if (this.selected != null && this.rows.querySelector(`#log-event-${this.selected}`))
+      this.list.setAttribute('aria-activedescendant', `log-event-${this.selected}`);
+    else this.list.removeAttribute('aria-activedescendant');
+    this.renderChips();
+  }
+
   private renderChips(): void {
     // Do not replace focused controls on each incoming batch.
     const key = JSON.stringify([this.filter, this.back.length]);
