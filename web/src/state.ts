@@ -1,5 +1,26 @@
 export type Weather = 'calm' | 'storm' | 'hurricane';
 
+const WINDOW_MS = 30_000;
+const COMPACT_AT = 1024;
+
+class TimeWindow {
+  private stamps: number[] = [];
+  private head = 0;
+
+  add(now: number): void {
+    this.stamps.push(now);
+  }
+
+  count(cutoff: number): number {
+    while (this.head < this.stamps.length && this.stamps[this.head] < cutoff) this.head++;
+    if (this.head > COMPACT_AT && this.head * 2 >= this.stamps.length) {
+      this.stamps = this.stamps.slice(this.head);
+      this.head = 0;
+    }
+    return this.stamps.length - this.head;
+  }
+}
+
 /** Global sim state: threat, energy, event-rate driven weather. */
 export class State {
   threat = 0.15;          // 0..1
@@ -14,36 +35,32 @@ export class State {
   }
   private slowmoHold = 0;
 
-  private stamps: number[] = [];  // recent event timestamps (ms)
-  private blockStamps: number[] = [];
-  private threatStamps: number[] = [];
+  private rateWindow = new TimeWindow();
+  private blockWindow = new TimeWindow();
+  private threatWindow = new TimeWindow();
+
+  constructor(private readonly clock: () => number = () => performance.now()) {}
 
   get rate30s(): number {
-    const cutoff = performance.now() - 30_000;
-    while (this.stamps.length && this.stamps[0] < cutoff) this.stamps.shift();
-    return this.stamps.length;
+    return this.rateWindow.count(this.clock() - WINDOW_MS);
   }
 
   blocks30s(): number {
-    const cutoff = performance.now() - 30_000;
-    while (this.blockStamps.length && this.blockStamps[0] < cutoff) this.blockStamps.shift();
-    return this.blockStamps.length;
+    return this.blockWindow.count(this.clock() - WINDOW_MS);
   }
 
   threats30s(): number {
-    const cutoff = performance.now() - 30_000;
-    while (this.threatStamps.length && this.threatStamps[0] < cutoff) this.threatStamps.shift();
-    return this.threatStamps.length;
+    return this.threatWindow.count(this.clock() - WINDOW_MS);
   }
 
   onEvent(kind: 'allow' | 'block' | 'net' | 'wifi-good' | 'wifi-bad' | 'system' | 'threat'): void {
-    const now = performance.now();
-    this.stamps.push(now);
+    const now = this.clock();
+    this.rateWindow.add(now);
     if (kind === 'block') {
-      this.blockStamps.push(now);
+      this.blockWindow.add(now);
       this.heat = Math.min(1, this.heat + 0.12);
     } else if (kind === 'threat') {
-      this.threatStamps.push(now);
+      this.threatWindow.add(now);
       this.heat = Math.min(1, this.heat + 0.06);
     } else if (kind === 'wifi-bad') {
       this.heat = Math.min(1, this.heat + 0.04);

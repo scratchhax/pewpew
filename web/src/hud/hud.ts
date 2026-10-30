@@ -39,6 +39,8 @@ export type HudLabelOverrides = Partial<Omit<HudLabels, 'weather' | 'panel'>> & 
   panel?: Partial<HudLabels['panel']>;
 };
 
+type FeedItem = { text: string; key: string; cls: string; count: number };
+
 export const DEFAULT_HUD_LABELS: HudLabels = {
   uplink: 'UPLINK',
   link: 'LINK',
@@ -74,15 +76,35 @@ export function hudLabels(o: HudLabelOverrides = {}): HudLabels {
 
 export class Hud {
   readonly logs = new LogInspector(() => {
-    this.queue = []; this.terminal.replaceChildren(); this.scrollY = 0;
+    this.clearQueue(); this.terminal.replaceChildren(); this.scrollY = 0;
   });
   private root: HTMLElement;
   private threatFill!: HTMLElement;
   private energyFill!: HTMLElement;
+  private threatNumEl!: HTMLElement;
+  private energyNumEl!: HTMLElement;
   private weatherEl!: HTMLElement;
   private rateEl!: HTMLElement;
   private connEl!: HTMLElement;
   private terminal!: HTMLElement;
+  private scanlinesEl!: HTMLElement;
+  private terminalPanel!: HTMLElement;
+  private scopePanel!: HTMLElement;
+  private barsPanel!: HTMLElement;
+  private statsPanel!: HTMLElement;
+  private mwPanel!: HTMLElement;
+  private mwBody!: HTMLElement;
+  private specPanel!: HTMLElement;
+  private radarPanel!: HTMLElement;
+  private topLeftPanel!: HTMLElement;
+  private demoBadge!: HTMLElement;
+  private statUptimeEl!: HTMLElement;
+  private statClientsEl!: HTMLElement;
+  private statNodesEl!: HTMLElement;
+  private statDeniedEl!: HTMLElement;
+  private statTotalEl!: HTMLElement;
+  private extraLabelEl: HTMLElement | null = null;
+  private extraValueEl: HTMLElement | null = null;
   private scope!: HTMLCanvasElement;
   private scopeCtx: CanvasRenderingContext2D;
   private radar!: HTMLCanvasElement;
@@ -92,7 +114,8 @@ export class Hud {
   private fluxPhase = 0;
   private scrollY = 0;
   private scrollSpeed = 8;
-  private queue: Array<{ text: string; key: string; cls: string; count: number }> = [];
+  private queue: FeedItem[] = [];
+  private queueHead = 0;
   private statAcc = 0;
   private readonly t0 = Date.now();
   private nTotal = 0;
@@ -106,6 +129,13 @@ export class Hud {
   private specBuf = new Uint8Array(64);
   private specT = 0;
   private specCtx: CanvasRenderingContext2D;
+  private barAcc = 0;
+  private radarAcc = 0;
+  private specAcc = 0;
+  private scopeAcc = 0;
+  private weatherShown: Weather | null = null;
+  private mwHtml = '';
+  private static readonly CANVAS_INTERVAL = 1 / 20;
   private static readonly BANDS: Record<string, [number, number]> = {
     wifi: [0, 4], dhcp: [5, 8], dns: [9, 14], allow: [15, 19], block: [20, 27],
   };
@@ -173,10 +203,28 @@ export class Hud {
 
     this.threatFill = q('threat-fill');
     this.energyFill = q('energy-fill');
+    this.threatNumEl = q('threat-num');
+    this.energyNumEl = q('energy-num');
     this.weatherEl = q('weather');
     this.rateEl = q('rate');
     this.connEl = q('conn-dot');
     this.terminal = q('terminal-body');
+    this.scanlinesEl = q('scanlines');
+    this.terminalPanel = q('terminal');
+    this.scopePanel = q('scope-wrap');
+    this.barsPanel = q('hud-bars');
+    this.statsPanel = q('hud-stats');
+    this.mwPanel = q('hud-mw');
+    this.mwBody = q('mw-body');
+    this.specPanel = q('hud-spec');
+    this.radarPanel = q('radar-wrap');
+    this.topLeftPanel = q('hud-topleft');
+    this.demoBadge = q('demo-badge');
+    this.statUptimeEl = q('stat-uptime');
+    this.statClientsEl = q('stat-clients');
+    this.statNodesEl = q('stat-nodes');
+    this.statDeniedEl = q('stat-denied');
+    this.statTotalEl = q('stat-total');
     q('expand-log').addEventListener('click', () => this.logs.open());
     this.scope = q('scope') as HTMLCanvasElement;
     this.scopeCtx = this.scope.getContext('2d')!;
@@ -188,15 +236,15 @@ export class Hud {
   }
 
   applySettings(s: Settings): void {
-    q('scanlines').style.display = s.scanlines ? '' : 'none';
-    q('terminal').style.display = s.terminal ? '' : 'none';
-    q('scope-wrap').style.display = s.oscilloscope ? '' : 'none';
-    q('hud-bars').style.display = s.threatBar ? '' : 'none';
-    q('hud-stats').style.display = s.telemetry ? '' : 'none';
-    q('hud-mw').style.display = s.mostWanted ? '' : 'none';
-    q('hud-spec').style.display = s.spectrum ? '' : 'none';
-    q('radar-wrap').style.display = s.radar ? '' : 'none';
-    q('hud-topleft').style.display = s.uplink ? '' : 'none';
+    this.scanlinesEl.style.display = s.scanlines ? '' : 'none';
+    this.terminalPanel.style.display = s.terminal ? '' : 'none';
+    this.scopePanel.style.display = s.oscilloscope ? '' : 'none';
+    this.barsPanel.style.display = s.threatBar ? '' : 'none';
+    this.statsPanel.style.display = s.telemetry ? '' : 'none';
+    this.mwPanel.style.display = s.mostWanted ? '' : 'none';
+    this.specPanel.style.display = s.spectrum ? '' : 'none';
+    this.radarPanel.style.display = s.radar ? '' : 'none';
+    this.topLeftPanel.style.display = s.uplink ? '' : 'none';
   }
 
   setConnected(on: boolean): void {
@@ -205,34 +253,80 @@ export class Hud {
   }
 
   showDemo(on: boolean): void {
-    q('demo-badge').style.display = on ? '' : 'none';
+    this.demoBadge.style.display = on ? '' : 'none';
   }
 
   /** Optional theme-supplied stat row in the telemetry panel (e.g. SURVIVORS DOWN). */
   setExtraStat(label: string, value: string | number): void {
-    let row = document.getElementById('stat-extra');
-    if (!row) {
-      row = document.createElement('div');
+    if (!this.extraLabelEl || !this.extraValueEl) {
+      const row = document.createElement('div');
       row.id = 'stat-extra';
       row.className = 'stat-row';
-      row.innerHTML = '<span id="stat-extra-label"></span><b id="stat-extra-value"></b>';
-      document.getElementById('hud-stats')?.appendChild(row);
+      this.extraLabelEl = document.createElement('span');
+      this.extraLabelEl.id = 'stat-extra-label';
+      this.extraValueEl = document.createElement('b');
+      this.extraValueEl.id = 'stat-extra-value';
+      row.append(this.extraLabelEl, this.extraValueEl);
+      this.statsPanel.appendChild(row);
     }
-    document.getElementById('stat-extra-label')!.textContent = label;
-    document.getElementById('stat-extra-value')!.textContent = String(value);
+    this.extraLabelEl.textContent = label;
+    this.extraValueEl.textContent = String(value);
   }
 
   private names = new Map<string, string>();   // MAC → hostname learned from DHCP
+
+  private queueLen(): number {
+    return this.queue.length - this.queueHead;
+  }
+
+  private tail(): FeedItem | undefined {
+    return this.queueLen() ? this.queue[this.queue.length - 1] : undefined;
+  }
+
+  private enqueue(item: FeedItem): void {
+    this.queue.push(item);
+    if (this.queue.length - this.queueHead > 1200) {
+      this.queueHead++;
+      this.compactQueue();
+    }
+  }
+
+  private dequeue(): FeedItem | undefined {
+    if (this.queueHead >= this.queue.length) {
+      this.queue.length = 0;
+      this.queueHead = 0;
+      return undefined;
+    }
+    const item = this.queue[this.queueHead++];
+    if (this.queueHead >= this.queue.length) {
+      this.queue.length = 0;
+      this.queueHead = 0;
+    } else {
+      this.compactQueue();
+    }
+    return item;
+  }
+
+  private compactQueue(): void {
+    if (this.queueHead > 256 && this.queueHead * 2 >= this.queue.length) {
+      this.queue = this.queue.slice(this.queueHead);
+      this.queueHead = 0;
+    }
+  }
+
+  private clearQueue(): void {
+    this.queue = [];
+    this.queueHead = 0;
+  }
 
   /** A synthetic line from the theme itself (radio chatter): terminal feed
    *  only, never the log store - it is atmosphere, not evidence. */
   say(text: string): void {
     const t = new Date().toTimeString().slice(0, 8);
     const key = text;
-    const tail = this.queue[this.queue.length - 1];
+    const tail = this.tail();
     if (tail && tail.key === key) { tail.count++; tail.text = `${t}  ${key}`; return; }
-    this.queue.push({ text: `${t}  ${key}`, key, cls: 'log-radio', count: 1 });
-    if (this.queue.length > 1200) this.queue.shift();
+    this.enqueue({ text: `${t}  ${key}`, key, cls: 'log-radio', count: 1 });
   }
 
   log(ev: NetEvent): void {
@@ -275,15 +369,14 @@ export class Hud {
       default: msg = `SYS ${syslogMsg(e.raw_log)}`;
     }
     const key = msg.replace(/\s+/g, ' ').trim();
-    const tail = this.queue[this.queue.length - 1];
+    const tail = this.tail();
     if (tail && tail.key === key) {
       tail.count++;
       tail.text = `${t}  ${key}`;          // keep newest timestamp
     } else {
       const cls = `log-${e.log_type}`
         + (e.threat ? ' log-threat' : e.rule_action === 'block' ? ' log-block' : '');
-      this.queue.push({ text: `${t}  ${key}`, key, cls, count: 1 });
-      if (this.queue.length > 1200) this.queue.shift();
+      this.enqueue({ text: `${t}  ${key}`, key, cls, count: 1 });
     }
     this.addBlip(ev);
 
@@ -305,19 +398,21 @@ export class Hud {
     const LINE = 16, VIS = 13;
     // pace comes from queue pressure: whatever is waiting must be shown
     // within ~1.2s, so the feed always keeps up with incoming traffic
-    const target = LINE * Math.min(30, Math.max(0.5, this.queue.length / 1.2));
+    const target = LINE * Math.min(30, Math.max(0.5, this.queueLen() / 1.2));
     const ease = target > this.scrollSpeed ? 4 : 0.8;
     this.scrollSpeed += (target - this.scrollSpeed) * Math.min(1, dt * ease);
 
-    while (this.terminal.children.length < VIS && this.queue.length) {
-      this.appendLine(this.queue.shift()!);
+    while (this.terminal.children.length < VIS && this.queueLen()) {
+      const next = this.dequeue();
+      if (!next) break;
+      this.appendLine(next);
     }
     if (this.terminal.children.length < VIS) {
       this.terminal.style.transform = 'none';
       return;
     }
 
-    if (this.queue.length) {
+    if (this.queueLen()) {
       this.scrollY += this.scrollSpeed * dt;
     } else {
       // nothing waiting: settle back to the rest position instead of
@@ -325,19 +420,29 @@ export class Hud {
       this.scrollY += (0 - this.scrollY) * Math.min(1, dt * 3);
     }
     while (this.scrollY >= LINE) {
-      const next = this.queue.shift();
+      const next = this.dequeue();
       if (!next) { this.scrollY = LINE - 0.01; break; }
-      this.terminal.firstChild?.remove();
-      this.appendLine(next);
+      const first = this.terminal.firstChild;
+      if (first) {
+        this.terminal.removeChild(first);
+        this.fillLine(first as HTMLElement, next);
+        this.terminal.appendChild(first);
+      } else {
+        this.appendLine(next);
+      }
       this.scrollY -= LINE;
     }
     this.terminal.style.transform = `translateY(${-this.scrollY}px)`;
   }
 
-  private appendLine(item: { text: string; cls: string; count: number }): void {
+  private fillLine(el: HTMLElement, item: FeedItem): void {
+    el.className = item.cls;
+    el.textContent = item.count > 1 ? `${item.text}  ×${item.count}` : item.text;
+  }
+
+  private appendLine(item: FeedItem): void {
     const div = document.createElement('div');
-    div.className = item.cls;
-    div.textContent = item.count > 1 ? `${item.text}  ×${item.count}` : item.text;
+    this.fillLine(div, item);
     this.terminal.appendChild(div);
   }
 
@@ -389,21 +494,24 @@ export class Hud {
   }
 
   private drawMostWanted(): void {
-    const el = q('mw-body');
     const top = [...this.wanted.entries()]
       .sort((a, b) => b[1] - a[1]).slice(0, 5);
-    if (!top.length) {
-      el.innerHTML = `<div class="mw-empty">${this.labels.noHostiles}</div>`;
-      return;
-    }
-    const max = top[0][1];
-    el.innerHTML = top.map(([ip, n], i) => `
+    const html = !top.length
+      ? `<div class="mw-empty">${this.labels.noHostiles}</div>`
+      : top.map(([ip, n], i) => {
+        const max = top[0][1];
+        return `
       <div class="mw-row">
         <span class="mw-rank">${String(i + 1).padStart(2, '0')}</span>
         <span class="mw-ip">${ip}</span>
         <div class="mw-bar"><i style="width:${(n / max * 100).toFixed(0)}%"></i></div>
         <span class="mw-n">${fmt(n)}</span>
-      </div>`).join('');
+      </div>`;
+      }).join('');
+    if (html !== this.mwHtml) {
+      this.mwHtml = html;
+      this.mwBody.innerHTML = html;
+    }
   }
 
   private updateStats(): void {
@@ -411,34 +519,59 @@ export class Hud {
     const hh = String(Math.floor(up / 3600)).padStart(2, '0');
     const mm = String(Math.floor(up / 60) % 60).padStart(2, '0');
     const ss = String(up % 60).padStart(2, '0');
-    q('stat-uptime').textContent = `${hh}:${mm}:${ss}`;
-    q('stat-clients').textContent = String(this.clientSet.size);
-    q('stat-nodes').textContent = String(this.hostSet.size);
-    q('stat-denied').textContent = fmt(this.nDenied);
-    q('stat-total').textContent = fmt(this.nTotal);
+    this.statUptimeEl.textContent = `${hh}:${mm}:${ss}`;
+    this.statClientsEl.textContent = String(this.clientSet.size);
+    this.statNodesEl.textContent = String(this.hostSet.size);
+    this.statDeniedEl.textContent = fmt(this.nDenied);
+    this.statTotalEl.textContent = fmt(this.nTotal);
   }
 
   private tick = 0;
 
   update(dt: number, state: State, settings: Settings): void {
     if (settings.threatBar) {
-      this.threatFill.style.width = `${(state.threat * 100).toFixed(1)}%`;
-      this.energyFill.style.width = `${(state.energy * 100).toFixed(1)}%`;
-      q('threat-num').textContent = ` ${(state.threat * 100).toFixed(0)}`;
-      q('energy-num').textContent = ` ${(state.energy * 100).toFixed(0)}`;
+      this.barAcc += dt;
+      if (this.barAcc >= 0.1) {
+        this.barAcc = 0;
+        this.threatFill.style.width = `${(state.threat * 100).toFixed(1)}%`;
+        this.energyFill.style.width = `${(state.energy * 100).toFixed(1)}%`;
+        this.threatNumEl.textContent = ` ${(state.threat * 100).toFixed(0)}`;
+        this.energyNumEl.textContent = ` ${(state.energy * 100).toFixed(0)}`;
+      }
     }
-    if (settings.radar) this.drawRadar(dt);
-    this.weatherEl.textContent = this.labels.weather[state.weather];
-    this.weatherEl.style.color = state.weather === 'hurricane' ? '#ff5a5a'
-      : state.weather === 'storm' ? '#ffd24a' : '#45ff9b';
+    if (settings.radar) {
+      this.radarAcc += dt;
+      if (this.radarAcc >= Hud.CANVAS_INTERVAL) {
+        this.drawRadar(this.radarAcc);
+        this.radarAcc = 0;
+      }
+    }
+    if (this.weatherShown !== state.weather) {
+      this.weatherShown = state.weather;
+      this.weatherEl.textContent = this.labels.weather[state.weather];
+      this.weatherEl.style.color = state.weather === 'hurricane' ? '#ff5a5a'
+        : state.weather === 'storm' ? '#ffd24a' : '#45ff9b';
+    }
 
     // sensor flux: sine whose frequency IS the event rate (1 ev/s = 1 cycle/s)
     const eps = state.rate30s / 30;
 
     if (settings.terminal) this.feedTick(dt);
-    if (settings.spectrum) this.drawSpectrum(dt);
+    if (settings.spectrum) {
+      this.specAcc += dt;
+      if (this.specAcc >= Hud.CANVAS_INTERVAL) {
+        this.drawSpectrum(this.specAcc);
+        this.specAcc = 0;
+      }
+    }
     this.fluxPhase = (this.fluxPhase + dt * eps) % 1;
-    if (settings.oscilloscope) this.drawFlux(eps, state.heat);
+    if (settings.oscilloscope) {
+      this.scopeAcc += dt;
+      if (this.scopeAcc >= Hud.CANVAS_INTERVAL) {
+        this.drawFlux(eps, state.heat);
+        this.scopeAcc = 0;
+      }
+    }
 
     this.tick += dt;
     if (this.tick >= 0.2) {
