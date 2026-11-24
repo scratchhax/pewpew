@@ -57,6 +57,10 @@ your own traffic. Pick a scene per screen:
   intrusion log scrolls as a proper table, Wi-Fi joins light the docking
   ports, blocks chip the force field, and a threat throws the whole deck into
   a steady red alert
+- **Event Horizon**: a black hole, ray traced. Every pixel follows a real
+  path of bent light, so the accretion disk wraps over and under the shadow;
+  traffic heats the disk, blocked hosts fall in and redden at the horizon,
+  devices orbit as moons, and a threat is a star torn apart
 
 There's no database, no cloud and nothing is recorded. pewpew only reads syslog
 and never touches the network itself.
@@ -92,6 +96,8 @@ and never touches the network itself.
 | ![slipstream](docs/slipstream.png) | ![slipstream gantry](docs/slipstream-gantry.png) |
 | **Bridge** | **Bridge: red alert** |
 | ![bridge](docs/bridge.png) | ![bridge alert](docs/bridge-alert.png) |
+| **Event Horizon** | **Event Horizon: a star torn apart** |
+| ![event horizon](docs/horizon.png) | ![event horizon tidal disruption](docs/horizon-shred.png) |
 
 | Midnight Run | Packet Rush | Last Outpost | Undergrowth | Slipstream |
 |---|---|---|---|---|
@@ -114,6 +120,7 @@ traffic, no hardware needed): [Last Outpost](https://scratchhax.github.io/pewpew
 [Substrate](https://scratchhax.github.io/pewpew/?theme=substrate) ·
 [Slipstream](https://scratchhax.github.io/pewpew/?theme=slipstream) ·
 [Bridge](https://scratchhax.github.io/pewpew/?theme=bridge) ·
+[Event Horizon](https://scratchhax.github.io/pewpew/?theme=horizon) ·
 Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 
 ## Contents
@@ -123,7 +130,7 @@ Orbital Command showreel: [gif](docs/demo.gif), [mp4 with sound](docs/demo.mp4)
 - [Setup](#setup): [Relay](#1-start-the-relay) · [Viewer](#2-build-the-viewer) · [UniFi logging](#3-send-unifi-logs-to-the-relay) · [Check it's working](#4-check-its-working) · [`relay.yaml`](#relayrelayyaml)
 - [Upgrading](#upgrading)
 - [Using pewpew](#using-pewpew): [Keys](#keys) · [Switching scenes](#switching-scenes) · [Log inspector](#log-inspector) · [Settings](#settings-f1)
-- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [The Rain](#the-rain) · [Game of Life](#game-of-life) · [Mycelium](#mycelium) · [Undergrowth](#undergrowth) · [FRAGNET](#fragnet) · [Substrate](#substrate) · [Slipstream](#slipstream) · [Bridge](#bridge) · [Net Fighter](#net-fighter)
+- [Scenes](#scenes): [Orbital Command](#orbital-command) · [Last Outpost](#last-outpost) · [Midnight Run](#midnight-run) · [Packet Rush](#packet-rush) · [Panopticon](#panopticon) · [Mainframe](#mainframe) · [Aquarium](#aquarium) · [The Gibson](#the-gibson) · [The Rain](#the-rain) · [Game of Life](#game-of-life) · [Mycelium](#mycelium) · [Undergrowth](#undergrowth) · [FRAGNET](#fragnet) · [Substrate](#substrate) · [Slipstream](#slipstream) · [Bridge](#bridge) · [Net Fighter](#net-fighter) · [Event Horizon](#event-horizon)
 - [Sound](#sound)
 - [Performance and quality](#performance-and-quality)
 - [URL parameters](#url-parameters)
@@ -159,9 +166,9 @@ a scene. The details (and what to do if nothing shows up) are in [Setup](#setup)
 
 ## Highlights
 
-- **Seventeen scenes, one relay.** Every screen picks its own scene, so the kiosk
+- **Eighteen scenes, one relay.** Every screen picks its own scene, so the kiosk
   in the hall and the laptop on your desk can show different worlds at the same
-  time. Nine are 2D (PixiJS), six are full 3D (three.js), one is a
+  time. Nine are 2D (PixiJS), seven are full 3D (three.js), one is a
   software raycaster and one is a software Mode 7 board; a screen only
   downloads the renderer its scene uses.
 - **A readable picture.** Each event type has one fixed colour in every scene
@@ -366,7 +373,7 @@ minutes to start logging after a settings change or a relay restart.
 |-----|---------|--------------|
 | `syslog_bind`, `syslog_port` | `0.0.0.0`, `5514` | where syslog (UDP) is received |
 | `http_host`, `http_port` | `0.0.0.0`, `8080` | the viewer, WebSocket and health endpoints |
-| `default_theme` | `scifi` | scene served at `/`: `scifi`, `holdout`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `rain`, `conway`, `netfighter`, `mycelium`, `undergrowth`, `fragnet`, `substrate`, `slipstream`, `bridge` (every scene is also at `/<id>/`) |
+| `default_theme` | `scifi` | scene served at `/`: `scifi`, `holdout`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `rain`, `conway`, `netfighter`, `mycelium`, `undergrowth`, `fragnet`, `substrate`, `slipstream`, `bridge`, `horizon` (every scene is also at `/<id>/`) |
 | `buffer_size` | `500` | recent events replayed to each newly opened browser |
 | `wan_interfaces` | `[eth8]` | which gateway interfaces count as WAN, for inbound and outbound. `eth8` fits most UDM and UDR setups on copper; `eth9`/`eth10` also turn up, and a DSL line is usually `ppp0`. Look at the `IN=`/`OUT=` fields of your own firewall log lines |
 | `wan_ips`, `vpn_networks` | empty | optional WAN addresses and VPN networks, for direction and VPN badges |
@@ -476,7 +483,7 @@ different screens can show different scenes at once:
 | URL | Scene |
 |-----|-------|
 | `http://<relay-host>:8080/` | this screen's saved pick, or else the relay's `default_theme` |
-| `http://<relay-host>:8080/scifi/`, `/holdout/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/`, `/gibson/`, `/rain/`, `/conway/`, `/netfighter/`, `/mycelium/`, `/undergrowth/`, `/fragnet/`, `/substrate/`, `/slipstream/`, `/bridge/` | that scene (unknown names are a 404) |
+| `http://<relay-host>:8080/scifi/`, `/holdout/`, `/racing/`, `/rush/`, `/spy/`, `/mainframe/`, `/aquarium/`, `/gibson/`, `/rain/`, `/conway/`, `/netfighter/`, `/mycelium/`, `/undergrowth/`, `/fragnet/`, `/substrate/`, `/slipstream/`, `/bridge/`, `/horizon/` | that scene (unknown names are a 404) |
 | any URL + `?theme=racing` | that scene (handy on the Pages demo) |
 
 The viewer checks the URL path, then `?theme=`, then the screen's saved pick,
@@ -531,7 +538,7 @@ panel's **Apply & reload**.
 
 | Tab | What's in it |
 |-----|--------------|
-| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: per-event-type visuals, buildings, day/night, rain, lightning, blood, screen shake, move with the music, plus budgets for zombies, blood decals, tents and fog + flashlights. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. The Rain: fall speed, density, trail length, glyph size, colour, depth fog, brightness waves, glyph flicker, camera (fly through in 3D, or falling in 2D), and whether the weather drives the downpour. Game of Life: generation speed, seeding, colour, fog haze, and whether the weather drives the field. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, the aurora sky, flight speed, bioluminescence, spore drift, and hypha half-life. FRAGNET: each event's effect, the weapon, gore, patrol speed and traces per level. Substrate: allow cracks, block scars, threat fractures, DNS blooms, DHCP seeds, Wi-Fi drift, host seeding, the pigment wash, crack hairlines, naming the busiest district, a new paper each picture, plus seconds per picture, pigment strength and wander. Slipstream: the circuit (or a home track picked by hostname), whether the camera follows the busiest host or the leader, draft surges, sprint and sponsor board, pit takeovers, oil spins, red shells, boost pads, yellow cautions, speed chevrons, background wobble, corner minimap and race pace. Bridge: sweep, sensor blips, the feed, bar bank, shield harmonics, red alert and docking ports, plus blip, feed-row and history budgets |
+| **Scene** | the scene's own toggles. Orbital Command: starfield, nebula, dust, ambient ships, DHCP planets, event stars, asteroids, attack rockets, crystals, IP constellations, ring objects, AP cores, screen shake, move with the music. Last Outpost: per-event-type visuals, buildings, day/night, rain, lightning, blood, screen shake, move with the music, plus budgets for zombies, blood decals, tents and fog + flashlights. Midnight Run: traffic, roadblocks, police chase, rivals, DNS billboards, Wi-Fi gates, rain, camera nudge, move with the music. Packet Rush: gems, baddies, query blocks, rivals, checkpoints, hunter drone, rain and embers, turbo, boss fights, hero. Panopticon: signal arcs, tracking, satellites, uplinks, ripples, clouds and storms, grid, move with the music, eye of god, and how often the eye is tasked. Mainframe: packets, firewalls, worms and ICE, lookup towers, pick-and-place, antennas, floating addresses, move with the music, flight speed, dive into a chip, and how often it dives. Aquarium: schools, pufferfish, shark, bubbles, residents, treasure chest, light dimming on system log bursts, names and addresses, how many residents the reef holds, current, camera drift. The Gibson: face pulses, scrolling listings, tower rewrites, access banners, target lock, move with the music, scroll speed. The Rain: fall speed, density, trail length, glyph size, colour, depth fog, brightness waves, glyph flicker, camera (fly through in 3D, or falling in 2D), and whether the weather drives the downpour. Game of Life: generation speed, seeding, colour, fog haze, and whether the weather drives the field. Mycelium: growing hyphae, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, device labels, keeping the garden across reloads, hypha half-life, bioluminescence, and spore drift. Undergrowth: light pulses, DNS blooms, DHCP sprouts, Wi-Fi spores, block scorch, threat blight, labels, following events, keeping the garden across reloads, the aurora sky, flight speed, bioluminescence, spore drift, and hypha half-life. FRAGNET: each event's effect, the weapon, gore, patrol speed and traces per level. Substrate: allow cracks, block scars, threat fractures, DNS blooms, DHCP seeds, Wi-Fi drift, host seeding, the pigment wash, crack hairlines, naming the busiest district, a new paper each picture, plus seconds per picture, pigment strength and wander. Slipstream: the circuit (or a home track picked by hostname), whether the camera follows the busiest host or the leader, draft surges, sprint and sponsor board, pit takeovers, oil spins, red shells, boost pads, yellow cautions, speed chevrons, background wobble, corner minimap and race pace. Bridge: sweep, sensor blips, the feed, bar bank, shield harmonics, red alert and docking ports, plus blip, feed-row and history budgets. Event Horizon: hot spots and jet knots, infall, tidal disruption, photon ring glints, moons, ripples, dimming on system log bursts, names and addresses, orbit traces, camera orbit and how many moons, plus a Light group for relativistic beaming, disk temperature, exposure and jets |
 | **HUD** | each HUD panel on or off (names follow the scene), plus scanlines |
 | **Audio** | see [Mixing](#mixing) |
 | **Colour** | hue shift and intensity for the HUD accent; Orbital Command also recolours its host mesh (spectrum, event law, mono, warm, cool). Event colours never change |
@@ -539,7 +546,7 @@ panel's **Apply & reload**.
 
 ## Scenes
 
-All seventeen scenes draw the same events with the same colours. Each has its own
+All eighteen scenes draw the same events with the same colours. Each has its own
 HUD, sound and settings.
 
 ### Orbital Command
@@ -1476,6 +1483,46 @@ pack by Luis Zuno (ansimuz) plus Chasersgaming's CC0 *Renegade* and
 with art it didn't draw; everything else here is still one shader and one
 oscillator away.
 
+### Event Horizon
+
+![event horizon](docs/horizon.png)
+
+A black hole, ray traced in real time. Every pixel's light is followed
+backwards from the camera along a real Schwarzschild path of bent light,
+stepped through on the GPU, so nothing in the frame is faked: the far side of
+the accretion disk shows over the top of the shadow and again beneath it, a
+thin photon ring hugs the edge, the nebula behind is wrapped into a ring, and
+stars near the hole smear into arcs. The disk turns at Keplerian speed, the
+inner edge lapping the outer many times over, so its gas shears into long
+filaments. The side turning toward you is Doppler boosted, brighter and bluer;
+the side turning away dims to orange; and every glow in the scene takes its
+colour from real blackbody temperature. The camera drifts round the hole on a
+slow orbit a few degrees above the disk, now and then rising for the view from
+above.
+
+| Event | What happens |
+|-------|--------------|
+| allow | a hot spot on the disk: it runs ahead of the gas around it and leaves a glowing wake that the shear draws out into an arc. Outbound traffic heats the inner disk, inbound the outer, and every few releases a knot of light climbs a polar jet |
+| block | the source falls in from the dark, labelled with its address. Near the horizon time stretches: it slows, reddens and fades instead of vanishing |
+| threat | a star on a doomed orbit: it stretches as it swings close, comes apart at pericentre, and its debris wraps the hole as a bright stream while the whole disk flares. The camera eases in and the soundtrack turns to Tidal |
+| dns | light circling the photon ring, with the domain beside the shadow |
+| dhcp | a moon with the device's name, lit by the disk: rock, ice or a banded gas giant, chosen by the name. When there are too many, the least recently seen moon leaves |
+| wifi | a gravitational-wave ripple runs out across the disk (fainter for a failure) |
+| system | a burst well above your usual rate dims the disk for a few seconds |
+
+Traffic weather is how hard the hole is feeding: a busy network churns the
+disk into higher-contrast filaments, brightens it and drives the jets. The HUD
+is an observatory's frosted-glass instrument panel, and the moons' orbits are
+hairline traces. Everything eases; nothing flashes, strobes or shakes.
+
+It is the most GPU-hungry scene here by a distance, made for a desktop
+graphics card. On an RTX 5070 a 2560×1440 frame takes about 1 ms on Low,
+3 ms on Medium, 8 ms on High and 10 ms on Ultra. Auto still runs it on a
+laptop or a Pi by tracing fewer pixels with fewer steps; **Ray-trace
+resolution** and **Geodesic steps** are the big levers.
+
+![event horizon tidal disruption](docs/horizon-shred.png)
+
 ## Sound
 
 All sound is synthesized in the browser with the WebAudio API. Browsers only
@@ -1808,6 +1855,28 @@ bed.
 
 **Interface beeps** and **Hypo hum** live on the Audio tab.
 
+### Event Horizon's soundtrack
+
+**Slow, wide and cold.** **Deep field** is a pipe-organ chord that breathes
+every four bars over a sub drone, with glass tones drifting in the gaps.
+**Long orbit** adds a soft eighth-note pulse, the sense of something turning.
+**Tidal** is what a star sounds like coming apart: low cellos, a slow
+heartbeat and a wordless choir a semitone off. **Auto** picks from the sky:
+quiet traffic gets Deep field, busy traffic Long orbit, and a tidal disruption
+always gets Tidal. Underneath, a deep-space hum follows the traffic.
+
+| Event | Sound |
+|-------|-------|
+| allow | the style's lead: glass in Deep field, a bell in Long orbit |
+| block | a tone that sinks and darkens as it falls, like the light does |
+| threat | a long swell as the star approaches, then a low boom and rising noise when it comes apart |
+| dns | a high glass ping in key |
+| dhcp | a struck bell, a fifth and an octave |
+| wifi | a slow swell, darker for a failure |
+| system | a filter sweep closing down |
+
+**Effects** and **Deep-space hum** live on the Audio tab.
+
 ### Background tracks
 
 Play your own music in any scene. In F1 → Audio → **Background track**, upload
@@ -1898,6 +1967,7 @@ controls for **Race sounds** and **Engine purr**:
 | Undergrowth | **Mycelium's score** (shared garden) **+ pulse whoosh** |
 | Slipstream | **Race sounds**, **Engine purr** |
 | Bridge | **Music** (Hypo watch / Ops pulse / Red alert), **Interface beeps**, **Hypo hum** |
+| Event Horizon | **Music** (Deep field / Long orbit / Tidal), **Effects**, **Deep-space hum** |
 | FRAGNET | **Riff city**, **Machine god**, **Grave drip** |
 | Substrate | **Drawing** (nib on paper), **Room** (air & drone), **Notes** |
 
@@ -2008,6 +2078,16 @@ Each scene adds its own budgets:
 | Bloom | off | on | on | on |
 | Smooth edges (multisampling) | off | on | on | on |
 
+| Event Horizon | Low | Medium | **High** | Ultra |
+|---------------|-----|--------|----------|-------|
+| Ray-trace resolution | 0.5 | 0.7 | 1.0 | 1.0 |
+| Geodesic steps per pixel | 110 | 160 | 240 | 360 |
+| Bodies traced (moons + glows) | 6 | 10 | 16 | 24 |
+| Disk texture | 768×256 | 1536×512 | 1536×512 | 3072×1024 |
+| Turbulence octaves | 3 | 4 | 5 | 6 |
+| Haze | off | on | on | on |
+| Lens streak | off | on | on | on |
+
 **Measured on a Raspberry Pi Compute Module 5** (Chromium kiosk at
 2560×1440, Auto → Low, demo traffic):
 
@@ -2047,7 +2127,7 @@ been measured on a Pi yet.
 
 | Parameter | Effect |
 |-----------|--------|
-| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `holdout`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `rain`, `conway`, `netfighter`, `mycelium`, `undergrowth`, `fragnet`, `substrate`, `slipstream`, `bridge` |
+| `/<scene>/` (path) or `?theme=` | pick the scene: `scifi`, `holdout`, `racing`, `rush`, `spy`, `mainframe`, `aquarium`, `gibson`, `rain`, `conway`, `netfighter`, `mycelium`, `undergrowth`, `fragnet`, `substrate`, `slipstream`, `bridge`, `horizon` |
 | `?demo=1` | synthetic traffic, no relay needed |
 | `?showreel=1` | with the demo: a looping 60-second calm → build → hurricane → cooldown arc |
 | `?rate=40` | with the demo: about 40 events per second |
@@ -2105,7 +2185,7 @@ UDM / UDR / UCG / APs ──syslog UDP :5514──► relay (Python) ──JSON 
   ring buffer of recent events, broadcasts every event to every browser, and
   stores uploaded background tracks.
 - **`web/`**: Vite and TypeScript. Nine scenes render with
-  [PixiJS v8](https://pixijs.com/), six with [three.js](https://threejs.org/),
+  [PixiJS v8](https://pixijs.com/), seven with [three.js](https://threejs.org/),
   and FRAGNET (raycaster) and Slipstream (Mode 7) with hand-written software
   renderers. The audio and nearly all graphics are
   generated in code; Last Outpost, Net Fighter, Slipstream and FRAGNET
@@ -2229,13 +2309,18 @@ Actions** first.
   Packet Rush, The Rain,
   Game of Life, Net Fighter, Mycelium, Substrate and Bridge;
   [three.js](https://threejs.org/) renders Midnight Run, Panopticon, Mainframe,
-  Aquarium, The Gibson and Undergrowth; FRAGNET's raycaster and Slipstream's
+  Aquarium, The Gibson, Undergrowth and Event Horizon; FRAGNET's raycaster and Slipstream's
   Mode 7 board are hand-written software renderers.
 - Every sound and melody, every Orbital Command texture, Midnight Run's car,
   city and signs, all of Packet Rush's pixel art, Panopticon's planet,
   satellites and surveillance scenes, Mainframe's circuit boards and the
   silicon inside its chips, the Aquarium's fish, reef and water, and the
   Gibson's storage towers, listings and circuit floor are generated in code.
+- Event Horizon is all code too: the geodesic tracer, disk, sky and moons are
+  computed on the GPU. Its tone mapping is Troy Sobotka's AgX, through
+  Benjamin Wrensch's minimal polynomial fit, and its blackbody colours
+  integrate Planck's law against the Wyman, Sloan and Shirley fit of the
+  CIE 1931 observer.
 - Last Outpost sprites: [Top-down Shooter](https://kenney.nl/assets/top-down-shooter)
   by [Kenney](https://kenney.nl) (CC0), packed into
   `web/src/themes/holdout/assets/atlas.png` with its license beside it.

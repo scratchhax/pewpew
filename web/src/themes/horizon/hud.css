@@ -1,0 +1,152 @@
+/* Event Horizon: an observatory's glass instrument panel. Frosted dark glass,
+   hairline borders, thin modern type with tabular numbers, small tracked-out
+   captions. Loaded only with this scene; nothing blinks, every change eases. */
+body[data-theme="horizon"] { background: #000; }
+body[data-theme="horizon"] #hud {
+  color: rgba(236, 241, 250, 0.92);
+  font-family: 'Inter', 'Segoe UI Variable Text', 'SF Pro Text', 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
+  font-feature-settings: 'tnum' 1, 'cv11' 1;
+}
+body[data-theme="horizon"] .corner,
+body[data-theme="horizon"] #scanlines,
+body[data-theme="horizon"] .cursor { display: none !important; }
+
+body[data-theme="horizon"] .panel {
+  clip-path: none;
+  filter: none;
+  border-radius: 14px;
+  padding: 11px 14px 12px;
+  background: linear-gradient(180deg, rgba(22, 24, 32, 0.42), rgba(8, 9, 14, 0.5));
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+}
+body[data-theme="horizon"] .panel-head {
+  font-size: 9.5px; font-weight: 600; letter-spacing: 2.6px; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.46);
+  border-bottom: none; padding-bottom: 0; margin-bottom: 9px;
+}
+body[data-theme="horizon"] #expand-log {
+  margin-left: auto; font: inherit; font-size: 10px; font-weight: 500; letter-spacing: 1.2px;
+  color: rgba(255, 214, 170, 0.85);
+}
+
+/* top left: the observatory and the state of the hole */
+body[data-theme="horizon"] #hud-topleft { min-width: 190px; }
+body[data-theme="horizon"] #conn { font-size: 10px; font-weight: 600; letter-spacing: 2.4px; text-transform: uppercase; color: rgba(255, 255, 255, 0.55); }
+body[data-theme="horizon"] #conn-dot { width: 6px; height: 6px; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05); transition: background 1.2s ease; }
+body[data-theme="horizon"] #weather {
+  margin-top: 4px; font-size: 26px; font-weight: 200; letter-spacing: 0.5px;
+  color: #fff !important;   /* the word carries the state; the core's green/amber/red would fight the palette */
+  text-shadow: none;
+}
+body[data-theme="horizon"] #radar-wrap { top: 128px; }
+/* the core draws these instruments in cyan: turn them warm and quiet to match */
+body[data-theme="horizon"] #radar,
+body[data-theme="horizon"] #scope { filter: hue-rotate(-140deg) saturate(0.55) brightness(1.15); }
+body[data-theme="horizon"] #radar { border-radius: 50%; background: rgba(0, 0, 0, 0.25); }
+
+/* top right: gauges, telemetry, what's falling in */
+body[data-theme="horizon"] #hud-bars { top: 22px; width: 268px; gap: 11px; }
+body[data-theme="horizon"] #hud-stats,
+body[data-theme="horizon"] #hud-mw { width: 268px; }
+body[data-theme="horizon"] .bar-row { font-size: 10px; font-weight: 600; letter-spacing: 1.6px; text-transform: uppercase; gap: 12px; }
+body[data-theme="horizon"] .bar-label { width: 132px; flex: none; display: flex; justify-content: space-between; gap: 8px; opacity: 1; color: rgba(255, 255, 255, 0.5); }
+body[data-theme="horizon"] .bar-label span { color: #fff; font-weight: 500; letter-spacing: 0.5px; }
+body[data-theme="horizon"] .bar {
+  clip-path: none; height: 3px; border-radius: 2px; overflow: hidden;
+  background: rgba(255, 255, 255, 0.08); box-shadow: none;
+}
+body[data-theme="horizon"] #threat-fill { border-radius: 2px; background: linear-gradient(90deg, #ffcf9a, #ff7d5c); background-size: auto; box-shadow: none; }
+body[data-theme="horizon"] #energy-fill { border-radius: 2px; background: linear-gradient(90deg, #a9c8ff, #ffffff); background-size: auto; box-shadow: none; }
+body[data-theme="horizon"] .stat-row { font-size: 12px; line-height: 1.9; letter-spacing: 0.2px; }
+body[data-theme="horizon"] .stat-row span { opacity: 1; color: rgba(255, 255, 255, 0.5); }
+body[data-theme="horizon"] .stat-row b { color: #fff; font-weight: 500; }
+body[data-theme="horizon"] .mw-empty { font-size: 11px; letter-spacing: 0.4px; opacity: 0.4; }
+body[data-theme="horizon"] .mw-row { font-size: 11.5px; letter-spacing: 0.2px; color: rgba(255, 196, 180, 0.95); }
+body[data-theme="horizon"] .mw-rank { opacity: 0.4; }
+body[data-theme="horizon"] .mw-bar { clip-path: none; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+body[data-theme="horizon"] .mw-bar i { border-radius: 2px; background: linear-gradient(90deg, #ffb29a, #ff7a6a); box-shadow: none; }
+body[data-theme="horizon"] .mw-n { color: #ff9c8a; }
+
+/* bottom right: spectrum and light curve */
+body[data-theme="horizon"] #spec,
+body[data-theme="horizon"] #scope { border-radius: 8px; background: rgba(0, 0, 0, 0.22); }
+body[data-theme="horizon"] #rate { font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: rgba(255, 220, 185, 0.8); }
+
+/* bottom left: the event log, a calm monospace with soft colours */
+body[data-theme="horizon"] #terminal { font-family: 'JetBrains Mono', 'Cascadia Mono', 'SF Mono', ui-monospace, Consolas, monospace; font-size: 11px; }
+body[data-theme="horizon"] #terminal .panel-head { font-family: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; }
+body[data-theme="horizon"] .log-firewall { color: #b9e8d2; text-shadow: none; }
+body[data-theme="horizon"] .log-block { color: #ffab9c; text-shadow: none; }
+body[data-theme="horizon"] .log-threat { color: #ffc98f; text-shadow: none; font-weight: 600; }
+body[data-theme="horizon"] .log-dns { color: #a9d8ff; text-shadow: none; }
+body[data-theme="horizon"] .log-dhcp { color: #f3e2b0; text-shadow: none; }
+body[data-theme="horizon"] .log-wifi { color: #d3c2ff; text-shadow: none; }
+body[data-theme="horizon"] .log-system { color: #8f99aa; }
+body[data-theme="horizon"] #hint { font-family: inherit; letter-spacing: 0.4px; opacity: 0.3; }
+body[data-theme="horizon"] #demo-badge {
+  animation: none; opacity: 0.85; clip-path: none; border-radius: 999px;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 2px;
+  background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12); color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+}
+
+/* F1 panel */
+body[data-theme="horizon"] #settings {
+  clip-path: none; filter: none; border-radius: 16px;
+  background: rgba(12, 13, 18, 0.9); border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #eef1f7; font-family: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  backdrop-filter: blur(20px);
+}
+body[data-theme="horizon"] #settings h2 { font-weight: 300; letter-spacing: 1px; color: #fff; }
+body[data-theme="horizon"] .set-tab {
+  border-radius: 999px; font-weight: 500; letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.7); background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1);
+}
+body[data-theme="horizon"] .set-tab.active { color: #111; background: #ffd7ad; }
+body[data-theme="horizon"] #settings select { background: rgba(255, 255, 255, 0.06); color: #eef1f7; border-color: rgba(255, 255, 255, 0.14); border-radius: 8px; }
+
+/* labels that follow things in the sky: a ring on the object, a hairline up to the name */
+#eh-labels { position: fixed; inset: 0; pointer-events: none; z-index: 8; overflow: hidden; }
+.eh-label {
+  position: absolute; left: 0; top: 0; width: 0; height: 0;
+  color: #eef3fb;
+  font-family: 'Inter', 'Segoe UI Variable Text', 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  opacity: 0; transition: opacity 1.1s ease;
+  will-change: transform, opacity;
+}
+.eh-label.on { opacity: 1; }
+.eh-label::before {
+  content: ''; position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%;
+  border: 1px solid currentColor; opacity: 0.7;
+}
+.eh-label::after {
+  content: ''; position: absolute; left: 4px; top: -4px; width: 20px; height: 1px;
+  background: linear-gradient(90deg, currentColor, rgba(255, 255, 255, 0));
+  transform-origin: 0 0; transform: rotate(-42deg); opacity: 0.55;
+}
+.eh-label b {
+  position: absolute; left: 20px; top: -32px; white-space: nowrap;
+  font-size: 12px; font-weight: 500; letter-spacing: 0.4px;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.8);
+}
+.eh-label i {
+  position: absolute; left: 20px; top: -16px; white-space: nowrap; font-style: normal;
+  font-size: 9px; font-weight: 600; letter-spacing: 1.8px; text-transform: uppercase; opacity: 0.6;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+}
+.eh-moon { color: #f6e4ab; }   /* DHCP is yellow in every scene */
+/* a moon that has been around a while keeps its name, quietly */
+.eh-label.on.quiet { opacity: 0.5; }
+.eh-label i { transition: opacity 1.1s ease; }
+.eh-label.quiet i { opacity: 0; }
+.eh-label.quiet b { font-size: 11px; font-weight: 400; }
+.eh-infall { color: #ffa898; }
+.eh-threat { color: #ffc98a; }
+.eh-dns { color: #a8dcff; }
+.eh-dns::before { display: none; }
+.eh-dns::after { display: none; }
+.eh-dns b { left: -2px; top: -8px; font-size: 11px; font-weight: 400; letter-spacing: 0.6px; }
+.eh-dns i { left: -2px; top: 8px; }
